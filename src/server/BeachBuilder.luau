@@ -205,7 +205,8 @@ local function buildShop(map: Folder)
 	buyerPrompt.RequiresLineOfSight = false
 	buyerPrompt.Parent = buyer
 
-	-- The bank house: unlock items dropped on the purple floor inside are banked.
+	-- The bank house: unlock items dropped on the purple floor inside are banked when you talk to
+	-- the banker.
 	Buildings.house(
 		shop,
 		"BankHouse",
@@ -216,7 +217,7 @@ local function buildShop(map: Folder)
 		"BANK"
 	)
 	Buildings.counter(shop, Vector3.new(BANK_X, Buildings.FLOOR, HOUSE_Z - 6), 16)
-	Buildings.person(
+	local banker = Buildings.person(
 		shop,
 		"Banker",
 		CFrame.new(BANK_X, Buildings.FLOOR, HOUSE_Z - 10) * CFrame.Angles(0, math.pi, 0),
@@ -234,8 +235,16 @@ local function buildShop(map: Folder)
 		CanCollide = false,
 		CanQuery = false,
 	})
-	MapParts.label(bankPad, "BANK: drop unlock items here to keep them safe", Vector3.new(0, 4, 0))
+	MapParts.label(bankPad, "BANK: drop unlock items here, then talk to the banker", Vector3.new(0, 4, 0))
 	bankPad.Parent = shop
+
+	local bankerPrompt = Instance.new("ProximityPrompt")
+	bankerPrompt.Name = "BankerPrompt"
+	bankerPrompt.ActionText = "Bank"
+	bankerPrompt.ObjectText = "Banker"
+	bankerPrompt.MaxActivationDistance = Config.Banking.BankerRange
+	bankerPrompt.RequiresLineOfSight = false
+	bankerPrompt.Parent = banker
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "BeachSpawn"

@@ -1,5 +1,5 @@
 -- The main shopkeeper (buying gear, respawning vessels), the buyer (selling what's on the sell
--- pad) and the bank floor (unlock items go into the inventory).
+-- pad, and your pockets) and the banker (unlock items on the bank floor go into the inventory).
 
 local Players = game:GetService("Players")
 
@@ -20,6 +20,7 @@ local ShopService = {}
 local notify: (Player, string) -> () = function(_player: Player, _text: string) end
 local shopkeeper: BasePart
 local buyer: BasePart
+local banker: BasePart
 local sellZone: BasePart
 local bankPad: BasePart
 
@@ -100,27 +101,31 @@ local function inSellZone(position: Vector3): boolean
 	return inPad(sellZone, position)
 end
 
--- Banking is automatic: unlock items on the bank floor go into the owner's inventory.
-local function bankTick()
+-- Banking happens when you talk to the banker. Banks every unlock item of yours on the bank
+-- floor, so items lying there are safe in the inventory from now on.
+local function bankFromFloor(player: Player)
+	local count = 0
 	for item in ItemService.all() do
-		local ownerId = ItemService.getOwnerId(item)
-		local owner = ownerId ~= 0 and Players:GetPlayerByUserId(ownerId)
-		if not owner then
-			continue
-		end
-		if item:GetAttribute("Unlock") and inPad(bankPad, item.Position) then
-			-- Unlock items are banked, never sold: safe in the inventory from now on.
+		if
+			ItemService.getOwnerId(item) == player.UserId
+			and item:GetAttribute("Unlock")
+			and inPad(bankPad, item.Position)
+		then
 			local itemId = item:GetAttribute("ItemId")
-			item:SetAttribute("BankedBy", owner.DisplayName)
+			item:SetAttribute("BankedBy", player.DisplayName)
 			ItemService.destroy(item)
-			DataService.addItem(owner, itemId, "beach")
-			notify(owner, "Banked a " .. Items.get(itemId).Name .. "!")
+			DataService.addItem(player, itemId, "beach")
+			notify(player, "Banked a " .. Items.get(itemId).Name .. "!")
+			count += 1
 		end
+	end
+	if count == 0 then
+		notify(player, "Nothing to bank. Drop unlock items on the purple floor, then talk to the banker.")
 	end
 end
 
 -- Selling happens only when you talk to the buyer. Sells every item of yours on the sell pad,
--- and your pockets too if you're standing on it.
+-- and everything in your pockets wherever you're standing.
 local function sellFromPad(player: Player)
 	local earned = 0
 	local count = 0
@@ -135,12 +140,9 @@ local function sellFromPad(player: Player)
 			ItemService.destroy(item)
 		end
 	end
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if root and (player:GetAttribute("Pockets") or 0) > 0 and inSellZone(root.Position) then
-		for _, entry in PocketService.takeAll(player) do
-			earned += entry.Value
-			count += 1
-		end
+	for _, entry in PocketService.takeAll(player) do
+		earned += entry.Value
+		count += 1
 	end
 
 	if count == 0 then
@@ -161,6 +163,7 @@ function ShopService.init(map: Instance, notifyFn: (Player, string) -> ())
 	sellZone = shop:WaitForChild("SellZone") :: BasePart
 	bankPad = shop:WaitForChild("BankPad") :: BasePart
 	buyer = shop:WaitForChild("Buyer") :: BasePart
+	banker = shop:WaitForChild("Banker") :: BasePart
 
 	Remotes.handle("Buy", onBuy)
 	Remotes.handle("SpawnVessel", ShopService.spawnVessel)
@@ -174,12 +177,8 @@ function ShopService.init(map: Instance, notifyFn: (Player, string) -> ())
 	local buyerPrompt = buyer:WaitForChild("BuyerPrompt") :: ProximityPrompt
 	buyerPrompt.Triggered:Connect(sellFromPad)
 
-	task.spawn(function()
-		while true do
-			task.wait(0.25)
-			bankTick()
-		end
-	end)
+	local bankerPrompt = banker:WaitForChild("BankerPrompt") :: ProximityPrompt
+	bankerPrompt.Triggered:Connect(bankFromFloor)
 end
 
 return ShopService

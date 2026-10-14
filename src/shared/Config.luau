@@ -207,7 +207,11 @@ Config.Drowning = {
 
 Config.Selling = {
 	ShopkeeperRange = 22, -- how close to the shopkeeper you must be to buy
-	BuyerRange = 14, -- how close to the buyer you must be to sell what's on the sell pad
+	BuyerRange = 14, -- how close to the buyer you must be to sell what's on the sell pad, and your pockets
+}
+
+Config.Banking = {
+	BankerRange = 14, -- how close to the banker you must be to bank unlock items on the bank floor
 }
 
 Config.Data = {

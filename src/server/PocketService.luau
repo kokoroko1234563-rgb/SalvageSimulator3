@@ -1,6 +1,6 @@
 -- Pockets: store Light items safe from bumps and waves. 3 slots from Deep Pockets (rebirth
--- reward), 3 more from a worn Deckhand's Satchel (exotic, attuned). Pockets are saved, sold to
--- the buyer while you stand on the sell pad, can be taken out one at a time, and drop where
+-- reward), 3 more from a worn Deckhand's Satchel (exotic, attuned). Pockets are saved, sold
+-- when you talk to the buyer (from anywhere), can be taken out one at a time, and drop where
 -- you die if you drown. Unlock items can't be pocketed.
 
 local Players = game:GetService("Players")
