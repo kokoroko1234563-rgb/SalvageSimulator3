@@ -102,7 +102,7 @@ function SecretService.tryEnter(player: Player, secretId: string, returnTo: CFra
 		return
 	end
 	local unlockName = Items.get(secret.Unlock).Name
-	if (profile.UnlockItems[secret.Unlock] or 0) < 1 then
+	if DataService.countItemType(player, secret.Unlock) < 1 then
 		notify(
 			player,
 			"You need a banked " .. unlockName .. ". Find one in the surf and bring it to the bank pad."
@@ -115,7 +115,7 @@ function SecretService.tryEnter(player: Player, secretId: string, returnTo: CFra
 	end
 
 	-- The unlock item is always used up, win or lose.
-	DataService.grantUnlock(player, secret.Unlock, -1)
+	DataService.removeItemsOfType(player, secret.Unlock, 1)
 	GrabService.forceRelease(player)
 
 	local run: Run = {

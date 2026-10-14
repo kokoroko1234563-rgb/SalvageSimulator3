@@ -7,7 +7,6 @@ local Players = game:GetService("Players")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
-local Gear = require(Shared.Gear)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
 
@@ -46,21 +45,15 @@ function RebirthService.rebirth(player: Player, free: boolean): (boolean, string
 	end
 
 	profile.Coins = 0
-	profile.Tools = { BareHands = true }
-	local keptVessels = {}
-	for id in profile.Vessels do
-		local def = Gear.getVessel(id)
-		if def and def.Magical then
-			keptVessels[id] = true
-		end
-	end
-	profile.Vessels = keptVessels
+	profile.EquippedTool = nil
+	profile.Rebirths += 1
+	-- Shop gear goes; magical vessels, unlock items and anything else that survives stays.
+	DataService.removeItemsLostOn(player, "Rebirth")
 	local active = VesselService.getVessel(player)
-	if active and not keptVessels[active:GetAttribute("Kind")] then
+	if active and DataService.countItemType(player, active:GetAttribute("Kind")) == 0 then
 		VesselService.despawn(player)
 	end
 
-	profile.Rebirths += 1
 	if profile.Rebirths <= Config.Rebirth.MaxPicks then
 		local options = Rebirth.remaining(profile.Rewards)
 		profile.PendingPick = if #options > 0 then options else nil
@@ -91,10 +84,10 @@ function RebirthService.grantReward(player: Player, id: string)
 		return
 	end
 	profile.Rewards[id] = true
-	if id == "FloatingClamshell" then
-		profile.Vessels.FloatingClamshell = true
-	end
 	DataService.changed(player)
+	if id == "FloatingClamshell" and DataService.countItemType(player, "FloatingClamshell") == 0 then
+		DataService.addItem(player, "FloatingClamshell", "reward")
+	end
 	RebirthService.applyEffects(player)
 end
 

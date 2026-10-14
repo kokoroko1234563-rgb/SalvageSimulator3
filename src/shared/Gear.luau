@@ -13,6 +13,7 @@ Gear.Depth = { Dry = 0, Shallow = 1, KneeDeep = 2, Waist = 3, Deep = 4 }
 Gear.Tools = {
 	{
 		Id = "BareHands",
+		Rarity = "Common",
 		Name = "Bare Hands",
 		Price = 0,
 		Reach = 10,
@@ -25,6 +26,7 @@ Gear.Tools = {
 	},
 	{
 		Id = "BeachRake",
+		Rarity = "Common",
 		Name = "Beach Rake",
 		Price = 150,
 		Reach = 14,
@@ -37,6 +39,7 @@ Gear.Tools = {
 	},
 	{
 		Id = "FishingNet",
+		Rarity = "Common",
 		Name = "Fishing Net",
 		Price = 600,
 		Reach = 14,
@@ -49,6 +52,7 @@ Gear.Tools = {
 	},
 	{
 		Id = "GrabberClaw",
+		Rarity = "Uncommon",
 		Name = "Grabber Claw",
 		Price = 2500,
 		Reach = 18,
@@ -62,6 +66,7 @@ Gear.Tools = {
 	{
 		-- Not in the doc's Milestone 1 list, but enabled so Heavy placeholder items can be tested.
 		Id = "BoatHook",
+		Rarity = "Rare",
 		Name = "Boat Hook",
 		Price = 9000,
 		Reach = 18,
@@ -74,6 +79,7 @@ Gear.Tools = {
 	},
 	{
 		Id = "HandWinch",
+		Rarity = "Rare",
 		Name = "Hand Winch",
 		Price = 30000,
 		Reach = 24,
@@ -86,6 +92,7 @@ Gear.Tools = {
 	},
 	{
 		Id = "ElectricWinch",
+		Rarity = "VeryRare",
 		Name = "Electric Winch",
 		Price = 90000,
 		Reach = 24,
@@ -101,6 +108,7 @@ Gear.Tools = {
 Gear.Vessels = {
 	{
 		Id = "Wheelbarrow",
+		Rarity = "Common",
 		Name = "Wheelbarrow",
 		Price = 250,
 		Capacity = 4,
@@ -109,6 +117,7 @@ Gear.Vessels = {
 	},
 	{
 		Id = "BeachWagon",
+		Rarity = "Common",
 		Name = "Beach Wagon",
 		Price = 1500,
 		Capacity = 6,
@@ -117,6 +126,7 @@ Gear.Vessels = {
 	},
 	{
 		Id = "SandCart",
+		Rarity = "Uncommon",
 		Name = "Sand Cart",
 		Price = 6000,
 		Capacity = 10,
@@ -125,6 +135,7 @@ Gear.Vessels = {
 	},
 	{
 		Id = "QuadBike",
+		Rarity = "Rare",
 		Name = "Quad Bike + Trailer",
 		Price = 25000,
 		Capacity = 16,
@@ -133,6 +144,7 @@ Gear.Vessels = {
 	},
 	{
 		Id = "Dinghy",
+		Rarity = "Rare",
 		Name = "Inflatable Dinghy",
 		Price = 60000,
 		Capacity = 14,
@@ -141,6 +153,7 @@ Gear.Vessels = {
 	},
 	{
 		Id = "PickupTruck",
+		Rarity = "VeryRare",
 		Name = "Pickup Truck",
 		Price = 150000,
 		Capacity = 24,
@@ -150,6 +163,7 @@ Gear.Vessels = {
 	{
 		-- Magical vessel from a rebirth reward: never sold in the shop, kept through rebirths.
 		Id = "FloatingClamshell",
+		Rarity = "VeryRare",
 		Name = "Floating Clamshell",
 		Price = 0,
 		Capacity = 8,

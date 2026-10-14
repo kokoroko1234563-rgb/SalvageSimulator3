@@ -2,12 +2,14 @@
 
 local AdminConsole = require(script.AdminConsole)
 local HUD = require(script.HUD)
+local InventoryUI = require(script.InventoryUI)
 local TideController = require(script.TideController)
 local WaveController = require(script.WaveController)
 local GrabController = require(script.GrabController)
 local SecretController = require(script.SecretController)
 
 HUD.init()
+InventoryUI.init()
 TideController.init()
 WaveController.init()
 GrabController.init()

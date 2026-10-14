@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
 local Biomes = require(Shared.Biomes)
+local Catalog = require(Shared.Catalog)
 local Rebirth = require(Shared.Rebirth)
 local Secrets = require(Shared.Secrets)
 local Config = require(Shared.Config)
@@ -243,12 +244,12 @@ command("give", "give <tool or vessel> [player]", "Give gear, e.g. give boathook
 	end
 	local lines = {}
 	return eachTarget(caller, args[2], function(target)
-		if kind == "Tool" then
-			DataService.grantTool(target, entry.Id)
+		if DataService.countItemType(target, entry.Id) > 0 then
+			table.insert(lines, target.Name .. " already owns " .. entry.Name)
 		else
-			DataService.grantVessel(target, entry.Id)
+			DataService.addItem(target, entry.Id, "admin")
+			table.insert(lines, "Gave " .. entry.Name .. " to " .. target.Name)
 		end
-		table.insert(lines, "Gave " .. entry.Name .. " to " .. target.Name)
 	end) or lines
 end)
 
@@ -536,7 +537,13 @@ command(
 		local count = math.floor(tonumber(args[2]) or 1)
 		local lines = {}
 		return eachTarget(caller, args[3], function(target)
-			DataService.grantUnlock(target, def.Id, count)
+			if count >= 0 then
+				for _ = 1, math.min(count, 100) do
+					DataService.addItem(target, def.Id, "admin")
+				end
+			else
+				DataService.removeItemsOfType(target, def.Id, -count)
+			end
 			table.insert(lines, string.format("%s: %+d %s (banked)", target.Name, count, def.Name))
 		end) or lines
 	end
@@ -637,7 +644,7 @@ command("reward", "reward <id|all|none> [player]", "Grant or clear rebirth rewar
 			if choice == "none" then
 				profile.Rewards[id] = nil
 				if id == "FloatingClamshell" then
-					profile.Vessels.FloatingClamshell = nil
+					DataService.removeItemsOfType(target, "FloatingClamshell", math.huge)
 				end
 			else
 				RebirthService.grantReward(target, id)
@@ -647,6 +654,31 @@ command("reward", "reward <id|all|none> [player]", "Grant or clear rebirth rewar
 		DataService.changed(target)
 		RebirthService.applyEffects(target)
 		table.insert(lines, target.Name .. ": rewards updated")
+	end) or lines
+end)
+
+command("inv", "inv [player]", "List a player's inventory", function(caller, args)
+	local lines = {}
+	return eachTarget(caller, args[1], function(target)
+		local profile = DataService.get(target)
+		if not profile then
+			return
+		end
+		local counts = {}
+		for _, record in profile.Items do
+			counts[record.Id] = (counts[record.Id] or 0) + 1
+		end
+		local parts = {}
+		for id, count in counts do
+			local entry = Catalog.get(id)
+			table.insert(parts, string.format("%s x%d", if entry then entry.Name else id, count))
+		end
+		table.sort(parts)
+		table.insert(
+			lines,
+			target.Name .. ": " .. (if #parts > 0 then table.concat(parts, ", ") else "(empty)")
+		)
+		table.insert(lines, string.format("  pockets %d, cores %d", #profile.Pockets, profile.Cores))
 	end) or lines
 end)
 

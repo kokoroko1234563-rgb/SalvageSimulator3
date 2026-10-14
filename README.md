@@ -44,6 +44,16 @@ Test with **Test → Clients and Servers** (2 or more players) to check bumping 
 | Secret course | Use a banked spade at the sandcastle door (always used up). You go to your own copy of the Sandcastle Vault, built only on your client (`SecretController`, layout in `Secrets.luau`): a spiral climb while the sea floods in. The flood time depends on when the real tide would cover the door. `SecretService` verifies the run from your position (checkpoints in order, above the water, plausible time, at the chest) before granting the yellow coin. |
 | Rebirth | In the shop: costs 100,000 coins, ×1.5 more each time. Resets coins, tools and shop vessels, adds ×0.5 coin multiplier. At each of the first 5 rebirths you pick a reward you don't have yet: Swift Feet, Deep Pockets (press **Q** or **Pocket** to pocket a Light item; pockets sell on the sell pad) or the Floating Clamshell (a magical vessel that hovers behind you). |
 
+## Inventory
+
+Press **I** (or the purple bag button) to open it.
+
+- **Saving:** every owned item is its own record on the save, with a unique id (`DataService`). Later on, a copy can be traded, carry a variant or a serial number, and never be duplicated. Only `DataService.addItem` / `removeItem` / `removeItemsOfType` change items. Older saves are converted when they load.
+- **Item rules:** `src/shared/Catalog.luau` gives each item type its category, rarity, whether it can be traded, and which reset removes it. Shop gear is lost on rebirth. The Floating Clamshell is lost on a true rebirth. Unlock items are never lost.
+- **Cards:** the colour band is the item's rarity. The border shows when it's lost: orange on a rebirth, purple on a true rebirth, none if never. The **Reset text** setting adds the same as a line of text, and **Hide shop gear** hides tools and vessels. Both settings are saved.
+- **Shop gear:** once bought, it lives in the inventory, not the shop. Tools are equipped there, and vessels are spawned there (at the shop).
+- **Other tabs:** **Coins** shows the five colored-coin slots and attunement cores. **Rewards** shows rebirth rewards. Deep Pockets slots run along the bottom and are saved.
+
 All tuning numbers are in `src/shared/Config.luau`, `Gear.luau` and `Items.luau`.
 
 ## Admin console
@@ -73,6 +83,7 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `colorcoin <color\|all\|none> [player]` | Give or clear colored coins |
 | `rebirth [player]`, `rebirths <n> [player]` | Free rebirth (with reward pick), or set the count |
 | `reward <id\|all\|none> [player]` | `swiftfeet`, `deeppockets`, `floatingclamshell` |
+| `inv [player]` | List a player's inventory |
 
 Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down recalls history.
 

@@ -12,6 +12,8 @@ local FUNCTIONS = {
 	"AdminCommand", -- (commandLine) -> { output lines } (admins only)
 	"Rebirth", -- () -> ok, reason
 	"ChooseReward", -- (rewardId) -> ok, reason
+	"GetInventory", -- () -> snapshot (see InventoryService)
+	"InventoryAction", -- (action, arg, value?) -> ok, reason
 }
 
 local EVENTS = {
@@ -22,7 +24,8 @@ local EVENTS = {
 	"SecretEvent", -- server -> client ("start", info) | ("end")
 	"SecretReady", -- client -> server () course built, ready to teleport
 	"ClaimChest", -- client -> server ()
-	"Pocket", -- client -> server ("store", part) | ("drop")
+	"Pocket", -- client -> server ("store", part) | ("drop", slot?)
+	"InventorySync", -- server -> client (snapshot) whenever the inventory changes
 }
 
 local Remotes = {}

@@ -44,40 +44,42 @@ local function onBuy(player: Player, category: any, id: any): (boolean, string?)
 		if tool.Id ~= id or not tool.Available then
 			return false, "Not for sale"
 		end
-		if profile.Tools[id] then
+		if DataService.countItemType(player, id) > 0 then
 			return false, "You already own that"
 		end
 		if not DataService.trySpend(player, tool.Price) then
 			return false, "Not enough coins"
 		end
-		DataService.grantTool(player, id)
-		notify(player, "Bought " .. tool.Name .. "!")
+		DataService.addItem(player, id, "shop")
+		profile.EquippedTool = id
+		DataService.changed(player)
+		notify(player, "Bought " .. tool.Name .. "! It's equipped, and in your inventory (I).")
 		return true
 	elseif category == "Vessel" then
 		local vessel = Gear.getVessel(id)
 		if not vessel or not vessel.Available then
 			return false, "Not for sale"
 		end
-		if profile.Vessels[id] then
+		if DataService.countItemType(player, id) > 0 then
 			return false, "You already own that"
 		end
 		if not DataService.trySpend(player, vessel.Price) then
 			return false, "Not enough coins"
 		end
-		DataService.grantVessel(player, id)
+		DataService.addItem(player, id, "shop")
 		VesselService.spawn(player, id)
-		notify(player, "Bought " .. vessel.Name .. "! It's waiting on the blue pad.")
+		notify(player, "Bought " .. vessel.Name .. "! It's on the blue pad, and in your inventory (I).")
 		return true
 	end
 	return false, "Invalid"
 end
 
-local function onSpawnVessel(player: Player, id: any): (boolean, string?)
+function ShopService.spawnVessel(player: Player, id: any): (boolean, string?)
 	if type(id) ~= "string" then
 		return false, "Invalid"
 	end
 	local profile = DataService.get(player)
-	if not profile or not profile.Vessels[id] then
+	if not profile or DataService.countItemType(player, id) == 0 then
 		return false, "You don't own that"
 	end
 	if not ShopService.nearShop(player) then
@@ -109,7 +111,7 @@ local function sellTick()
 			-- Unlock items are banked, never sold: safe in the inventory from now on.
 			local itemId = item:GetAttribute("ItemId")
 			ItemService.destroy(item)
-			DataService.grantUnlock(owner, itemId, 1)
+			DataService.addItem(owner, itemId, "beach")
 			notify(owner, "Banked a " .. Items.get(itemId).Name .. "!")
 		elseif not unlock and inSellZone(item.Position) then
 			earned[owner] = (earned[owner] or 0) + (item:GetAttribute("Value") or 0)
@@ -140,7 +142,7 @@ function ShopService.init(map: Instance, notifyFn: (Player, string) -> ())
 	bankPad = map.Shop:WaitForChild("BankPad") :: BasePart
 
 	Remotes.get("Buy").OnServerInvoke = onBuy
-	Remotes.get("SpawnVessel").OnServerInvoke = onSpawnVessel
+	Remotes.get("SpawnVessel").OnServerInvoke = ShopService.spawnVessel
 
 	local openShop = Remotes.get("OpenShop")
 	local prompt = shopkeeper:WaitForChild("ShopPrompt") :: ProximityPrompt

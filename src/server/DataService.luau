@@ -1,16 +1,22 @@
--- Saves coins and owned gear with DataStoreService.
+-- Saves each player's progress with DataStoreService.
 --   * Every DataStore call is wrapped in pcall and retried.
 --   * UpdateAsync with a session lock (JobId + timestamp) stops two servers from holding the
 --     same profile at once, which is how items get duplicated.
 --   * Saves on autosave, PlayerRemoving and BindToClose.
 -- In Studio without "Enable Studio Access to API Services", data loads as a fresh profile
 -- and is not saved.
+--
+-- Inventory items are stored one record per copy, keyed by a unique id, so a copy can
+-- later be traded, carry a variant or a serial number, and never be duplicated. Only this
+-- module edits them (addItem / removeItem / removeItemsOfType).
 
 local DataStoreService = game:GetService("DataStoreService")
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Catalog = require(Shared.Catalog)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
@@ -21,40 +27,64 @@ local cfg = Config.Data
 
 local DataService = {}
 
+export type ItemRecord = {
+	Id: string, -- catalog id
+	Acquired: number, -- os.time()
+	Source: string?, -- "shop", "beach", "reward", "admin", "migrated"
+	Variant: string?, -- cosmetic variant, e.g. "Frosted"
+	Serial: number?, -- numbered auction items: #Serial of Of
+	Of: number?,
+}
+
+export type PocketEntry = { ItemId: string, Zone: number, Value: number }
+
 export type Profile = {
 	Version: number,
 	Coins: number,
-	Tools: { [string]: boolean },
-	Vessels: { [string]: boolean },
 	Rebirths: number,
 	Rewards: { [string]: boolean },
 	PendingPick: { string }?, -- reward options waiting for the player to choose one
-	UnlockItems: { [string]: number }, -- banked unlock items by item id
 	ColoredCoins: { [string]: boolean },
+	Cores: number, -- attunement cores (true rebirth, later)
+	Items: { [string]: ItemRecord }, -- inventory, by unique id
+	EquippedTool: string?, -- catalog id; nil = best owned
+	Pockets: { PocketEntry }, -- Deep Pockets contents
+	Settings: { HideShopGear: boolean, ShowResetText: boolean },
 }
 
 local function defaultProfile(): Profile
 	return {
-		Version = 1,
+		Version = 2,
 		Coins = 0,
-		Tools = { BareHands = true },
-		Vessels = {},
 		Rebirths = 0,
 		Rewards = {},
 		PendingPick = nil,
-		UnlockItems = {},
 		ColoredCoins = {},
+		Cores = 0,
+		Items = {},
+		EquippedTool = nil,
+		Pockets = {},
+		Settings = { HideShopGear = false, ShowResetText = false },
 	}
 end
 
 local profiles: { [Player]: Profile } = {}
 local canSave: { [Player]: boolean } = {}
 local loadedCallbacks = {}
+local changedCallbacks = {}
 
 local store: DataStore? = nil
 
 local function keyFor(player: Player): string
 	return "p_" .. player.UserId
+end
+
+local function newUid(): string
+	return HttpService:GenerateGUID(false)
+end
+
+local function newRecord(id: string, source: string): ItemRecord
+	return { Id = id, Acquired = os.time(), Source = source }
 end
 
 local function reconcile(data: any): Profile
@@ -64,20 +94,6 @@ local function reconcile(data: any): Profile
 	end
 	if type(data.Coins) == "number" then
 		profile.Coins = math.max(0, math.floor(data.Coins))
-	end
-	if type(data.Tools) == "table" then
-		for id, owned in data.Tools do
-			if owned == true and Gear.getTool(id).Id == id then
-				profile.Tools[id] = true
-			end
-		end
-	end
-	if type(data.Vessels) == "table" then
-		for id, owned in data.Vessels do
-			if owned == true and Gear.getVessel(id) then
-				profile.Vessels[id] = true
-			end
-		end
 	end
 	if type(data.Rebirths) == "number" then
 		profile.Rebirths = math.max(0, math.floor(data.Rebirths))
@@ -98,20 +114,73 @@ local function reconcile(data: any): Profile
 		end
 		profile.PendingPick = if #pick > 0 then pick else nil
 	end
-	if type(data.UnlockItems) == "table" then
-		for id, count in data.UnlockItems do
-			local def = Items.get(id)
-			if def and def.Unlock and type(count) == "number" and count > 0 then
-				profile.UnlockItems[id] = math.floor(count)
-			end
-		end
-	end
 	if type(data.ColoredCoins) == "table" then
 		for color, owned in data.ColoredCoins do
 			if owned == true and Secrets.CoinColors[color] then
 				profile.ColoredCoins[color] = true
 			end
 		end
+	end
+	if type(data.Cores) == "number" then
+		profile.Cores = math.max(0, math.floor(data.Cores))
+	end
+
+	if type(data.Items) == "table" then
+		for uid, record in data.Items do
+			if type(uid) == "string" and type(record) == "table" and Catalog.get(record.Id) then
+				profile.Items[uid] = {
+					Id = record.Id,
+					Acquired = if type(record.Acquired) == "number" then record.Acquired else os.time(),
+					Source = if type(record.Source) == "string" then record.Source else nil,
+					Variant = if type(record.Variant) == "string" then record.Variant else nil,
+					Serial = if type(record.Serial) == "number" then record.Serial else nil,
+					Of = if type(record.Of) == "number" then record.Of else nil,
+				}
+			end
+		end
+	else
+		-- Version 1 saves: owned-gear flags and unlock-item counts become item records.
+		for _, field in { "Tools", "Vessels" } do
+			if type(data[field]) == "table" then
+				for id, owned in data[field] do
+					if owned == true and Catalog.get(id) then
+						profile.Items[newUid()] = newRecord(id, "migrated")
+					end
+				end
+			end
+		end
+		if type(data.UnlockItems) == "table" then
+			for id, count in data.UnlockItems do
+				if Catalog.get(id) and type(count) == "number" then
+					for _ = 1, math.clamp(math.floor(count), 0, 1000) do
+						profile.Items[newUid()] = newRecord(id, "migrated")
+					end
+				end
+			end
+		end
+	end
+
+	if type(data.EquippedTool) == "string" and Catalog.get(data.EquippedTool) then
+		profile.EquippedTool = data.EquippedTool
+	end
+	if type(data.Pockets) == "table" then
+		for _, entry in data.Pockets do
+			if
+				type(entry) == "table"
+				and Items.get(entry.ItemId)
+				and #profile.Pockets < Config.Pockets.Slots
+			then
+				table.insert(profile.Pockets, {
+					ItemId = entry.ItemId,
+					Zone = if type(entry.Zone) == "number" then entry.Zone else 1,
+					Value = if type(entry.Value) == "number" then entry.Value else 0,
+				})
+			end
+		end
+	end
+	if type(data.Settings) == "table" then
+		profile.Settings.HideShopGear = data.Settings.HideShopGear == true
+		profile.Settings.ShowResetText = data.Settings.ShowResetText == true
 	end
 	return profile
 end
@@ -120,15 +189,26 @@ local function serialize(profile: Profile, release: boolean)
 	return {
 		Version = profile.Version,
 		Coins = profile.Coins,
-		Tools = profile.Tools,
-		Vessels = profile.Vessels,
 		Rebirths = profile.Rebirths,
 		Rewards = profile.Rewards,
 		PendingPick = profile.PendingPick,
-		UnlockItems = profile.UnlockItems,
 		ColoredCoins = profile.ColoredCoins,
+		Cores = profile.Cores,
+		Items = profile.Items,
+		EquippedTool = profile.EquippedTool,
+		Pockets = profile.Pockets,
+		Settings = profile.Settings,
 		Lock = if release then nil else { JobId = game.JobId, Time = os.time() },
 	}
+end
+
+-- Set of catalog ids the profile owns at least one of.
+local function ownedTypes(profile: Profile): { [string]: boolean }
+	local set = {}
+	for _, record in profile.Items do
+		set[record.Id] = true
+	end
+	return set
 end
 
 local function csv(set: { [string]: boolean }, list): string
@@ -146,33 +226,36 @@ for _, id in Rebirth.Order do
 	table.insert(rewardList, Rebirth.Rewards[id])
 end
 
--- Mirrors the profile onto player attributes so clients can show it.
+-- The tool the player grabs with: the one they equipped if they still own it, else their best.
+local function activeTool(profile: Profile)
+	local owned = ownedTypes(profile)
+	owned.BareHands = true
+	if profile.EquippedTool and owned[profile.EquippedTool] then
+		return Gear.getTool(profile.EquippedTool)
+	end
+	return Gear.bestTool(owned)
+end
+
+-- Mirrors the profile onto player attributes (small values the HUD and checks read) and
+-- tells listeners (the inventory sync) that it changed.
 local function publish(player: Player)
 	local profile = profiles[player]
 	if not profile then
 		return
 	end
+	local owned = ownedTypes(profile)
 	player:SetAttribute("Coins", profile.Coins)
-	player:SetAttribute("Tool", Gear.bestTool(profile.Tools).Id)
-	player:SetAttribute("OwnedTools", csv(profile.Tools, Gear.Tools))
-	player:SetAttribute("OwnedVessels", csv(profile.Vessels, Gear.Vessels))
+	player:SetAttribute("Tool", activeTool(profile).Id)
+	player:SetAttribute("OwnedTools", csv(owned, Gear.Tools))
+	player:SetAttribute("OwnedVessels", csv(owned, Gear.Vessels))
 	player:SetAttribute("Rebirths", profile.Rebirths)
 	player:SetAttribute("Multiplier", Rebirth.multiplier(profile.Rebirths))
 	player:SetAttribute("Rewards", csv(profile.Rewards, rewardList))
 	player:SetAttribute("PendingPick", table.concat(profile.PendingPick or {}, ","))
-	local unlocks = {}
-	for id, count in profile.UnlockItems do
-		table.insert(unlocks, id .. ":" .. count)
+	player:SetAttribute("Pockets", #profile.Pockets)
+	for _, callback in changedCallbacks do
+		task.spawn(callback, player, profile)
 	end
-	table.sort(unlocks)
-	player:SetAttribute("UnlockItems", table.concat(unlocks, ","))
-	local coins = {}
-	for _, color in Secrets.CoinOrder do
-		if profile.ColoredCoins[color] then
-			table.insert(coins, color)
-		end
-	end
-	player:SetAttribute("ColoredCoins", table.concat(coins, ","))
 end
 
 local function load(player: Player): (Profile?, boolean)
@@ -316,17 +399,6 @@ function DataService.trySpend(player: Player, amount: number): boolean
 	return true
 end
 
-function DataService.grantUnlock(player: Player, id: string, count: number)
-	local profile = profiles[player]
-	if profile then
-		profile.UnlockItems[id] = math.max(0, (profile.UnlockItems[id] or 0) + count)
-		if profile.UnlockItems[id] == 0 then
-			profile.UnlockItems[id] = nil
-		end
-		publish(player)
-	end
-end
-
 function DataService.grantColoredCoin(player: Player, color: string)
 	local profile = profiles[player]
 	if profile then
@@ -335,20 +407,104 @@ function DataService.grantColoredCoin(player: Player, color: string)
 	end
 end
 
-function DataService.grantTool(player: Player, id: string)
-	local profile = profiles[player]
-	if profile then
-		profile.Tools[id] = true
-		publish(player)
-	end
+-- Inventory ------------------------------------------------------------------------
+
+function DataService.onChanged(callback: (Player, Profile) -> ())
+	table.insert(changedCallbacks, callback)
 end
 
-function DataService.grantVessel(player: Player, id: string)
+function DataService.ownedTypes(player: Player): { [string]: boolean }
 	local profile = profiles[player]
+	return if profile then ownedTypes(profile) else {}
+end
+
+function DataService.countItemType(player: Player, id: string): number
+	local profile = profiles[player]
+	local count = 0
 	if profile then
-		profile.Vessels[id] = true
+		for _, record in profile.Items do
+			if record.Id == id then
+				count += 1
+			end
+		end
+	end
+	return count
+end
+
+-- Adds one copy of a catalog item and returns its unique id.
+function DataService.addItem(player: Player, id: string, source: string, extra: { [string]: any }?): string?
+	local profile = profiles[player]
+	if not profile or not Catalog.get(id) then
+		return nil
+	end
+	local record = newRecord(id, source)
+	if extra then
+		for key, value in extra do
+			(record :: any)[key] = value
+		end
+	end
+	local uid = newUid()
+	profile.Items[uid] = record
+	print(string.format("[Inventory] %s +%s (%s)", player.Name, id, source))
+	publish(player)
+	return uid
+end
+
+function DataService.removeItem(player: Player, uid: string): boolean
+	local profile = profiles[player]
+	local record = profile and profile.Items[uid]
+	if not profile or not record then
+		return false
+	end
+	profile.Items[uid] = nil
+	print(string.format("[Inventory] %s -%s", player.Name, record.Id))
+	publish(player)
+	return true
+end
+
+-- Removes up to `count` copies of a type (oldest first). Returns how many were removed.
+function DataService.removeItemsOfType(player: Player, id: string, count: number): number
+	local profile = profiles[player]
+	if not profile then
+		return 0
+	end
+	local matches = {}
+	for uid, record in profile.Items do
+		if record.Id == id then
+			table.insert(matches, { uid = uid, at = record.Acquired })
+		end
+	end
+	table.sort(matches, function(a, b)
+		return a.at < b.at
+	end)
+	local removed = 0
+	for _, match in matches do
+		if removed >= count then
+			break
+		end
+		profile.Items[match.uid] = nil
+		removed += 1
+	end
+	if removed > 0 then
+		print(string.format("[Inventory] %s -%d %s", player.Name, removed, id))
 		publish(player)
 	end
+	return removed
+end
+
+-- Removes every item a reset of this kind takes away ("Rebirth" or "TrueRebirth").
+function DataService.removeItemsLostOn(player: Player, reset: string)
+	local profile = profiles[player]
+	if not profile then
+		return
+	end
+	for uid, record in profile.Items do
+		local entry = Catalog.get(record.Id)
+		if entry and Catalog.lostOn(entry, reset) then
+			profile.Items[uid] = nil
+		end
+	end
+	publish(player)
 end
 
 function DataService.init()

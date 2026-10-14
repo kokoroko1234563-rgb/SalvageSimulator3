@@ -7,7 +7,6 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Gear = require(Shared.Gear)
-local Items = require(Shared.Items)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
 
@@ -32,8 +31,6 @@ local shopFrame: Frame
 local shopRows: ScrollingFrame
 local shopCoinsLabel: TextLabel
 
-local pocketFrame: Frame
-local pocketLabel: TextLabel
 local rewardFrame: Frame
 local onPocket: () -> () = function() end
 local onDrop: () -> () = function() end
@@ -105,33 +102,12 @@ local function refreshStats()
 			string.format("Rebirths: %d (coins x%.1f)", rebirths, player:GetAttribute("Multiplier") or 1)
 		)
 	end
-	for entry in string.gmatch(player:GetAttribute("UnlockItems") or "", "[^,]+") do
-		local id, count = entry:match("^(.-):(%d+)$")
-		local def = id and Items.get(id)
-		if def then
-			table.insert(lines, string.format("Banked: %s x%s", def.Name, count))
-		end
-	end
-	local coins = player:GetAttribute("ColoredCoins") or ""
-	if coins ~= "" then
-		table.insert(lines, "Colored coins: " .. coins:gsub(",", ", "))
+	local hasPockets =
+		string.find("," .. (player:GetAttribute("Rewards") or "") .. ",", ",DeepPockets,", 1, true)
+	if hasPockets then
+		table.insert(lines, string.format("Pockets: %d/3", player:GetAttribute("Pockets") or 0))
 	end
 	statsLabel.Text = table.concat(lines, "\n")
-
-	-- Deep Pockets
-	local hasPockets = string.find(
-		"," .. (player:GetAttribute("Rewards") or "") .. ",",
-		",DeepPockets,",
-		1,
-		true
-	) ~= nil
-	pocketFrame.Visible = hasPockets
-	if hasPockets then
-		local count = player:GetAttribute("Pockets") or 0
-		local contents = player:GetAttribute("PocketItems") or ""
-		pocketLabel.Text =
-			string.format("Pockets %d/3%s", count, if contents ~= "" then ": " .. contents else "")
-	end
 end
 
 -- The reward choice after a rebirth stays up until one is picked.
@@ -287,8 +263,6 @@ local DEPTH_NAMES =
 local ROW_BG = Color3.fromRGB(34, 58, 76)
 local MUTED = Color3.fromRGB(170, 195, 210)
 local BUY = Color3.fromRGB(235, 150, 40)
-local SPAWN = Color3.fromRGB(60, 140, 220)
-local EQUIPPED = Color3.fromRGB(60, 160, 90)
 local DISABLED = Color3.fromRGB(70, 80, 90)
 
 local function sectionHeader(label: string, order: number)
@@ -314,10 +288,7 @@ local function refreshShop()
 
 	local ownedTools = owned("OwnedTools")
 	local ownedVessels = owned("OwnedVessels")
-	local equippedTool = player:GetAttribute("Tool")
-	local activeVessel = player:GetAttribute("ActiveVessel")
 	local buyRemote = Remotes.get("Buy")
-	local spawnRemote = Remotes.get("SpawnVessel")
 
 	local order = 0
 	local function row(category: string, entry)
@@ -376,20 +347,8 @@ local function refreshShop()
 			TextColor3 = MUTED,
 		}, frame)
 
-		local isOwned = if category == "Tool" then ownedTools[entry.Id] else ownedVessels[entry.Id]
 		local label, color, action
-		if category == "Tool" and isOwned then
-			if entry.Id == equippedTool then
-				label, color = "Equipped", EQUIPPED
-			else
-				label, color = "Owned", DISABLED
-			end
-		elseif isOwned then
-			label, color = if activeVessel == entry.Id then "Respawn" else "Spawn", SPAWN
-			action = function()
-				return spawnRemote:InvokeServer(entry.Id)
-			end
-		elseif coins >= entry.Price then
+		if coins >= entry.Price then
 			label, color = "Buy · " .. formatNumber(entry.Price), BUY
 			action = function()
 				return buyRemote:InvokeServer(category, entry.Id)
@@ -483,17 +442,28 @@ local function refreshShop()
 	order += 1
 	sectionHeader("GRABBING TOOLS", order)
 	for _, tool in Gear.Tools do
-		if tool.Price > 0 then
+		if tool.Price > 0 and not ownedTools[tool.Id] then
 			row("Tool", tool)
 		end
 	end
 	order += 1
 	sectionHeader("VESSELS", order)
 	for _, vessel in Gear.Vessels do
-		if not vessel.Magical or ownedVessels[vessel.Id] then
+		if not vessel.Magical and not ownedVessels[vessel.Id] then
 			row("Vessel", vessel)
 		end
 	end
+	order += 1
+	text({
+		Text = "Gear you own is in your inventory (press I). Equip tools and spawn vessels from there.",
+		Size = UDim2.new(1, -8, 0, 40),
+		TextWrapped = true,
+		TextSize = 14,
+		Font = Enum.Font.GothamMedium,
+		TextStrokeTransparency = 1,
+		TextColor3 = MUTED,
+		LayoutOrder = order,
+	}, shopRows)
 end
 
 function HUD.openShop()
@@ -592,27 +562,6 @@ function HUD.init()
 	end)
 	holdButtons.Size = UDim2.fromOffset(150, 150)
 
-	pocketFrame = make("Frame", {
-		Size = UDim2.fromOffset(300, 30),
-		Position = UDim2.fromOffset(12, 172),
-		BackgroundTransparency = 1,
-		Visible = false,
-	}, gui)
-	pocketLabel = text({
-		Size = UDim2.new(1, -80, 1, 0),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextSize = 16,
-		TextStrokeTransparency = 0.3,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	}, pocketFrame)
-	local empty = button("Take out", Color3.fromRGB(150, 100, 200), pocketFrame)
-	empty.TextSize = 14
-	empty.Size = UDim2.fromOffset(74, 26)
-	empty.Position = UDim2.new(1, -74, 0, 2)
-	empty.Activated:Connect(function()
-		Remotes.get("Pocket"):FireServer("drop")
-	end)
-
 	rewardFrame = make("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -703,11 +652,8 @@ function HUD.init()
 			"ActiveVessel",
 			"Rebirths",
 			"Multiplier",
-			"UnlockItems",
-			"ColoredCoins",
 			"Rewards",
 			"Pockets",
-			"PocketItems",
 		}
 	do
 		player:GetAttributeChangedSignal(attribute):Connect(refreshStats)
