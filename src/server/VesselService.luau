@@ -58,6 +58,11 @@ local function weld(a: BasePart, b: BasePart)
 	w.Parent = a
 end
 
+-- Physics wheels on hinges are fiddly in Roblox, so wheels are just for looks: each one is
+-- welded on and doesn't collide, and a hidden low-friction ball under it is what actually
+-- touches the ground. A ball slides smoothly and doesn't catch on seams or slopes.
+local SKID_PHYSICS = PhysicalProperties.new(0.6, 0.02, 0, 100, 1) -- friction 0.02, and it wins over the sand's
+
 local function wheel(
 	model: Model,
 	base: BasePart,
@@ -72,30 +77,25 @@ local function wheel(
 		Vector3.new(width, diameter, diameter),
 		base.CFrame * CFrame.new(offset),
 		Color3.fromRGB(40, 40, 40),
+		{ Shape = Enum.PartType.Cylinder, CanCollide = false, Massless = true }
+	)
+	weld(base, w)
+
+	local skidSize = diameter * 0.6
+	local skid = part(
+		model,
+		name .. "Skid",
+		Vector3.new(skidSize, skidSize, skidSize),
+		base.CFrame * CFrame.new(offset - Vector3.new(0, (diameter - skidSize) / 2, 0)),
+		Color3.fromRGB(40, 40, 40),
 		{
-			Shape = Enum.PartType.Cylinder,
-			CustomPhysicalProperties = PhysicalProperties.new(0.6, 0.9, 0.2),
+			Shape = Enum.PartType.Ball,
+			Transparency = 1,
+			CanQuery = false,
+			CustomPhysicalProperties = SKID_PHYSICS,
 		}
 	)
-	local a0 = Instance.new("Attachment")
-	a0.Name = name .. "Axle"
-	a0.Position = offset
-	a0.Parent = base
-	local a1 = Instance.new("Attachment")
-	a1.Name = "Axle"
-	a1.Parent = w
-	local hinge = Instance.new("HingeConstraint")
-	hinge.Attachment0 = a0
-	hinge.Attachment1 = a1
-	hinge.Parent = w
-	for _, other in model:GetChildren() do
-		if other:IsA("BasePart") and other ~= w and other.Name ~= "Cargo" then
-			local nc = Instance.new("NoCollisionConstraint")
-			nc.Part0 = w
-			nc.Part1 = other
-			nc.Parent = w
-		end
-	end
+	weld(base, skid)
 	return w
 end
 
@@ -140,7 +140,7 @@ function builders.Wheelbarrow(model: Model, at: CFrame)
 			base.CFrame * CFrame.new(side * 1.2, -0.95, 1.6),
 			color,
 			{
-				CustomPhysicalProperties = PhysicalProperties.new(0.4, 0.8, 0.1),
+				CustomPhysicalProperties = PhysicalProperties.new(0.4, 0.5, 0.1),
 			}
 		)
 		weld(base, leg)
