@@ -109,7 +109,7 @@ function SecretService.tryEnter(player: Player, secretId: string, returnTo: CFra
 	if DataService.countItemType(player, secret.Unlock) < 1 then
 		notify(
 			player,
-			"You need a banked " .. unlockName .. ". Find one in the surf and bring it to the bank pad."
+			"You need a banked " .. unlockName .. ". Find one in the surf and bring it to the bank house."
 		)
 		return
 	end

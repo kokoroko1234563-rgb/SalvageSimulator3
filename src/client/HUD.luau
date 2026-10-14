@@ -863,7 +863,7 @@ function HUD.init()
 		local character = player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local shopkeeper = workspace:FindFirstChild("Map") and workspace.Map.Shop:FindFirstChild("Shopkeeper")
-		if root and shopkeeper and (root.Position - shopkeeper.Position).Magnitude > 26 then
+		if root and shopkeeper and (root.Position - shopkeeper:GetPivot().Position).Magnitude > 26 then
 			shopFrame.Visible = false
 		end
 	end)

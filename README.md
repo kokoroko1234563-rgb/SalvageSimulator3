@@ -44,7 +44,7 @@ Two more safeguards live in the game itself:
 | Grabbing | `GrabController` (client) and `GrabService` (server). Items are claimed when grabbed, get physics, are network-owned by the holder, become *Loose* when put down, freeze and turn *Unclaimed* after 25 s, then despawn. |
 | Assist grab | Tap an item to lift it, then tap your vessel (or press **To vessel**). This works on every platform. On touch screens, a lifted item is only dropped with the **Drop** button, so panning the camera never drops it. |
 | Vessels | `VesselService`: Wheelbarrow (one wheel, tips easily) and Beach Wagon (4 wheels). Wheels are visual; vessels slide on hidden low-friction ball skids. Tow them by the handle. Loaded items are welded into slots, so a vessel always holds its full capacity; they only spill if it tips over. Your client keeps your vessel upright (less so for the wheelbarrow) and parks it when you let go. Other players can't touch the vessel or what's in it (collision groups). A vessel covered by deep water is lost with everything in it, and you can spawn it again for free from your inventory, in front of you, anywhere except deep water or a secret. |
-| Shop and selling | `ShopService`: shopkeeper prompt, fixed prices, Bare Hands → Grabber Claw (plus Boat Hook, so Heavy items can be tested). Drop items, or park your vessel, on the yellow sell pad. |
+| Shop and selling | `ShopService`: shopkeeper prompt, fixed prices, Bare Hands → Grabber Claw (plus Boat Hook, so Heavy items can be tested). Drop items, or park your vessel, on the yellow sell pad, then talk to the **buyer** beside it to sell them. Nothing sells on its own. Your pockets sell when you talk to the buyer, from anywhere. |
 | Items | `src/shared/Items.luau` has 14 placeholder items across Light, Medium and Heavy, with each zone's value multiplier applied. |
 | Tide | `src/shared/Tide.luau`: the sea level falls, uncovering the outer zones, holds at low tide, then rises again. The cycle is shortened ×0.4 (10 min) for testing. The sea surface and the foam line at the waterline are drawn on each client from the shared clock. There's a warning when the tide turns each way and no on-screen clock; Studio shows a debug readout in the bottom-right. |
 | Drowning | `DrowningService`: you lose breath in water deeper than waist height, which moves in and out with the tide, and then take damage. What you were carrying drops when you die. |
@@ -55,7 +55,7 @@ Two more safeguards live in the game itself:
 | Doc item | Where |
 | --- | --- |
 | Biomes | `BiomeService` rolls each zone every tide cycle (test build: Sandcastle Flats or nothing, `Config.Biomes.RollChance`). A biome zone gets sandcastle decor, mostly its own loot (`Biomes.luau`), and the giant sandcastle with the secret's door. |
-| Unlock item | The Golden Spade sometimes washes up in a Sandcastle Flats zone (`Config.Unlocks`). It glows, can be bumped and lost like any item, and is only safe once dropped on the purple **bank pad** at the shore. It is never sold. |
+| Unlock item | The Golden Spade sometimes washes up in a Sandcastle Flats zone (`Config.Unlocks`). It glows, can be bumped and lost like any item, and is only safe once dropped on the purple floor inside the **bank house** and banked by talking to the **banker**. It is never sold. |
 | Secret course | Use a banked spade at the sandcastle door (always used up). You go to your own copy of the Sandcastle Vault, built only on your client (`SecretController`, layout in `Secrets.luau`): a spiral climb while the sea floods in. The flood time depends on when the real tide would cover the door. `SecretService` verifies the run from your position (checkpoints in order, above the water, plausible time, at the chest) before granting the yellow coin. |
 | Rebirth | In the shop: costs 100,000 coins, ×1.5 more each time. Resets coins, tools and shop vessels, adds ×0.5 coin multiplier. At each rebirth you pick one of the 8 rewards you don't have yet (see **Rebirth rewards** below). |
 
@@ -119,7 +119,7 @@ All 8 are in. Each rebirth lets you pick one you don't have yet. They stay throu
 | Swift Feet | +20% walk speed and faster vessel towing |
 | Sea Legs | Waves push you 40% less, and your breath lasts twice as long |
 | Strong Back | Every grabber lifts one weight class heavier, up to Very heavy |
-| Deep Pockets | 3 pocket slots for Light items (press **Q** or **Pocket**). They sell on the sell pad |
+| Deep Pockets | 3 pocket slots for Light items (press **Q** or **Pocket**). They sell to the buyer |
 | Tide Magnet | A magical grabber. It reels whatever it holds toward you while that item is in the water, and waves push it half as hard |
 | Bubble Wand | A magical grabber. It lifts anything, reaches into deep water and floats items to you slowly in a bubble. Waves can't push or knock it loose |
 | Floating Clamshell | A magical vessel. It hovers behind you, carries 8 and never tips. It's lost if it's covered by water |
@@ -224,7 +224,7 @@ Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down 
 
 ```
             dunes
-   +--------------------------+   Z < 0: shop, sell pad, bank pad (flat)
+   +--------------------------+   Z < 0: shop house, buyer, sell pad, bank house
    |  shop   sell   vessels   |
  ==+==========================+== Z = 0: top of the beach
    |  zone 1  Shopside Shore  |   the sand slopes gently down toward +Z
@@ -240,7 +240,7 @@ Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down 
  headland     X ->     headland
 ```
 
-The shoreline runs along X (320 studs wide, between two rocky headlands). The zones are
+The shoreline runs along X (720 studs wide, between two rocky headlands). The zones are
 200-stud bands running out to sea along +Z. The sand slopes down 0.06 studs per stud, so
 the tide is simply the sea level rising and falling: as it drops, the waterline moves out
 and uncovers the richer zones. Items wash up in the surf around the current waterline, and
@@ -253,3 +253,10 @@ shallow < 1.5, knee-deep < 3, waist < 4.5, and deep (drowning, vessels lost) bey
 - Unclaimed items sit still. They don't follow scripted movement in the surf yet.
 - The sea is a visual-only part; depth comes from the sea level and the beach slope. There is no terrain water or swimming.
 - The server doesn't check character walk speed yet. Held items are leashed by distance and speed.
+
+### Map dressing
+
+- **Fog:** `Config.Beach.Fog` hides anything further than about 520 studs, so you can't see the whole map at once.
+- **Banking:** unlock items on the bank floor go into your inventory only when you talk to the banker. Nothing banks on its own.
+- **Buildings and people:** `src/server/Buildings.luau` builds the shopkeeper's house, the bank house, the buyer and the banker out of parts. `src/server/BeachDressing.luau` adds palms, umbrellas, driftwood, shells and the lifeguard tower. Positions use a fixed seed, so every server builds the same beach.
+- **No external models:** nothing in the map comes from the Toolbox or any other outside asset. Everything is generated in code from `MapParts.luau`, so no scripts or content from outside the repo can end up in the world.
