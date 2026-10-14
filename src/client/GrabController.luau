@@ -192,6 +192,19 @@ local function vesselMass(vessel: Model): number
 	return mass
 end
 
+-- The vessel plus everything loaded in it, so towing a full cart feels like towing an
+-- empty one.
+local function loadedMass(vessel: Model): number
+	local mass = vesselMass(vessel)
+	local vesselId = vessel:GetAttribute("VesselId")
+	for _, item in CollectionService:GetTagged("SalvageItem") do
+		if item:GetAttribute("VesselId") == vesselId and item:GetAttribute("State") == "InVessel" then
+			mass += (item :: BasePart).Mass
+		end
+	end
+	return mass
+end
+
 local function cleanup()
 	if not held then
 		return
@@ -254,7 +267,7 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 	else
 		local vessel = part.Parent :: Model
 		align.ApplyAtCenterOfMass = false
-		align.MaxForce = vesselMass(vessel) * grabCfg.TowAcceleration
+		align.MaxForce = loadedMass(vessel) * grabCfg.TowAcceleration
 	end
 	align.Position = part.Position
 	align.Parent = part
@@ -297,8 +310,6 @@ local function updateBrake()
 		align.Attachment0 = attachment
 		align.ApplyAtCenterOfMass = true
 		align.ForceLimitMode = Enum.ForceLimitMode.PerAxis
-		local force = vesselMass(vessel) * grabCfg.BrakeAcceleration
-		align.MaxAxesForce = Vector3.new(force, 0, force)
 		align.Responsiveness = 15
 		align.Position = base.Position
 		align.Parent = base
@@ -311,6 +322,8 @@ local function updateBrake()
 	if towing or Vector3.new(offset.X, 0, offset.Z).Magnitude > grabCfg.BrakeSlip then
 		current.park = base.Position
 	end
+	local force = loadedMass(vessel) * grabCfg.BrakeAcceleration
+	current.align.MaxAxesForce = Vector3.new(force, 0, force)
 	current.align.Enabled = not towing
 	current.align.Position = current.park
 end
@@ -401,6 +414,10 @@ local function update(dt: number)
 
 	local target = targetPosition(current, root)
 	current.align.Position = target
+	if current.kind == "vessel" then
+		-- Cargo gets loaded and spilled while towing, so keep the pull matched to the load.
+		current.align.MaxForce = loadedMass(part.Parent :: Model) * grabCfg.TowAcceleration
+	end
 
 	if DEBUG and not current.checkedOwnership and os.clock() - current.startedAt > 1 then
 		current.checkedOwnership = true
