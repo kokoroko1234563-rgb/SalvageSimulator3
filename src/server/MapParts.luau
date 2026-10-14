@@ -7,6 +7,8 @@ local Palette = require(Shared.Palette)
 
 local MapParts = {}
 
+local BOARD_THICKNESS = 0.4
+
 -- An anchored part with smooth faces and the sand material unless told otherwise.
 function MapParts.part(props: { [string]: any }): Part
 	local part = Instance.new("Part")
@@ -20,24 +22,59 @@ function MapParts.part(props: { [string]: any }): Part
 	return part
 end
 
--- A floating sign above a part.
-function MapParts.label(parent: BasePart, text: string, offset: Vector3, size: Vector2?)
-	local gui = Instance.new("BillboardGui")
-	local pixels = size or Vector2.new(240, 50)
-	gui.Size = UDim2.fromOffset(pixels.X, pixels.Y)
-	gui.StudsOffset = offset
-	gui.AlwaysOnTop = false
-	gui.MaxDistance = 250
-	local textLabel = Instance.new("TextLabel")
-	textLabel.Size = UDim2.fromScale(1, 1)
-	textLabel.BackgroundTransparency = 1
-	textLabel.Font = Palette.Font.Title
-	textLabel.TextScaled = true
-	textLabel.TextColor3 = Color3.new(1, 1, 1)
-	textLabel.TextStrokeTransparency = 0.4
-	textLabel.Text = text
-	textLabel.Parent = gui
-	gui.Parent = parent
+-- A real sign: a painted board with text on both faces. `cf` is the centre of the board, and
+-- `width` and `height` are its size in studs. If `ground` is given, a post runs from the
+-- ground up to the board, so it stands on the beach.
+function MapParts.sign(
+	parent: Instance,
+	text: string,
+	cf: CFrame,
+	width: number,
+	height: number,
+	ground: number?
+)
+	local board = MapParts.part({
+		Name = "Sign",
+		Size = Vector3.new(width, height, BOARD_THICKNESS),
+		CFrame = cf,
+		Color = Palette.World.Boardwalk,
+		Material = Palette.Material.WoodPlanks,
+	})
+	board.Parent = parent
+
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 40
+		gui.LightInfluence = 0
+		local textLabel = Instance.new("TextLabel")
+		textLabel.Size = UDim2.fromScale(0.92, 0.84)
+		textLabel.Position = UDim2.fromScale(0.04, 0.08)
+		textLabel.BackgroundTransparency = 1
+		textLabel.Font = Palette.Font.Title
+		textLabel.TextScaled = true
+		textLabel.TextColor3 = Palette.World.SignText
+		textLabel.Text = text
+		textLabel.Parent = gui
+		gui.Parent = board
+	end
+
+	if ground then
+		local top = cf.Position.Y - height / 2
+		local postHeight = top - ground
+		if postHeight > 0 then
+			MapParts.part({
+				Name = "SignPost",
+				Size = Vector3.new(0.6, postHeight, 0.6),
+				CFrame = CFrame.new(cf.Position.X, ground + postHeight / 2, cf.Position.Z),
+				Color = Palette.World.Post,
+				Material = Palette.Material.Wood,
+			}).Parent =
+				parent
+		end
+	end
+	return board
 end
 
 return MapParts

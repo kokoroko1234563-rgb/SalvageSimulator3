@@ -18,16 +18,17 @@ local VesselService = require(script.Parent.VesselService)
 local ShopService = {}
 
 local notify: (Player, string) -> () = function(_player: Player, _text: string) end
-local shopkeeper: BasePart
-local buyer: BasePart
-local banker: BasePart
+local shopkeeper: Model
+local buyer: Model
+local banker: Model
 local sellZone: BasePart
 local bankPad: BasePart
 
 function ShopService.nearShop(player: Player): boolean
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	return root ~= nil and (root.Position - shopkeeper.Position).Magnitude <= Config.Selling.ShopkeeperRange
+	local target = shopkeeper:GetPivot().Position
+	return root ~= nil and (root.Position - target).Magnitude <= Config.Selling.ShopkeeperRange
 end
 
 local function onBuy(player: Player, category: any, id: any): (boolean, string?)
@@ -159,25 +160,26 @@ end
 function ShopService.init(map: Instance, notifyFn: (Player, string) -> ())
 	notify = notifyFn
 	local shop = map:WaitForChild("Shop")
-	shopkeeper = shop:WaitForChild("Shopkeeper") :: BasePart
+	shopkeeper = shop:WaitForChild("Shopkeeper") :: Model
 	sellZone = shop:WaitForChild("SellZone") :: BasePart
 	bankPad = shop:WaitForChild("BankPad") :: BasePart
-	buyer = shop:WaitForChild("Buyer") :: BasePart
-	banker = shop:WaitForChild("Banker") :: BasePart
+	buyer = shop:WaitForChild("Buyer") :: Model
+	banker = shop:WaitForChild("Banker") :: Model
 
 	Remotes.handle("Buy", onBuy)
 	Remotes.handle("SpawnVessel", ShopService.spawnVessel)
 
 	local openShop = Remotes.get("OpenShop")
-	local prompt = shopkeeper:WaitForChild("ShopPrompt") :: ProximityPrompt
+	local prompt = shopkeeper:WaitForChild("HumanoidRootPart"):WaitForChild("ShopPrompt") :: ProximityPrompt
 	prompt.Triggered:Connect(function(player)
 		openShop:FireClient(player)
 	end)
 
-	local buyerPrompt = buyer:WaitForChild("BuyerPrompt") :: ProximityPrompt
+	local buyerPrompt = buyer:WaitForChild("HumanoidRootPart"):WaitForChild("BuyerPrompt") :: ProximityPrompt
 	buyerPrompt.Triggered:Connect(sellFromPad)
 
-	local bankerPrompt = banker:WaitForChild("BankerPrompt") :: ProximityPrompt
+	local bankerRoot = banker:WaitForChild("HumanoidRootPart")
+	local bankerPrompt = bankerRoot:WaitForChild("BankerPrompt") :: ProximityPrompt
 	bankerPrompt.Triggered:Connect(bankFromFloor)
 end
 

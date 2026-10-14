@@ -35,6 +35,13 @@ end
 
 -- Engine-only members, by class, that Lune doesn't have.
 local stubs = {
+	Model = {
+		-- Lune has no world, so a model's position is only read back, never moved.
+		PivotTo = function() end,
+		GetPivot = function()
+			return CFrame.new()
+		end,
+	},
 	Workspace = {
 		GetServerTimeNow = function()
 			return os.clock()
@@ -64,6 +71,17 @@ local stubs = {
 		end,
 	},
 	Players = {
+		-- Builds an avatar-shaped model (the engine's real one loads the default character).
+		CreateHumanoidModelFromDescriptionAsync = function()
+			local model = roblox.Instance.new("Model")
+			for _, name in { "HumanoidRootPart", "Head", "Torso" } do
+				local part = roblox.Instance.new("Part")
+				part.Name = name
+				part.Parent = model
+			end
+			roblox.Instance.new("Humanoid").Parent = model
+			return Harness.wrap(model)
+		end,
 		GetPlayers = function()
 			return {}
 		end,

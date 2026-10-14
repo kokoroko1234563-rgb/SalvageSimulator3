@@ -73,7 +73,7 @@ Palette.World = {
 	Sand = rgb(236, 215, 160),
 	WetSand = rgb(196, 170, 120),
 	Rock = rgb(120, 115, 105),
-	Sea = rgb(50, 150, 195),
+	Sea = rgb(40, 185, 205),
 	Flood = rgb(40, 120, 170),
 	Foam = rgb(255, 255, 255),
 	Boardwalk = rgb(160, 115, 75),
@@ -94,6 +94,7 @@ Palette.World = {
 
 	-- Buildings and people on the shore.
 	Stucco = rgb(242, 230, 205),
+	SignText = rgb(70, 40, 20),
 	RoofTile = rgb(170, 85, 60),
 	Awning = rgb(225, 75, 65),
 	AwningCream = rgb(248, 242, 225),

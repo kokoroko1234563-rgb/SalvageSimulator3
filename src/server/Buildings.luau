@@ -1,6 +1,9 @@
--- Buildings and people for the shore, made from parts. A house is a floor, four walls with a
--- doorway in the front (facing the sea, +Z), a flat roof, an awning over the door and a sign.
--- They stand on the dry sand behind the shoreline, with the floor raised above it.
+-- Buildings and people for the shore. A house is a floor, four walls with a doorway in the front
+-- (facing the sea, +Z), a flat roof, an awning over the door and a sign on the front. People are
+-- real Roblox avatars (the default R15 rig, from the engine itself), recoloured in code.
+-- Everything stands on the dry sand behind the shoreline, with the floor raised above it.
+
+local Players = game:GetService("Players")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Palette = require(Shared.Palette)
@@ -10,22 +13,26 @@ local MapParts = require(script.Parent.MapParts)
 local Buildings = {}
 
 Buildings.FLOOR = 1.2 -- height of the floor above the sand
+Buildings.WALL_HEIGHT = 18
+Buildings.DOOR_WIDTH = 8
+Buildings.DOOR_HEIGHT = 9
 local WALL = 1 -- wall thickness
-local DOOR_WIDTH = 6
-local DOOR_HEIGHT = 8
+local BOARD_OFFSET = 0.3 -- how far a sign stands proud of the wall it hangs on
 
 -- A house whose floor is centred on `center` (its X and Z; Y is ignored and the floor sits on
--- the sand). `signText` goes on the awning over the door.
+-- the sand). `signText` goes on the front, above the door.
 function Buildings.house(
 	parent: Instance,
 	name: string,
 	center: Vector3,
 	width: number,
 	depth: number,
-	height: number,
 	signText: string
 )
 	local floorY = Buildings.FLOOR
+	local height = Buildings.WALL_HEIGHT
+	local doorW = Buildings.DOOR_WIDTH
+	local doorH = Buildings.DOOR_HEIGHT
 	local cx, cz = center.X, center.Z
 	local model = Instance.new("Folder")
 	model.Name = name
@@ -54,27 +61,24 @@ function Buildings.house(
 	-- Back and sides run the full depth; the front has a doorway in the middle.
 	wall("BackWall", Vector3.new(width, height, WALL), Vector3.new(cx, wallsY, cz - depth / 2 + WALL / 2))
 	for side = -1, 1, 2 do
-		wall(
-			"SideWall",
-			Vector3.new(WALL, height, depth),
-			Vector3.new(cx + side * (width / 2 - WALL / 2), wallsY, cz)
-		)
+		local x = cx + side * (width / 2 - WALL / 2)
+		wall("SideWall", Vector3.new(WALL, height, depth), Vector3.new(x, wallsY, cz))
 	end
 
 	local frontZ = cz + depth / 2 - WALL / 2
-	local sideWidth = (width - DOOR_WIDTH) / 2
+	local sideWidth = (width - doorW) / 2
 	for side = -1, 1, 2 do
 		wall(
 			"FrontWall",
 			Vector3.new(sideWidth, height, WALL),
-			Vector3.new(cx + side * (DOOR_WIDTH / 2 + sideWidth / 2), wallsY, frontZ)
+			Vector3.new(cx + side * (doorW / 2 + sideWidth / 2), wallsY, frontZ)
 		)
 	end
 	-- Above the doorway.
 	wall(
 		"Lintel",
-		Vector3.new(DOOR_WIDTH, height - DOOR_HEIGHT, WALL),
-		Vector3.new(cx, floorY + DOOR_HEIGHT + (height - DOOR_HEIGHT) / 2, frontZ)
+		Vector3.new(doorW, height - doorH, WALL),
+		Vector3.new(cx, floorY + doorH + (height - doorH) / 2, frontZ)
 	)
 
 	-- Windows on both sides, glass a little proud of the wall.
@@ -101,22 +105,30 @@ function Buildings.house(
 	}).Parent =
 		model
 
-	-- Awning over the door, with the sign on it.
-	local awning = MapParts.part({
+	-- Awning over the door.
+	MapParts.part({
 		Name = "Awning",
-		Size = Vector3.new(DOOR_WIDTH + 4, 0.5, 4),
-		CFrame = CFrame.new(cx, floorY + DOOR_HEIGHT + 0.5, frontZ + 2),
+		Size = Vector3.new(doorW + 5, 0.5, 4),
+		CFrame = CFrame.new(cx, floorY + doorH + 0.5, frontZ + 2),
 		Color = Palette.World.Awning,
 		Material = Palette.Material.Fabric,
-	})
-	awning.Parent = model
-	MapParts.label(awning, signText, Vector3.new(0, 3.5, 0), Vector2.new(260, 60))
+	}).Parent =
+		model
+
+	-- The sign goes on the front wall, above the awning.
+	MapParts.sign(
+		model,
+		signText,
+		CFrame.new(cx, floorY + height - 2.5, frontZ + WALL / 2 + BOARD_OFFSET),
+		width * 0.7,
+		3.5
+	)
 
 	model.Parent = parent
 end
 
--- A flat-topped counter, `length` wide along X, facing the door.
-function Buildings.counter(parent: Instance, position: Vector3, length: number)
+-- A counter, `length` wide along X, with a sign on its front (the side facing the door).
+function Buildings.counter(parent: Instance, position: Vector3, length: number, signText: string?)
 	MapParts.part({
 		Name = "Counter",
 		Size = Vector3.new(length, 3, 2),
@@ -125,38 +137,44 @@ function Buildings.counter(parent: Instance, position: Vector3, length: number)
 		Material = Palette.Material.WoodPlanks,
 	}).Parent =
 		parent
+	if signText then
+		MapParts.sign(
+			parent,
+			signText,
+			CFrame.new(position + Vector3.new(0, 4.2, 1 + 0.3)),
+			length * 0.6,
+			1.6
+		)
+	end
 end
 
--- A person built from blocks. `base` is the CFrame at their feet (facing is the way their
--- front points). The torso is returned: it's the part you talk to, so it takes the prompt
--- and the sign.
-function Buildings.person(
-	parent: Instance,
-	name: string,
-	base: CFrame,
-	shirt: Color3,
-	signText: string
-): BasePart
-	local function limb(limbName: string, size: Vector3, offset: Vector3, color: Color3): BasePart
-		return MapParts.part({
-			Name = limbName,
-			Size = size,
-			CFrame = base * CFrame.new(offset),
-			Color = color,
-			Material = Palette.Material.Fabric,
-		})
-	end
+-- A real Roblox character: the engine's default R15 avatar, recoloured. It's anchored in place
+-- and has no name tag, so the sign next to it says who it is. Its HumanoidRootPart is the
+-- part you talk to, so the prompt goes there. Returns the model.
+function Buildings.person(parent: Instance, name: string, cf: CFrame, shirt: Color3): Model
+	local description = Instance.new("HumanoidDescription")
+	description.HeadColor = Palette.World.Skin
+	description.TorsoColor = shirt
+	description.LeftArmColor = shirt
+	description.RightArmColor = shirt
+	description.LeftLegColor = Palette.World.Pants
+	description.RightLegColor = Palette.World.Pants
 
-	limb("Legs", Vector3.new(2, 2, 1), Vector3.new(0, 1, 0), Palette.World.Pants).Parent = parent
-	for side = -1, 1, 2 do
-		limb("Arm", Vector3.new(0.7, 2.2, 0.8), Vector3.new(side * 1.85, 3.1, 0), shirt).Parent = parent
+	-- Yields while the avatar loads, so people are built from the server's start-up thread.
+	local model = Players:CreateHumanoidModelFromDescriptionAsync(description, Enum.HumanoidRigType.R15)
+	model.Name = name
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.Anchored = true
+			part.CanTouch = false
+		elseif part:IsA("Humanoid") then
+			part.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		end
 	end
-	limb("Head", Vector3.new(1.6, 1.6, 1.6), Vector3.new(0, 4.8, 0), Palette.World.Skin).Parent = parent
-
-	local torso = limb(name, Vector3.new(2.6, 2.4, 1.3), Vector3.new(0, 3.2, 0), shirt)
-	torso.Parent = parent
-	MapParts.label(torso, signText, Vector3.new(0, 3.6, 0))
-	return torso
+	model.PrimaryPart = model:FindFirstChild("HumanoidRootPart") :: BasePart
+	model:PivotTo(cf)
+	model.Parent = parent
+	return model
 end
 
 return Buildings

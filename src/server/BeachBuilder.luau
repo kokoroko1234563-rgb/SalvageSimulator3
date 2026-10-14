@@ -25,13 +25,15 @@ local WET_SAND = Palette.World.WetSand
 local ROCK = Palette.World.Rock
 
 -- Where the shop buildings stand, on the dry sand behind the shoreline.
-local HOUSE_Z = -48
-local HOUSE_WIDTH = 36
-local HOUSE_DEPTH = 28
-local HOUSE_HEIGHT = 14
-local SHOP_X = -150
-local BANK_X = 150
-local SELL_PAD = Vector3.new(85, 1.1, -30)
+local HOUSE_Z = -50
+local HOUSE_WIDTH = 48
+local HOUSE_DEPTH = 36
+local SHOP_X = -200
+local BANK_X = 200
+local SELL_PAD = Vector3.new(90, 1.1, -30)
+local SELL_PAD_SIZE = Vector3.new(30, 0.2, 22)
+local BANK_PAD_SIZE = Vector3.new(32, 0.2, 16)
+local BUYER_X = 68
 
 -- A block whose top face slopes down from (zStart, yStart) to (zEnd, yEnd).
 local function slopedBlock(
@@ -86,6 +88,36 @@ local function buildBeach(map: Folder)
 	end
 end
 
+-- Flat patches of lighter and darker sand scattered over the beach, so it isn't one colour.
+local function buildSandPatches(map: Folder)
+	local folder = Instance.new("Folder")
+	folder.Name = "SandPatches"
+	folder.Parent = map
+	local rng = Random.new(23)
+	local tilt = math.atan(beach.Slope)
+	local bleached = SAND:Lerp(Color3.new(1, 1, 1), 0.35)
+	local damp = SAND:Lerp(WET_SAND, 0.45)
+	for _ = 1, 420 do
+		local x = rng:NextNumber(-Beach.HalfWidth + 4, Beach.HalfWidth - 4)
+		local z = rng:NextNumber(2, Beach.Depth + 40)
+		local diameter = rng:NextNumber(3, 8)
+		local color = if rng:NextNumber() < 0.5 then bleached else damp
+		MapParts.part({
+			Name = "SandPatch",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.15, diameter, diameter),
+			CFrame = CFrame.new(x, Beach.groundY(z) + 0.05, z)
+				* CFrame.Angles(tilt, rng:NextNumber() * math.pi * 2, 0)
+				* CFrame.Angles(0, 0, math.pi / 2),
+			Color = color,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+		}).Parent =
+			folder
+	end
+end
+
 local function buildSea(map: Folder)
 	local seaEnd = Beach.Depth + beach.SeaExtent
 	slopedBlock(
@@ -101,7 +133,8 @@ local function buildSea(map: Folder)
 		map
 end
 
--- Zone markers: a tall post at each side of the beach where each zone starts.
+-- Zone markers: a tall post at each side of the beach where each zone starts, with its name
+-- on a sign across the post.
 local function buildZoneMarkers(map: Folder)
 	local half = Beach.HalfWidth
 	for index = 1, beach.ActiveZones do
@@ -110,27 +143,30 @@ local function buildZoneMarkers(map: Folder)
 		local groundY = Beach.groundY(startZ)
 		local topY = 14
 		for side = -1, 1, 2 do
+			local x = side * (half - 8)
 			local post = MapParts.part({
 				Name = "ZoneMarker" .. index,
 				Size = Vector3.new(1.2, topY - groundY, 1.2),
-				CFrame = CFrame.new(side * (half - 8), (topY + groundY) / 2, startZ),
+				CFrame = CFrame.new(x, (topY + groundY) / 2, startZ),
 				Color = Palette.World.Post,
 				Material = Palette.Material.Wood,
 			})
+			post.Parent = map
 			local flag = MapParts.part({
 				Name = "Flag",
 				Size = Vector3.new(0.2, 2.5, 4),
-				CFrame = CFrame.new(side * (half - 8), topY - 1.5, startZ + 2.2),
+				CFrame = CFrame.new(x, topY - 1.5, startZ + 2.2),
 				Color = Color3.fromHSV((index - 1) / beach.ActiveZones * 0.6, 0.7, 1),
 				CanCollide = false,
 			})
 			flag.Parent = post
-			MapParts.label(
+			MapParts.sign(
 				post,
 				string.format("Zone %d · %s · x%d", index, zone.Name, zone.Multiplier),
-				Vector3.new(0, post.Size.Y / 2 + 3, 0)
+				CFrame.new(x, 11, startZ),
+				16,
+				3
 			)
-			post.Parent = map
 		end
 	end
 end
@@ -143,30 +179,21 @@ local function buildShop(map: Folder)
 
 	MapParts.part({
 		Name = "Boardwalk",
-		Size = Vector3.new(120, 1, beach.ShopDepth - 10),
-		CFrame = CFrame.new(0, 0.5, -beach.ShopDepth / 2 - 2),
+		Size = Vector3.new(120, 2, beach.ShopDepth - 10),
+		CFrame = CFrame.new(0, 0, -beach.ShopDepth / 2 - 2),
 		Color = Palette.World.Boardwalk,
 		Material = Palette.Material.WoodPlanks,
 	}).Parent =
 		shop
 
 	-- Shopkeeper's house: the shopkeeper stands behind the counter, facing the door.
-	Buildings.house(
-		shop,
-		"ShopHouse",
-		Vector3.new(SHOP_X, 0, HOUSE_Z),
-		HOUSE_WIDTH,
-		HOUSE_DEPTH,
-		HOUSE_HEIGHT,
-		"SHOP"
-	)
-	Buildings.counter(shop, Vector3.new(SHOP_X, Buildings.FLOOR, HOUSE_Z + 4), 16)
+	Buildings.house(shop, "ShopHouse", Vector3.new(SHOP_X, 0, HOUSE_Z), HOUSE_WIDTH, HOUSE_DEPTH, "SHOP")
+	Buildings.counter(shop, Vector3.new(SHOP_X, Buildings.FLOOR, HOUSE_Z + 4), 22, "SHOPKEEPER")
 	local shopkeeper = Buildings.person(
 		shop,
 		"Shopkeeper",
-		CFrame.new(SHOP_X, Buildings.FLOOR, HOUSE_Z - 4) * CFrame.Angles(0, math.pi, 0),
-		Palette.World.Shopkeeper,
-		"Shopkeeper"
+		CFrame.new(SHOP_X, Buildings.FLOOR, HOUSE_Z - 2) * CFrame.Angles(0, math.pi, 0),
+		Palette.World.Shopkeeper
 	)
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "ShopPrompt"
@@ -174,12 +201,12 @@ local function buildShop(map: Folder)
 	prompt.ObjectText = "Shopkeeper"
 	prompt.MaxActivationDistance = 14
 	prompt.RequiresLineOfSight = false
-	prompt.Parent = shopkeeper
+	prompt.Parent = shopkeeper.PrimaryPart
 
-	-- The sell pad, and the buyer who sells what's on it when you talk to them.
+	-- The sell pad, its sign, and the buyer who sells what's on it when you talk to them.
 	local sellZone = MapParts.part({
 		Name = "SellZone",
-		Size = Vector3.new(30, 0.2, 22),
+		Size = SELL_PAD_SIZE,
 		CFrame = CFrame.new(SELL_PAD),
 		Color = Palette.World.SellPad,
 		Material = Palette.Material.Neon,
@@ -187,15 +214,29 @@ local function buildShop(map: Folder)
 		CanCollide = false,
 		CanQuery = false,
 	})
-	MapParts.label(sellZone, "SELL: drop items here, then talk to the buyer", Vector3.new(0, 5, 0))
 	sellZone.Parent = shop
+	MapParts.sign(
+		shop,
+		"SELL: drop items on the yellow pad, then talk to the buyer",
+		CFrame.new(SELL_PAD.X, 5, SELL_PAD.Z - SELL_PAD_SIZE.Z / 2 - 2),
+		26,
+		2.6,
+		0
+	)
 
 	local buyer = Buildings.person(
 		shop,
 		"Buyer",
-		CFrame.new(62, 0, SELL_PAD.Z) * CFrame.Angles(0, -math.pi / 2, 0),
-		Palette.World.Buyer,
-		"Buyer"
+		CFrame.new(BUYER_X, 0, SELL_PAD.Z) * CFrame.Angles(0, -math.pi / 2, 0),
+		Palette.World.Buyer
+	)
+	MapParts.sign(
+		shop,
+		"BUYER",
+		CFrame.new(BUYER_X - 4, 5, SELL_PAD.Z - 10),
+		12,
+		2.4,
+		0
 	)
 	local buyerPrompt = Instance.new("ProximityPrompt")
 	buyerPrompt.Name = "BuyerPrompt"
@@ -203,31 +244,29 @@ local function buildShop(map: Folder)
 	buyerPrompt.ObjectText = "Buyer"
 	buyerPrompt.MaxActivationDistance = Config.Selling.BuyerRange
 	buyerPrompt.RequiresLineOfSight = false
-	buyerPrompt.Parent = buyer
+	buyerPrompt.Parent = buyer.PrimaryPart
 
 	-- The bank house: unlock items dropped on the purple floor inside are banked when you talk to
 	-- the banker.
-	Buildings.house(
-		shop,
-		"BankHouse",
-		Vector3.new(BANK_X, 0, HOUSE_Z),
-		HOUSE_WIDTH,
-		HOUSE_DEPTH,
-		HOUSE_HEIGHT,
-		"BANK"
-	)
-	Buildings.counter(shop, Vector3.new(BANK_X, Buildings.FLOOR, HOUSE_Z - 6), 16)
+	Buildings.house(shop, "BankHouse", Vector3.new(BANK_X, 0, HOUSE_Z), HOUSE_WIDTH, HOUSE_DEPTH, "BANK")
+	Buildings.counter(shop, Vector3.new(BANK_X, Buildings.FLOOR, HOUSE_Z - 8), 22, "BANKER")
 	local banker = Buildings.person(
 		shop,
 		"Banker",
-		CFrame.new(BANK_X, Buildings.FLOOR, HOUSE_Z - 10) * CFrame.Angles(0, math.pi, 0),
-		Palette.World.Banker,
-		"Banker"
+		CFrame.new(BANK_X, Buildings.FLOOR, HOUSE_Z - 12) * CFrame.Angles(0, math.pi, 0),
+		Palette.World.Banker
 	)
+	local bankerPrompt = Instance.new("ProximityPrompt")
+	bankerPrompt.Name = "BankerPrompt"
+	bankerPrompt.ActionText = "Bank"
+	bankerPrompt.ObjectText = "Banker"
+	bankerPrompt.MaxActivationDistance = Config.Banking.BankerRange
+	bankerPrompt.RequiresLineOfSight = false
+	bankerPrompt.Parent = banker.PrimaryPart
 
 	local bankPad = MapParts.part({
 		Name = "BankPad",
-		Size = Vector3.new(24, 0.2, 14),
+		Size = BANK_PAD_SIZE,
 		CFrame = CFrame.new(BANK_X, Buildings.FLOOR + 0.1, HOUSE_Z + 4),
 		Color = Palette.World.BankPad,
 		Material = Palette.Material.Neon,
@@ -235,16 +274,14 @@ local function buildShop(map: Folder)
 		CanCollide = false,
 		CanQuery = false,
 	})
-	MapParts.label(bankPad, "BANK: drop unlock items here, then talk to the banker", Vector3.new(0, 4, 0))
 	bankPad.Parent = shop
-
-	local bankerPrompt = Instance.new("ProximityPrompt")
-	bankerPrompt.Name = "BankerPrompt"
-	bankerPrompt.ActionText = "Bank"
-	bankerPrompt.ObjectText = "Banker"
-	bankerPrompt.MaxActivationDistance = Config.Banking.BankerRange
-	bankerPrompt.RequiresLineOfSight = false
-	bankerPrompt.Parent = banker
+	MapParts.sign(
+		shop,
+		"BANK: drop unlock items on the purple floor, then talk to the banker",
+		CFrame.new(BANK_X, 12, HOUSE_Z - HOUSE_DEPTH / 2 + 1.6),
+		HOUSE_WIDTH * 0.6,
+		3
+	)
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "BeachSpawn"
@@ -258,11 +295,45 @@ local function buildShop(map: Folder)
 	spawn.Parent = shop
 end
 
--- Haze over the far part of the map, so you can't see all of it at once.
-local function setFog()
+-- The look: haze over the far part of the map, and Roblox's own lighting effects for a bright,
+-- saturated, sunny feel. These are engine objects, not assets. Each is made once and reused.
+local function setLighting()
 	Lighting.FogStart = beach.Fog.Start
 	Lighting.FogEnd = beach.Fog.End
 	Lighting.FogColor = beach.Fog.Color
+
+	local function ensure(className: string): Instance
+		local existing = Lighting:FindFirstChildOfClass(className)
+		if existing then
+			return existing
+		end
+		local created = Instance.new(className)
+		created.Parent = Lighting
+		return created
+	end
+
+	local atmosphere = ensure("Atmosphere") :: Atmosphere
+	atmosphere.Density = 0.32
+	atmosphere.Offset = 0.2
+	atmosphere.Color = Color3.fromRGB(200, 228, 242)
+	atmosphere.Decay = Color3.fromRGB(110, 170, 210)
+	atmosphere.Glare = 0.25
+	atmosphere.Haze = 1.4
+
+	local correction = ensure("ColorCorrectionEffect") :: ColorCorrectionEffect
+	correction.Saturation = 0.25
+	correction.Contrast = 0.08
+	correction.Brightness = 0.02
+	correction.TintColor = Color3.fromRGB(255, 246, 230)
+
+	local bloom = ensure("BloomEffect") :: BloomEffect
+	bloom.Intensity = 0.35
+	bloom.Size = 18
+	bloom.Threshold = 0.9
+
+	local sunRays = ensure("SunRaysEffect") :: SunRaysEffect
+	sunRays.Intensity = 0.12
+	sunRays.Spread = 0.8
 end
 
 function BeachBuilder.build(): Folder
@@ -279,7 +350,7 @@ function BeachBuilder.build(): Folder
 	Lighting.ClockTime = 13.5
 	Lighting.Brightness = 2.5
 	Lighting.OutdoorAmbient = Color3.fromRGB(160, 150, 130)
-	setFog()
+	setLighting()
 
 	local map = Instance.new("Folder")
 	map.Name = "Map"
@@ -297,10 +368,10 @@ function BeachBuilder.build(): Folder
 	}).Parent =
 		map
 
-	-- Dunes behind the shop.
+	-- Low dunes behind the shop, so the cove stays open.
 	MapParts.part({
 		Name = "Dunes",
-		Size = Vector3.new(beach.Width + 60, 16, 40),
+		Size = Vector3.new(beach.Width + 60, 8, 40),
 		CFrame = CFrame.new(0, 0, -beach.ShopDepth - 20),
 		Color = Palette.World.Sand,
 		Material = Palette.Material.Sand,
@@ -310,15 +381,16 @@ function BeachBuilder.build(): Folder
 	-- The beach: one long slope from the shoreline out under the sea. The tide uncovers more
 	-- or less of it.
 	buildBeach(map)
+	buildSandPatches(map)
 	buildSea(map)
 
-	-- Rocky headlands on both sides make the beach a cove.
+	-- Rocky headlands on both sides, pushed out and kept low so the cove reads as open.
 	for side = -1, 1, 2 do
 		local length = seaEnd + beach.ShopDepth + 40
 		MapParts.part({
 			Name = "Headland",
-			Size = Vector3.new(40, 120, length),
-			CFrame = CFrame.new(side * (half + 20), -40, -beach.ShopDepth - 40 + length / 2),
+			Size = Vector3.new(80, 70, length),
+			CFrame = CFrame.new(side * (half + 60), -25, -beach.ShopDepth - 40 + length / 2),
 			Color = ROCK,
 			Material = Palette.Material.Rock,
 		}).Parent =
@@ -327,9 +399,7 @@ function BeachBuilder.build(): Folder
 
 	buildZoneMarkers(map)
 	buildShop(map)
-
-	local dressingRng = Random.new(7)
-	BeachDressing.build(map, dressingRng)
+	BeachDressing.build(map, Random.new(7))
 
 	map.Parent = Workspace
 	return map

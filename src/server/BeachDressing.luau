@@ -137,7 +137,7 @@ local function lifeguardTower(parent: Instance, base: Vector3)
 		Material = Palette.Material.Smooth,
 	})
 	roof.Parent = parent
-	MapParts.label(deck, "LIFEGUARD", Vector3.new(0, 4, 0))
+	MapParts.sign(parent, "LIFEGUARD", CFrame.new(base + Vector3.new(0, legHeight + 2.3, 2.5)), 4, 1.2)
 end
 
 -- Scatters the dressing over the dry sand, the dunes and the top of the beach.
@@ -154,7 +154,7 @@ function BeachDressing.build(map: Instance, rng: Random)
 	-- Palms beyond the shop buildings, on the dry sand at the sides of the cove.
 	for _ = 1, 12 do
 		local side = if rng:NextNumber() < 0.5 then -1 else 1
-		local x = side * rng:NextNumber(190, half - 25)
+		local x = side * rng:NextNumber(250, half - 25)
 		local z = rng:NextNumber(-70, -12)
 		palm(folder, groundAt(x, z), rng:NextNumber(14, 20), rng)
 	end

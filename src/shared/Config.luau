@@ -30,8 +30,8 @@ Config.Beach = {
 	-- Haze over the sea and sand: things further than FogEnd fade into it, so the whole map
 	-- can't be seen at once.
 	Fog = {
-		Start = 220, -- studs away where the haze starts
-		End = 520, -- studs away where it's fully opaque
+		Start = 150, -- studs away where the haze starts
+		End = 400, -- studs away where it's fully opaque
 		Color = Color3.fromRGB(205, 220, 228),
 	},
 

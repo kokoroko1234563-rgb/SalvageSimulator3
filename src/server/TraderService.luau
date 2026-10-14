@@ -16,7 +16,9 @@ local Palette = require(Shared.Palette)
 local Remotes = require(Shared.Remotes)
 local Traders = require(Shared.Traders)
 
+local Buildings = require(script.Parent.Buildings)
 local BiomeService = require(script.Parent.BiomeService)
+local MapParts = require(script.Parent.MapParts)
 local DataService = require(script.Parent.DataService)
 local ItemService = require(script.Parent.ItemService)
 local RebirthService = require(script.Parent.RebirthService)
@@ -201,11 +203,12 @@ function TraderService.spawn(trader, zone: number, parent: Instance): Model
 		p.Parent = model
 		return p
 	end
-	local body = part("Body", Vector3.new(2.2, 3.4, 1.4), Vector3.new(0, 1.7, 0), Palette.World.TraderCoat)
-	part("Head", Vector3.new(1.5, 1.5, 1.5), Vector3.new(0, 4.2, 0), Palette.World.Skin)
-	part("Stall", Vector3.new(6, 2.4, 2.4), Vector3.new(0, 1.2, -3), Palette.World.Boardwalk).Material =
-		Palette.Material.WoodPlanks
-	model.PrimaryPart = body
+	local stall = part("Stall", Vector3.new(6, 2.4, 2.4), Vector3.new(0, 1.2, -3), Palette.World.Boardwalk)
+	stall.Material = Palette.Material.WoodPlanks
+	-- The trader is a real Roblox character, standing behind the stall.
+	local avatar = Buildings.person(model, "Trader", CFrame.new(x, groundY, z), Palette.World.TraderCoat)
+	model.PrimaryPart = avatar.PrimaryPart :: BasePart
+	MapParts.sign(model, trader.Name, CFrame.new(x, groundY + 3.6, z - 4.5), 6, 1.6)
 
 	local encounterId = HttpService:GenerateGUID(false)
 	model:SetAttribute("EncounterId", encounterId)
@@ -214,25 +217,10 @@ function TraderService.spawn(trader, zone: number, parent: Instance): Model
 	prompt.ObjectText = trader.Name
 	prompt.MaxActivationDistance = 12
 	prompt.RequiresLineOfSight = false
-	prompt.Parent = body
+	prompt.Parent = avatar.PrimaryPart
 	prompt.Triggered:Connect(function(player)
 		open(player, encounterId)
 	end)
-
-	local label = Instance.new("BillboardGui")
-	label.Size = UDim2.fromOffset(220, 40)
-	label.StudsOffset = Vector3.new(0, 6, 0)
-	label.MaxDistance = 120
-	local text = Instance.new("TextLabel")
-	text.Size = UDim2.fromScale(1, 1)
-	text.BackgroundTransparency = 1
-	text.Font = Palette.Font.Title
-	text.TextScaled = true
-	text.TextColor3 = Palette.UI.Accent
-	text.TextStrokeTransparency = 0.4
-	text.Text = trader.Name
-	text.Parent = label
-	label.Parent = body
 
 	active[encounterId] = { trader = trader, model = model, bought = {} }
 	model.Destroying:Connect(function()
