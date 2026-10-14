@@ -226,6 +226,23 @@ end
 
 -- Public -----------------------------------------------------------------------------
 
+local setCallbacks: { (number, any, Folder) -> () } = {}
+local rerollCallbacks: { () -> () } = {}
+
+-- Called after a zone gets a biome, with its folder (things built there go when it changes).
+function BiomeService.onBiomeSet(callback: (number, any, Folder) -> ())
+	table.insert(setCallbacks, callback)
+end
+
+-- Called after every zone has been rolled for a new tide cycle.
+function BiomeService.onRerolled(callback: () -> ())
+	table.insert(rerollCallbacks, callback)
+end
+
+function BiomeService.zoneFolder(zone: number): Folder?
+	return folder and folder:FindFirstChild("Zone" .. zone) :: Folder?
+end
+
 function BiomeService.get(zone: number): string?
 	return Workspace:GetAttribute(Biomes.attributeFor(zone))
 end
@@ -245,6 +262,9 @@ function BiomeService.set(zone: number, biomeId: string?)
 		decorBuilders[biome.Entrance](zoneFolder, biome, startZ, endZ)
 		buildEntrance(zoneFolder, biome, zone)
 		zoneFolder.Parent = folder
+		for _, callback in setCallbacks do
+			task.spawn(callback, zone, biome, zoneFolder)
+		end
 	end
 end
 
@@ -266,6 +286,9 @@ function BiomeService.reroll()
 			end
 		end
 		BiomeService.set(zone, if picked and Biomes.List[picked] then picked else nil)
+	end
+	for _, callback in rerollCallbacks do
+		task.spawn(callback)
 	end
 end
 

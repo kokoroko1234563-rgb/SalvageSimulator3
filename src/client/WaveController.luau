@@ -8,6 +8,7 @@ local RunService = game:GetService("RunService")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Tide = require(Shared.Tide)
+local Traders = require(Shared.Traders)
 local Waves = require(Shared.Waves)
 
 local player = Players.LocalPlayer
@@ -24,7 +25,11 @@ function WaveController.init()
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if humanoid and root and humanoid.Health > 0 then
 			-- Characters are moved directly: the Humanoid controller would cancel a plain force.
-			local push = Waves.getPush(root.Position, now, waterline) * Config.Waves.CharacterFactor
+			local resistance =
+				Traders.wavePushMultiplier(Traders.parseLevels(player:GetAttribute("Upgrades")))
+			local push = Waves.getPush(root.Position, now, waterline)
+				* Config.Waves.CharacterFactor
+				* resistance
 			if push.Magnitude > 0 then
 				root.CFrame += Vector3.new(push.X, 0, push.Z) * dt
 			end

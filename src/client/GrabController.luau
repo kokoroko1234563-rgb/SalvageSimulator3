@@ -21,6 +21,7 @@ local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Rebirth = require(Shared.Rebirth)
+local Traders = require(Shared.Traders)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
@@ -31,6 +32,11 @@ local player = Players.LocalPlayer
 local grabCfg = Config.Grab
 
 local GrabController = {}
+
+-- This player's trader upgrade levels.
+local function upgrades(): { [string]: number }
+	return Traders.parseLevels(player:GetAttribute("Upgrades"))
+end
 
 type Held = {
 	part: BasePart,
@@ -296,6 +302,7 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 	align.Responsiveness = 25
 	align.MaxVelocity = 60
 		* (if hasReward("SwiftFeet") and kind == "vessel" then Rebirth.SwiftFeetSpeed else 1)
+		* (if kind == "vessel" then Traders.vesselSpeedMultiplier(upgrades()) else 1)
 	if kind == "item" then
 		align.ApplyAtCenterOfMass = true
 		-- part.Mass, not AssemblyMass: the item may still read as anchored on this client for a
@@ -304,7 +311,9 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 	else
 		local vessel = part.Parent :: Model
 		align.ApplyAtCenterOfMass = false
-		align.MaxForce = loadedMass(vessel) * grabCfg.TowAcceleration
+		align.MaxForce = loadedMass(vessel)
+			* grabCfg.TowAcceleration
+			* Traders.vesselSpeedMultiplier(upgrades())
 	end
 	align.Position = part.Position
 	align.Parent = part
@@ -416,7 +425,7 @@ local function updateBrake()
 			current.upright.CFrame =
 				CFrame.fromMatrix(Vector3.zero, Vector3.yAxis, flatLook:Cross(Vector3.yAxis))
 		end
-		local force = mass * grabCfg.HoverAcceleration
+		local force = mass * grabCfg.HoverAcceleration * Traders.vesselSpeedMultiplier(upgrades())
 		current.align.MaxAxesForce = Vector3.new(force, force, force)
 		current.align.Enabled = true
 		current.upright.PrimaryAxisOnly = false
@@ -509,7 +518,9 @@ local function update(dt: number)
 	current.align.Position = target
 	if current.kind == "vessel" then
 		-- Cargo gets loaded and spilled while towing, so keep the pull matched to the load.
-		current.align.MaxForce = loadedMass(part.Parent :: Model) * grabCfg.TowAcceleration
+		current.align.MaxForce = loadedMass(part.Parent :: Model)
+			* grabCfg.TowAcceleration
+			* Traders.vesselSpeedMultiplier(upgrades())
 	end
 
 	if DEBUG and not current.checkedOwnership and os.clock() - current.startedAt > 1 then
@@ -535,7 +546,8 @@ local function update(dt: number)
 		local tool = currentTool()
 		if
 			os.clock() - current.startedAt > 0.8
-			and (part.Position - target).Magnitude > tool.GripBreak + part.Size.Magnitude / 2
+			and (part.Position - target).Magnitude
+				> tool.GripBreak * Traders.gripMultiplier(upgrades()) + part.Size.Magnitude / 2
 		then
 			current.farFor += dt
 			if current.farFor > grabCfg.GripBreakTime then

@@ -19,7 +19,7 @@ local Catalog = {}
 export type Entry = {
 	Id: string,
 	Name: string,
-	Category: "Tool" | "Vessel" | "Accessory" | "Unlock",
+	Category: "Tool" | "Vessel" | "Accessory" | "Cosmetic" | "Unlock",
 	Rarity: string,
 	Tradeable: boolean,
 	Resets: "Rebirth" | "TrueRebirth" | "Never",
@@ -29,7 +29,7 @@ export type Entry = {
 	Order: number,
 }
 
-Catalog.Categories = { "Tool", "Vessel", "Accessory", "Unlock" }
+Catalog.Categories = { "Tool", "Vessel", "Accessory", "Cosmetic", "Unlock" }
 
 Catalog.ResetText = {
 	Rebirth = "Lost on rebirth",
@@ -102,6 +102,20 @@ for _, accessory in Gear.Accessories do
 		ShopItem = false,
 		Exotic = accessory.Exotic == true,
 		Description = accessory.Note .. ".",
+	})
+end
+
+for _, cosmetic in Gear.Cosmetics do
+	add({
+		Id = cosmetic.Id,
+		Name = cosmetic.Name,
+		Category = "Cosmetic",
+		Rarity = cosmetic.Rarity,
+		Tradeable = false,
+		Resets = "Never",
+		ShopItem = false,
+		Exotic = false,
+		Description = cosmetic.Note .. ".",
 	})
 end
 

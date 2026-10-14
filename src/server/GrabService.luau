@@ -8,9 +8,11 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 local Gear = require(Shared.Gear)
+local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
 
+local DataService = require(script.Parent.DataService)
 local ItemService = require(script.Parent.ItemService)
 local VesselService = require(script.Parent.VesselService)
 
@@ -71,6 +73,23 @@ local function grabItem(player: Player, item: BasePart, root: BasePart): (boolea
 	GrabService.forceRelease(player)
 	ItemService.setHeld(item, player)
 	heldBy[player] = item
+
+	-- Finding something on the beach yourself records it in your lexicon.
+	if state == "Unclaimed" then
+		local itemId = item:GetAttribute("ItemId")
+		if DataService.recordLexicon(player, itemId) then
+			local def = Items.get(itemId)
+			notify(
+				player,
+				string.format(
+					"New lexicon entry: %s! (%d/%d)",
+					if def then def.Name else itemId,
+					player:GetAttribute("LexiconCount") or 0,
+					#Items.Catalog
+				)
+			)
+		end
+	end
 	return true
 end
 

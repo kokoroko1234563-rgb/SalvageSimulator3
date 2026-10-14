@@ -191,6 +191,7 @@ local EVENTS = {
 	OnServerEvent = true,
 	OnClientEvent = true,
 	Completed = true,
+	Destroying = true,
 }
 function Harness.isEvent(_real, key)
 	return EVENTS[key] == true

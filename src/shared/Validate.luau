@@ -11,12 +11,13 @@ local Items = require(script.Parent.Items)
 local Palette = require(script.Parent.Palette)
 local Rebirth = require(script.Parent.Rebirth)
 local Secrets = require(script.Parent.Secrets)
+local Traders = require(script.Parent.Traders)
 
 local Validate = {}
 
 local SHAPES = { Ball = true, Block = true, Cylinder = true }
 local RESETS = { Rebirth = true, TrueRebirth = true, Never = true }
-local CATEGORIES = { Tool = true, Vessel = true, Accessory = true, Unlock = true }
+local CATEGORIES = { Tool = true, Vessel = true, Accessory = true, Cosmetic = true, Unlock = true }
 
 -- Returns a list of problems (empty when everything checks out).
 -- `extra` lets server code add checks for things only it knows (vessel builders, entrances).
@@ -208,6 +209,32 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 				where .. ": spawn is outside the course box"
 			)
 		end
+	end
+
+	-- Cosmetics
+	for _, cosmetic in Gear.Cosmetics do
+		check(Palette.Rarity[cosmetic.Rarity] ~= nil, "Cosmetic " .. cosmetic.Id .. ": rarity has no colour")
+	end
+
+	-- Traders: each sells a real upgrade; traders whose biome exists must be payable with
+	-- something that exists.
+	for id, trader in Traders.List do
+		local where = "Trader " .. id
+		check(trader.Id == id, where .. ": Id doesn't match its key")
+		check(
+			Traders.Upgrades[trader.Upgrade] ~= nil,
+			where .. ": sells unknown upgrade " .. tostring(trader.Upgrade)
+		)
+		check(trader.PaidWithItem ~= nil or trader.PaidWithCores ~= nil, where .. ": needs a way to be paid")
+		if Biomes.List[trader.Biome] and trader.PaidWithItem then
+			check(
+				Items.get(trader.PaidWithItem) ~= nil,
+				where .. ": wants " .. trader.PaidWithItem .. ", which doesn't exist"
+			)
+		end
+	end
+	for _, id in Traders.UpgradeOrder do
+		check(Traders.Upgrades[id] ~= nil, "Upgrade " .. id .. " is listed but not defined")
 	end
 
 	-- Rebirth

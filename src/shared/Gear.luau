@@ -211,6 +211,16 @@ Gear.Accessories = {
 	},
 }
 
+-- Worn for looks only.
+Gear.Cosmetics = {
+	{
+		Id = "TallTopHat",
+		Name = "Tall Top Hat",
+		Rarity = "VeryRare",
+		Note = "From the man on the dirt tower, for completing the lexicon. Wear it with pride",
+	},
+}
+
 local toolsById = {}
 for index, tool in Gear.Tools do
 	tool.Order = index

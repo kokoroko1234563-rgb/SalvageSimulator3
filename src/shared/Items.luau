@@ -167,6 +167,17 @@ Items.Catalog = {
 	},
 	-- Heavy
 	{
+		Id = "ShipBell",
+		Name = "Ship's Bell",
+		Class = Heavy,
+		Rarity = "Uncommon",
+		Value = 110,
+		Size = Vector3.new(2, 2.2, 2),
+		Shape = "Cylinder",
+		Color = Color3.fromRGB(190, 150, 60),
+		Material = Palette.Material.Metal,
+	},
+	{
 		Id = "Barrel",
 		Name = "Barrel",
 		Class = Heavy,

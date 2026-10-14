@@ -70,6 +70,15 @@ function InventoryService.snapshot(player: Player)
 		Attunements = attunements,
 		TrueRebirths = profile.TrueRebirths,
 		EquippedAccessory = player:GetAttribute("Accessory"),
+		EquippedCosmetic = player:GetAttribute("Cosmetic"),
+		Lexicon = (function()
+			local found = {}
+			for id in profile.Lexicon do
+				table.insert(found, id)
+			end
+			return found
+		end)(),
+		Upgrades = profile.Upgrades,
 		PocketSlots = player:GetAttribute("PocketSlots"),
 		Rewards = rewards,
 		Pockets = profile.Pockets,
@@ -110,7 +119,11 @@ local function onAction(player: Player, action: any, arg: any, value: any): (boo
 
 	if action == "equip" then
 		local record, entry = findRecord(player, arg)
-		if not record or not entry or (entry.Category ~= "Tool" and entry.Category ~= "Accessory") then
+		if
+			not record
+			or not entry
+			or (entry.Category ~= "Tool" and entry.Category ~= "Accessory" and entry.Category ~= "Cosmetic")
+		then
 			return false, "You can't equip that"
 		end
 		if not DataService.canUse(player, record.Id) then
@@ -118,6 +131,8 @@ local function onAction(player: Player, action: any, arg: any, value: any): (boo
 		end
 		if entry.Category == "Tool" then
 			profile.EquippedTool = record.Id
+		elseif entry.Category == "Cosmetic" then
+			profile.EquippedCosmetic = record.Id
 		else
 			profile.EquippedAccessory = record.Id
 		end
@@ -125,6 +140,11 @@ local function onAction(player: Player, action: any, arg: any, value: any): (boo
 		return true
 	elseif action == "unequip" then
 		local record, entry = findRecord(player, arg)
+		if record and entry and entry.Category == "Cosmetic" then
+			profile.EquippedCosmetic = nil
+			DataService.changed(player)
+			return true
+		end
 		if not record or not entry or entry.Category ~= "Accessory" then
 			return false, "Nothing to take off"
 		end

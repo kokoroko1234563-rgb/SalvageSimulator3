@@ -10,6 +10,7 @@ local Config = require(Shared.Config)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
 local Secrets = require(Shared.Secrets)
+local Traders = require(Shared.Traders)
 
 local DataService = require(script.Parent.DataService)
 local VesselService = require(script.Parent.VesselService)
@@ -28,7 +29,9 @@ function RebirthService.applyEffects(player: Player)
 	if not profile or not humanoid then
 		return
 	end
-	humanoid.WalkSpeed = 16 * (if profile.Rewards.SwiftFeet then Rebirth.SwiftFeetSpeed else 1)
+	humanoid.WalkSpeed = 16
+		* (if profile.Rewards.SwiftFeet then Rebirth.SwiftFeetSpeed else 1)
+		* Traders.walkMultiplier(profile.Upgrades)
 end
 
 -- Does the reset. `free` skips the cost (admin console).
@@ -94,6 +97,14 @@ function RebirthService.trueRebirth(player: Player, free: boolean): (boolean, st
 	profile.PendingPick = nil
 	profile.ColoredCoins = {}
 	profile.Pockets = {} -- Deep Pockets is gone with the rewards
+	-- Trader upgrades go too, except permanent ones (Madame Gull's Tide Reading).
+	local keptUpgrades = {}
+	for id, level in profile.Upgrades do
+		if Traders.Upgrades[id] and Traders.Upgrades[id].Permanent then
+			keptUpgrades[id] = level
+		end
+	end
+	profile.Upgrades = keptUpgrades
 	profile.TrueRebirths += 1
 	profile.Cores += 1
 	DataService.removeItemsLostOn(player, "TrueRebirth")

@@ -16,6 +16,7 @@ local Items = require(Shared.Items)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
 local Secrets = require(Shared.Secrets)
+local Traders = require(Shared.Traders)
 
 local HUD = require(script.Parent.HUD)
 
@@ -213,6 +214,12 @@ local function itemCard(group, order: number)
 				act("attune", item.Uid)
 			end)
 		end
+	elseif entry.Category == "Cosmetic" then
+		local worn = snapshot.EquippedCosmetic == item.Id
+		actionButton = button(if worn then "Take off" else "Wear", Palette.UI.Pocket, card);
+		(actionButton :: TextButton).Activated:Connect(function()
+			act(if worn then "unequip" else "equip", item.Uid)
+		end)
 	elseif entry.Category == "Accessory" then
 		local worn = snapshot.EquippedAccessory == item.Id
 		actionButton = button(if worn then "Take off" else "Wear", Palette.UI.Pocket, card);
@@ -370,6 +377,122 @@ local function showRewards()
 			Size = UDim2.new(1, -20, 0, 30),
 		}, card)
 	end
+
+	-- Trader upgrades.
+	label({
+		Text = "Trader upgrades",
+		Font = FONT,
+		TextSize = 18,
+		TextColor3 = ACCENT,
+		Size = UDim2.new(1, -12, 0, 26),
+		LayoutOrder = 100,
+	}, content)
+	local any = false
+	for index, id in Traders.UpgradeOrder do
+		local level = (snapshot.Upgrades or {})[id] or 0
+		if level > 0 then
+			any = true
+			local upgrade = Traders.Upgrades[id]
+			local card = make(
+				"Frame",
+				{ BackgroundColor3 = CARD, Size = UDim2.new(1, -12, 0, 52), LayoutOrder = 100 + index },
+				content
+			)
+			corner(card, 8)
+			border(card, if upgrade.Permanent then nil else "TrueRebirth")
+			label({
+				Text = string.format("%s  ·  level %d/%d", upgrade.Name, level, upgrade.MaxLevel),
+				Font = FONT,
+				TextSize = 16,
+				Position = UDim2.fromOffset(10, 4),
+				Size = UDim2.new(1, -20, 0, 22),
+			}, card)
+			label({
+				Text = upgrade.Effect,
+				TextSize = 12,
+				TextColor3 = MUTED,
+				Position = UDim2.fromOffset(10, 26),
+				Size = UDim2.new(1, -20, 0, 22),
+			}, card)
+		end
+	end
+	if not any then
+		label({
+			Text = "None yet. Special traders sometimes appear in their biome and sell upgrades.",
+			TextColor3 = MUTED,
+			Size = UDim2.new(1, -12, 0, 36),
+			LayoutOrder = 101,
+		}, content)
+	end
+end
+
+-- Every beach item; the ones this player has found are shown, the rest are "???".
+local function showLexicon()
+	make("UIGridLayout", {
+		CellSize = UDim2.fromOffset(120, 74),
+		CellPadding = UDim2.fromOffset(8, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, content)
+	local found = {}
+	for _, id in snapshot.Lexicon or {} do
+		found[id] = true
+	end
+	local count = 0
+	for _ in found do
+		count += 1
+	end
+	local header = make("Frame", { BackgroundTransparency = 1, LayoutOrder = 0 }, content)
+	label({
+		Text = string.format("%d / %d found", count, #Items.Catalog),
+		Font = FONT,
+		TextSize = 18,
+		Size = UDim2.fromScale(1, 1),
+		TextYAlignment = Enum.TextYAlignment.Center,
+	}, header)
+	for index, item in Items.Catalog do
+		local card = make("Frame", { BackgroundColor3 = CARD, LayoutOrder = index }, content)
+		corner(card, 8)
+		if found[item.Id] then
+			local band = make("Frame", {
+				BackgroundColor3 = Items.RarityColors[item.Rarity] or Palette.UI.Text,
+				Size = UDim2.new(1, 0, 0, 6),
+				BorderSizePixel = 0,
+			}, card)
+			corner(band, 6)
+			label({
+				Text = item.Name,
+				Font = FONT,
+				TextSize = 14,
+				Position = UDim2.fromOffset(6, 10),
+				Size = UDim2.new(1, -12, 0, 36),
+			}, card)
+			label({
+				Text = if item.Rarity == "VeryRare" then "Very rare" else item.Rarity,
+				TextSize = 12,
+				TextColor3 = Items.RarityColors[item.Rarity] or MUTED,
+				Position = UDim2.fromOffset(6, 50),
+				Size = UDim2.new(1, -12, 0, 16),
+			}, card)
+		else
+			label({
+				Text = "???",
+				Font = FONT,
+				TextSize = 20,
+				TextColor3 = MUTED,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				Size = UDim2.fromScale(1, 1),
+			}, card)
+		end
+	end
+	if count == #Items.Catalog then
+		label({
+			Text = "Complete! Find the man on the dirt tower.",
+			TextColor3 = ACCENT,
+			LayoutOrder = #Items.Catalog + 1,
+			Size = UDim2.fromScale(1, 1),
+		}, content)
+	end
 end
 
 local function refreshFilters()
@@ -455,6 +578,8 @@ local function refresh()
 	clearContent()
 	if tab == "Items" then
 		showItems()
+	elseif tab == "Lexicon" then
+		showLexicon()
 	elseif tab == "Coins" then
 		showCoins()
 	else
@@ -524,7 +649,7 @@ function InventoryUI.init()
 		panel
 	)
 	make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8) }, tabs)
-	for _, name in { "Items", "Coins", "Rewards" } do
+	for _, name in { "Items", "Lexicon", "Coins", "Rewards" } do
 		local b = button(name, Palette.UI.Tab, tabs)
 		b.Size = UDim2.fromOffset(100, 32)
 		b.Activated:Connect(function()

@@ -11,6 +11,7 @@ local Biomes = require(Shared.Biomes)
 local Catalog = require(Shared.Catalog)
 local Rebirth = require(Shared.Rebirth)
 local Secrets = require(Shared.Secrets)
+local Traders = require(Shared.Traders)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
@@ -20,6 +21,8 @@ local Waves = require(Shared.Waves)
 
 local BiomeService = require(script.Parent.BiomeService)
 local DataService = require(script.Parent.DataService)
+local LexiconService = require(script.Parent.LexiconService)
+local TraderService = require(script.Parent.TraderService)
 local RebirthService = require(script.Parent.RebirthService)
 local ItemService = require(script.Parent.ItemService)
 local VesselService = require(script.Parent.VesselService)
@@ -757,6 +760,98 @@ command("inv", "inv [player]", "List a player's inventory", function(caller, arg
 		table.insert(lines, string.format("  pockets %d, cores %d", #profile.Pockets, profile.Cores))
 	end) or lines
 end)
+
+command("towerman", "towerman [zone]", "Make the tower man appear (zone 1 by default)", function(_, args)
+	local zone = math.clamp(math.floor(tonumber(args[1]) or 1), 1, Config.Beach.ActiveZones)
+	LexiconService.spawnTowerMan(zone)
+	return { "The tower man is in zone " .. zone .. " until the next tide cycle" }
+end)
+
+command("lexicon", "lexicon <all|none> [player]", "Fill or clear the lexicon", function(caller, args)
+	local choice = (args[1] or ""):lower()
+	if choice ~= "all" and choice ~= "none" then
+		return { "Usage: lexicon <all|none> [player]" }
+	end
+	local lines = {}
+	return eachTarget(caller, args[2], function(target)
+		local profile = DataService.get(target)
+		if profile then
+			profile.Lexicon = {}
+			if choice == "all" then
+				for _, item in Items.Catalog do
+					profile.Lexicon[item.Id] = os.time()
+				end
+			end
+			DataService.changed(target)
+			table.insert(
+				lines,
+				target.Name .. ": lexicon " .. (if choice == "all" then "complete" else "cleared")
+			)
+		end
+	end) or lines
+end)
+
+command("trader", "trader <id> [zone]", "Make a special trader appear, e.g. trader gary 1", function(_, args)
+	local key = (args[1] or ""):lower()
+	local trader
+	for id, entry in Traders.List do
+		if id:lower() == key then
+			trader = entry
+		end
+	end
+	if not trader then
+		local ids = {}
+		for id in Traders.List do
+			table.insert(ids, id)
+		end
+		table.sort(ids)
+		return { "Usage: trader <" .. table.concat(ids, "|") .. "> [zone]" }
+	end
+	local zone = math.clamp(math.floor(tonumber(args[2]) or 1), 1, Config.Beach.ActiveZones)
+	local parent = Workspace:FindFirstChild("AdminTraders") or Instance.new("Folder")
+	parent.Name = "AdminTraders"
+	parent.Parent = Workspace
+	TraderService.spawn(trader, zone, parent)
+	return {
+		trader.Name
+			.. " is in zone "
+			.. zone
+			.. ", about 65 studs in. Admin traders stay until the server restarts.",
+	}
+end)
+
+command(
+	"upgrade",
+	"upgrade <id> <level> [player]",
+	"Set a trader upgrade level, e.g. upgrade deeplungs 3",
+	function(caller, args)
+		local key = (args[1] or ""):lower()
+		local upgradeId
+		for id in Traders.Upgrades do
+			if id:lower() == key then
+				upgradeId = id
+			end
+		end
+		local level = tonumber(args[2])
+		if not upgradeId or not level then
+			return { "Usage: upgrade <" .. table.concat(Traders.UpgradeOrder, "|") .. "> <level> [player]" }
+		end
+		local lines = {}
+		return eachTarget(caller, args[3], function(target)
+			local profile = DataService.get(target)
+			if profile then
+				profile.Upgrades[upgradeId] =
+					math.clamp(math.floor(level), 0, Traders.Upgrades[upgradeId].MaxLevel)
+				DataService.changed(target)
+				RebirthService.applyEffects(target)
+				table.insert(
+					lines,
+					string.format("%s: %s level %d", target.Name, upgradeId, profile.Upgrades[upgradeId])
+				)
+			end
+		end) or lines
+	end
+)
 
 -- Remote --------------------------------------------------------------------------
 

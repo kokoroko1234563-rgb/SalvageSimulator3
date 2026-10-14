@@ -86,6 +86,10 @@ Palette.World = {
 	Mast = rgb(80, 55, 35),
 	Barrel = rgb(120, 80, 45),
 	ChestWood = rgb(120, 75, 35),
+	Dirt = rgb(120, 90, 60),
+	Skin = rgb(240, 200, 160),
+	Hat = rgb(25, 25, 30),
+	TraderCoat = rgb(80, 120, 160),
 }
 
 Palette.Material = {
@@ -101,6 +105,7 @@ Palette.Material = {
 	Smooth = Enum.Material.SmoothPlastic,
 	Foil = Enum.Material.Foil,
 	Fabric = Enum.Material.Fabric,
+	Dirt = Enum.Material.Ground,
 }
 
 Palette.Font = {

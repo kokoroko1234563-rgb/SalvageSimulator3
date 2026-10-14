@@ -22,6 +22,7 @@ local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
 local Rebirth = require(Shared.Rebirth)
 local Secrets = require(Shared.Secrets)
+local Traders = require(Shared.Traders)
 
 local cfg = Config.Data
 
@@ -51,6 +52,9 @@ export type Profile = {
 	Items: { [string]: ItemRecord }, -- inventory, by unique id
 	EquippedTool: string?, -- catalog id; nil = best owned
 	EquippedAccessory: string?,
+	EquippedCosmetic: string?,
+	Lexicon: { [string]: number }, -- item id -> when first found (os.time); never reset
+	Upgrades: { [string]: number }, -- trader upgrade id -> level
 	Pockets: { PocketEntry }, -- Deep Pockets contents
 	Settings: { HideShopGear: boolean, ShowResetText: boolean },
 }
@@ -69,6 +73,9 @@ local function defaultProfile(): Profile
 		Items = {},
 		EquippedTool = nil,
 		EquippedAccessory = nil,
+		EquippedCosmetic = nil,
+		Lexicon = {},
+		Upgrades = {},
 		Pockets = {},
 		Settings = { HideShopGear = false, ShowResetText = false },
 	}
@@ -143,6 +150,24 @@ local function reconcile(data: any): Profile
 	end
 	if type(data.EquippedAccessory) == "string" and Catalog.get(data.EquippedAccessory) then
 		profile.EquippedAccessory = data.EquippedAccessory
+	end
+	if type(data.EquippedCosmetic) == "string" and Catalog.get(data.EquippedCosmetic) then
+		profile.EquippedCosmetic = data.EquippedCosmetic
+	end
+	if type(data.Lexicon) == "table" then
+		for id, at in data.Lexicon do
+			if Items.get(id) and type(at) == "number" then
+				profile.Lexicon[id] = at
+			end
+		end
+	end
+	if type(data.Upgrades) == "table" then
+		for id, level in data.Upgrades do
+			local upgrade = Traders.Upgrades[id]
+			if upgrade and type(level) == "number" and level > 0 then
+				profile.Upgrades[id] = math.clamp(math.floor(level), 0, upgrade.MaxLevel)
+			end
+		end
 	end
 
 	if type(data.Items) == "table" then
@@ -219,6 +244,9 @@ local function serialize(profile: Profile, release: boolean)
 		Items = profile.Items,
 		EquippedTool = profile.EquippedTool,
 		EquippedAccessory = profile.EquippedAccessory,
+		EquippedCosmetic = profile.EquippedCosmetic,
+		Lexicon = profile.Lexicon,
+		Upgrades = profile.Upgrades,
 		Pockets = profile.Pockets,
 		Settings = profile.Settings,
 		Lock = if release then nil else { JobId = game.JobId, Time = os.time() },
@@ -316,6 +344,16 @@ local function publish(player: Player)
 	player:SetAttribute("Accessory", if accessory then accessory.Id else "")
 	player:SetAttribute("Cores", profile.Cores)
 	player:SetAttribute("ColoredCoinCount", countKeys(profile.ColoredCoins))
+	player:SetAttribute("LexiconCount", countKeys(profile.Lexicon))
+	local cosmetic = profile.EquippedCosmetic
+	player:SetAttribute("Cosmetic", if cosmetic and ownedTypes(profile)[cosmetic] then cosmetic else "")
+	local upgrades = {}
+	for _, id in Traders.UpgradeOrder do
+		if (profile.Upgrades[id] or 0) > 0 then
+			table.insert(upgrades, id .. ":" .. profile.Upgrades[id])
+		end
+	end
+	player:SetAttribute("Upgrades", table.concat(upgrades, ","))
 	for _, callback in changedCallbacks do
 		task.spawn(callback, player, profile)
 	end
@@ -468,6 +506,32 @@ function DataService.grantColoredCoin(player: Player, color: string)
 		profile.ColoredCoins[color] = true
 		publish(player)
 	end
+end
+
+-- Lexicon ----------------------------------------------------------------------------
+
+-- Records that the player found an item type on the beach. Returns true the first time.
+function DataService.recordLexicon(player: Player, itemId: string): boolean
+	local profile = profiles[player]
+	if not profile or profile.Lexicon[itemId] or not Items.get(itemId) then
+		return false
+	end
+	profile.Lexicon[itemId] = os.time()
+	publish(player)
+	return true
+end
+
+function DataService.lexiconComplete(player: Player): boolean
+	local profile = profiles[player]
+	if not profile then
+		return false
+	end
+	for _, item in Items.Catalog do
+		if not profile.Lexicon[item.Id] then
+			return false
+		end
+	end
+	return true
 end
 
 -- Inventory ------------------------------------------------------------------------

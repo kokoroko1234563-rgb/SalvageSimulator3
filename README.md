@@ -69,6 +69,31 @@ Two more safeguards live in the game itself:
 | True rebirth | In the shop: redeem all 5 colored coins (two clicks). It resets coins, gear, rebirths, multiplier, rewards, magical vessels, colored coins and pockets. It keeps unlock items, exotic items, cores and attunements, and gives **1 attunement core**. |
 | Attunement | Exotic items can't be used until you spend a core on them (**Attune** on the inventory card). Attunement is to the item type, so trading the copy away and getting another later still works. |
 
+## Lexicon and the tower man
+
+- **Recording:** the first time you grab an item type off the beach, it's recorded in your lexicon for good (`DataService.recordLexicon`), with a "New lexicon entry" message.
+- **Viewing it:** the inventory's **Lexicon** tab shows every item, with undiscovered ones as "???".
+- **The tower man:** each tide cycle, every zone has a 0.1% chance (`Config.Lexicon`) of a man appearing on top of a tall dirt tower with ledges to climb (`LexiconService`).
+- **The hat:** with a complete lexicon, talking to him gives you the **Tall Top Hat**. It's untradeable, never lost, and worn or taken off from the inventory.
+
+## Special traders
+
+All six from the design doc are defined in `src/shared/Traders.luau`.
+
+- **Who can appear:** only Gary (Sandcastle Flats) and Rusty (Shipwreck Shallows) for now, because the other traders' biomes don't exist yet.
+- **When:** if their biome rolls, they appear 50% of the time in common biomes and 25% in rare ones (`Config.Traders`).
+- **Buying:** each appearance sells at most one level. A level costs coins plus 3/6/10 of the biome's item, which you bring. Items count if they're near the trader, in your vessel, held, or in your pockets. Madame Gull takes 1/2/3 attunement cores instead.
+- **Resets:** upgrades are kept through normal rebirths and lost on a true rebirth, except Madame Gull's Tide Reading.
+
+| Upgrade | Effect (per level) | Where |
+| --- | --- | --- |
+| Comfy Sandals | +5% walk speed | `RebirthService.applyEffects` |
+| Tight Knots | items 15% harder to knock loose | `GrabController` grip |
+| Deep Lungs | +20% breath | `DrowningService` |
+| Tide Reading | rare-biome hints when you join and each tide | `TraderService` |
+| Barnacle Boots | waves push 10% less, never below 30% | `WaveController` |
+| Frostrunner Wax | +20% vessel speed | `GrabController` towing and hover |
+
 ## Trading
 
 Press **T** (or the orange **Trade** button). Invite anyone on the server. They get a message and can accept or decline from their trade screen.
@@ -119,6 +144,8 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `rebirth [player]`, `rebirths <n> [player]` | Free rebirth (with reward pick), or set the count |
 | `reward <id\|all\|none> [player]` | `swiftfeet`, `deeppockets`, `floatingclamshell` |
 | `inv [player]` | List a player's inventory |
+| `towerman [zone]`, `lexicon <all\|none> [player]` | Make the tower man appear; fill or clear the lexicon |
+| `trader <id> [zone]`, `upgrade <id> <level> [player]` | Make a trader appear (`gary`, `rusty`, ...); set an upgrade level |
 | `give <item> [player] [variant]` | Any inventory item: `give anchorhook`, `give deckhandssatchel me Barnacled` |
 | `cores <n> [player]` | Set attunement cores |
 | `attune <item\|all\|none> [player]` | Attune without spending a core |

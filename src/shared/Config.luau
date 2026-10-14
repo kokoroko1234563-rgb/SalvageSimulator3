@@ -106,6 +106,19 @@ Config.Secrets = {
 	MaxFlood = 180, -- ...and at most this many, depending on when in the tide cycle you enter
 }
 
+Config.Lexicon = {
+	TowerManChance = 0.001, -- per zone, per tide cycle
+}
+
+Config.Traders = {
+	CommonChance = 0.5, -- a trader appears this often when their common biome rolls
+	RareChance = 0.25, -- and this often in rare biomes
+	BringRadius = 18, -- payment items count if they're this close to the trader (or in your vessel or pockets)
+	LevelCoins = { 5000, 25000, 100000 },
+	LevelItems = { 3, 6, 10 },
+	MinWavePush = 0.3, -- stacked wave resistance never takes waves below 30%
+}
+
 Config.Hazards = {
 	BarrelPeriod = 6, -- Shipwreck Shallows: a barrel rolls down the sand this often (learnable timer)
 	BarrelSpeed = 16,

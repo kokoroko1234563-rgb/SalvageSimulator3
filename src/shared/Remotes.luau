@@ -13,6 +13,7 @@ local FUNCTIONS = {
 	"Rebirth", -- () -> ok, reason
 	"TrueRebirth", -- () -> ok, reason
 	"Trade", -- (action, ...) -> ok, reason (see TradeService)
+	"TraderBuy", -- (encounterId) -> ok, reason
 	"ChooseReward", -- (rewardId) -> ok, reason
 	"GetInventory", -- () -> snapshot (see InventoryService)
 	"InventoryAction", -- (action, arg, value?) -> ok, reason
@@ -29,6 +30,7 @@ local EVENTS = {
 	"Pocket", -- client -> server ("store", part) | ("drop", slot?)
 	"InventorySync", -- server -> client (snapshot) whenever the inventory changes
 	"TradeSync", -- server -> client (trade state) whenever a trade or invite changes
+	"TraderOpen", -- server -> client (offer) when a player talks to a special trader
 }
 
 local Remotes = {}

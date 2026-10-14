@@ -36,6 +36,7 @@ for _, name in
 		"Biomes",
 		"Secrets",
 		"Rebirth",
+		"Traders",
 		"Tide",
 		"Beach",
 		"Waves",
@@ -66,6 +67,9 @@ test("load server services", function()
 			"InventoryService",
 			"AdminService",
 			"DrowningService",
+			"LexiconService",
+			"TraderService",
+			"TradeService",
 		}
 	do
 		h.require("Server/" .. name)
@@ -137,7 +141,16 @@ end
 
 -- 8. Client UI modules load.
 for _, name in
-	{ "HUD", "InventoryUI", "TideController", "WaveController", "GrabController", "AdminConsole", "TradeUI" }
+	{
+		"HUD",
+		"InventoryUI",
+		"TideController",
+		"WaveController",
+		"GrabController",
+		"AdminConsole",
+		"TradeUI",
+		"TraderUI",
+	}
 do
 	test("load Client/" .. name, function()
 		h.require("Client/" .. name)
@@ -229,6 +242,59 @@ test("trade rejects shop gear, missing items and too many coins", function()
 	)
 	local pa = DataService.get(a :: any)
 	assert(pa.Coins == 100 and pa.Items.k and pa.Items.g, "rejected trades must change nothing")
+end)
+
+-- 10. Lexicon, tower man, hat and traders.
+test("build the tower man and the hat", function()
+	local LexiconService = h.require("Server/LexiconService")
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	folder.Parent = h.game.Workspace
+	local tower = LexiconService.buildTower(folder, roblox.Vector3.new(0, 0, 100))
+	assert(tower:FindFirstChild("Man"), "no man on the tower")
+	local hat = LexiconService.buildHat()
+	assert(hat:IsA("Accessory"), "the hat must be an Accessory")
+	local handle = hat:FindFirstChild("Handle")
+	assert(handle and handle:FindFirstChild("HatAttachment"), "the hat needs a Handle with a HatAttachment")
+	folder:Destroy()
+end)
+
+local Traders = h.require("Shared/Traders")
+for id, trader in Traders.List do
+	test("build trader " .. id, function()
+		local folder = Harness.wrap(roblox.Instance.new("Folder"))
+		folder.Parent = h.game.Workspace
+		local model = h.require("Server/TraderService").spawn(trader, 1, folder)
+		assert(model:GetAttribute("EncounterId"), "trader needs an encounter id")
+		folder:Destroy()
+	end)
+end
+
+test("upgrade effects and caps", function()
+	assert(Traders.walkMultiplier({ ComfySandals = 3 }) == 1.15, "sandals")
+	assert(math.abs(Traders.wavePushMultiplier({ BarnacleBoots = 3 }) - 0.7) < 1e-9, "boots")
+	assert(Traders.wavePushMultiplier({ BarnacleBoots = 50 }) == 0.3, "waves must keep at least 30%")
+	assert(Traders.breathMultiplier({}) == 1, "no upgrades means no change")
+	local levels = Traders.parseLevels("ComfySandals:2,DeepLungs:1")
+	assert(levels.ComfySandals == 2 and levels.DeepLungs == 1, "parse levels")
+	local gull = Traders.cost(Traders.List.MadameGull, 2)
+	assert(gull.Cores == 2 and gull.Coins == 0, "Madame Gull takes cores")
+	local gary = Traders.cost(Traders.List.Gary, 3)
+	assert(gary.Coins == 100000 and gary.Items == 10, "Gary's level 3 cost")
+end)
+
+test("lexicon records each item once and knows when it's complete", function()
+	local DataService = h.require("Server/DataService")
+	local Items = h.require("Shared/Items")
+	local p = fakePlayer("E", 5)
+	DataService._setProfile(p, {})
+	assert(DataService.recordLexicon(p :: any, "Seashell") == true, "first find is new")
+	assert(DataService.recordLexicon(p :: any, "Seashell") == false, "second find isn't")
+	assert(DataService.recordLexicon(p :: any, "NotAnItem") == false, "unknown items aren't recorded")
+	assert(not DataService.lexiconComplete(p :: any), "not complete yet")
+	for _, item in Items.Catalog do
+		DataService.recordLexicon(p :: any, item.Id)
+	end
+	assert(DataService.lexiconComplete(p :: any), "should be complete")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failures))
