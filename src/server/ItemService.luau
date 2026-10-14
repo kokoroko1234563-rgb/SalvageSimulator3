@@ -201,6 +201,7 @@ local function createItem(def, zoneIndex: number, position: Vector3): BasePart
 		* CFrame.Angles(0, rng:NextNumber() * math.pi * 2, 0)
 	part:SetAttribute("ItemId", def.Id)
 	part:SetAttribute("Class", def.Class)
+	part:SetAttribute("Floats", Items.floats(def))
 	part:SetAttribute("Rarity", def.Rarity)
 	part:SetAttribute("Zone", zoneIndex)
 	part:SetAttribute("Value", math.floor(def.Value * Config.Zones[zoneIndex].Multiplier))
@@ -324,7 +325,12 @@ local function maintenanceTick()
 
 		local fellOut = position.Y < Beach.groundY(position.Z) - 30
 			or math.abs(position.X) > Beach.HalfWidth + 40
-		local drowned = Beach.isLost(position, waterline) and (state == "Unclaimed" or state == "Loose")
+		-- Floating items drift out instead of sinking, and are lost once they're far out.
+		local floats = item:GetAttribute("Floats") == true
+		local lostAt = if floats
+			then position.Z > waterline + Config.Waves.FloatAwayDistance
+			else Beach.isLost(position, waterline)
+		local drowned = lostAt and (state == "Unclaimed" or state == "Loose")
 		if fellOut or drowned then
 			ItemService.destroy(item)
 		elseif state == "Unclaimed" then
@@ -333,7 +339,9 @@ local function maintenanceTick()
 				ItemService.destroy(item)
 			end
 		elseif state == "Loose" then
-			if t - since > cfg.LooseTimeout and item.AssemblyLinearVelocity.Magnitude < 1 then
+			-- Never freeze something bobbing in the water: it'd hang there when the tide moved.
+			local afloat = floats and Beach.depthAt(position, waterline) > 0
+			if t - since > cfg.LooseTimeout and item.AssemblyLinearVelocity.Magnitude < 1 and not afloat then
 				ItemService.setUnclaimed(item, true)
 			end
 		end

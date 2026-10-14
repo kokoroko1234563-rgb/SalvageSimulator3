@@ -87,6 +87,14 @@ Config.Waves = {
 	CharacterFactor = 1, -- multiplier on push for characters (displacement)
 	ItemFactor = 2.5, -- multiplier on push for physical items (acceleration)
 	Buoyancy = 0.55, -- fraction of gravity cancelled for submerged items
+	-- Floating items (round ones: balls and cylinders) bob at the surface instead of rolling
+	-- down the seabed, and a current carries them out to sea until they're lost.
+	FloatSpring = 0.5, -- extra lift per stud below the surface, as a fraction of gravity
+	FloatDamping = 8, -- calms the bobbing
+	FloatDrag = 1.2, -- water slows their sideways drift
+	FloatDrift = 3, -- studs/s current carrying floating items out to sea
+	FloatWavePush = 0.4, -- waves push floating items this much, so the current wins over time
+	FloatAwayDistance = 120, -- floating items this far out past the waterline are lost
 	MinPushFraction = 0.3, -- future stat stacking can never reduce waves below this
 }
 

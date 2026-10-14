@@ -280,6 +280,15 @@ function Items.scaleRare(weights: { [string]: number }, scale: number): { [strin
 	return scaled
 end
 
+-- Whether an item floats in the sea. Round things (balls and cylinders) roll down the
+-- seabed otherwise, so they float unless the item sets Floats = false.
+function Items.floats(def): boolean
+	if def.Floats ~= nil then
+		return def.Floats
+	end
+	return def.Shape == "Ball" or def.Shape == "Cylinder"
+end
+
 function Items.rollRarity(weights: { [string]: number }, rng: Random): string
 	local total = 0
 	for _, rarity in Items.Rarities do

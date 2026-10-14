@@ -48,10 +48,40 @@ function Waves.getPush(position: Vector3, now: number, waterline: number): Vecto
 	return Vector3.zero
 end
 
+-- Keeps a floating part at the sea surface and lets the current carry it out. Returns false
+-- (and does nothing) when the part isn't in the water.
+function Waves.applyFloat(part: BasePart, dt: number, waterline: number): boolean
+	local surface = Beach.waterY(waterline)
+	local below = surface - part.Position.Y -- > 0: its centre is under water
+	if below < -part.Size.Y / 2 or Beach.depthAt(part.Position, waterline) <= 0 then
+		return false
+	end
+	local velocity = part.AssemblyLinearVelocity
+	local gravity = workspace.Gravity
+	-- A spring around "half under water", damped so it settles instead of bouncing.
+	local lift = gravity * (1 + cfg.FloatSpring * math.max(below, 0)) - cfg.FloatDamping * velocity.Y
+	if below < 0 then
+		lift = gravity * (1 + below / (part.Size.Y / 2)) - cfg.FloatDamping * velocity.Y
+	end
+	local drift = Vector3.new(-velocity.X * cfg.FloatDrag, 0, (cfg.FloatDrift - velocity.Z) * cfg.FloatDrag)
+	part:ApplyImpulse((Vector3.new(0, lift, 0) + drift) * part.Mass * dt)
+	part.AssemblyAngularVelocity *= 0.95
+	return true
+end
+
 -- Applies one frame of wave push to an unanchored part this machine simulates.
 -- `multiplier` lets future stats (Sea Legs, Barnacle Boots) reduce the push, capped below.
 function Waves.applyToPart(part: BasePart, dt: number, now: number, waterline: number, multiplier: number?)
 	if part.Anchored or part.Massless then
+		return
+	end
+	-- Cargo is welded into its vessel, so it rides with it instead of floating on its own.
+	local floats = part:GetAttribute("Floats") and part:GetAttribute("State") ~= "InVessel"
+	if floats and Waves.applyFloat(part, dt, waterline) then
+		-- Floating at the surface: waves still push it, but it doesn't sink.
+		local push = Waves.getPush(part.Position, now, waterline)
+		local scale = math.max(multiplier or 1, cfg.MinPushFraction)
+		part:ApplyImpulse(push * cfg.ItemFactor * cfg.FloatWavePush * scale * part.Mass * dt)
 		return
 	end
 	local push = Waves.getPush(part.Position, now, waterline)

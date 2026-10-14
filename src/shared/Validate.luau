@@ -57,6 +57,7 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 			where .. ": rarity '" .. tostring(item.Rarity) .. "' has no colour"
 		)
 		check(SHAPES[item.Shape], where .. ": unknown Shape " .. tostring(item.Shape))
+		check(item.Floats == nil or type(item.Floats) == "boolean", where .. ": Floats must be true or false")
 		check(typeof(item.Size) == "Vector3", where .. ": Size must be a Vector3")
 		check(isColor(item.Color), where .. ": Color must be a Color3")
 		check(type(item.Value) == "number", where .. ": missing Value")
