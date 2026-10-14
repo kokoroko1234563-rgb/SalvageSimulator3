@@ -7,7 +7,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 local Tide = require(Shared.Tide)
-local Traders = require(Shared.Traders)
+local Stats = require(Shared.Stats)
 
 local cfg = Config.Drowning
 local TICK = 0.2
@@ -27,7 +27,7 @@ local function tick()
 
 		local breath = player:GetAttribute("Breath") or 1
 		if Beach.isDeep(root.Position, waterline) and not player:GetAttribute("AdminGod") then
-			local lungs = Traders.breathMultiplier(Traders.parseLevels(player:GetAttribute("Upgrades")))
+			local lungs = Stats.breath(player)
 			breath = math.max(0, breath - TICK / (cfg.BreathTime * lungs))
 			if breath <= 0 then
 				humanoid:TakeDamage(cfg.DamagePerSecond * TICK)

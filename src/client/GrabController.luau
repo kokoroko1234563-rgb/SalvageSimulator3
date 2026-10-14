@@ -21,6 +21,7 @@ local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Rebirth = require(Shared.Rebirth)
+local Stats = require(Shared.Stats)
 local Traders = require(Shared.Traders)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
@@ -43,6 +44,7 @@ type Held = {
 	kind: "item" | "vessel",
 	mode: "drag" | "lifted",
 	holdDistance: number,
+	bubble: BasePart?,
 	attachment: Attachment,
 	align: AlignPosition,
 	startedAt: number,
@@ -240,6 +242,11 @@ local function cleanup()
 	end
 	held.align:Destroy()
 	held.attachment:Destroy()
+	if held.bubble then
+		held.bubble:Destroy()
+	end
+	-- Local-only marks for WaveController (see begin).
+	held.part:SetAttribute("WaveScale", nil)
 	held = nil
 	HUD.setHoldButtons(false)
 end
@@ -308,6 +315,16 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 		-- part.Mass, not AssemblyMass: the item may still read as anchored on this client for a
 		-- moment after the server lets go of it, and an anchored assembly's mass isn't usable.
 		align.MaxForce = part.Mass * currentTool().Grip
+		local tool = currentTool()
+		if tool.MaxSpeed then
+			align.MaxVelocity = tool.MaxSpeed
+		end
+		-- Set on this client only: WaveController reads it to soften waves on what we hold.
+		if tool.Bubble then
+			part:SetAttribute("WaveScale", 0)
+		elseif tool.Magnet then
+			part:SetAttribute("WaveScale", grabCfg.MagnetWaveScale)
+		end
 	else
 		local vessel = part.Parent :: Model
 		align.ApplyAtCenterOfMass = false
@@ -328,6 +345,27 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 		startedAt = os.clock(),
 		farFor = 0,
 	}
+	if kind == "item" and currentTool().Bubble then
+		local bubble = Instance.new("Part")
+		bubble.Name = "Bubble"
+		bubble.Shape = Enum.PartType.Ball
+		local size = part.Size.Magnitude + 1
+		bubble.Size = Vector3.new(size, size, size)
+		bubble.CFrame = part.CFrame
+		bubble.Transparency = 0.7
+		bubble.Material = Palette.Material.Glass
+		bubble.Color = Palette.UI.Breath
+		bubble.CanCollide = false
+		bubble.CanQuery = false
+		bubble.CanTouch = false
+		bubble.Massless = true
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = part
+		weld.Part1 = bubble
+		weld.Parent = bubble
+		bubble.Parent = part
+		held.bubble = bubble
+	end
 end
 
 -- Height of the map surface (sand, seabed or boardwalk) under a position.
@@ -492,7 +530,10 @@ local function targetPosition(current: Held, root: BasePart): Vector3
 	if current.kind == "vessel" then
 		return Vector3.new(target.X, ground + handleHeight, target.Z)
 	end
-	local floor = ground + current.part.Size.Y / 2 + grabCfg.HoldLift
+	local floor = ground
+		+ current.part.Size.Y / 2
+		+ grabCfg.HoldLift
+		+ (if currentTool().Bubble then grabCfg.BubbleFloat else 0)
 	if target.Y < floor then
 		target = Vector3.new(target.X, floor, target.Z)
 	end
@@ -523,6 +564,14 @@ local function update(dt: number)
 		return
 	end
 
+	-- Tide Magnet: reels what it holds in toward you while it's in the water.
+	if current.kind == "item" and current.mode == "drag" and currentTool().Magnet then
+		if Beach.depthAt(part.Position, Tide.waterline()) > 0 then
+			local camera = Workspace.CurrentCamera
+			local closest = (root.Position - camera.CFrame.Position).Magnitude + 4
+			current.holdDistance = math.max(closest, current.holdDistance - grabCfg.MagnetPull * dt)
+		end
+	end
 	local target = targetPosition(current, root)
 	current.align.Position = target
 	if current.kind == "vessel" then
@@ -587,7 +636,7 @@ local function describe(part: BasePart): (string, Color3)
 		return line .. " (claimed)", Palette.UI.Claimed
 	end
 	local tool = currentTool()
-	if not Gear.canLift(tool, class) then
+	if class > Stats.lift(player, tool) then
 		return line .. " (too heavy)", Palette.UI.Bad
 	end
 	if

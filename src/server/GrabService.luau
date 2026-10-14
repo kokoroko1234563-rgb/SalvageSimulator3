@@ -8,6 +8,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 local Gear = require(Shared.Gear)
+local Stats = require(Shared.Stats)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
@@ -61,7 +62,7 @@ local function grabItem(player: Player, item: BasePart, root: BasePart): (boolea
 	if (item.Position - root.Position).Magnitude > tool.Reach + cfg.ReachSlack then
 		return false, "Too far away"
 	end
-	if not Gear.canLift(tool, item:GetAttribute("Class") or 1) then
+	if (item:GetAttribute("Class") or 1) > Stats.lift(player, tool) then
 		return false, "Too heavy for your " .. tool.Name
 	end
 	if

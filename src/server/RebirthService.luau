@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Rebirth = require(Shared.Rebirth)
+local Stats = require(Shared.Stats)
 local Remotes = require(Shared.Remotes)
 local Secrets = require(Shared.Secrets)
 local Traders = require(Shared.Traders)
@@ -30,9 +31,7 @@ function RebirthService.applyEffects(player: Player)
 	if not profile or not humanoid then
 		return
 	end
-	humanoid.WalkSpeed = 16
-		* (if profile.Rewards.SwiftFeet then Rebirth.SwiftFeetSpeed else 1)
-		* Traders.walkMultiplier(profile.Upgrades)
+	humanoid.WalkSpeed = Stats.walkSpeed(player)
 end
 
 -- Does the reset. `free` skips the cost (admin console).
@@ -147,8 +146,11 @@ function RebirthService.grantReward(player: Player, id: string)
 	end
 	profile.Rewards[id] = true
 	DataService.changed(player)
-	if id == "FloatingClamshell" and DataService.countItemType(player, "FloatingClamshell") == 0 then
-		DataService.addItem(player, "FloatingClamshell", "reward")
+	-- Item rewards (magical grabbers and vessels) are inventory items: give one if they
+	-- don't have it. They last until a true rebirth, which also clears the reward.
+	local item = Rebirth.Rewards[id].GrantsItem
+	if item and DataService.countItemType(player, item) == 0 then
+		DataService.addItem(player, item, "reward")
 	end
 	RebirthService.applyEffects(player)
 end
@@ -164,8 +166,9 @@ local function onChoose(player: Player, id: any): (boolean, string?)
 	profile.PendingPick = nil
 	RebirthService.grantReward(player, id)
 	notify(player, "You chose " .. Rebirth.Rewards[id].Name .. "!")
-	if id == "FloatingClamshell" then
-		notify(player, "Spawn your Floating Clamshell from the shop.")
+	local item = Rebirth.Rewards[id].GrantsItem
+	if item then
+		notify(player, "Your " .. Rebirth.Rewards[id].Name .. " is in your inventory (I).")
 	end
 	return true
 end

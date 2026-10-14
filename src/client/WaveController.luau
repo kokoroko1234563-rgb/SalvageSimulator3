@@ -8,7 +8,7 @@ local RunService = game:GetService("RunService")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Tide = require(Shared.Tide)
-local Traders = require(Shared.Traders)
+local Stats = require(Shared.Stats)
 local Waves = require(Shared.Waves)
 
 local player = Players.LocalPlayer
@@ -25,8 +25,7 @@ function WaveController.init()
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if humanoid and root and humanoid.Health > 0 then
 			-- Characters are moved directly: the Humanoid controller would cancel a plain force.
-			local resistance =
-				Traders.wavePushMultiplier(Traders.parseLevels(player:GetAttribute("Upgrades")))
+			local resistance = Stats.wavePush(player)
 			local push = Waves.getPush(root.Position, now, waterline)
 				* Config.Waves.CharacterFactor
 				* resistance
@@ -38,8 +37,9 @@ function WaveController.init()
 		for _, item in CollectionService:GetTagged("SalvageItem") do
 			if item:GetAttribute("Owner") == player.UserId then
 				local state = item:GetAttribute("State")
-				if state == "Held" or state == "InVessel" then
-					Waves.applyToPart(item, dt, now, waterline)
+				local scale = item:GetAttribute("WaveScale") -- set by GrabController on magical grabs
+				if (state == "Held" or state == "InVessel") and scale ~= 0 then
+					Waves.applyToPart(item, dt, now, waterline, scale)
 				end
 			end
 		end

@@ -131,6 +131,26 @@ for id, biome in Biomes.List do
 	end)
 end
 
+test("rebirth rewards stack in Stats", function()
+	local Stats = h.require("Shared/Stats")
+	local Gear = h.require("Shared/Gear")
+	local function fake(attributes)
+		return {
+			GetAttribute = function(_, name)
+				return attributes[name]
+			end,
+		}
+	end
+	local plain = fake({})
+	local rewarded = fake({ Rewards = "SwiftFeet,SeaLegs,StrongBack", Accessory = "TideCrown" })
+	assert(Stats.walkSpeed(rewarded) > Stats.walkSpeed(plain), "Swift Feet should be faster")
+	assert(Stats.breath(rewarded) == 2 * Stats.breath(plain), "Sea Legs doubles breath")
+	assert(Stats.wavePush(rewarded) >= 0.3 and Stats.wavePush(rewarded) < 0.6, "Sea Legs and the crown stack")
+	local tool = Gear.getTool("BasicGrabber") or Gear.Tools[1]
+	assert(Stats.lift(rewarded, tool) == tool.Lift + 1, "Strong Back lifts one class heavier")
+	assert(Stats.lift(rewarded, Gear.getTool("BubbleWand")) == 4, "lift is capped at Very Heavy")
+end)
+
 test("build the bell tower", function()
 	local map = Harness.wrap(roblox.Instance.new("Folder"))
 	local door = h.require("Server/FarSandbarService").build(map)

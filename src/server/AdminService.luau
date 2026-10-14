@@ -715,7 +715,7 @@ command("reward", "reward <id|all|none> [player]", "Grant or clear rebirth rewar
 		end
 	end
 	if #ids == 0 then
-		return { "Usage: reward <swiftfeet|deeppockets|floatingclamshell|all|none> [player]" }
+		return { "Usage: reward <" .. table.concat(Rebirth.Order, "|"):lower() .. "|all|none> [player]" }
 	end
 	local lines = {}
 	return eachTarget(caller, args[2], function(target)
@@ -726,8 +726,9 @@ command("reward", "reward <id|all|none> [player]", "Grant or clear rebirth rewar
 		for _, id in ids do
 			if choice == "none" then
 				profile.Rewards[id] = nil
-				if id == "FloatingClamshell" then
-					DataService.removeItemsOfType(target, "FloatingClamshell", math.huge)
+				local item = Rebirth.Rewards[id].GrantsItem
+				if item then
+					DataService.removeItemsOfType(target, item, math.huge)
 				end
 			else
 				RebirthService.grantReward(target, id)
