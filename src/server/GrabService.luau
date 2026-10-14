@@ -172,7 +172,14 @@ end
 function GrabService.init(notifyFn: (Player, string) -> ())
 	notify = notifyFn
 
-	Remotes.get("GrabRequest").OnServerInvoke = onGrabRequest
+	Remotes.get("GrabRequest").OnServerInvoke = function(player: Player, part: any)
+		local ok, granted, reason = pcall(onGrabRequest, player, part)
+		if not ok then
+			warn("[GrabService] grab request from", player.Name, "errored:", granted)
+			return false, "Grab failed (server error)"
+		end
+		return granted, reason
+	end
 	Remotes.get("Release").OnServerEvent:Connect(onRelease)
 	Remotes.get("SendToVessel").OnServerEvent:Connect(onSendToVessel)
 

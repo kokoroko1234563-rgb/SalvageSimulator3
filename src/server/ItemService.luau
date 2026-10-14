@@ -163,7 +163,9 @@ local function createItem(def, zoneIndex: number, position: Vector3): BasePart
 	part.CustomPhysicalProperties = PhysicalProperties.new(Items.ClassDensity[def.Class], 0.4, 0.1)
 	-- `position` assumes the catalog size; Roblox can resize some shapes (balls are always
 	-- round), so rest the real part on the surface instead of sinking it into the sand.
-	local restY = position.Y - def.Size.Y / 2 + part.Size.Y / 2 + 0.05
+	-- (plus a margin for the beach's slope under the item's corners).
+	local slopeMargin = Config.Beach.Slope * math.max(part.Size.X, part.Size.Z) / 2
+	local restY = position.Y - def.Size.Y / 2 + part.Size.Y / 2 + slopeMargin + 0.05
 	part.CFrame = CFrame.new(position.X, restY, position.Z)
 		* CFrame.Angles(0, rng:NextNumber() * math.pi * 2, 0)
 	part:SetAttribute("ItemId", def.Id)

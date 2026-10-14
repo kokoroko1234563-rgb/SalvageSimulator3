@@ -39,6 +39,7 @@ type Held = {
 	align: AlignPosition,
 	startedAt: number,
 	farFor: number,
+	checkedOwnership: boolean?,
 }
 
 type Press = {
@@ -59,6 +60,18 @@ local releaseRemote
 local sendRemote
 
 local CLASS_NAMES = { "Light", "Medium", "Heavy", "Very heavy" }
+
+-- Clicks that land on the sand this close to an item (or anywhere on your own vessel)
+-- still grab it, so small or half-sunk items aren't fiddly to hit.
+local PICK_RADIUS = 2.5
+
+-- In Studio, explain every click in the Output window.
+local DEBUG = RunService:IsStudio()
+local function debugLog(...)
+	if DEBUG then
+		print("[Grab]", ...)
+	end
+end
 
 local function getRoot(): BasePart?
 	local character = player.Character
@@ -119,10 +132,54 @@ local function grabbableFrom(part: Instance?): (BasePart?, ("item" | "vessel")?)
 	if CollectionService:HasTag(part, "SalvageItem") then
 		return part, "item"
 	end
-	if CollectionService:HasTag(part, "VesselHandle") and ownVesselFrom(part) then
-		return part, "vessel"
+	-- Any part of your own vessel tows it by its handle.
+	local vessel = ownVesselFrom(part)
+	if vessel then
+		for _, child in vessel:GetChildren() do
+			if CollectionService:HasTag(child, "VesselHandle") then
+				return child :: BasePart, "vessel"
+			end
+		end
 	end
 	return nil, nil
+end
+
+-- Finds what the player is pointing at: the part under the pointer if it's grabbable,
+-- otherwise the nearest grabbable thing close to where the pointer ray landed.
+local function pick(screenPosition: Vector2): (BasePart?, ("item" | "vessel")?, Vector3?, string)
+	local hit = raycastFrom(screenPosition)
+	if not hit then
+		return nil, nil, nil, "pointer hit nothing"
+	end
+	local part, kind = grabbableFrom(hit.Instance)
+	if part and kind then
+		return part, kind, hit.Position, "hit " .. hit.Instance:GetFullName()
+	end
+
+	local include = {}
+	for _, name in { "Items", "Vessels" } do
+		local folder = Workspace:FindFirstChild(name)
+		if folder then
+			table.insert(include, folder)
+		end
+	end
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = include
+	local best, bestKind, bestDistance = nil, nil, math.huge
+	for _, nearby in Workspace:GetPartBoundsInRadius(hit.Position, PICK_RADIUS, params) do
+		local candidate, candidateKind = grabbableFrom(nearby)
+		if candidate and candidateKind then
+			local distance = (nearby.Position - hit.Position).Magnitude
+			if distance < bestDistance then
+				best, bestKind, bestDistance = candidate, candidateKind, distance
+			end
+		end
+	end
+	if best then
+		return best, bestKind, hit.Position, "near " .. hit.Instance:GetFullName()
+	end
+	return nil, nil, nil, "hit " .. hit.Instance:GetFullName() .. ", nothing grabbable nearby"
 end
 
 local function vesselMass(vessel: Model): number
@@ -299,6 +356,21 @@ local function update(dt: number)
 	local target = targetPosition(current, root)
 	current.align.Position = target
 
+	if DEBUG and not current.checkedOwnership and os.clock() - current.startedAt > 1 then
+		current.checkedOwnership = true
+		-- ReceiveAge > 0 means the server is still simulating it, so our constraint can't move it.
+		debugLog(
+			"after 1s:",
+			part.Name,
+			"anchored:",
+			part.Anchored,
+			"owned by this client:",
+			part.ReceiveAge == 0,
+			"distance to target:",
+			math.floor((part.Position - target).Magnitude * 10) / 10
+		)
+	end
+
 	if current.kind == "item" then
 		-- Damp spinning so held things don't tumble forever.
 		part.AssemblyAngularVelocity *= 0.9
@@ -358,13 +430,16 @@ local function updateHover()
 	local mouse = UserInputService:GetMouseLocation()
 	local inset = game:GetService("GuiService"):GetGuiInset()
 	local screen = mouse - inset
-	local hit = raycastFrom(screen)
-	local part, kind = grabbableFrom(hit and hit.Instance)
+	local part, kind = pick(screen)
 	if part and kind == "item" then
 		local message, color = describe(part)
 		HUD.setTooltip(message, color, screen)
 	elseif part and kind == "vessel" then
-		HUD.setTooltip("Your vessel · drag the handle to tow", Color3.new(1, 1, 1), screen)
+		HUD.setTooltip(
+			"Your vessel · drag to tow, release items over it to load",
+			Color3.new(1, 1, 1),
+			screen
+		)
 	else
 		HUD.setTooltip(nil)
 	end
@@ -377,6 +452,9 @@ end
 
 local function onInputBegan(input: InputObject, processed: boolean)
 	if processed then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			debugLog("click was taken by the UI, not the world")
+		end
 		return
 	end
 	if
@@ -398,15 +476,24 @@ local function onInputBegan(input: InputObject, processed: boolean)
 		end
 		return
 	end
-	if held or press then
+	if held then
 		return
+	end
+	if press then
+		-- Never let a lost press block grabbing for good.
+		if os.clock() - press.startedAt < 5 then
+			debugLog("ignored click: still waiting on the previous grab")
+			return
+		end
+		press = nil
 	end
 
-	local hit = raycastFrom(screen)
-	local part, kind = grabbableFrom(hit and hit.Instance)
-	if not part or not kind or not hit then
+	local part, kind, hitPosition, why = pick(screen)
+	if not part or not kind or not hitPosition then
+		debugLog("click did not grab:", why)
 		return
 	end
+	debugLog("requesting", kind, part:GetFullName(), "(" .. why .. ")")
 
 	pointer = screen
 	local thisPress: Press = {
@@ -418,19 +505,24 @@ local function onInputBegan(input: InputObject, processed: boolean)
 	}
 	press = thisPress
 
-	local hitPosition = hit.Position
 	task.spawn(function()
-		local ok, reason = grabRemote:InvokeServer(part)
+		local called, ok, reason = pcall(grabRemote.InvokeServer, grabRemote, part)
+		if not called then
+			ok, reason = false, "Grab failed: " .. tostring(ok)
+		end
 		if press == thisPress and (thisPress.ended or not ok) then
 			press = nil
 		end
 		if not ok then
-			if reason then
-				HUD.notify(reason)
-			end
+			debugLog("server refused:", reason)
+			HUD.notify(reason or "Couldn't grab that")
 			return
 		end
-		begin(part, kind, hitPosition)
+		if not part.Parent then
+			return
+		end
+		debugLog("grabbed", part:GetFullName(), "anchored on this client:", part.Anchored)
+		begin(part, kind, hitPosition :: Vector3)
 		if thisPress.ended then
 			-- The press finished while we waited for the server.
 			if isTap(thisPress) then
@@ -457,6 +549,7 @@ local function onInputChanged(input: InputObject)
 	end
 	local isPointerMove = input.UserInputType == Enum.UserInputType.MouseMovement
 		or (input.UserInputType == Enum.UserInputType.Touch and input == p.input)
+		or (input.UserInputType == Enum.UserInputType.MouseButton1)
 	if isPointerMove then
 		pointer = Vector2.new(input.Position.X, input.Position.Y)
 		p.moved = math.max(p.moved, (pointer - p.startPosition).Magnitude)
@@ -465,7 +558,14 @@ end
 
 local function onInputEnded(input: InputObject)
 	local p = press
-	if not p or input ~= p.input then
+	if not p then
+		return
+	end
+	-- Touches are matched exactly; for the mouse, any left-button release ends the press.
+	local matches = if p.input.UserInputType == Enum.UserInputType.Touch
+		then input == p.input
+		else input.UserInputType == Enum.UserInputType.MouseButton1
+	if not matches then
 		return
 	end
 	p.ended = true
