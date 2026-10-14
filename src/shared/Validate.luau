@@ -124,6 +124,58 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		Config.Tide.LowWaterline > sandbar.ChannelEnd and Config.Tide.LowWaterline < sandbar.End,
 		"low tide must reach past the channel but not past the sandbar"
 	)
+	-- Tide shape and sections
+	for _, name in { "OutShape", "InShape" } do
+		local shape = Config.Tide[name]
+		check(type(shape) == "table" and #shape >= 2, "Config.Tide." .. name .. " needs at least 2 values")
+		if type(shape) == "table" and #shape >= 2 then
+			check(
+				shape[1] == 0 and shape[#shape] == 1,
+				"Config.Tide." .. name .. " must start at 0 and end at 1"
+			)
+			for _, value in shape do
+				check(
+					type(value) == "number" and value >= 0 and value <= 1,
+					"Config.Tide." .. name .. " values must be between 0 and 1"
+				)
+			end
+		end
+	end
+	local lastX = -math.huge
+	for _, section in Config.Tide.Sections or {} do
+		check(
+			type(section.X) == "number" and type(section.Lag) == "number",
+			"Config.Tide.Sections entries need X and Lag numbers"
+		)
+		check((section.X or 0) > lastX, "Config.Tide.Sections must be in order of X")
+		check(
+			math.abs(section.Lag or 0) < Config.Tide.HoldTime,
+			"a tide section's Lag must be shorter than the low-tide hold, or that part never reaches low tide with the rest"
+		)
+		lastX = section.X or lastX
+	end
+
+	-- Waves and rock pools
+	check(#Config.Waves.ZoneScale >= #Config.Zones, "Config.Waves.ZoneScale needs an entry for every zone")
+	for index, pool in Config.Beach.Pools or {} do
+		local where = "Rock pool " .. index
+		check(
+			type(pool.Radius) == "number"
+				and pool.Radius > 2
+				and type(pool.Depth) == "number"
+				and pool.Depth > 0,
+			where .. ": needs a Radius (over 2) and a Depth"
+		)
+		check(
+			math.abs(pool.X) + pool.Radius < Config.Beach.Width / 2 and pool.Z - pool.Radius > 0,
+			where .. ": must be on the beach"
+		)
+		check(
+			pool.Z + pool.Radius < sandbar.ChannelStart,
+			where .. ": must be in front of the Far Sandbar's channel"
+		)
+	end
+
 	for index, zone in Config.Zones do
 		for rarity in zone.Rarity do
 			check(

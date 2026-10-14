@@ -462,7 +462,7 @@ local function updateBrake()
 			local y = groundBelow(spot) + grabCfg.HoverHeight
 			if vessel:GetAttribute("Swims") then
 				-- Swims at the surface; on sand it crawls low and slow.
-				local waterY = Tide.getState().WaterY
+				local waterY = Beach.waterYAt(Tide.sea(), spot.X)
 				y = math.max(groundBelow(spot) + 1.5, waterY + grabCfg.SwimFloat)
 			end
 			current.align.Position = Vector3.new(spot.X, y, spot.Z)
@@ -470,7 +470,7 @@ local function updateBrake()
 				CFrame.fromMatrix(Vector3.zero, Vector3.yAxis, flatLook:Cross(Vector3.yAxis))
 		end
 		local force = mass * grabCfg.HoverAcceleration * Traders.vesselSpeedMultiplier(upgrades())
-		if vessel:GetAttribute("Swims") and Beach.depthAt(base.Position, Tide.waterline()) <= 0 then
+		if vessel:GetAttribute("Swims") and Beach.depthAt(base.Position, Tide.sea()) <= 0 then
 			force *= grabCfg.SwimSandSpeed
 		end
 		current.align.MaxAxesForce = Vector3.new(force, force, force)
@@ -566,7 +566,7 @@ local function update(dt: number)
 
 	-- Tide Magnet: reels what it holds in toward you while it's in the water.
 	if current.kind == "item" and current.mode == "drag" and currentTool().Magnet then
-		if Beach.depthAt(part.Position, Tide.waterline()) > 0 then
+		if Beach.depthAt(part.Position, Tide.sea()) > 0 then
 			local camera = Workspace.CurrentCamera
 			local closest = (root.Position - camera.CFrame.Position).Magnitude + 4
 			current.holdDistance = math.max(closest, current.holdDistance - grabCfg.MagnetPull * dt)
@@ -639,9 +639,7 @@ local function describe(part: BasePart): (string, Color3)
 	if class > Stats.lift(player, tool) then
 		return line .. " (too heavy)", Palette.UI.Bad
 	end
-	if
-		state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(part.Position, Tide.waterline()))
-	then
+	if state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(part.Position, Tide.sea())) then
 		return line .. " (too deep)", Palette.UI.Bad
 	end
 	local rarityColor = Items.RarityColors[part:GetAttribute("Rarity") or "Common"]

@@ -182,9 +182,8 @@ end
 -- whatever you're holding out of your hands. Learnable, so a hit feels like a mistake.
 local function rollBarrel(zoneFolder: Folder, zone: number)
 	local startZ = Beach.zoneRange(zone)
-	local waterline = Tide.waterline()
 	local fromZ = math.max(startZ + 5, 1)
-	if Beach.isDeep(Vector3.new(0, 0, fromZ), waterline) then
+	if Beach.isDeep(Vector3.new(0, 0, fromZ), Tide.sea()) then
 		return -- the top of the zone is under water: nothing to roll down
 	end
 	local barrel = makePart({

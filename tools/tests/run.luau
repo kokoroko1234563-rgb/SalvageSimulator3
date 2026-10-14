@@ -79,6 +79,7 @@ test("load server services", function()
 			"CosmeticService",
 			"FarSandbarService",
 			"MonetizationService",
+			"SurfService",
 		}
 	do
 		h.require("Server/" .. name)
@@ -200,17 +201,65 @@ test("hotbar slots", function()
 	)
 end)
 
+test("tide shape, sections and pools", function()
+	local Tide = h.require("Shared/Tide")
+	local Beach = h.require("Shared/Beach")
+	assert(Tide._shaped({ 0, 1 }, 0) == 0 and Tide._shaped({ 0, 1 }, 1) == 1, "shape endpoints")
+	assert(math.abs(Tide._shaped({ 0, 0.5, 1 }, 0.5) - 0.5) < 1e-6, "shape passes through its points")
+	-- Sections: the east end lags the west end, so mid-tide the waterlines differ.
+	local start = Tide.startFor("Out", 0.5, 1000)
+	h.game.Workspace:SetAttribute(Tide.StartAttribute, start)
+	local sea = Tide.sea(1000)
+	local west, east = Tide.waterlineAt(sea, -360), Tide.waterlineAt(sea, 360)
+	assert(west > east, string.format("the west end should drain first (%.1f vs %.1f)", west, east))
+	-- A rock pool holds water even at high tide... well above the sea.
+	local pool = Beach.Pools[1]
+	local inside = roblox.Vector3.new(pool.X, 0, pool.Z - pool.Radius * 0.5)
+	h.game.Workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("Hold", 0.5, 1000))
+	local lowSea = Tide.sea(1000)
+	assert(Beach.depthAt(inside, lowSea) > 0, "rock pools keep water at low tide")
+	assert(not Beach.isDeep(inside, lowSea), "rock pools never count as deep sea")
+	h.game.Workspace:SetAttribute(Tide.StartAttribute, nil)
+end)
+
+test("waves run up and slide back", function()
+	local Waves = h.require("Shared/Waves")
+	local Config = h.require("Shared/Config")
+	local Tide = h.require("Shared/Tide")
+	local cfg = Config.Waves
+	local n = 1001 -- not a set wave
+	local arrive = (cfg.StartOffset + cfg.WobbleAmplitude * math.sin(0 * cfg.WobbleFrequency + n * 1.7))
+		/ cfg.Speed
+	-- Hold the tide still (low tide) so the waterline doesn't move during the wave.
+	h.game.Workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("Hold", 0.5, n * cfg.Period))
+	local line = Tide.waterlineAt(Tide.sea(n * cfg.Period), 0)
+	local function at(t)
+		return Waves.wave(n, 0, Tide.sea(n * cfg.Period + t), line)
+	end
+	assert(at(0).Phase == "Rolling" and at(0).Front > 0, "starts out at sea")
+	local up = at(arrive + 0.3)
+	assert(up and up.Phase == "RunUp" and up.Front < 0, "runs up the sand after reaching the waterline")
+	local push =
+		Waves.getPush(roblox.Vector3.new(0, 0, line + up.Front / 2), Tide.sea(n * cfg.Period + arrive + 0.3))
+	h.game.Workspace:SetAttribute(Tide.StartAttribute, nil)
+	assert(push.Z < 0, "the run-up pushes up the beach")
+	local life = Waves.lifetime(n)
+	assert(at(life + 0.5) == nil, "gone after its lifetime")
+	assert(Waves.size(cfg.SetEvery * 50) > Waves.size(cfg.SetEvery * 50 + 1) * 1.1, "set waves are bigger")
+	assert(Waves.reach(n, 700) > Waves.reach(n, 100), "waves are bigger further out")
+end)
+
 test("build the bell tower", function()
 	local map = Harness.wrap(roblox.Instance.new("Folder"))
 	local door = h.require("Server/FarSandbarService").build(map)
 	assert(door:FindFirstChildOfClass("ProximityPrompt"), "the door needs a prompt")
 	local Beach = h.require("Shared/Beach")
 	local Tide = h.require("Shared/Tide")
-	-- The door must be dry at low tide, or the secret can never be entered.
-	assert(
-		not Beach.isDeep(door.CFrame.Position, Tide.LowWaterline),
-		"the door is underwater even at low tide"
-	)
+	-- The door must be dry at low tide (wherever the sections put it), or it can never be used.
+	h.game.Workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("Hold", 0.99, 1000))
+	local dry = not Beach.isDeep(door.CFrame.Position, Tide.sea(1000))
+	h.game.Workspace:SetAttribute(Tide.StartAttribute, nil)
+	assert(dry, "the door is underwater even at low tide")
 end)
 
 -- 7. Every secret course builds on the client.
@@ -239,6 +288,7 @@ for _, name in
 		"AuctionUI",
 		"SkyBeamController",
 		"HotbarUI",
+		"SeaController",
 	}
 do
 	test("load Client/" .. name, function()

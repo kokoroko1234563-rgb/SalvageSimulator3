@@ -236,20 +236,19 @@ end
 
 -- Washes one item up somewhere in the surf around the current waterline. The zone (and so
 -- the value and rarity) comes from where it lands, so low tide brings richer loot.
-function ItemService.spawnInSurf(waterline: number): BasePart?
+function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
 	local beach = Config.Beach
 	-- Heavy things sit out in deeper water; lighter ones anywhere from the wet sand out.
 	local heavyRoll = rng:NextNumber()
 	local depth = if heavyRoll < 0.3
 		then rng:NextNumber(beach.ShallowDepth, beach.WaistDepth - 0.3)
 		else rng:NextNumber(-0.3, beach.WaistDepth - 0.3)
-	local z = Beach.zForDepth(depth, waterline)
+	local x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
+	local z = Beach.zForDepth(depth, sea, x)
 	local zoneIndex = Beach.zoneAt(z)
 	if not zoneIndex or zoneIndex < 1 then
 		return nil
 	end
-
-	local x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
 
 	-- A biome zone sometimes washes up its secret's unlock item, and mostly its own loot.
 	local biome = Biomes.activeIn(zoneIndex)
@@ -299,25 +298,25 @@ function ItemService.spawnInSurf(waterline: number): BasePart?
 end
 
 local function spawnTick()
-	local waterline = Tide.waterline()
+	local sea = Tide.sea()
 	local total, inSurf = 0, 0
 	for item in all do
 		total += 1
 		if ItemService.getState(item) == "Unclaimed" and item:GetAttribute("Fresh") then
-			local depth = Beach.depthAt(item.Position, waterline)
+			local depth = Beach.depthAt(item.Position, sea)
 			if depth > -1 and depth < Config.Beach.WaistDepth then
 				inSurf += 1
 			end
 		end
 	end
 	if total < cfg.MaxTotal and inSurf < cfg.MaxSurfItems then
-		ItemService.spawnInSurf(waterline)
+		ItemService.spawnInSurf(sea)
 	end
 end
 
 local function maintenanceTick()
 	local t = now()
-	local waterline = Tide.waterline(t)
+	local sea = Tide.sea(t)
 	for item in all do
 		local position = item.Position
 		local state = ItemService.getState(item)
@@ -328,8 +327,8 @@ local function maintenanceTick()
 		-- Floating items drift out instead of sinking, and are lost once they're far out.
 		local floats = item:GetAttribute("Floats") == true
 		local lostAt = if floats
-			then position.Z > waterline + Config.Waves.FloatAwayDistance
-			else Beach.isLost(position, waterline)
+			then position.Z > Tide.waterlineAt(sea, position.X) + Config.Waves.FloatAwayDistance
+			else Beach.isLost(position, sea)
 		local drowned = lostAt and (state == "Unclaimed" or state == "Loose")
 		if fellOut or drowned then
 			ItemService.destroy(item)
@@ -340,7 +339,7 @@ local function maintenanceTick()
 			end
 		elseif state == "Loose" then
 			-- Never freeze something bobbing in the water: it'd hang there when the tide moved.
-			local afloat = floats and Beach.depthAt(position, waterline) > 0
+			local afloat = floats and Beach.depthAt(position, sea) > 0
 			if t - since > cfg.LooseTimeout and item.AssemblyLinearVelocity.Magnitude < 1 and not afloat then
 				ItemService.setUnclaimed(item, true)
 			end
@@ -357,10 +356,9 @@ function ItemService.init(map: Instance)
 
 	-- Server simulates loose items, so the server pushes them with the waves.
 	RunService.Heartbeat:Connect(function(dt)
-		local t = now()
-		local waterline = Tide.waterline(t)
+		local sea = Tide.sea(now())
 		for item in loose do
-			Waves.applyToPart(item, dt, t, waterline)
+			Waves.applyToPart(item, dt, sea)
 		end
 	end)
 

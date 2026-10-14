@@ -94,6 +94,28 @@ All six from the design doc are defined in `src/shared/Traders.luau`.
 | Barnacle Boots | waves push 10% less, never below 30% | `WaveController` |
 | Frostrunner Wax | +20% vessel speed | `GrabController` towing and hover |
 
+## The tide and the waves
+
+All of this is computed from the shared clock, so the server and every client agree without sending anything per frame. Every number is in `Config.Tide`, `Config.Waves` and `Config.Beach.Pools`.
+
+**How the tide goes up and down:** `OutShape` and `InShape` are lists of how far out the tide is (0 = high, 1 = low) at evenly spaced moments through that phase. The tide follows a smooth curve through them. Repeat a value to make it pause, or bunch values to make it rush.
+
+**Which part goes down when:** `Sections` are points along the shoreline, each with a delay in seconds. That part of the sea follows the tide this much later: positive drains later and floods later, negative goes first. Between points the delay blends smoothly, so the waterline curves along the beach instead of being a straight line. By default the west end drains first and the east end holds water longest. Each delay must stay shorter than the low-tide hold, which the validator checks.
+
+**Rock pools** (`Config.Beach.Pools`): rings of rock that hold still water at a fixed level after the sea leaves. Floating items float in them. They never count as deep water.
+
+**Waves:** each wave rolls in to the local waterline, runs up the exposed sand as a thin sheet, slows to a stop and slides back.
+- **Sizes:** each wave's size varies a little. Every 6th wave is a big one, about 3% are rogue waves, and waves get bigger further out (`ZoneScale`, 1.7x on the Far Sandbar). Size scales how far a wave runs up and how hard it pushes. `waves <n>` still scales all of it.
+- **Danger:** the run-up pushes players, held items, vessels and dropped loot up the beach, and the backwash drags them toward the sea. Following the water out, or staying out on the sandbar, is risky, especially when a big one comes.
+- **Unclaimed items:** after each wave, unclaimed items it reached may be dragged a few studs, mostly seaward (`DragChance`, `DragDistance`, in `SurfService`). Anything dragged deep enough is lost.
+- **Rogue waves:** clients know they're coming and show a warning banner about 8 seconds before. `waves rogue` sends one.
+
+**What you see** (`SeaController`, client only):
+- The sea in 24-stud strips, each at its own level.
+- White crests rolling in.
+- The run-up sheet with a foam edge.
+- Darker wet sand where the tide was in the last 40 seconds, or where the last wave reached.
+
 ## The sky-beam item
 
 The **Beacon Pearl** is the rarest unlock item. Your doc doesn't name it, so the name is a placeholder.
@@ -197,7 +219,7 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `clearitems [all]` | Remove unclaimed items (or all items) |
 | `tide <out\|hold\|in> [percent]` | Jump the tide, e.g. `tide in 90` |
 | `tidespeed <scale>` | 1 = real 25 min cycle, 0.1 = 2.5 min |
-| `waves <multiplier>` | Wave strength, 0 = calm |
+| `waves <multiplier\|rogue>` | Wave strength (0 = calm), or send a rogue wave |
 | `tp <shop\|zone\|sandbar\|player> [who]` | Teleport (`sandbar` = the bell tower door) |
 | `heal`, `god`, `speed <n>` | Health/breath, toggle no-drowning, walk speed |
 | `resetdata <player>`, `kick <player> [reason]` | Wipe a save, kick |

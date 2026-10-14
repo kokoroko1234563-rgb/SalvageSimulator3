@@ -178,6 +178,48 @@ local function buildZoneMarkers(map: Folder)
 	end
 end
 
+-- Rock pools: a ring of rocks holding still water at a fixed level (Beach.Pools), so they
+-- stay full after the sea has gone out.
+local function buildPools(map: Folder)
+	local folder = Instance.new("Folder")
+	folder.Name = "RockPools"
+	folder.Parent = map
+	local rng = Random.new(31)
+	for index, pool in Beach.Pools do
+		local rocks = math.max(8, math.floor(pool.Radius * 1.3))
+		for i = 1, rocks do
+			local angle = (i / rocks) * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
+			local x = pool.X + math.cos(angle) * pool.Radius
+			local z = pool.Z + math.sin(angle) * pool.Radius
+			local ground = Beach.groundY(z)
+			local top = pool.Level + rng:NextNumber(0.3, 0.9)
+			local width = rng:NextNumber(2.4, 3.8)
+			MapParts.part({
+				Name = "PoolRock",
+				Size = Vector3.new(width, top - ground + 1, rng:NextNumber(2.2, 3.4)),
+				CFrame = CFrame.new(x, (top + ground - 1) / 2, z)
+					* CFrame.Angles(0, -angle + rng:NextNumber(-0.3, 0.3), rng:NextNumber(-0.12, 0.12)),
+				Color = ROCK:Lerp(WET_SAND, rng:NextNumber(0, 0.3)),
+				Material = Palette.Material.Rock,
+			}).Parent =
+				folder
+		end
+		MapParts.part({
+			Name = "PoolWater" .. index,
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.2, pool.Radius * 2, pool.Radius * 2),
+			CFrame = CFrame.new(pool.X, pool.Level - 0.1, pool.Z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = Palette.World.Sea,
+			Material = Palette.Material.Glass,
+			Transparency = 0.35,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+		}).Parent =
+			folder
+	end
+end
+
 -- The Far Sandbar's marker, on the near edge of the sandbar.
 local function buildSandbarMarker(map: Folder)
 	local sandbar = beach.FarSandbar
@@ -425,6 +467,7 @@ function BeachBuilder.build(): Folder
 
 	buildZoneMarkers(map)
 	buildSandbarMarker(map)
+	buildPools(map)
 	buildShop(map)
 	BeachDressing.build(map, Random.new(7))
 

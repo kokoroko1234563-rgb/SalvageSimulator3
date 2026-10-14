@@ -35,6 +35,15 @@ Config.Beach = {
 		Color = Color3.fromRGB(205, 220, 228),
 	},
 
+	-- Rock pools: rings of rock that hold water after the sea leaves (a fixed level, Depth
+	-- studs above the ground at the ring's seaward edge). X, Z is the centre.
+	Pools = {
+		{ X = -210, Z = 150, Radius = 9, Depth = 1.4 },
+		{ X = 140, Z = 270, Radius = 12, Depth = 1.8 },
+		{ X = -60, Z = 430, Radius = 10, Depth = 1.6 },
+		{ X = 260, Z = 520, Radius = 8, Depth = 1.4 },
+	},
+
 	-- Depth bands, by how deep the water is at a spot.
 	ShallowDepth = 1.5,
 	KneeDepth = 3,
@@ -80,16 +89,55 @@ Config.Tide = {
 	TimeScale = 0.4, -- 0.4 => 10 minute cycle for testing. Set to 1 for the real 25 minutes.
 	HighWaterline = 60, -- waterline Z at high tide (inside zone 1)
 	LowWaterline = 700, -- waterline Z at low tide: the channel to the Far Sandbar is crossable
+
+	-- How the tide goes out and comes back in. Each list is how far out the tide is (0 = high,
+	-- 1 = low) at evenly spaced moments through that phase, joined by a smooth curve. Repeat
+	-- a value to make the tide pause, or bunch values to make it rush.
+	OutShape = { 0, 0.08, 0.3, 0.55, 0.62, 0.85, 1 }, -- eases out, pauses a little past halfway
+	InShape = { 0, 0.12, 0.4, 0.7, 0.9, 1 }, -- comes back in faster at first
+
+	-- Which parts of the beach drain first. Points along the shoreline (X), each with a delay
+	-- in seconds (scaled by TimeScale like the phases): that part of the sea follows the tide
+	-- this much later. Positive = drains later and floods later; negative = earlier. Between
+	-- points the delay blends smoothly, so the waterline curves.
+	Sections = {
+		{ X = -360, Lag = -30 }, -- the west end drains first
+		{ X = -120, Lag = 0 },
+		{ X = 80, Lag = 20 },
+		{ X = 360, Lag = 45 }, -- the east end holds water longest
+	},
 }
 
 Config.Waves = {
 	Period = 7, -- seconds between waves
 	Speed = 14, -- studs/s the wave front travels toward shore
 	StartOffset = 70, -- where each wave starts, studs seaward of the waterline
-	EndOffset = -6, -- how far up the dry sand past the waterline a wave washes
 	BandWidth = 10, -- thickness of the pushing band behind the front
 	Push = 16, -- studs/s shoreward push at the leading edge
 	Backwash = 4, -- studs/s seaward pull in the water between waves
+
+	-- Run-up: after reaching the waterline each wave keeps running up the exposed sand as a
+	-- thin sheet, slowing down, then slides back. While running up it pushes things up the
+	-- beach; while sliding back it drags them toward the sea.
+	RunUp = 8, -- studs an average wave runs up the sand
+	RunUpVariation = 0.35, -- each wave is up to this much bigger or smaller (deterministic)
+	RunUpPush = 10, -- studs/s up the beach under the running-up sheet
+	BackwashPull = 12, -- studs/s toward the sea under the sliding-back sheet
+	BackwashRatio = 1.6, -- sliding back takes this many times as long as running up
+	SetEvery = 6, -- every Nth wave is a big one...
+	SetSize = 1.7, -- ...this much bigger
+	RogueChance = 0.03, -- and this fraction of waves are rogue waves...
+	RogueSize = 3, -- ...this much bigger. The admin console can send one (wave rogue).
+	-- Waves get bigger further out: by zone (where the water reaches), 1 = normal.
+	ZoneScale = { 1, 1, 1.15, 1.3, 1.7 },
+
+	-- Unclaimed items near the waterline get moved by the swash: after each wave, items it
+	-- reached may be dragged a little (mostly seaward, sometimes up the beach).
+	DragChance = 0.35, -- chance per item per normal wave (scaled by the wave's size)
+	DragDistance = 3, -- studs, for a normal wave (scaled by size)
+	DragShallows = 6, -- items this far into the water (past the waterline) count as reached
+
+	WetSeconds = 40, -- sand the tide uncovered this recently still looks wet
 	WobbleAmplitude = 5, -- the front is not a perfect line along the beach
 	WobbleFrequency = 1 / 45,
 	CharacterFactor = 1, -- multiplier on push for characters (displacement)

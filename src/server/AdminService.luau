@@ -438,14 +438,25 @@ command("tidespeed", "tidespeed <scale>", "Tide time scale: 1 = real 25 min, 0.1
 	return { string.format("Tide time scale %.2f, full cycle %.0fs", scale, Tide.cycleLength()) }
 end)
 
-command("waves", "waves <multiplier>", "Wave strength: 1 = normal, 0 = calm", function(_, args)
-	local scale = tonumber(args[1])
-	if not scale or scale < 0 then
-		return { "Usage: waves <multiplier>" }
+command(
+	"waves",
+	"waves <multiplier|rogue>",
+	"Wave strength (1 = normal, 0 = calm), or send a rogue wave",
+	function(_, args)
+		if (args[1] or ""):lower() == "rogue" then
+			-- The wave after the one already rolling in (clients get a few seconds' warning).
+			local index = Waves.indexAt(Tide.now()) + 1
+			Workspace:SetAttribute(Waves.RogueAttribute, index)
+			return { string.format("Wave %d will be a rogue wave", index) }
+		end
+		local scale = tonumber(args[1])
+		if not scale or scale < 0 then
+			return { "Usage: waves <multiplier|rogue>" }
+		end
+		Workspace:SetAttribute(Waves.ScaleAttribute, scale)
+		return { string.format("Wave strength x%.2f", scale) }
 	end
-	Workspace:SetAttribute(Waves.ScaleAttribute, scale)
-	return { string.format("Wave strength x%.2f", scale) }
-end)
+)
 
 command(
 	"tp",

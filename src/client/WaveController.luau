@@ -17,8 +17,7 @@ local WaveController = {}
 
 function WaveController.init()
 	RunService.Stepped:Connect(function(_, dt)
-		local now = Tide.now()
-		local waterline = Tide.waterline(now)
+		local sea = Tide.sea()
 
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -26,9 +25,7 @@ function WaveController.init()
 		if humanoid and root and humanoid.Health > 0 then
 			-- Characters are moved directly: the Humanoid controller would cancel a plain force.
 			local resistance = Stats.wavePush(player)
-			local push = Waves.getPush(root.Position, now, waterline)
-				* Config.Waves.CharacterFactor
-				* resistance
+			local push = Waves.getPush(root.Position, sea) * Config.Waves.CharacterFactor * resistance
 			if push.Magnitude > 0 then
 				root.CFrame += Vector3.new(push.X, 0, push.Z) * dt
 			end
@@ -39,7 +36,7 @@ function WaveController.init()
 				local state = item:GetAttribute("State")
 				local scale = item:GetAttribute("WaveScale") -- set by GrabController on magical grabs
 				if (state == "Held" or state == "InVessel") and scale ~= 0 then
-					Waves.applyToPart(item, dt, now, waterline, scale)
+					Waves.applyToPart(item, dt, sea, scale)
 				end
 			end
 		end
@@ -48,7 +45,7 @@ function WaveController.init()
 			if vessel:GetAttribute("Owner") == player.UserId then
 				for _, part in vessel:GetDescendants() do
 					if part:IsA("BasePart") then
-						Waves.applyToPart(part, dt, now, waterline)
+						Waves.applyToPart(part, dt, sea)
 					end
 				end
 			end
