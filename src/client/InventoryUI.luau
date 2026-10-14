@@ -275,7 +275,7 @@ local function showItems()
 		label({
 			Text = if hideShop and #snapshot.Items > 0
 				then 'Only shop gear here, and it\'s hidden. Turn off "Hide shop gear" to see it.'
-				else "Nothing yet. Bank unlock items at the shore, or buy gear at the shop.",
+				else "Nothing yet. Bank unlock items at the bank house, or buy gear at the shop.",
 			Size = UDim2.fromOffset(340, 60),
 			TextColor3 = MUTED,
 		}, content)

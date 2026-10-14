@@ -20,12 +20,20 @@ Config.Admins = {
 -- +Z, and the zones are bands running out to sea: zone 1 nearest the shop, the last zone
 -- furthest out, only uncovered at low tide.
 Config.Beach = {
-	Width = 320, -- studs along the shoreline
+	Width = 720, -- studs along the shoreline
 	ZoneLength = 200, -- studs each zone runs out to sea
 	ActiveZones = 3, -- test build only uses the first 3 zones
 	ShopDepth = 80, -- dry ground behind Z = 0 for the shop and boardwalk
 	Slope = 0.06, -- studs of drop per stud out to sea
 	SeaExtent = 300, -- seabed continues this far past the last zone
+
+	-- Haze over the sea and sand: things further than FogEnd fade into it, so the whole map
+	-- can't be seen at once.
+	Fog = {
+		Start = 220, -- studs away where the haze starts
+		End = 520, -- studs away where it's fully opaque
+		Color = Color3.fromRGB(205, 220, 228),
+	},
 
 	-- Depth bands, by how deep the water is at a spot.
 	ShallowDepth = 1.5,
@@ -199,6 +207,7 @@ Config.Drowning = {
 
 Config.Selling = {
 	ShopkeeperRange = 22, -- how close to the shopkeeper you must be to buy
+	BuyerRange = 14, -- how close to the buyer you must be to sell what's on the sell pad
 }
 
 Config.Data = {

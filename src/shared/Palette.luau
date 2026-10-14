@@ -91,6 +91,30 @@ Palette.World = {
 	Skin = rgb(240, 200, 160),
 	Hat = rgb(25, 25, 30),
 	TraderCoat = rgb(80, 120, 160),
+
+	-- Buildings and people on the shore.
+	Stucco = rgb(242, 230, 205),
+	RoofTile = rgb(170, 85, 60),
+	Awning = rgb(225, 75, 65),
+	AwningCream = rgb(248, 242, 225),
+	Window = rgb(150, 205, 225),
+	Counter = rgb(140, 95, 55),
+	Pants = rgb(55, 60, 85),
+	Buyer = rgb(90, 160, 110),
+	Banker = rgb(60, 90, 150),
+
+	-- Beach dressing.
+	Driftwood = rgb(150, 130, 105),
+	Palm = rgb(120, 90, 55),
+	Frond = rgb(70, 145, 70),
+	Lifeguard = rgb(230, 60, 50),
+	UmbrellaRed = rgb(230, 90, 80),
+	UmbrellaTeal = rgb(60, 170, 190),
+	UmbrellaYellow = rgb(245, 200, 70),
+	ShellPink = rgb(245, 205, 200),
+	ShellCream = rgb(250, 240, 220),
+	ShellTan = rgb(215, 180, 140),
+	SandDark = rgb(222, 200, 150),
 }
 
 Palette.Material = {

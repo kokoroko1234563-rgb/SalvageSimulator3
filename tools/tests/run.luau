@@ -57,6 +57,9 @@ test("load server services", function()
 	for _, name in
 		{
 			"BeachBuilder",
+			"BeachDressing",
+			"Buildings",
+			"MapParts",
 			"ItemService",
 			"GrabService",
 			"ShopService",
