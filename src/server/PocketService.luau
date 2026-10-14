@@ -1,11 +1,10 @@
--- Deep Pockets (rebirth reward): store up to 3 Light items in your pockets, safe from bumps
--- and waves. Pockets are saved, sold automatically on the sell pad, can be taken out one at
+-- Pockets: store Light items safe from bumps and waves. 3 slots from Deep Pockets (rebirth
+-- reward), 3 more from a worn Deckhand's Satchel (exotic, attuned). Pockets are saved, sold automatically on the sell pad, can be taken out one at
 -- a time, and drop where you die if you drown. Unlock items can't be pocketed.
 
 local Players = game:GetService("Players")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
-local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
@@ -40,7 +39,8 @@ end
 
 local function store(player: Player, part: any)
 	local profile = DataService.get(player)
-	if not profile or not profile.Rewards.DeepPockets then
+	local slots = DataService.pocketSlots(player)
+	if not profile or slots == 0 then
 		return
 	end
 	local item = GrabService.getHeld(player)
@@ -55,7 +55,7 @@ local function store(player: Player, part: any)
 		notify(player, "Only Light items fit in your pockets.")
 		return
 	end
-	if #profile.Pockets >= Config.Pockets.Slots then
+	if #profile.Pockets >= slots then
 		notify(player, "Your pockets are full.")
 		return
 	end

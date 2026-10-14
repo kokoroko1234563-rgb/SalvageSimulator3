@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
+local Catalog = require(Shared.Catalog)
 local Config = require(Shared.Config)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
@@ -19,6 +20,7 @@ local DataService = require(script.Parent.DataService)
 local GrabService = require(script.Parent.GrabService)
 
 local cfg = Config.Secrets
+local rng = Random.new()
 
 local SecretService = {}
 
@@ -97,7 +99,7 @@ function SecretService.tryEnter(player: Player, secretId: string, returnTo: CFra
 		notify(player, "The door is underwater. Come back when the tide is out.")
 		return
 	end
-	if profile.ColoredCoins[secret.Coin] then
+	if secret.Coin and profile.ColoredCoins[secret.Coin] then
 		notify(player, "You already have the " .. secret.Coin:lower() .. " coin from this secret.")
 		return
 	end
@@ -193,8 +195,21 @@ local function onClaim(player: Player)
 		return
 	end
 	run.finished = true
-	DataService.grantColoredCoin(player, run.secret.Coin)
-	endRun(player, "You found the " .. run.secret.Coin:lower() .. " coin!", true)
+	if run.secret.Coin then
+		DataService.grantColoredCoin(player, run.secret.Coin)
+		endRun(player, "You found the " .. run.secret.Coin:lower() .. " coin!", true)
+	else
+		-- Exotic secret: a lootbox. The reward goes straight into the inventory.
+		local itemId, variant = Secrets.rollLoot(run.secret, rng)
+		local entry = itemId and Catalog.get(itemId)
+		if itemId and entry then
+			DataService.addItem(player, itemId, "secret", { Variant = variant })
+			local name = (if variant then variant .. " " else "") .. entry.Name
+			endRun(player, "The lootbox held: " .. name .. "! It's in your inventory.", true)
+		else
+			endRun(player, nil, true)
+		end
+	end
 end
 
 local function tick()

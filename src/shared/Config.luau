@@ -81,12 +81,18 @@ Config.Waves = {
 
 -- Biomes: each tide cycle, every zone rolls whether it becomes a biome (see Biomes.luau).
 Config.Biomes = {
-	RollChance = 0.5, -- test build: each zone has this chance of rolling Sandcastle Flats per cycle
+	-- Each cycle every zone rolls one of these (relative weights). Rare biomes are never announced.
+	Weights = {
+		None = 40,
+		SandcastleFlats = 45,
+		ShipwreckShallows = 15,
+	},
 }
 
 -- Rare unlock items for secrets.
 Config.Unlocks = {
-	SpawnChance = 0.02, -- chance that a surf spawn in a biome zone is that biome's unlock item
+	SpawnChance = 0.02, -- chance that a surf spawn in a common biome zone is its unlock item
+	ExoticSpawnChance = 0.008, -- the same for rare biomes (exotic unlock items are much rarer)
 	MaxOnMap = 1, -- of each unlock item at once
 }
 
@@ -99,6 +105,11 @@ Config.Secrets = {
 	MaxFlood = 180, -- ...and at most this many, depending on when in the tide cycle you enter
 }
 
+Config.Hazards = {
+	BarrelPeriod = 6, -- Shipwreck Shallows: a barrel rolls down the sand this often (learnable timer)
+	BarrelSpeed = 16,
+}
+
 Config.Rebirth = {
 	BaseCost = 100000,
 	CostGrowth = 1.5, -- each rebirth costs this much more than the last
@@ -107,7 +118,8 @@ Config.Rebirth = {
 }
 
 Config.Pockets = {
-	Slots = 3,
+	Slots = 3, -- from Deep Pockets
+	MaxSlots = 6, -- Deep Pockets plus the Deckhand's Satchel
 }
 
 Config.Items = {

@@ -1,6 +1,7 @@
 -- Biomes. Each tide cycle every zone rolls a biome (or none). The server stores the result
 -- on Workspace attributes ("ZoneBiome1", ...) so every client sees the same thing.
--- Milestone 2 only has Sandcastle Flats; the rest of the doc's biomes slot in here.
+-- So far: Sandcastle Flats (common, normal secret) and Shipwreck Shallows (rare, exotic
+-- secret). The rest of the doc's biomes slot in here.
 
 local Workspace = game:GetService("Workspace")
 
@@ -16,7 +17,21 @@ Biomes.List = {
 		UnlockItem = "GoldenSpade",
 		Secret = "SandcastleFlats",
 		EntranceSpots = { -110, -40, 40, 110 }, -- X positions the secret's sandcastle can stand at
+		Entrance = "Sandcastle",
 		Decor = Color3.fromRGB(230, 200, 140),
+	},
+	ShipwreckShallows = {
+		Id = "ShipwreckShallows",
+		Name = "Shipwreck Shallows",
+		Tier = "Uncommon", -- a rare biome: never announced
+		Loot = { "Barrel", "SmallCrate", "Lantern", "GlassBottle" },
+		LootShare = 0.6,
+		UnlockItem = "CaptainsKey",
+		Secret = "ShipwreckShallows",
+		EntranceSpots = { -100, -20, 60, 120 },
+		Entrance = "Wreck",
+		Hazard = "Barrels",
+		Decor = Color3.fromRGB(105, 75, 50),
 	},
 }
 

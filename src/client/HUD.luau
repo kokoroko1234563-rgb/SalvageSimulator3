@@ -102,10 +102,13 @@ local function refreshStats()
 			string.format("Rebirths: %d (coins x%.1f)", rebirths, player:GetAttribute("Multiplier") or 1)
 		)
 	end
-	local hasPockets =
-		string.find("," .. (player:GetAttribute("Rewards") or "") .. ",", ",DeepPockets,", 1, true)
-	if hasPockets then
-		table.insert(lines, string.format("Pockets: %d/3", player:GetAttribute("Pockets") or 0))
+	local slots = player:GetAttribute("PocketSlots") or 0
+	if slots > 0 then
+		table.insert(lines, string.format("Pockets: %d/%d", player:GetAttribute("Pockets") or 0, slots))
+	end
+	local cores = player:GetAttribute("Cores") or 0
+	if cores > 0 then
+		table.insert(lines, string.format("Attunement cores: %d", cores))
 	end
 	statsLabel.Text = table.concat(lines, "\n")
 end
@@ -439,6 +442,75 @@ local function refreshShop()
 		end
 	end
 
+	-- True rebirth: redeem the 5 colored coins.
+	order += 1
+	sectionHeader("TRUE REBIRTH", order)
+	do
+		order += 1
+		local have = player:GetAttribute("ColoredCoinCount") or 0
+		local frame = make("Frame", {
+			Size = UDim2.new(1, -8, 0, 70),
+			BackgroundColor3 = ROW_BG,
+			LayoutOrder = order,
+		}, shopRows)
+		corner(frame, 8)
+		make("UIStroke", { Color = Color3.fromRGB(175, 110, 255), Thickness = 2 }, frame)
+		text({
+			Text = string.format("Redeem colored coins (%d/5)", have),
+			Size = UDim2.new(1, -160, 0, 26),
+			Position = UDim2.fromOffset(12, 6),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextSize = 20,
+			TextStrokeTransparency = 1,
+		}, frame)
+		text({
+			Text = "Gives an attunement core. Resets coins, gear, rebirths, rewards and coins. Keeps unlock and exotic items.",
+			Size = UDim2.new(1, -160, 0, 34),
+			Position = UDim2.fromOffset(12, 32),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			TextSize = 12,
+			TextWrapped = true,
+			Font = Enum.Font.GothamMedium,
+			TextStrokeTransparency = 1,
+			TextColor3 = MUTED,
+		}, frame)
+		local ready = have >= 5
+		local b = button(
+			if ready then "True rebirth" else have .. "/5 coins",
+			if ready then Color3.fromRGB(150, 90, 230) else DISABLED,
+			frame
+		)
+		b.Size = UDim2.fromOffset(136, 40)
+		b.Position = UDim2.new(1, -148, 0.5, -20)
+		b.TextSize = 15
+		if ready then
+			-- It wipes a lot, so it takes two clicks.
+			local armed = false
+			b.Activated:Connect(function()
+				if not armed then
+					armed = true
+					b.Text = "Click to confirm"
+					task.delay(4, function()
+						if b.Parent then
+							armed = false
+							b.Text = "True rebirth"
+						end
+					end)
+					return
+				end
+				local ok, reason = Remotes.get("TrueRebirth"):InvokeServer()
+				if not ok and reason then
+					HUD.notify(reason)
+				end
+				refreshShop()
+			end)
+		else
+			b.AutoButtonColor = false
+			b.TextColor3 = Color3.fromRGB(200, 205, 210)
+		end
+	end
+
 	order += 1
 	sectionHeader("GRABBING TOOLS", order)
 	for _, tool in Gear.Tools do
@@ -449,7 +521,7 @@ local function refreshShop()
 	order += 1
 	sectionHeader("VESSELS", order)
 	for _, vessel in Gear.Vessels do
-		if not vessel.Magical and not ownedVessels[vessel.Id] then
+		if not vessel.Magical and not vessel.Exotic and not ownedVessels[vessel.Id] then
 			row("Vessel", vessel)
 		end
 	end
@@ -654,6 +726,8 @@ function HUD.init()
 			"Multiplier",
 			"Rewards",
 			"Pockets",
+			"PocketSlots",
+			"Cores",
 		}
 	do
 		player:GetAttributeChangedSignal(attribute):Connect(refreshStats)
@@ -661,7 +735,16 @@ function HUD.init()
 	player:GetAttributeChangedSignal("PendingPick"):Connect(refreshRewardPick)
 	refreshRewardPick()
 	for _, attribute in
-		{ "Coins", "Tool", "ActiveVessel", "OwnedTools", "OwnedVessels", "Rebirths", "PendingPick" }
+		{
+			"Coins",
+			"Tool",
+			"ActiveVessel",
+			"OwnedTools",
+			"OwnedVessels",
+			"Rebirths",
+			"PendingPick",
+			"ColoredCoinCount",
+		}
 	do
 		player:GetAttributeChangedSignal(attribute):Connect(function()
 			if shopFrame.Visible then

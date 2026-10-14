@@ -9,6 +9,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
+local Secrets = require(Shared.Secrets)
 
 local DataService = require(script.Parent.DataService)
 local VesselService = require(script.Parent.VesselService)
@@ -70,6 +71,52 @@ function RebirthService.rebirth(player: Player, free: boolean): (boolean, string
 	return true
 end
 
+-- True rebirth: redeem all 5 colored coins under the main shopkeeper. Resets almost
+-- everything, including the rebirth count, multiplier, reward picks, magical vessels and
+-- secret progress, and gives one attunement core. Unlock items, exotic items, cores and
+-- attunements stay.
+function RebirthService.trueRebirth(player: Player, free: boolean): (boolean, string?)
+	local profile = DataService.get(player)
+	if not profile then
+		return false, "Still loading"
+	end
+	if not free then
+		for _, color in Secrets.CoinOrder do
+			if not profile.ColoredCoins[color] then
+				return false, "You need all 5 colored coins. Missing: " .. color:lower()
+			end
+		end
+	end
+
+	profile.Coins = 0
+	profile.Rebirths = 0
+	profile.Rewards = {}
+	profile.PendingPick = nil
+	profile.ColoredCoins = {}
+	profile.Pockets = {} -- Deep Pockets is gone with the rewards
+	profile.TrueRebirths += 1
+	profile.Cores += 1
+	DataService.removeItemsLostOn(player, "TrueRebirth")
+	local active = VesselService.getVessel(player)
+	if active and DataService.countItemType(player, active:GetAttribute("Kind")) == 0 then
+		VesselService.despawn(player)
+	end
+	DataService.changed(player)
+	RebirthService.applyEffects(player)
+	notify(
+		player,
+		"True rebirth! You received an attunement core. Use it on an exotic item in your inventory."
+	)
+	return true
+end
+
+local function onTrueRebirth(player: Player): (boolean, string?)
+	if not nearShop(player) then
+		return false, "Redeem your coins with the shopkeeper"
+	end
+	return RebirthService.trueRebirth(player, false)
+end
+
 local function onRebirth(player: Player): (boolean, string?)
 	if not nearShop(player) then
 		return false, "Talk to the shopkeeper to rebirth"
@@ -113,6 +160,7 @@ function RebirthService.init(notifyFn: (Player, string) -> (), nearShopFn: (Play
 	nearShop = nearShopFn
 	Remotes.handle("Rebirth", onRebirth)
 	Remotes.handle("ChooseReward", onChoose)
+	Remotes.handle("TrueRebirth", onTrueRebirth)
 
 	local function onPlayer(player: Player)
 		player.CharacterAdded:Connect(function(character)

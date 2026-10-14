@@ -11,6 +11,7 @@ local FUNCTIONS = {
 	"SpawnVessel", -- (id) -> ok, reason
 	"AdminCommand", -- (commandLine) -> { output lines } (admins only)
 	"Rebirth", -- () -> ok, reason
+	"TrueRebirth", -- () -> ok, reason
 	"ChooseReward", -- (rewardId) -> ok, reason
 	"GetInventory", -- () -> snapshot (see InventoryService)
 	"InventoryAction", -- (action, arg, value?) -> ok, reason

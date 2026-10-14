@@ -13,6 +13,7 @@ Items.Rarities = { "Common", "Uncommon", "Rare", "VeryRare" }
 
 Items.RarityColors = {
 	Unlock = Color3.fromRGB(255, 205, 60),
+	Exotic = Color3.fromRGB(40, 225, 200),
 	Common = Color3.fromRGB(235, 235, 235),
 	Uncommon = Color3.fromRGB(120, 220, 120),
 	Rare = Color3.fromRGB(90, 160, 255),
@@ -113,6 +114,18 @@ Items.Catalog = {
 		Shape = "Block",
 		Color = Color3.fromRGB(255, 200, 50),
 		Material = Enum.Material.Foil,
+	},
+	{
+		Id = "CaptainsKey",
+		Name = "Captain's Key",
+		Class = Light,
+		Rarity = "Unlock",
+		Unlock = "ShipwreckShallows",
+		Value = 0,
+		Size = Vector3.new(0.5, 0.3, 1.8),
+		Shape = "Block",
+		Color = Color3.fromRGB(80, 200, 190),
+		Material = Enum.Material.Metal,
 	},
 	-- Medium
 	{

@@ -7,6 +7,9 @@
 --   "Rebirth"      lost on a normal rebirth (and so also on a true rebirth): shop gear
 --   "TrueRebirth"  kept through normal rebirths, lost on a true rebirth: magical rewards
 --   "Never"        kept through everything: unlock items, secret rewards, cosmetics
+--
+-- Exotic items (from exotic secrets) can only be used once the player is attuned to that
+-- item type (an attunement core, see InventoryService).
 
 local Gear = require(script.Parent.Gear)
 local Items = require(script.Parent.Items)
@@ -16,16 +19,17 @@ local Catalog = {}
 export type Entry = {
 	Id: string,
 	Name: string,
-	Category: "Tool" | "Vessel" | "Unlock",
+	Category: "Tool" | "Vessel" | "Accessory" | "Unlock",
 	Rarity: string,
 	Tradeable: boolean,
 	Resets: "Rebirth" | "TrueRebirth" | "Never",
 	ShopItem: boolean,
+	Exotic: boolean,
 	Description: string,
 	Order: number,
 }
 
-Catalog.Categories = { "Tool", "Vessel", "Unlock" }
+Catalog.Categories = { "Tool", "Vessel", "Accessory", "Unlock" }
 
 Catalog.ResetText = {
 	Rebirth = "Lost on rebirth",
@@ -58,9 +62,10 @@ for _, tool in Gear.Tools do
 			Name = tool.Name,
 			Category = "Tool",
 			Rarity = tool.Rarity,
-			Tradeable = false,
-			Resets = "Rebirth",
-			ShopItem = true,
+			Tradeable = tool.Exotic == true,
+			Resets = if tool.Exotic then "Never" else "Rebirth",
+			ShopItem = not tool.Exotic,
+			Exotic = tool.Exotic == true,
 			Description = string.format(
 				"%s. Reach %d, lifts %s, reaches %s.",
 				tool.Note,
@@ -78,10 +83,25 @@ for _, vessel in Gear.Vessels do
 		Name = vessel.Name,
 		Category = "Vessel",
 		Rarity = vessel.Rarity,
-		Tradeable = false,
-		Resets = if vessel.Magical then "TrueRebirth" else "Rebirth",
-		ShopItem = not vessel.Magical,
+		Tradeable = vessel.Exotic == true,
+		Resets = if vessel.Exotic then "Never" elseif vessel.Magical then "TrueRebirth" else "Rebirth",
+		ShopItem = not vessel.Magical and not vessel.Exotic,
+		Exotic = vessel.Exotic == true,
 		Description = string.format("%s. Holds %d.", vessel.Note, vessel.Capacity),
+	})
+end
+
+for _, accessory in Gear.Accessories do
+	add({
+		Id = accessory.Id,
+		Name = accessory.Name,
+		Category = "Accessory",
+		Rarity = accessory.Rarity,
+		Tradeable = true,
+		Resets = "Never",
+		ShopItem = false,
+		Exotic = accessory.Exotic == true,
+		Description = accessory.Note .. ".",
 	})
 end
 
@@ -95,6 +115,7 @@ for _, item in Items.Catalog do
 			Tradeable = true,
 			Resets = "Never",
 			ShopItem = false,
+			Exotic = false,
 			Description = "Opens a secret. Used up when you go in, win or lose.",
 		})
 	end

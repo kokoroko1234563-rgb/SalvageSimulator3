@@ -135,6 +135,7 @@ local stability = {
 	Wheelbarrow = 0.6,
 	BeachWagon = 1.2,
 	FloatingClamshell = 1,
+	CaptainsLongboat = 2,
 }
 
 -- One wheel at the front, two legs at the back: tips easily, lifts by the handles.
@@ -199,6 +200,56 @@ function builders.FloatingClamshell(model: Model, at: CFrame)
 		{ Transparency = 1, CanCollide = false }
 	)
 	weld(base, handle)
+	return handle
+end
+
+-- Exotic: a long wooden boat dragged over the sand on hidden skids, tow rope at the bow.
+function builders.CaptainsLongboat(model: Model, at: CFrame)
+	local color = Color3.fromRGB(110, 75, 45)
+	local base = tray(model, at * CFrame.new(0, 1.1, 0), Vector3.new(4.6, 0, 10.5), 1.4, color)
+	for _, child in model:GetChildren() do
+		if child:IsA("BasePart") and child.Name ~= "Cargo" then
+			child.Material = Enum.Material.WoodPlanks
+		end
+	end
+	local bow = part(
+		model,
+		"Bow",
+		Vector3.new(3.4, 1.6, 3.4),
+		base.CFrame * CFrame.new(0, 0.6, -6.4) * CFrame.Angles(0, math.rad(45), 0),
+		color,
+		{ Material = Enum.Material.WoodPlanks }
+	)
+	weld(base, bow)
+	local handle = part(
+		model,
+		"Handle",
+		Vector3.new(0.5, 0.5, 2.6),
+		base.CFrame * CFrame.new(0, 0.8, -9),
+		Color3.fromRGB(200, 180, 120),
+		{ Material = Enum.Material.Fabric }
+	)
+	weld(base, handle)
+	-- Skids along the keel: the same low-friction balls the wheels use, just no wheels.
+	for _, offset in
+		{
+			Vector3.new(-1.8, -0.6, -4),
+			Vector3.new(1.8, -0.6, -4),
+			Vector3.new(-1.8, -0.6, 0),
+			Vector3.new(1.8, -0.6, 0),
+			Vector3.new(-1.8, -0.6, 4),
+			Vector3.new(1.8, -0.6, 4),
+		}
+	do
+		local skid =
+			part(model, "Skid", Vector3.new(0.9, 0.9, 0.9), base.CFrame * CFrame.new(offset), color, {
+				Shape = Enum.PartType.Ball,
+				Transparency = 1,
+				CanQuery = false,
+				CustomPhysicalProperties = SKID_PHYSICS,
+			})
+		weld(base, skid)
+	end
 	return handle
 end
 

@@ -217,13 +217,14 @@ end
 -- Whether the held item could go in Deep Pockets (the server checks again).
 local function canPocket(): boolean
 	local current = held
-	if not current or current.kind ~= "item" or not hasReward("DeepPockets") then
+	local slots = player:GetAttribute("PocketSlots") or 0
+	if not current or current.kind ~= "item" or slots == 0 then
 		return false
 	end
 	local part = current.part
 	return part:GetAttribute("Class") == Gear.WeightClass.Light
 		and not part:GetAttribute("Unlock")
-		and (player:GetAttribute("Pockets") or 0) < Config.Pockets.Slots
+		and (player:GetAttribute("Pockets") or 0) < slots
 end
 
 local function cleanup()
@@ -254,7 +255,7 @@ function GrabController.pocket()
 	if not current or current.kind ~= "item" then
 		return
 	end
-	if not hasReward("DeepPockets") then
+	if (player:GetAttribute("PocketSlots") or 0) == 0 then
 		return
 	end
 	Remotes.get("Pocket"):FireServer("store", current.part)

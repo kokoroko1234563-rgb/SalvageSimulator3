@@ -1,5 +1,6 @@
 -- Sends each player their inventory as data (attributes can't hold it) and handles what
--- they do from the inventory screen: equip a tool, spawn a vessel, change a setting.
+-- they do from the inventory screen: equip a tool or accessory, spawn a vessel, attune to an
+-- exotic item type, change a setting.
 -- The items themselves live on the saved profile; DataService is the only thing that
 -- adds or removes them.
 
@@ -7,6 +8,7 @@ local Players = game:GetService("Players")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Catalog = require(Shared.Catalog)
+local Gear = require(Shared.Gear)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
 local Secrets = require(Shared.Secrets)
@@ -56,10 +58,19 @@ function InventoryService.snapshot(player: Player)
 			table.insert(rewards, id)
 		end
 	end
+	local attunements = {}
+	for id in profile.Attunements do
+		table.insert(attunements, id)
+	end
+	table.sort(attunements)
 	return {
 		Items = items,
 		ColoredCoins = coins,
 		Cores = profile.Cores,
+		Attunements = attunements,
+		TrueRebirths = profile.TrueRebirths,
+		EquippedAccessory = player:GetAttribute("Accessory"),
+		PocketSlots = player:GetAttribute("PocketSlots"),
 		Rewards = rewards,
 		Pockets = profile.Pockets,
 		Settings = profile.Settings,
@@ -99,10 +110,29 @@ local function onAction(player: Player, action: any, arg: any, value: any): (boo
 
 	if action == "equip" then
 		local record, entry = findRecord(player, arg)
-		if not record or not entry or entry.Category ~= "Tool" then
+		if not record or not entry or (entry.Category ~= "Tool" and entry.Category ~= "Accessory") then
 			return false, "You can't equip that"
 		end
-		profile.EquippedTool = record.Id
+		if not DataService.canUse(player, record.Id) then
+			return false, "Attune to " .. entry.Name .. " first (1 attunement core)"
+		end
+		if entry.Category == "Tool" then
+			profile.EquippedTool = record.Id
+		else
+			profile.EquippedAccessory = record.Id
+		end
+		DataService.changed(player)
+		return true
+	elseif action == "unequip" then
+		local record, entry = findRecord(player, arg)
+		if not record or not entry or entry.Category ~= "Accessory" then
+			return false, "Nothing to take off"
+		end
+		local slotsAfter = DataService.pocketSlots(player) - (Gear.getAccessory(record.Id).PocketSlots or 0)
+		if #profile.Pockets > slotsAfter then
+			return false, "Take some items out of your pockets first"
+		end
+		profile.EquippedAccessory = nil
 		DataService.changed(player)
 		return true
 	elseif action == "spawn" then
@@ -111,6 +141,23 @@ local function onAction(player: Player, action: any, arg: any, value: any): (boo
 			return false, "That isn't a vessel"
 		end
 		return ShopService.spawnVessel(player, record.Id)
+	elseif action == "attune" then
+		-- Attunement is to the item type, not this copy: trade it away, get another later,
+		-- and it still works without a new core.
+		local record, entry = findRecord(player, arg)
+		if not record or not entry or not entry.Exotic then
+			return false, "Only exotic items need attuning"
+		end
+		if profile.Attunements[record.Id] then
+			return false, "You're already attuned to " .. entry.Name
+		end
+		if profile.Cores < 1 then
+			return false, "You need an attunement core. True rebirth gives you one."
+		end
+		profile.Cores -= 1
+		profile.Attunements[record.Id] = true
+		DataService.changed(player)
+		return true, "Attuned to " .. entry.Name .. "!"
 	elseif action == "setting" then
 		if (arg == "HideShopGear" or arg == "ShowResetText") and type(value) == "boolean" then
 			profile.Settings[arg] = value

@@ -42,12 +42,15 @@ export type Profile = {
 	Version: number,
 	Coins: number,
 	Rebirths: number,
+	TrueRebirths: number,
 	Rewards: { [string]: boolean },
 	PendingPick: { string }?, -- reward options waiting for the player to choose one
 	ColoredCoins: { [string]: boolean },
-	Cores: number, -- attunement cores (true rebirth, later)
+	Cores: number, -- attunement cores, one per true rebirth
+	Attunements: { [string]: boolean }, -- exotic item types the player can use
 	Items: { [string]: ItemRecord }, -- inventory, by unique id
 	EquippedTool: string?, -- catalog id; nil = best owned
+	EquippedAccessory: string?,
 	Pockets: { PocketEntry }, -- Deep Pockets contents
 	Settings: { HideShopGear: boolean, ShowResetText: boolean },
 }
@@ -57,12 +60,15 @@ local function defaultProfile(): Profile
 		Version = 2,
 		Coins = 0,
 		Rebirths = 0,
+		TrueRebirths = 0,
 		Rewards = {},
 		PendingPick = nil,
 		ColoredCoins = {},
 		Cores = 0,
+		Attunements = {},
 		Items = {},
 		EquippedTool = nil,
+		EquippedAccessory = nil,
 		Pockets = {},
 		Settings = { HideShopGear = false, ShowResetText = false },
 	}
@@ -124,6 +130,20 @@ local function reconcile(data: any): Profile
 	if type(data.Cores) == "number" then
 		profile.Cores = math.max(0, math.floor(data.Cores))
 	end
+	if type(data.TrueRebirths) == "number" then
+		profile.TrueRebirths = math.max(0, math.floor(data.TrueRebirths))
+	end
+	if type(data.Attunements) == "table" then
+		for id, attuned in data.Attunements do
+			local entry = Catalog.get(id)
+			if attuned == true and entry and entry.Exotic then
+				profile.Attunements[id] = true
+			end
+		end
+	end
+	if type(data.EquippedAccessory) == "string" and Catalog.get(data.EquippedAccessory) then
+		profile.EquippedAccessory = data.EquippedAccessory
+	end
 
 	if type(data.Items) == "table" then
 		for uid, record in data.Items do
@@ -168,7 +188,7 @@ local function reconcile(data: any): Profile
 			if
 				type(entry) == "table"
 				and Items.get(entry.ItemId)
-				and #profile.Pockets < Config.Pockets.Slots
+				and #profile.Pockets < Config.Pockets.MaxSlots
 			then
 				table.insert(profile.Pockets, {
 					ItemId = entry.ItemId,
@@ -190,12 +210,15 @@ local function serialize(profile: Profile, release: boolean)
 		Version = profile.Version,
 		Coins = profile.Coins,
 		Rebirths = profile.Rebirths,
+		TrueRebirths = profile.TrueRebirths,
 		Rewards = profile.Rewards,
 		PendingPick = profile.PendingPick,
 		ColoredCoins = profile.ColoredCoins,
 		Cores = profile.Cores,
+		Attunements = profile.Attunements,
 		Items = profile.Items,
 		EquippedTool = profile.EquippedTool,
+		EquippedAccessory = profile.EquippedAccessory,
 		Pockets = profile.Pockets,
 		Settings = profile.Settings,
 		Lock = if release then nil else { JobId = game.JobId, Time = os.time() },
@@ -226,14 +249,49 @@ for _, id in Rebirth.Order do
 	table.insert(rewardList, Rebirth.Rewards[id])
 end
 
--- The tool the player grabs with: the one they equipped if they still own it, else their best.
+-- Whether the player may use this item type: anything not exotic, or exotic once attuned.
+local function canUse(profile: Profile, id: string): boolean
+	local entry = Catalog.get(id)
+	return entry ~= nil and (not entry.Exotic or profile.Attunements[id] == true)
+end
+
+-- The tool the player grabs with: the one they equipped if they still own (and may use)
+-- it, else their best shop tool.
 local function activeTool(profile: Profile)
 	local owned = ownedTypes(profile)
 	owned.BareHands = true
-	if profile.EquippedTool and owned[profile.EquippedTool] then
-		return Gear.getTool(profile.EquippedTool)
+	local equipped = profile.EquippedTool
+	if equipped and owned[equipped] and (equipped == "BareHands" or canUse(profile, equipped)) then
+		return Gear.getTool(equipped)
 	end
 	return Gear.bestTool(owned)
+end
+
+-- The worn accessory, if the player still owns it and is attuned to it.
+local function activeAccessory(profile: Profile)
+	local id = profile.EquippedAccessory
+	if id and ownedTypes(profile)[id] and canUse(profile, id) then
+		return Gear.getAccessory(id)
+	end
+	return nil
+end
+
+-- Pocket slots: 3 from Deep Pockets, plus whatever a worn accessory adds.
+local function pocketSlots(profile: Profile): number
+	local slots = if profile.Rewards.DeepPockets then Config.Pockets.Slots else 0
+	local accessory = activeAccessory(profile)
+	if accessory and accessory.PocketSlots then
+		slots += accessory.PocketSlots
+	end
+	return math.min(slots, Config.Pockets.MaxSlots)
+end
+
+local function countKeys(set: { [string]: any }): number
+	local count = 0
+	for _ in set do
+		count += 1
+	end
+	return count
 end
 
 -- Mirrors the profile onto player attributes (small values the HUD and checks read) and
@@ -253,6 +311,11 @@ local function publish(player: Player)
 	player:SetAttribute("Rewards", csv(profile.Rewards, rewardList))
 	player:SetAttribute("PendingPick", table.concat(profile.PendingPick or {}, ","))
 	player:SetAttribute("Pockets", #profile.Pockets)
+	player:SetAttribute("PocketSlots", pocketSlots(profile))
+	local accessory = activeAccessory(profile)
+	player:SetAttribute("Accessory", if accessory then accessory.Id else "")
+	player:SetAttribute("Cores", profile.Cores)
+	player:SetAttribute("ColoredCoinCount", countKeys(profile.ColoredCoins))
 	for _, callback in changedCallbacks do
 		task.spawn(callback, player, profile)
 	end
@@ -408,6 +471,16 @@ function DataService.grantColoredCoin(player: Player, color: string)
 end
 
 -- Inventory ------------------------------------------------------------------------
+
+function DataService.canUse(player: Player, id: string): boolean
+	local profile = profiles[player]
+	return profile ~= nil and canUse(profile, id)
+end
+
+function DataService.pocketSlots(player: Player): number
+	local profile = profiles[player]
+	return if profile then pocketSlots(profile) else 0
+end
 
 function DataService.onChanged(callback: (Player, Profile) -> ())
 	table.insert(changedCallbacks, callback)

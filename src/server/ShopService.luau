@@ -82,6 +82,9 @@ function ShopService.spawnVessel(player: Player, id: any): (boolean, string?)
 	if not profile or DataService.countItemType(player, id) == 0 then
 		return false, "You don't own that"
 	end
+	if not DataService.canUse(player, id) then
+		return false, "Attune to it first (1 attunement core)"
+	end
 	return VesselService.spawn(player, id)
 end
 

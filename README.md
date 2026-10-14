@@ -44,6 +44,16 @@ Test with **Test → Clients and Servers** (2 or more players) to check bumping 
 | Secret course | Use a banked spade at the sandcastle door (always used up). You go to your own copy of the Sandcastle Vault, built only on your client (`SecretController`, layout in `Secrets.luau`): a spiral climb while the sea floods in. The flood time depends on when the real tide would cover the door. `SecretService` verifies the run from your position (checkpoints in order, above the water, plausible time, at the chest) before granting the yellow coin. |
 | Rebirth | In the shop: costs 100,000 coins, ×1.5 more each time. Resets coins, tools and shop vessels, adds ×0.5 coin multiplier. At each of the first 5 rebirths you pick a reward you don't have yet: Swift Feet, Deep Pockets (press **Q** or **Pocket** to pocket a Light item; pockets sell on the sell pad) or the Floating Clamshell (a magical vessel that hovers behind you). |
 
+## True rebirth, attunement and exotic secrets
+
+| Doc item | Where |
+| --- | --- |
+| Rare biome | **Shipwreck Shallows** (Uncommon tier) rolls by weight with the others (`Config.Biomes.Weights`) and is never announced. It has wreck debris, ship loot, and its hazard: barrels roll down the sand every 6 s (`Config.Hazards`), and a hit knocks what you hold out of your hands. |
+| Exotic unlock item | The **Captain's Key** washes up in Shipwreck Shallows, much more rarely than common unlock items (`Config.Unlocks.ExoticSpawnChance`). It is banked like the Golden Spade. |
+| Exotic secret | The **Sunken Hold**: use a banked key at the wreck's hatch. It's a zig-zag climb up a hull while it floods, and it can be repeated. It ends in a **lootbox** (`Secrets.luau`) rolling the Anchor Hook (grabber), Captain's Longboat (vessel, holds 12) or Deckhand's Satchel (accessory, +3 pocket slots), with a 1.5% chance of the **Barnacled** cosmetic variant. Rewards go straight to the inventory. |
+| True rebirth | In the shop: redeem all 5 colored coins (two clicks). It resets coins, gear, rebirths, multiplier, rewards, magical vessels, colored coins and pockets. It keeps unlock items, exotic items, cores and attunements, and gives **1 attunement core**. |
+| Attunement | Exotic items can't be used until you spend a core on them (**Attune** on the inventory card). Attunement is to the item type, so trading the copy away and getting another later still works. |
+
 ## Inventory
 
 Press **I** (or the purple bag button) to open it.
@@ -67,7 +77,6 @@ is checked on the server, so non-admins can't use it even with exploits.
 | --- | --- |
 | `status` | Tide phase, item counts, wave strength, players |
 | `coins <n> [player]` / `addcoins <n> [player]` | Set or add coins |
-| `give <tool or vessel> [player]` | e.g. `give boathook`, `give beachwagon` |
 | `vessel <vessel> [player]` | Spawn a vessel next to the player |
 | `spawn <item or rarity> [count]` | e.g. `spawn rare 5`, `spawn anchor` |
 | `clearitems [all]` | Remove unclaimed items (or all items) |
@@ -84,6 +93,10 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `rebirth [player]`, `rebirths <n> [player]` | Free rebirth (with reward pick), or set the count |
 | `reward <id\|all\|none> [player]` | `swiftfeet`, `deeppockets`, `floatingclamshell` |
 | `inv [player]` | List a player's inventory |
+| `give <item> [player] [variant]` | Any inventory item: `give anchorhook`, `give deckhandssatchel me Barnacled` |
+| `cores <n> [player]` | Set attunement cores |
+| `attune <item\|all\|none> [player]` | Attune without spending a core |
+| `truerebirth [player]` | True rebirth without needing the 5 coins |
 
 Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down recalls history.
 

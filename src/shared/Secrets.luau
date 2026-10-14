@@ -38,6 +38,34 @@ local function sandcastleCourse()
 	}
 end
 
+-- Sunken Hold: a zig-zag climb up the slanted inside of a wrecked hull.
+local function hullCourse()
+	local platforms: { Platform } = {}
+	local steps = 12
+	for i = 1, steps do
+		local side = if i % 2 == 0 then 1 else -1
+		table.insert(platforms, {
+			Position = Vector3.new(side * 9, i * 5, -27 + i * 4.5),
+			Size = Vector3.new(8, 1, 5),
+		})
+	end
+	local top = (steps + 1) * 5
+	table.insert(platforms, { Position = Vector3.new(0, top, 30), Size = Vector3.new(14, 1, 8) })
+	return {
+		Floor = { Position = Vector3.new(0, 0, 0), Size = Vector3.new(40, 1, 72) },
+		WallHeight = top + 20,
+		Platforms = platforms,
+		Checkpoints = { platforms[4].Position, platforms[8].Position },
+		CheckpointRadius = 6,
+		Spawn = Vector3.new(0, 3, -30),
+		Chest = Vector3.new(0, top + 1.5, 30),
+		ChestRadius = 9,
+		FloodFrom = -2,
+		FloodTo = top + 6,
+		HalfSize = 36, -- the hull is long, so it's a bigger box
+	}
+end
+
 Secrets.List = {
 	SandcastleFlats = {
 		Id = "SandcastleFlats",
@@ -47,6 +75,22 @@ Secrets.List = {
 		Coin = "Yellow",
 		Course = sandcastleCourse(),
 		Color = Color3.fromRGB(230, 200, 140),
+	},
+	-- Exotic secret: ends in a lootbox instead of a colored coin.
+	ShipwreckShallows = {
+		Id = "ShipwreckShallows",
+		Name = "Sunken Hold",
+		Biome = "ShipwreckShallows",
+		Unlock = "CaptainsKey",
+		Loot = {
+			{ Id = "AnchorHook", Weight = 34 },
+			{ Id = "CaptainsLongboat", Weight = 33 },
+			{ Id = "DeckhandsSatchel", Weight = 33 },
+		},
+		Variant = "Barnacled", -- the rare cosmetic variant in this secret's style
+		VariantChance = 0.015,
+		Course = hullCourse(),
+		Color = Color3.fromRGB(105, 75, 50),
 	},
 }
 
@@ -58,6 +102,30 @@ Secrets.CoinColors = {
 	Pink = Color3.fromRGB(255, 120, 200),
 }
 Secrets.CoinOrder = { "Yellow", "Orange", "Blue", "Green", "Pink" }
+
+-- Rolls a lootbox: an item id from the secret's pool, and maybe its cosmetic variant.
+function Secrets.rollLoot(secret, rng: Random): (string?, string?)
+	if not secret.Loot then
+		return nil, nil
+	end
+	local total = 0
+	for _, entry in secret.Loot do
+		total += entry.Weight
+	end
+	local roll = rng:NextNumber() * total
+	local picked = secret.Loot[#secret.Loot].Id
+	for _, entry in secret.Loot do
+		roll -= entry.Weight
+		if roll <= 0 then
+			picked = entry.Id
+			break
+		end
+	end
+	local variant = if secret.Variant and rng:NextNumber() < (secret.VariantChance or 0)
+		then secret.Variant
+		else nil
+	return picked, variant
+end
 
 -- Each player slot gets its own spot far off the map, so courses never overlap.
 function Secrets.originFor(slot: number): Vector3

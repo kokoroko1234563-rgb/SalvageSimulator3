@@ -103,6 +103,21 @@ Gear.Tools = {
 		Note = "Pulls chests out of rough water",
 		Available = false,
 	},
+	{
+		-- Exotic (Sunken Hold lootbox): needs attunement to use. Never in the shop.
+		Id = "AnchorHook",
+		Name = "Anchor Hook",
+		Rarity = "Exotic",
+		Price = 0,
+		Reach = 22,
+		Lift = Gear.WeightClass.Heavy,
+		Depth = Gear.Depth.Waist,
+		Grip = 480,
+		GripBreak = 10,
+		Note = "Exotic grabber: long reach, holds tight in the surf",
+		Available = false,
+		Exotic = true,
+	},
 }
 
 Gear.Vessels = {
@@ -171,6 +186,29 @@ Gear.Vessels = {
 		Available = false,
 		Magical = true,
 	},
+	{
+		-- Exotic (Sunken Hold lootbox): needs attunement to spawn. Never in the shop.
+		Id = "CaptainsLongboat",
+		Name = "Captain's Longboat",
+		Rarity = "Exotic",
+		Price = 0,
+		Capacity = 12,
+		Note = "Exotic vessel: long, steady, holds 12",
+		Available = false,
+		Exotic = true,
+	},
+}
+
+-- Worn items. Exotic ones need attunement.
+Gear.Accessories = {
+	{
+		Id = "DeckhandsSatchel",
+		Name = "Deckhand's Satchel",
+		Rarity = "Exotic",
+		PocketSlots = 3,
+		Note = "Exotic accessory: 3 extra pocket slots for Light items",
+		Exotic = true,
+	},
 }
 
 local toolsById = {}
@@ -185,6 +223,15 @@ for index, vessel in Gear.Vessels do
 	vesselsById[vessel.Id] = vessel
 end
 
+local accessoriesById = {}
+for _, accessory in Gear.Accessories do
+	accessoriesById[accessory.Id] = accessory
+end
+
+function Gear.getAccessory(id: string?)
+	return accessoriesById[id or ""]
+end
+
 function Gear.getTool(id: string?)
 	return toolsById[id or ""] or Gear.Tools[1]
 end
@@ -193,11 +240,12 @@ function Gear.getVessel(id: string?)
 	return vesselsById[id or ""]
 end
 
--- Picks the best tool from a set of owned ids ({ [id] = true }).
+-- Picks the best shop tool from a set of owned ids ({ [id] = true }). Exotic tools are only
+-- ever used when equipped (and attuned).
 function Gear.bestTool(owned: { [string]: boolean })
 	local best = Gear.Tools[1]
 	for _, tool in Gear.Tools do
-		if owned[tool.Id] then
+		if owned[tool.Id] and not tool.Exotic then
 			best = tool
 		end
 	end

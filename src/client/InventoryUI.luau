@@ -94,6 +94,8 @@ local function act(action: string, arg: any, value: any?)
 		HUD.notify("That didn't work: " .. tostring(ok))
 	elseif not ok then
 		HUD.notify(reason or "That didn't work")
+	elseif reason then
+		HUD.notify(reason)
 	end
 end
 
@@ -187,6 +189,10 @@ local function itemCard(group, order: number)
 	if settings.ShowResetText then
 		table.insert(lines, Catalog.ResetText[entry.Resets])
 	end
+	local attuned = table.find(snapshot.Attunements or {}, item.Id) ~= nil
+	if entry.Exotic then
+		table.insert(lines, if attuned then "Attuned" else "Not attuned: needs 1 core to use")
+	end
 	table.insert(lines, if entry.Tradeable then "Tradeable" else "Not tradeable")
 	label({
 		Text = table.concat(lines, "\n"),
@@ -197,7 +203,25 @@ local function itemCard(group, order: number)
 	}, card)
 
 	local actionButton: TextButton? = nil
-	if entry.Category == "Tool" then
+	if entry.Exotic and not attuned then
+		local hasCore = (snapshot.Cores or 0) > 0
+		actionButton = button(
+			if hasCore then "Attune · 1 core" else "Needs a core",
+			if hasCore then Color3.fromRGB(40, 190, 170) else Color3.fromRGB(70, 80, 90),
+			card
+		)
+		if hasCore then
+			(actionButton :: TextButton).Activated:Connect(function()
+				act("attune", item.Uid)
+			end)
+		end
+	elseif entry.Category == "Accessory" then
+		local worn = snapshot.EquippedAccessory == item.Id
+		actionButton = button(if worn then "Take off" else "Wear", Color3.fromRGB(150, 100, 200), card);
+		(actionButton :: TextButton).Activated:Connect(function()
+			act(if worn then "unequip" else "equip", item.Uid)
+		end)
+	elseif entry.Category == "Tool" then
 		local equipped = snapshot.EquippedTool == item.Id
 		actionButton = button(
 			if equipped then "Equipped" else "Equip",
@@ -286,11 +310,28 @@ local function showCoins()
 		}, slot)
 	end
 	label({
-		Text = "Attunement cores: " .. (snapshot.Cores or 0),
+		Text = string.format(
+			"Attunement cores: %d   ·   True rebirths: %d",
+			snapshot.Cores or 0,
+			snapshot.TrueRebirths or 0
+		),
 		Font = FONT,
 		TextSize = 18,
 		Size = UDim2.new(1, 0, 0, 26),
 		LayoutOrder = 3,
+	}, content)
+	local attunedNames = {}
+	for _, id in snapshot.Attunements or {} do
+		local entry = Catalog.get(id)
+		table.insert(attunedNames, if entry then entry.Name else id)
+	end
+	label({
+		Text = "Attuned to: "
+			.. (if #attunedNames > 0 then table.concat(attunedNames, ", ") else "nothing yet")
+			.. "\nSpend a core on an exotic item you own (Items tab) to use that kind of item for good, even if you trade the copy away.",
+		TextColor3 = MUTED,
+		Size = UDim2.new(1, -10, 0, 54),
+		LayoutOrder = 4,
 	}, content)
 end
 
@@ -363,16 +404,16 @@ local function refreshPockets()
 			child:Destroy()
 		end
 	end
-	local hasPockets = table.find(snapshot.Rewards, "DeepPockets") ~= nil
-	pocketsRow.Visible = hasPockets
-	if not hasPockets then
+	local slots = snapshot.PocketSlots or 0
+	pocketsRow.Visible = slots > 0
+	if slots == 0 then
 		return
 	end
-	for slot = 1, 3 do
+	for slot = 1, math.max(slots, #snapshot.Pockets) do
 		local entry = snapshot.Pockets[slot]
 		local frame = make(
 			"Frame",
-			{ BackgroundColor3 = CARD, Size = UDim2.fromOffset(170, 44), LayoutOrder = slot },
+			{ BackgroundColor3 = CARD, Size = UDim2.fromOffset(112, 44), LayoutOrder = slot },
 			pocketsRow
 		)
 		corner(frame, 6)
@@ -381,19 +422,19 @@ local function refreshPockets()
 			label({
 				Text = string.format("%s\n%d coins", if def then def.Name else entry.ItemId, entry.Value),
 				TextSize = 12,
-				Position = UDim2.fromOffset(8, 4),
-				Size = UDim2.new(1, -80, 1, -8),
+				Position = UDim2.fromOffset(6, 4),
+				Size = UDim2.new(1, -46, 1, -8),
 			}, frame)
-			local out = button("Take out", Color3.fromRGB(150, 100, 200), frame)
+			local out = button("Out", Color3.fromRGB(150, 100, 200), frame)
 			out.TextSize = 13
-			out.Size = UDim2.fromOffset(66, 28)
-			out.Position = UDim2.new(1, -72, 0.5, -14)
+			out.Size = UDim2.fromOffset(36, 28)
+			out.Position = UDim2.new(1, -40, 0.5, -14)
 			out.Activated:Connect(function()
 				Remotes.get("Pocket"):FireServer("drop", slot)
 			end)
 		else
 			label({
-				Text = "Empty pocket",
+				Text = "Empty",
 				TextSize = 12,
 				TextColor3 = MUTED,
 				Position = UDim2.fromOffset(8, 14),

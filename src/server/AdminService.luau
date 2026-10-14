@@ -234,24 +234,108 @@ command("addcoins", "addcoins <amount> [player]", "Add (or remove) coins", funct
 	end) or lines
 end)
 
-command("give", "give <tool or vessel> [player]", "Give gear, e.g. give boathook", function(caller, args)
-	if not args[1] then
-		return { "Usage: give <tool or vessel> [player]" }
+-- Any inventory item by id or name: tools, vessels, accessories, unlock and exotic items.
+local function findCatalog(query: string)
+	local key = normalize(query)
+	for id, entry in Catalog.all() do
+		if normalize(id) == key or normalize(entry.Name) == key then
+			return entry
+		end
 	end
-	local kind, entry = findGear(args[1])
-	if not kind then
-		return { "Unknown tool or vessel '" .. args[1] .. "'" }
+	return nil
+end
+
+command(
+	"give",
+	"give <item> [player] [variant]",
+	"Give any inventory item, e.g. give boathook, give anchorhook me Barnacled",
+	function(caller, args)
+		if not args[1] then
+			return { "Usage: give <item> [player] [variant]" }
+		end
+		local entry = findCatalog(args[1])
+		if not entry then
+			return { "Unknown item '" .. args[1] .. "'" }
+		end
+		local variant = args[3]
+		local lines = {}
+		return eachTarget(caller, args[2], function(target)
+			-- Shop gear is one per player; everything else can stack up copies.
+			if entry.ShopItem and DataService.countItemType(target, entry.Id) > 0 then
+				table.insert(lines, target.Name .. " already owns " .. entry.Name)
+			else
+				DataService.addItem(target, entry.Id, "admin", if variant then { Variant = variant } else nil)
+				table.insert(
+					lines,
+					"Gave " .. (if variant then variant .. " " else "") .. entry.Name .. " to " .. target.Name
+				)
+			end
+		end) or lines
+	end
+)
+
+command("cores", "cores <n> [player]", "Set attunement cores", function(caller, args)
+	local n = tonumber(args[1])
+	if not n then
+		return { "Usage: cores <n> [player]" }
 	end
 	local lines = {}
 	return eachTarget(caller, args[2], function(target)
-		if DataService.countItemType(target, entry.Id) > 0 then
-			table.insert(lines, target.Name .. " already owns " .. entry.Name)
-		else
-			DataService.addItem(target, entry.Id, "admin")
-			table.insert(lines, "Gave " .. entry.Name .. " to " .. target.Name)
+		local profile = DataService.get(target)
+		if profile then
+			profile.Cores = math.max(0, math.floor(n))
+			DataService.changed(target)
+			table.insert(lines, string.format("%s: %d cores", target.Name, profile.Cores))
 		end
 	end) or lines
 end)
+
+command(
+	"attune",
+	"attune <item|all|none> [player]",
+	"Attune to exotic item types (no core needed)",
+	function(caller, args)
+		local choice = (args[1] or ""):lower()
+		local ids = {}
+		if choice == "all" or choice == "none" then
+			for id, entry in Catalog.all() do
+				if entry.Exotic then
+					table.insert(ids, id)
+				end
+			end
+		else
+			local entry = findCatalog(choice)
+			if not entry or not entry.Exotic then
+				return { "Usage: attune <exotic item|all|none> [player]" }
+			end
+			ids = { entry.Id }
+		end
+		local lines = {}
+		return eachTarget(caller, args[2], function(target)
+			local profile = DataService.get(target)
+			if profile then
+				for _, id in ids do
+					profile.Attunements[id] = if choice == "none" then nil else true
+				end
+				DataService.changed(target)
+				table.insert(lines, target.Name .. ": attunements updated")
+			end
+		end) or lines
+	end
+)
+
+command(
+	"truerebirth",
+	"truerebirth [player]",
+	"True rebirth for free (no coins needed): resets and gives a core",
+	function(caller, args)
+		local lines = {}
+		return eachTarget(caller, args[1], function(target)
+			local ok, reason = RebirthService.trueRebirth(target, true)
+			table.insert(lines, target.Name .. ": " .. (if ok then "true rebirth done" else tostring(reason)))
+		end) or lines
+	end
+)
 
 command("vessel", "vessel <vessel> [player]", "Spawn a vessel next to the player", function(caller, args)
 	local kind, entry = findGear(args[1] or "")

@@ -241,7 +241,10 @@ function ItemService.spawnInSurf(waterline: number): BasePart?
 	-- A biome zone sometimes washes up its secret's unlock item, and mostly its own loot.
 	local biome = Biomes.activeIn(zoneIndex)
 	local def
-	if biome and biome.UnlockItem and rng:NextNumber() < Config.Unlocks.SpawnChance then
+	local unlockChance = if biome and biome.Tier == "Common"
+		then Config.Unlocks.SpawnChance
+		else Config.Unlocks.ExoticSpawnChance
+	if biome and biome.UnlockItem and rng:NextNumber() < unlockChance then
 		if ItemService.countOf(biome.UnlockItem) < Config.Unlocks.MaxOnMap then
 			def = Items.get(biome.UnlockItem)
 		end
