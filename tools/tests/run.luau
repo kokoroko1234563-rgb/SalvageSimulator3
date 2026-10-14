@@ -73,6 +73,7 @@ test("load server services", function()
 			"AuctionService",
 			"SkyBeamService",
 			"CosmeticService",
+			"FarSandbarService",
 		}
 	do
 		h.require("Server/" .. name)
@@ -129,6 +130,19 @@ for id, biome in Biomes.List do
 		folder:Destroy()
 	end)
 end
+
+test("build the bell tower", function()
+	local map = Harness.wrap(roblox.Instance.new("Folder"))
+	local door = h.require("Server/FarSandbarService").build(map)
+	assert(door:FindFirstChildOfClass("ProximityPrompt"), "the door needs a prompt")
+	local Beach = h.require("Shared/Beach")
+	local Tide = h.require("Shared/Tide")
+	-- The door must be dry at low tide, or the secret can never be entered.
+	assert(
+		not Beach.isDeep(door.CFrame.Position, Tide.LowWaterline),
+		"the door is underwater even at low tide"
+	)
+end)
 
 -- 7. Every secret course builds on the client.
 local Secrets = h.require("Shared/Secrets")

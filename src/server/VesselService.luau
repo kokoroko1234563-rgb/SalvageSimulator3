@@ -137,6 +137,8 @@ local stability = {
 	BeachWagon = 1.2,
 	FloatingClamshell = 1,
 	CaptainsLongboat = 2,
+	SeaTurtle = 1,
+	LeviathanRowboat = 3,
 }
 
 -- One wheel at the front, two legs at the back: tips easily, lifts by the handles.
@@ -250,6 +252,110 @@ function builders.CaptainsLongboat(model: Model, at: CFrame)
 				CustomPhysicalProperties = SKID_PHYSICS,
 			})
 		weld(base, skid)
+	end
+	return handle
+end
+
+-- Magical: a turtle with a flat shell to load. It follows its owner like the clamshell, but
+-- swims at the surface instead of hovering, so deep water doesn't take it (GrabController).
+function builders.SeaTurtle(model: Model, at: CFrame)
+	local shell = Color3.fromRGB(70, 120, 70)
+	local skin = Color3.fromRGB(150, 175, 110)
+	local base = tray(model, at * CFrame.new(0, 2, 0), Vector3.new(4.4, 0, 5), 0.9, shell)
+	for _, child in model:GetChildren() do
+		if child:IsA("BasePart") and child.Name ~= "Cargo" then
+			child.Material = Palette.Material.Smooth
+		end
+	end
+	local head =
+		part(model, "Head", Vector3.new(1.6, 1.4, 1.8), base.CFrame * CFrame.new(0, 0.2, -3.6), skin, {
+			Shape = Enum.PartType.Ball,
+			CanCollide = false,
+		})
+	weld(base, head)
+	for side = -1, 1, 2 do
+		for _, z in { -1.8, 1.8 } do
+			local flipper = part(
+				model,
+				"Flipper",
+				Vector3.new(1.8, 0.25, 1),
+				base.CFrame * CFrame.new(side * 3, -0.2, z) * CFrame.Angles(0, math.rad(side * z * 10), 0),
+				skin,
+				{ CanCollide = false }
+			)
+			weld(base, flipper)
+		end
+	end
+	local handle = part(
+		model,
+		"Handle",
+		Vector3.new(1, 0.3, 1),
+		base.CFrame * CFrame.new(0, -0.2, 0),
+		shell,
+		{ Transparency = 1, CanCollide = false }
+	)
+	weld(base, handle)
+	return handle
+end
+
+-- Exotic: the longboat's big sibling, a dark rowboat with a carved prow and oars.
+function builders.LeviathanRowboat(model: Model, at: CFrame)
+	local color = Color3.fromRGB(55, 60, 70)
+	local base = tray(model, at * CFrame.new(0, 1.1, 0), Vector3.new(6, 0, 13), 1.6, color)
+	for _, child in model:GetChildren() do
+		if child:IsA("BasePart") and child.Name ~= "Cargo" then
+			child.Material = Palette.Material.WoodPlanks
+		end
+	end
+	local prow = part(
+		model,
+		"Prow",
+		Vector3.new(4.4, 2, 4.4),
+		base.CFrame * CFrame.new(0, 0.8, -7.8) * CFrame.Angles(0, math.rad(45), 0),
+		color,
+		{ Material = Palette.Material.WoodPlanks }
+	)
+	weld(base, prow)
+	local eye = part(
+		model,
+		"Eye",
+		Vector3.new(0.8, 0.8, 0.8),
+		base.CFrame * CFrame.new(0, 2, -9.6),
+		Color3.fromRGB(90, 230, 200),
+		{ Shape = Enum.PartType.Ball, Material = Palette.Material.Neon, CanCollide = false }
+	)
+	weld(base, eye)
+	for side = -1, 1, 2 do
+		local oar = part(
+			model,
+			"Oar",
+			Vector3.new(0.3, 0.3, 6),
+			base.CFrame * CFrame.new(side * 3.8, 1, 0) * CFrame.Angles(0, math.rad(side * 20), 0),
+			Palette.World.Mast,
+			{ Material = Palette.Material.Wood, CanCollide = false }
+		)
+		weld(base, oar)
+	end
+	local handle = part(
+		model,
+		"Handle",
+		Vector3.new(0.5, 0.5, 2.6),
+		base.CFrame * CFrame.new(0, 0.8, -11),
+		Color3.fromRGB(200, 180, 120),
+		{ Material = Palette.Material.Fabric }
+	)
+	weld(base, handle)
+	for _, x in { -2.4, 2.4 } do
+		for _, z in { -5, 0, 5 } do
+			local skid =
+				part(model, "Skid", Vector3.new(1, 1, 1), base.CFrame * CFrame.new(x, -0.6, z), color, {
+					Shape = Enum.PartType.Ball,
+					Transparency = 1,
+					CanQuery = false,
+					CustomPhysicalProperties = SKID_PHYSICS,
+				})
+			weld(base, skid)
+		end
 	end
 	return handle
 end
@@ -469,6 +575,7 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 	model:SetAttribute("Capacity", def.Capacity)
 	model:SetAttribute("Stability", stability[def.Id] or 1)
 	model:SetAttribute("Hover", def.Magical == true)
+	model:SetAttribute("Swims", def.Swims == true)
 	handle:SetAttribute("VesselId", vesselId)
 	-- A little above its resting height, so the wheelbarrow's legs lift clear of the sand.
 	handle:SetAttribute("HandleHeight", handle.Position.Y - origin.Position.Y + 0.5)
@@ -501,8 +608,19 @@ local function tick()
 			destroyVessel(player, nil)
 			continue
 		end
+		local swims = vessel:GetAttribute("Swims") == true
+		if swims and Beach.isDeep(base.Position, waterline) then
+			-- Swimming vessels survive deep water, but the waves can wash cargo off.
+			if math.random() < Config.Grab.SwimWashChance then
+				local contents = VesselService.contents(vessel)
+				if #contents > 0 then
+					ItemService.setLoose(contents[math.random(#contents)])
+					notify(player, "A wave washed something off your vessel!")
+				end
+			end
+		end
 		if
-			Beach.isDeep(base.Position, waterline)
+			(not swims and Beach.isDeep(base.Position, waterline))
 			or base.Position.Y < Beach.groundY(base.Position.Z) - 30
 		then
 			destroyVessel(

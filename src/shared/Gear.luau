@@ -118,6 +118,40 @@ Gear.Tools = {
 		Available = false,
 		Exotic = true,
 	},
+	{
+		-- Magical (rebirth reward): pulls whatever it grabs toward you through the water.
+		Id = "TideMagnet",
+		Name = "Tide Magnet",
+		Rarity = "VeryRare",
+		Price = 0,
+		Reach = 26,
+		Lift = Gear.WeightClass.Heavy,
+		Depth = Gear.Depth.Waist,
+		Grip = 500,
+		GripBreak = 12,
+		Note = "Magical grabber: pulls items toward you through the water",
+		Available = false,
+		Magical = true,
+		Magnet = true,
+	},
+	{
+		-- Magical (rebirth reward): floats anything to you in a bubble, slowly; waves can't
+		-- knock it loose.
+		Id = "BubbleWand",
+		Name = "Bubble Wand",
+		Rarity = "VeryRare",
+		Price = 0,
+		Reach = 30,
+		Lift = Gear.WeightClass.VeryHeavy,
+		Depth = Gear.Depth.Deep,
+		Grip = 600,
+		GripBreak = math.huge,
+		Note = "Magical grabber: floats any item to you in a bubble, slowly. Waves can't knock it loose",
+		Available = false,
+		Magical = true,
+		Bubble = true,
+		MaxSpeed = 10,
+	},
 }
 
 Gear.Vessels = {
@@ -197,6 +231,29 @@ Gear.Vessels = {
 		Available = false,
 		Exotic = true,
 	},
+	{
+		-- Magical (rebirth reward): swims, so deep water doesn't take it.
+		Id = "SeaTurtle",
+		Name = "Sea Turtle",
+		Rarity = "VeryRare",
+		Price = 0,
+		Capacity = 6,
+		Note = "Magical: swims, so it survives being covered. Cargo can wash off. Slow on sand",
+		Available = false,
+		Magical = true,
+		Swims = true,
+	},
+	{
+		-- Exotic (Sunken Bell Tower lootbox).
+		Id = "LeviathanRowboat",
+		Name = "Leviathan Rowboat",
+		Rarity = "Exotic",
+		Price = 0,
+		Capacity = 20,
+		Note = "Exotic vessel: huge and steady, holds 20",
+		Available = false,
+		Exotic = true,
+	},
 }
 
 -- Worn items. Exotic ones need attunement.
@@ -207,6 +264,15 @@ Gear.Accessories = {
 		Rarity = "Exotic",
 		PocketSlots = 3,
 		Note = "Exotic accessory: 3 extra pocket slots for Light items",
+		Exotic = true,
+	},
+	{
+		-- Exotic (Sunken Bell Tower lootbox).
+		Id = "TideCrown",
+		Name = "Tide Crown",
+		Rarity = "Exotic",
+		WaveResist = 0.25,
+		Note = "Exotic accessory: waves push you 25% less",
 		Exotic = true,
 	},
 }
@@ -300,7 +366,7 @@ end
 function Gear.bestTool(owned: { [string]: boolean })
 	local best = Gear.Tools[1]
 	for _, tool in Gear.Tools do
-		if owned[tool.Id] and not tool.Exotic then
+		if owned[tool.Id] and not tool.Exotic and not tool.Magical then
 			best = tool
 		end
 	end

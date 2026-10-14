@@ -63,8 +63,8 @@ for _, tool in Gear.Tools do
 			Category = "Tool",
 			Rarity = tool.Rarity,
 			Tradeable = tool.Exotic == true,
-			Resets = if tool.Exotic then "Never" else "Rebirth",
-			ShopItem = not tool.Exotic,
+			Resets = if tool.Exotic then "Never" elseif tool.Magical then "TrueRebirth" else "Rebirth",
+			ShopItem = not tool.Exotic and not tool.Magical,
 			Exotic = tool.Exotic == true,
 			Description = string.format(
 				"%s. Reach %d, lifts %s, reaches %s.",

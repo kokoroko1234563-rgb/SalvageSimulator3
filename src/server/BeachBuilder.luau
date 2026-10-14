@@ -119,9 +119,40 @@ function BeachBuilder.build(): Folder
 
 	-- The beach: one long slope from the shoreline out under the sea. The tide uncovers more
 	-- or less of it.
-	local sand = slopedBlock("Beach", -half, half, 0, 0, Beach.Depth, Beach.groundY(Beach.Depth))
+	-- The beach out to the last zone, the deep channel, then the Far Sandbar.
+	local sandbar = beach.FarSandbar
+	local sand = slopedBlock(
+		"Beach",
+		-half,
+		half,
+		0,
+		0,
+		sandbar.ChannelStart,
+		Beach.groundY(sandbar.ChannelStart - 0.01)
+	)
 	sand.Color = SAND
 	sand.Parent = map
+	slopedBlock(
+		"Channel",
+		-half,
+		half,
+		sandbar.ChannelStart,
+		Beach.groundY(sandbar.ChannelStart),
+		sandbar.ChannelEnd,
+		Beach.groundY(sandbar.ChannelEnd - 0.01)
+	).Parent =
+		map
+	local bar = slopedBlock(
+		"FarSandbar",
+		-half,
+		half,
+		sandbar.ChannelEnd,
+		Beach.groundY(sandbar.ChannelEnd),
+		sandbar.End,
+		Beach.groundY(sandbar.End)
+	)
+	bar.Color = SAND
+	bar.Parent = map
 	slopedBlock(
 		"Seabed",
 		-half - 300,
@@ -171,6 +202,28 @@ function BeachBuilder.build(): Folder
 			label(
 				post,
 				string.format("Zone %d · %s · x%d", index, zone.Name, zone.Multiplier),
+				Vector3.new(0, post.Size.Y / 2 + 3, 0)
+			)
+			post.Parent = map
+		end
+	end
+
+	-- The Far Sandbar's marker, on the near edge of the sandbar.
+	do
+		local zone = Config.Zones[sandbar.Zone]
+		local z = sandbar.ChannelEnd + 1
+		local groundY = Beach.groundY(z)
+		for side = -1, 1, 2 do
+			local post = makePart({
+				Name = "ZoneMarkerFarSandbar",
+				Size = Vector3.new(1.2, 14 - groundY, 1.2),
+				CFrame = CFrame.new(side * (half - 8), (14 + groundY) / 2, z),
+				Color = Palette.World.Post,
+				Material = Palette.Material.Wood,
+			})
+			label(
+				post,
+				string.format("%s · x%d", zone.Name, zone.Multiplier),
 				Vector3.new(0, post.Size.Y / 2 + 3, 0)
 			)
 			post.Parent = map

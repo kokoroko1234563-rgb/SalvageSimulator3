@@ -14,10 +14,10 @@ Tide.ScaleAttribute = "TideTimeScale" -- set by the admin console; overrides Con
 local cfg = Config.Tide
 local beach = Config.Beach
 
--- Waterline Z at high and low tide. Zone 1 is always partly uncovered; low tide uncovers
--- most of the last zone.
+-- Waterline Z at high and low tide. Zone 1 is always partly uncovered; only low tide makes
+-- the channel to the Far Sandbar shallow enough to cross.
 Tide.HighWaterline = cfg.HighWaterline
-Tide.LowWaterline = beach.ZoneLength * beach.ActiveZones - cfg.LowWaterlineFromEnd
+Tide.LowWaterline = cfg.LowWaterline
 
 local function smoothstep(t: number): number
 	t = math.clamp(t, 0, 1)

@@ -421,11 +421,20 @@ local function updateBrake()
 			local look = root.CFrame.LookVector
 			local flatLook = Vector3.new(look.X, 0, look.Z).Unit
 			local spot = root.Position - flatLook * 7
-			current.align.Position = Vector3.new(spot.X, groundBelow(spot) + grabCfg.HoverHeight, spot.Z)
+			local y = groundBelow(spot) + grabCfg.HoverHeight
+			if vessel:GetAttribute("Swims") then
+				-- Swims at the surface; on sand it crawls low and slow.
+				local waterY = Tide.getState().WaterY
+				y = math.max(groundBelow(spot) + 1.5, waterY + grabCfg.SwimFloat)
+			end
+			current.align.Position = Vector3.new(spot.X, y, spot.Z)
 			current.upright.CFrame =
 				CFrame.fromMatrix(Vector3.zero, Vector3.yAxis, flatLook:Cross(Vector3.yAxis))
 		end
 		local force = mass * grabCfg.HoverAcceleration * Traders.vesselSpeedMultiplier(upgrades())
+		if vessel:GetAttribute("Swims") and Beach.depthAt(base.Position, Tide.waterline()) <= 0 then
+			force *= grabCfg.SwimSandSpeed
+		end
 		current.align.MaxAxesForce = Vector3.new(force, force, force)
 		current.align.Enabled = true
 		current.upright.PrimaryAxisOnly = false

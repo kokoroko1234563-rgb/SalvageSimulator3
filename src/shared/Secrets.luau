@@ -67,6 +67,47 @@ local function hullCourse()
 	}
 end
 
+-- Sunken Bell Tower: a tall square tower, climbed on ledges that run around its walls.
+-- The longest climb of the three, and the gaps get wider near the top.
+local function towerCourse()
+	local platforms: { Platform } = {}
+	local steps = 20
+	-- Corners and midpoints of the walls, walked round in order.
+	local ring = {
+		Vector3.new(-13, 0, -13),
+		Vector3.new(0, 0, -14),
+		Vector3.new(13, 0, -13),
+		Vector3.new(14, 0, 0),
+		Vector3.new(13, 0, 13),
+		Vector3.new(0, 0, 14),
+		Vector3.new(-13, 0, 13),
+		Vector3.new(-14, 0, 0),
+	}
+	for i = 1, steps do
+		local spot = ring[(i - 1) % #ring + 1]
+		local size = if i > 14 then 4 else 5
+		table.insert(platforms, {
+			Position = spot + Vector3.new(0, i * 5, 0),
+			Size = Vector3.new(size, 1, size),
+		})
+	end
+	local top = (steps + 1) * 5
+	table.insert(platforms, { Position = Vector3.new(0, top, 0), Size = Vector3.new(10, 1, 10) })
+	return {
+		Floor = { Position = Vector3.new(0, 0, 0), Size = Vector3.new(36, 1, 36) },
+		WallHeight = top + 20,
+		Platforms = platforms,
+		Checkpoints = { platforms[7].Position, platforms[14].Position },
+		CheckpointRadius = 6,
+		Spawn = Vector3.new(0, 3, 0),
+		Chest = Vector3.new(0, top + 1.5, 0),
+		ChestRadius = 8,
+		FloodFrom = -2,
+		FloodTo = top + 6,
+		HalfSize = 18,
+	}
+end
+
 Secrets.List = {
 	SandcastleFlats = {
 		Id = "SandcastleFlats",
@@ -93,11 +134,25 @@ Secrets.List = {
 		Course = hullCourse(),
 		Color = Color3.fromRGB(105, 75, 50),
 	},
-}
-
--- Secrets that unlock items already point at, but that aren't built yet.
-Secrets.Planned = {
-	FarSandbar = "The Sunken Bell Tower, on the Far Sandbar (zone 5)",
+	-- Exotic secret with a fixed door: the bell tower stands on the Far Sandbar, which is
+	-- only uncovered around low tide, so the door is reachable for a short window.
+	FarSandbar = {
+		Id = "FarSandbar",
+		Name = "Sunken Bell Tower",
+		Location = "FarSandbar",
+		Unlock = "BeaconPearl",
+		Loot = {
+			{ Id = "LeviathanRowboat", Weight = 50 },
+			{ Id = "TideCrown", Weight = 50 },
+		},
+		Variant = "Gilded",
+		VariantChance = 0.015,
+		Course = towerCourse(),
+		Color = Color3.fromRGB(120, 130, 125),
+		-- The water inside rises on its own clock rather than the real tide's, since the
+		-- sandbar is already about to flood whenever you can reach the door.
+		FloodSeconds = 150,
+	},
 }
 
 Secrets.CoinColors = Palette.Coin

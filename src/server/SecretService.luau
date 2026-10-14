@@ -125,7 +125,7 @@ function SecretService.tryEnter(player: Player, secretId: string, returnTo: CFra
 	local run: Run = {
 		secret = secret,
 		origin = Secrets.originFor(slot),
-		duration = floodDuration(returnTo.Position),
+		duration = secret.FloodSeconds or floodDuration(returnTo.Position),
 		returnTo = returnTo,
 		startedAt = nil,
 		nextCheckpoint = 1,

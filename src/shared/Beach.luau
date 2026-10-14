@@ -10,7 +10,10 @@ local beach = Config.Beach
 
 local Beach = {}
 
-Beach.Depth = beach.ZoneLength * beach.ActiveZones -- how far out the playable zones reach
+local sandbar = beach.FarSandbar
+
+Beach.Depth = sandbar.End -- how far out the playable beach reaches (to the end of the Far Sandbar)
+Beach.FarSandbarZone = sandbar.Zone
 Beach.HalfWidth = beach.Width / 2
 
 -- Zone index for a Z position: 0 at the shop, nil past the playable zones.
@@ -19,13 +22,19 @@ function Beach.zoneAt(z: number): number?
 		return 0
 	end
 	local index = math.floor(z / beach.ZoneLength) + 1
-	if index > beach.ActiveZones then
-		return nil
+	if index <= beach.ActiveZones then
+		return index
 	end
-	return index
+	if z < sandbar.End then
+		return sandbar.Zone -- the channel and the Far Sandbar
+	end
+	return nil
 end
 
 function Beach.zoneRange(index: number): (number, number)
+	if index == sandbar.Zone then
+		return sandbar.ChannelStart, sandbar.End
+	end
 	return (index - 1) * beach.ZoneLength, index * beach.ZoneLength
 end
 
@@ -33,6 +42,9 @@ end
 function Beach.groundY(z: number): number
 	if z <= 0 then
 		return 0
+	end
+	if z >= sandbar.ChannelStart and z < sandbar.ChannelEnd then
+		return -z * beach.Slope - sandbar.ChannelDepth
 	end
 	return -z * beach.Slope
 end

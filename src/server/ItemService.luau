@@ -261,10 +261,10 @@ function ItemService.spawnInSurf(waterline: number): BasePart?
 			def = Items.get(biome.UnlockItem)
 		end
 	end
-	-- The sky-beam item only ever washes up in the outermost zone, and only one at a time.
+	-- The sky-beam item only ever washes up on the Far Sandbar, and only one at a time.
 	if
 		not def
-		and zoneIndex == Config.Beach.ActiveZones
+		and zoneIndex == Beach.FarSandbarZone
 		and rng:NextNumber() < Config.SkyBeam.SpawnChance
 		and ItemService.countOf("BeaconPearl") == 0
 	then

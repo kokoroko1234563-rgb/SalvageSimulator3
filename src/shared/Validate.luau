@@ -62,8 +62,8 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		check(type(item.Value) == "number", where .. ": missing Value")
 		if item.Unlock then
 			check(
-				Biomes.List[item.Unlock] ~= nil or Secrets.Planned[item.Unlock] ~= nil,
-				where .. ": unlocks unknown biome " .. tostring(item.Unlock)
+				Biomes.List[item.Unlock] ~= nil or Secrets.List[item.Unlock] ~= nil,
+				where .. ": unlocks unknown biome or secret " .. tostring(item.Unlock)
 			)
 			check(Catalog.get(item.Id) ~= nil, where .. ": unlock item missing from the inventory catalog")
 		end
@@ -113,6 +113,16 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 
 	-- Zones
 	check(#Config.Zones >= Config.Beach.ActiveZones, "Config.Zones has fewer zones than Beach.ActiveZones")
+	local sandbar = Config.Beach.FarSandbar
+	check(Config.Zones[sandbar.Zone] ~= nil, "Config.Zones has no entry for the Far Sandbar")
+	check(
+		sandbar.ChannelStart == Config.Beach.ZoneLength * Config.Beach.ActiveZones,
+		"the Far Sandbar's channel must start where the last zone ends"
+	)
+	check(
+		Config.Tide.LowWaterline > sandbar.ChannelEnd and Config.Tide.LowWaterline < sandbar.End,
+		"low tide must reach past the channel but not past the sandbar"
+	)
 	for index, zone in Config.Zones do
 		for rarity in zone.Rarity do
 			check(
@@ -186,6 +196,16 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 					where .. ": loot weights must be positive"
 				)
 			end
+		end
+		check(
+			(secret.Biome ~= nil) ~= (secret.Location ~= nil),
+			where .. ": needs a Biome (door comes with the biome) or a fixed Location, not both"
+		)
+		if secret.FloodSeconds then
+			check(
+				type(secret.FloodSeconds) == "number" and secret.FloodSeconds >= Config.Secrets.MinFlood,
+				where .. ": FloodSeconds must be at least Config.Secrets.MinFlood"
+			)
 		end
 		local course = secret.Course
 		for _, field in

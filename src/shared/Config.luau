@@ -32,6 +32,17 @@ Config.Beach = {
 	KneeDepth = 3,
 	WaistDepth = 4.5, -- deeper than this drowns players and swallows vessels
 	LostDepth = 7, -- unclaimed and loose items this deep are lost to the tide
+
+	-- The Far Sandbar: a fixed final zone past the others, across a deep channel that's
+	-- only shallow enough to cross around low tide (about 5 minutes per cycle).
+	FarSandbar = {
+		Zone = 5, -- its entry in Config.Zones (x15 values)
+		ChannelStart = 600,
+		ChannelEnd = 640,
+		ChannelDepth = 8, -- extra depth of the channel below the normal slope
+		DoorZ = 680, -- the Sunken Bell Tower's door, uncovered for a while around low tide
+		End = 760,
+	},
 }
 
 Config.Zones = {
@@ -60,7 +71,7 @@ Config.Tide = {
 	InTime = 600,
 	TimeScale = 0.4, -- 0.4 => 10 minute cycle for testing. Set to 1 for the real 25 minutes.
 	HighWaterline = 60, -- waterline Z at high tide (inside zone 1)
-	LowWaterlineFromEnd = 40, -- at low tide the waterline is this far before the end of the last zone
+	LowWaterline = 700, -- waterline Z at low tide: the channel to the Far Sandbar is crossable
 }
 
 Config.Waves = {
@@ -189,6 +200,9 @@ Config.Grab = {
 	StabilizerTorque = 600, -- per unit of mass, times the vessel's Stability; keeps vessels upright
 	HoverHeight = 3.5, -- the Floating Clamshell hovers this high, behind its owner
 	HoverAcceleration = 400,
+	SwimWashChance = 0.02, -- per 0.3s in deep water: a swimming vessel loses one item
+	SwimSandSpeed = 0.35, -- swimming vessels follow this much slower on dry sand
+	SwimFloat = 1, -- how high a swimming vessel's base sits above the water
 }
 
 Config.Drowning = {

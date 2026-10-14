@@ -448,13 +448,16 @@ end)
 
 command(
 	"tp",
-	"tp <shop|zone number|player> [who]",
-	"Teleport, e.g. tp 3, tp shop, tp bob",
+	"tp <shop|zone number|sandbar|player> [who]",
+	"Teleport, e.g. tp 3, tp shop, tp sandbar (the bell tower door), tp bob",
 	function(caller, args)
 		local where = (args[1] or ""):lower()
 		local destination: Vector3?
 		if where == "shop" then
 			destination = Vector3.new(0, 5, -45)
+		elseif where == "sandbar" or where == "tower" then
+			local z = Config.Beach.FarSandbar.DoorZ - 6
+			destination = Vector3.new(0, Beach.groundY(z) + 4, z)
 		elseif tonumber(where) then
 			local zone = math.clamp(math.floor(tonumber(where) :: number), 1, Config.Beach.ActiveZones)
 			local startZ = Beach.zoneRange(zone)
@@ -469,7 +472,7 @@ command(
 			destination = root.Position + Vector3.new(0, 0, -4)
 		end
 		if not destination then
-			return { "Usage: tp <shop|zone number|player> [who]" }
+			return { "Usage: tp <shop|zone number|sandbar|player> [who]" }
 		end
 		local lines = {}
 		return eachTarget(caller, args[2], function(target)
