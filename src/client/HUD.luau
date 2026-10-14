@@ -1,12 +1,14 @@
 -- Placeholder UI for the test build: coins and gear, zone name, notifications, tide
 -- warnings, breath bar, hold buttons for the assist grab, a hover tooltip and the shop.
 
+local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Palette = require(Shared.Palette)
+local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
@@ -281,6 +283,28 @@ local function sectionHeader(label: string, order: number)
 	}, shopRows)
 end
 
+-- Robux prices come from Roblox, so they're fetched once and cached.
+local priceCache: { [string]: number } = {}
+local function robuxPrice(kind: "product" | "pass", id: number, callback: (number) -> ())
+	local key = kind .. id
+	if priceCache[key] then
+		callback(priceCache[key])
+		return
+	end
+	task.spawn(function()
+		local ok, info = pcall(
+			MarketplaceService.GetProductInfo,
+			MarketplaceService,
+			id,
+			if kind == "product" then Enum.InfoType.Product else Enum.InfoType.GamePass
+		)
+		if ok and info and type(info.PriceInRobux) == "number" then
+			priceCache[key] = info.PriceInRobux
+			callback(info.PriceInRobux)
+		end
+	end)
+end
+
 local function refreshShop()
 	for _, child in shopRows:GetChildren() do
 		if child:IsA("GuiObject") then
@@ -526,6 +550,71 @@ local function refreshShop()
 			row("Vessel", vessel)
 		end
 	end
+	-- Robux: coin packs and gamepasses.
+	order += 1
+	sectionHeader("ROBUX", order)
+	local passes = owned("Passes")
+	local function robuxRow(name: string, note: string, id: number, kind: "product" | "pass", have: boolean)
+		order += 1
+		local frame = make("Frame", {
+			Size = UDim2.new(1, -8, 0, 56),
+			BackgroundColor3 = ROW_BG,
+			LayoutOrder = order,
+		}, shopRows)
+		corner(frame, 8)
+		text({
+			Text = name,
+			Size = UDim2.new(1, -160, 0, 24),
+			Position = UDim2.fromOffset(12, 4),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextSize = 18,
+			TextStrokeTransparency = 1,
+		}, frame)
+		text({
+			Text = note,
+			Size = UDim2.new(1, -160, 0, 22),
+			Position = UDim2.fromOffset(12, 28),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextSize = 14,
+			TextWrapped = true,
+			Font = Palette.Font.Body,
+			TextStrokeTransparency = 1,
+			TextColor3 = MUTED,
+		}, frame)
+		local ready = id ~= 0 and not have
+		local b = button(
+			if have then "Owned" elseif id == 0 then "Not set up" else "Buy",
+			if ready then Palette.UI.Robux else DISABLED,
+			frame
+		)
+		b.Size = UDim2.fromOffset(136, 40)
+		b.Position = UDim2.new(1, -148, 0.5, -20)
+		b.TextSize = 16
+		if not ready then
+			b.AutoButtonColor = false
+			b.TextColor3 = Palette.UI.DisabledText
+			return
+		end
+		robuxPrice(kind, id, function(price)
+			if b.Parent then
+				b.Text = "R$ " .. formatNumber(price)
+			end
+		end)
+		b.Activated:Connect(function()
+			if kind == "product" then
+				MarketplaceService:PromptProductPurchase(player, id)
+			else
+				MarketplaceService:PromptGamePassPurchase(player, id)
+			end
+		end)
+	end
+	for _, pack in Config.Monetization.CoinPacks do
+		robuxRow(pack.Name, formatNumber(pack.Coins) .. " coins", pack.ProductId, "product", false)
+	end
+	for _, pass in Config.Monetization.Gamepasses do
+		robuxRow(pass.Name, "Gamepass: " .. pass.Note, pass.PassId, "pass", passes[pass.Id] == true)
+	end
+
 	order += 1
 	text({
 		Text = "Gear you own is in your inventory (press I). Equip tools and spawn vessels from there.",
@@ -745,6 +834,7 @@ function HUD.init()
 			"Rebirths",
 			"PendingPick",
 			"ColoredCoinCount",
+			"Passes",
 		}
 	do
 		player:GetAttributeChangedSignal(attribute):Connect(function()

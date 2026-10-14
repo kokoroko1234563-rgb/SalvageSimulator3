@@ -10,6 +10,7 @@ local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
 
 local DataService = require(script.Parent.DataService)
+local MonetizationService = require(script.Parent.MonetizationService)
 local ItemService = require(script.Parent.ItemService)
 local PocketService = require(script.Parent.PocketService)
 local VesselService = require(script.Parent.VesselService)
@@ -130,7 +131,11 @@ local function sellTick()
 	end
 	for player, amount in earned do
 		local profile = DataService.get(player)
-		local total = math.floor(amount * Rebirth.multiplier(if profile then profile.Rebirths else 0))
+		local total = math.floor(
+			amount
+				* Rebirth.multiplier(if profile then profile.Rebirths else 0)
+				* MonetizationService.sellMultiplier(player)
+		)
 		DataService.addCoins(player, total)
 		notify(player, "+" .. total .. " coins")
 	end

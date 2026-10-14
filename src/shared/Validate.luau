@@ -231,6 +231,32 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		end
 	end
 
+	-- Paid features
+	local seenIds = {}
+	for _, pack in Config.Monetization.CoinPacks do
+		local where = "Coin pack " .. tostring(pack.Id)
+		check(type(pack.Name) == "string", where .. ": needs a Name")
+		check(type(pack.Coins) == "number" and pack.Coins > 0, where .. ": Coins must be positive")
+		check(type(pack.ProductId) == "number", where .. ": ProductId must be a number (0 = not set up)")
+		if pack.ProductId ~= 0 then
+			check(not seenIds[pack.ProductId], where .. ": ProductId is used twice")
+			seenIds[pack.ProductId] = true
+		end
+	end
+	local passEffects = { SellMultiplier = true, PocketSlots = true }
+	for _, pass in Config.Monetization.Gamepasses do
+		local where = "Gamepass " .. tostring(pass.Id)
+		check(type(pass.Name) == "string" and type(pass.Note) == "string", where .. ": needs a Name and Note")
+		check(type(pass.PassId) == "number", where .. ": PassId must be a number (0 = not set up)")
+		local effects = 0
+		for key in pass do
+			if passEffects[key] then
+				effects += 1
+			end
+		end
+		check(effects > 0, where .. ": has no effect (SellMultiplier or PocketSlots)")
+	end
+
 	-- Cosmetics
 	for _, cosmetic in Gear.Cosmetics do
 		local where = "Cosmetic " .. cosmetic.Id

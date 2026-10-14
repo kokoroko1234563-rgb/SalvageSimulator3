@@ -253,9 +253,14 @@ function ItemService.spawnInSurf(waterline: number): BasePart?
 	-- A biome zone sometimes washes up its secret's unlock item, and mostly its own loot.
 	local biome = Biomes.activeIn(zoneIndex)
 	local def
-	local unlockChance = if biome and biome.Tier == "Common"
-		then Config.Unlocks.SpawnChance
-		else Config.Unlocks.ExoticSpawnChance
+	-- Private servers scale rare spawns down with the player count (MonetizationService).
+	local rareScale = Workspace:GetAttribute("RareSpawnScale") or 1
+	local unlockChance = rareScale
+		* (
+			if biome and biome.Tier == "Common"
+				then Config.Unlocks.SpawnChance
+				else Config.Unlocks.ExoticSpawnChance
+		)
 	if biome and biome.UnlockItem and rng:NextNumber() < unlockChance then
 		if ItemService.countOf(biome.UnlockItem) < Config.Unlocks.MaxOnMap then
 			def = Items.get(biome.UnlockItem)
@@ -265,7 +270,7 @@ function ItemService.spawnInSurf(waterline: number): BasePart?
 	if
 		not def
 		and zoneIndex == Beach.FarSandbarZone
-		and rng:NextNumber() < Config.SkyBeam.SpawnChance
+		and rng:NextNumber() < Config.SkyBeam.SpawnChance * rareScale
 		and ItemService.countOf("BeaconPearl") == 0
 	then
 		def = Items.get("BeaconPearl")
@@ -274,7 +279,7 @@ function ItemService.spawnInSurf(waterline: number): BasePart?
 		def = Items.get(biome.Loot[rng:NextInteger(1, #biome.Loot)])
 	end
 	if not def then
-		local rarity = Items.rollRarity(Config.Zones[zoneIndex].Rarity, rng)
+		local rarity = Items.rollRarity(Items.scaleRare(Config.Zones[zoneIndex].Rarity, rareScale), rng)
 		local choices = {}
 		for _, candidate in Items.ofRarity(rarity) do
 			-- Only heavy items in the deeper spots, only lighter ones in the shallows.

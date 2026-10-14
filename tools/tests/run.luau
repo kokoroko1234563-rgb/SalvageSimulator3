@@ -74,6 +74,7 @@ test("load server services", function()
 			"SkyBeamService",
 			"CosmeticService",
 			"FarSandbarService",
+			"MonetizationService",
 		}
 	do
 		h.require("Server/" .. name)
@@ -149,6 +150,19 @@ test("rebirth rewards stack in Stats", function()
 	local tool = Gear.getTool("BasicGrabber") or Gear.Tools[1]
 	assert(Stats.lift(rewarded, tool) == tool.Lift + 1, "Strong Back lifts one class heavier")
 	assert(Stats.lift(rewarded, Gear.getTool("BubbleWand")) == 4, "lift is capped at Very Heavy")
+end)
+
+test("private servers scale rare spawns", function()
+	local Items = h.require("Shared/Items")
+	local weights = { Common = 60, Uncommon = 25, Rare = 10, VeryRare = 5 }
+	assert(Items.scaleRare(weights, 1) == weights, "full rate leaves weights alone")
+	local half = Items.scaleRare(weights, 0.5)
+	assert(
+		half.Rare == 5 and half.VeryRare == 2.5 and half.Common == 67.5,
+		"rares halve, commons take the rest"
+	)
+	local sandbar = Items.scaleRare({ Rare = 60, VeryRare = 40 }, 0.25)
+	assert(sandbar.Common == 75, "a rares-only zone still scales")
 end)
 
 test("build the bell tower", function()
@@ -410,6 +424,34 @@ test("auction: a rebirth cancels and refunds the bid first", function()
 	AuctionService._resolve(AuctionService._lotIndex())
 	AuctionService._collect(c :: any)
 	assert(pc.Coins == 60000 and next(pc.Items) == nil, "a cancelled bid can't win or be refunded twice")
+end)
+
+-- 10. Paid features: a coin pack is granted exactly once, however often Roblox retries.
+test("coin pack receipts grant once", function()
+	local Config = h.require("Shared/Config")
+	local DataService = h.require("Server/DataService")
+	local Monetization = h.require("Server/MonetizationService")
+	local buyer = fakePlayer("Buyer", 77)
+	DataService._setProfile(buyer, { Coins = 0, Items = {} })
+	local pack = Config.Monetization.CoinPacks[1]
+	local oldId, oldLookup = pack.ProductId, Harness.stubs.Players.GetPlayerByUserId
+	pack.ProductId = 12345
+	Harness.stubs.Players.GetPlayerByUserId = function(_, userId)
+		return if userId == 77 then buyer else nil
+	end
+	local ok, err = pcall(function()
+		local receipt = { PlayerId = 77, ProductId = 12345, PurchaseId = "abc" }
+		local first = Monetization._processReceipt(receipt)
+		local again = Monetization._processReceipt(receipt)
+		local profile = DataService.get(buyer)
+		assert(first == roblox.Enum.ProductPurchaseDecision.PurchaseGranted, "first try should grant")
+		assert(again == roblox.Enum.ProductPurchaseDecision.PurchaseGranted, "a retry is still acknowledged")
+		assert(profile.Coins == pack.Coins, "coins granted once, got " .. profile.Coins)
+		local gone = Monetization._processReceipt({ PlayerId = 99, ProductId = 12345, PurchaseId = "x" })
+		assert(gone == roblox.Enum.ProductPurchaseDecision.NotProcessedYet, "absent buyers wait")
+	end)
+	pack.ProductId, Harness.stubs.Players.GetPlayerByUserId = oldId, oldLookup
+	assert(ok, err)
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failures))

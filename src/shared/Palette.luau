@@ -36,6 +36,7 @@ Palette.UI = {
 	Pocket = rgb(150, 100, 200),
 	Attune = rgb(40, 190, 170),
 	TrueRebirth = rgb(150, 90, 230),
+	Robux = rgb(40, 170, 90),
 
 	Bad = rgb(255, 120, 110), -- "too heavy", "too deep"
 	Warn = rgb(255, 160, 120),

@@ -58,6 +58,7 @@ export type Profile = {
 	Upgrades: { [string]: number }, -- trader upgrade id -> level
 	Pockets: { PocketEntry }, -- Deep Pockets contents
 	Settings: { HideShopGear: boolean, ShowResetText: boolean },
+	Receipts: { string }, -- recent Robux purchase ids, already granted (MonetizationService)
 }
 
 local function defaultProfile(): Profile
@@ -79,6 +80,7 @@ local function defaultProfile(): Profile
 		Upgrades = {},
 		Pockets = {},
 		Settings = { HideShopGear = false, ShowResetText = false },
+		Receipts = {},
 	}
 end
 
@@ -229,6 +231,13 @@ local function reconcile(data: any): Profile
 		profile.Settings.HideShopGear = data.Settings.HideShopGear == true
 		profile.Settings.ShowResetText = data.Settings.ShowResetText == true
 	end
+	if type(data.Receipts) == "table" then
+		for _, id in data.Receipts do
+			if type(id) == "string" then
+				table.insert(profile.Receipts, id)
+			end
+		end
+	end
 	return profile
 end
 
@@ -251,6 +260,7 @@ local function serialize(profile: Profile, release: boolean)
 		Upgrades = profile.Upgrades,
 		Pockets = profile.Pockets,
 		Settings = profile.Settings,
+		Receipts = profile.Receipts,
 		Lock = if release then nil else { JobId = game.JobId, Time = os.time() },
 	}
 end
@@ -307,8 +317,12 @@ local function activeAccessory(profile: Profile)
 end
 
 -- Pocket slots: 3 from Deep Pockets, plus whatever a worn accessory adds.
-local function pocketSlots(profile: Profile): number
-	local slots = if profile.Rewards.DeepPockets then Config.Pockets.Slots else 0
+-- Extra pocket slots from outside the profile (gamepasses, see MonetizationService).
+local bonusPockets: { [Player]: number } = {}
+
+local function pocketSlots(player: Player, profile: Profile): number
+	local slots = (if profile.Rewards.DeepPockets then Config.Pockets.Slots else 0)
+		+ (bonusPockets[player] or 0)
 	local accessory = activeAccessory(profile)
 	if accessory and accessory.PocketSlots then
 		slots += accessory.PocketSlots
@@ -341,7 +355,7 @@ local function publish(player: Player)
 	player:SetAttribute("Rewards", csv(profile.Rewards, rewardList))
 	player:SetAttribute("PendingPick", table.concat(profile.PendingPick or {}, ","))
 	player:SetAttribute("Pockets", #profile.Pockets)
-	player:SetAttribute("PocketSlots", pocketSlots(profile))
+	player:SetAttribute("PocketSlots", pocketSlots(player, profile))
 	local accessory = activeAccessory(profile)
 	player:SetAttribute("Accessory", if accessory then accessory.Id else "")
 	player:SetAttribute("Cores", profile.Cores)
@@ -545,7 +559,23 @@ end
 
 function DataService.pocketSlots(player: Player): number
 	local profile = profiles[player]
-	return if profile then pocketSlots(profile) else 0
+	return if profile then pocketSlots(player, profile) else 0
+end
+
+function DataService.setBonusPockets(player: Player, slots: number)
+	bonusPockets[player] = if slots > 0 then slots else nil
+	publish(player)
+end
+
+-- Saves now. False if it couldn't (DataStores down, or this server lost the session lock).
+function DataService.saveNow(player: Player): boolean
+	return save(player, false)
+end
+
+-- Whether this player's profile is being saved at all (false in Studio without API access,
+-- or when their save couldn't be loaded).
+function DataService.isPersistent(player: Player): boolean
+	return store ~= nil and canSave[player] == true
 end
 
 function DataService.onChanged(callback: (Player, Profile) -> ())
@@ -747,6 +777,7 @@ function DataService.init()
 		save(player, true)
 		profiles[player] = nil
 		canSave[player] = nil
+		bonusPockets[player] = nil
 	end)
 
 	task.spawn(function()

@@ -23,6 +23,7 @@ local AuctionService = require(script.Parent.AuctionService)
 local BiomeService = require(script.Parent.BiomeService)
 local DataService = require(script.Parent.DataService)
 local LexiconService = require(script.Parent.LexiconService)
+local MonetizationService = require(script.Parent.MonetizationService)
 local TraderService = require(script.Parent.TraderService)
 local RebirthService = require(script.Parent.RebirthService)
 local ItemService = require(script.Parent.ItemService)
@@ -909,6 +910,57 @@ local function onCommand(player: Player, line: any): { string }
 	print(string.format("[Admin] %s: %s", player.Name, line))
 	return result
 end
+
+command(
+	"pass",
+	"pass <id|list> [on|off] [player]",
+	"Give or take a gamepass for this session, to test its effect, e.g. pass extrapockets on",
+	function(caller, args)
+		local choice = (args[1] or ""):lower()
+		local pass
+		for _, candidate in Config.Monetization.Gamepasses do
+			if candidate.Id:lower() == choice then
+				pass = candidate
+			end
+		end
+		if not pass then
+			local lines = { "Gamepasses (PassId 0 = not set up on Roblox yet):" }
+			for _, candidate in Config.Monetization.Gamepasses do
+				table.insert(
+					lines,
+					string.format("  %s (%d): %s", candidate.Id, candidate.PassId, candidate.Note)
+				)
+			end
+			return lines
+		end
+		local on = (args[2] or "on"):lower() ~= "off"
+		local lines = {}
+		return eachTarget(caller, args[3], function(target)
+			MonetizationService.setPass(target, pass.Id, on)
+			table.insert(
+				lines,
+				string.format("%s: %s %s", target.Name, pass.Name, if on then "on" else "off")
+			)
+		end) or lines
+	end
+)
+
+command(
+	"private",
+	"private <players|off>",
+	"Act as a private server with this many players (rare spawns scale with it)",
+	function(_, args)
+		local count = tonumber(args[1])
+		if count then
+			MonetizationService.simulatePrivate(math.max(0, math.floor(count)))
+		elseif (args[1] or ""):lower() == "off" then
+			MonetizationService.simulatePrivate(nil)
+		else
+			return { "Usage: private <players|off>" }
+		end
+		return { string.format("Rare spawns at x%.2f", MonetizationService.rareScale()) }
+	end
+)
 
 function AdminService.init()
 	local function onPlayer(player: Player)

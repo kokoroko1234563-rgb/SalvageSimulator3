@@ -92,6 +92,9 @@ local stubs = {
 	},
 }
 
+-- Tests can swap a stand-in for one test (restore it after).
+Harness.stubs = stubs
+
 function Harness.unwrap(value)
 	return realOf[value] or value
 end

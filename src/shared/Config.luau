@@ -218,6 +218,37 @@ Config.Selling = {
 	ShopkeeperRange = 22, -- how close to the shopkeeper you must be to buy
 }
 
+-- Paid features. Every Robux id is made in the Creator Hub (see README), then pasted here.
+-- Anything still at id 0 shows in the shop as "not set up" and can't be bought.
+Config.Monetization = {
+	-- Developer products: coins for Robux, bought as many times as you like.
+	CoinPacks = {
+		{ Id = "PouchOfCoins", Name = "Pouch of Coins", Coins = 5000, ProductId = 0 },
+		{ Id = "ChestOfCoins", Name = "Chest of Coins", Coins = 30000, ProductId = 0 },
+		{ Id = "PiratesHoard", Name = "Pirate's Hoard", Coins = 150000, ProductId = 0 },
+	},
+	-- Gamepasses: bought once, kept forever. These two are examples of the two kinds of
+	-- effect a pass can have (a multiplier and a slot count); add more the same way.
+	Gamepasses = {
+		{
+			Id = "MerchantsScale",
+			Name = "Merchant's Scale",
+			Note = "Everything you sell is worth 25% more",
+			PassId = 0,
+			SellMultiplier = 1.25,
+		},
+		{
+			Id = "ExtraPockets",
+			Name = "Extra Pockets",
+			Note = "+2 pocket slots for Light items",
+			PassId = 0,
+			PocketSlots = 2,
+		},
+	},
+	ReceiptMemory = 100, -- the newest purchase ids kept on each profile, so none is granted twice
+	FullRatePlayers = 20, -- private servers: rare spawns reach normal rates at this many players
+}
+
 Config.Data = {
 	StoreName = "SalvageSim3_Player_v1",
 	AutosaveInterval = 120,

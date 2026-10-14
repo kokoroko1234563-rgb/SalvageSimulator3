@@ -57,7 +57,7 @@ Two more safeguards live in the game itself:
 | Biomes | `BiomeService` rolls each zone every tide cycle (test build: Sandcastle Flats or nothing, `Config.Biomes.RollChance`). A biome zone gets sandcastle decor, mostly its own loot (`Biomes.luau`), and the giant sandcastle with the secret's door. |
 | Unlock item | The Golden Spade sometimes washes up in a Sandcastle Flats zone (`Config.Unlocks`). It glows, can be bumped and lost like any item, and is only safe once dropped on the purple **bank pad** at the shore. It is never sold. |
 | Secret course | Use a banked spade at the sandcastle door (always used up). You go to your own copy of the Sandcastle Vault, built only on your client (`SecretController`, layout in `Secrets.luau`): a spiral climb while the sea floods in. The flood time depends on when the real tide would cover the door. `SecretService` verifies the run from your position (checkpoints in order, above the water, plausible time, at the chest) before granting the yellow coin. |
-| Rebirth | In the shop: costs 100,000 coins, ×1.5 more each time. Resets coins, tools and shop vessels, adds ×0.5 coin multiplier. At each of the first 5 rebirths you pick a reward you don't have yet: Swift Feet, Deep Pockets (press **Q** or **Pocket** to pocket a Light item; pockets sell on the sell pad) or the Floating Clamshell (a magical vessel that hovers behind you). |
+| Rebirth | In the shop: costs 100,000 coins, ×1.5 more each time. Resets coins, tools and shop vessels, adds ×0.5 coin multiplier. At each rebirth you pick one of the 8 rewards you don't have yet (see **Rebirth rewards** below). |
 
 ## True rebirth, attunement and exotic secrets
 
@@ -98,10 +98,49 @@ All six from the design doc are defined in `src/shared/Traders.luau`.
 
 The **Beacon Pearl** is the rarest unlock item. Your doc doesn't name it, so the name is a placeholder.
 
-- **Spawning:** it only washes up in the outermost zone, at a 0.05% chance per surf spawn there (`Config.SkyBeam`), and only one at a time.
+- **Spawning:** it only washes up on the Far Sandbar, at a 0.05% chance per surf spawn there (`Config.SkyBeam`), and only one at a time.
 - **The beam:** every client draws a tall beam of light over it (`SkyBeamController`). The beam follows the pearl wherever it goes (in the surf, in someone's hands, in a vessel) until it's banked.
 - **Announcements:** the server tells everyone when it washes up, who picks it up, and when it's banked or lost (`SkyBeamService`).
-- **What it opens:** the Sunken Bell Tower on the Far Sandbar, which is zone 5 and not built yet.
+- **What it opens:** the Sunken Bell Tower on the Far Sandbar (below).
+
+## The Far Sandbar and the Sunken Bell Tower
+
+- **The sandbar:** zone 5, past the other zones (Z 640 to 760), with x15 values. A deep channel (Z 600 to 640) cuts it off. You can only cross the channel around low tide, when the waterline reaches Z 700 (`Config.Beach.FarSandbar`, `Config.Tide.LowWaterline`).
+- **The bell tower:** its top sticks out of the sand at Z 680 (`FarSandbarService`). The door is only above water for a short window around low tide.
+- **The secret:** bank a Beacon Pearl, then use it at the door. It's an exotic secret, so the climb ends in a lootbox: the **Leviathan Rowboat** (exotic vessel, holds 20) or the **Tide Crown** (exotic accessory, waves push you 25% less). There's a 1.5% chance of the Gilded variant. The climb is the longest of the three, 20 ledges around the tower walls. It floods over a fixed 150 seconds instead of following the tide, because the door is always about to go under when you enter.
+- **Admin:** `tp sandbar` puts you in front of the door, and `give beaconpearl` gives you the key.
+
+## Rebirth rewards
+
+All 8 are in. Each rebirth lets you pick one you don't have yet. They stay through normal rebirths and are cleared by a true rebirth.
+
+| Reward | Effect |
+|---|---|
+| Swift Feet | +20% walk speed and faster vessel towing |
+| Sea Legs | Waves push you 40% less, and your breath lasts twice as long |
+| Strong Back | Every grabber lifts one weight class heavier, up to Very heavy |
+| Deep Pockets | 3 pocket slots for Light items (press **Q** or **Pocket**). They sell on the sell pad |
+| Tide Magnet | A magical grabber. It reels whatever it holds toward you while that item is in the water, and waves push it half as hard |
+| Bubble Wand | A magical grabber. It lifts anything, reaches into deep water and floats items to you slowly in a bubble. Waves can't push or knock it loose |
+| Floating Clamshell | A magical vessel. It hovers behind you, carries 8 and never tips. It's lost if it's covered by water |
+| Sea Turtle | A magical vessel. It carries 6 and swims at the surface, so deep water doesn't take it, but waves can wash cargo off. It's slow on dry sand |
+
+Walk speed, breath, wave push and lift all come from `Stats.luau`, so rewards, trader upgrades and accessories stack the same way everywhere. The 30% minimum wave push applies once, to the total.
+
+## Paid features
+
+Nothing can be bought until you create the products on Roblox:
+
+1. Publish the game. Then, in the [Creator Hub](https://create.roblox.com/dashboard/creations), open the experience and go to **Monetization**.
+2. Under **Developer Products**, create one product for each coin pack. Under **Passes**, create one pass for each gamepass.
+3. Paste each id into `Config.Monetization` (`ProductId` / `PassId`). Anything left at `0` shows as "Not set up" in the shop.
+4. Private servers: under **Access**, turn on private servers and set a price.
+
+- **Coin packs** (developer products, buy any number of times): 5,000, 30,000 and 150,000 coins. Each purchase is granted exactly once. Its id is saved on the profile before Roblox is told it went through, so a retry, a crash or a second server can't grant it twice or lose it (`MonetizationService`).
+- **Gamepasses**, two examples of the two kinds of effect: **Merchant's Scale** (+25% on everything you sell) and **Extra Pockets** (+2 pocket slots, even without Deep Pockets). Add more in `Config.Monetization.Gamepasses` with `SellMultiplier` or `PocketSlots`.
+- **Private servers:** rare spawns scale with the player count, reaching normal at 20 players. This covers Rare and Very Rare items (the difference becomes Common), unlock items and the Beacon Pearl. Public servers are always at full rates.
+- **Shop:** a **Robux** section lists the packs and passes with their Robux prices.
+- **Testing:** in Studio, test purchases are free. `pass <id> on` turns a pass's effect on without buying it, and `private <n>` makes the server act like a private server with n players.
 
 ## The global auction
 
@@ -154,7 +193,7 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `tide <out\|hold\|in> [percent]` | Jump the tide, e.g. `tide in 90` |
 | `tidespeed <scale>` | 1 = real 25 min cycle, 0.1 = 2.5 min |
 | `waves <multiplier>` | Wave strength, 0 = calm |
-| `tp <shop\|zone\|player> [who]` | Teleport |
+| `tp <shop\|zone\|sandbar\|player> [who]` | Teleport (`sandbar` = the bell tower door) |
 | `heal`, `god`, `speed <n>` | Health/breath, toggle no-drowning, walk speed |
 | `resetdata <player>`, `kick <player> [reason]` | Wipe a save, kick |
 | `biomes` | Show each zone's biome and the biomes that exist |
@@ -162,7 +201,9 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `unlock <item> [count] [player]` | Bank unlock items, e.g. `unlock goldenspade 3` |
 | `colorcoin <color\|all\|none> [player]` | Give or clear colored coins |
 | `rebirth [player]`, `rebirths <n> [player]` | Free rebirth (with reward pick), or set the count |
-| `reward <id\|all\|none> [player]` | `swiftfeet`, `deeppockets`, `floatingclamshell` |
+| `reward <id\|all\|none> [player]` | Any of the 8, e.g. `sealegs`, `tidemagnet`, `seaturtle` |
+| `pass <id\|list> [on\|off] [player]` | Turn a gamepass's effect on or off for this session |
+| `private <players\|off>` | Act as a private server with that many players |
 | `inv [player]` | List a player's inventory |
 | `auction [end]` | Show the current auction lot, or end it now (the next one starts) |
 | `towerman [zone]`, `lexicon <all\|none> [player]` | Make the tower man appear; fill or clear the lexicon |
@@ -186,7 +227,9 @@ Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down 
    |  zone 2  Sunny Stretch   |
    |                          |
    |  zone 3  Middle Banks    |
-   |..........................|   <- waterline at low tide (Z = 560)
+   |~~~~~~ deep channel ~~~~~~|   Z = 600 to 640
+   |  zone 5  Far Sandbar     |   bell tower door at Z = 680
+   |..........................|   <- waterline at low tide (Z = 700)
    |  open sea                |
    +--------------------------+
  headland     X ->     headland

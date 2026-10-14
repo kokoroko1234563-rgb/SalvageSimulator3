@@ -259,6 +259,27 @@ function Items.ofRarity(rarity: string)
 end
 
 -- Rolls a rarity from a weight table such as { Common = 70, Uncommon = 25, Rare = 5 }.
+-- Rarity weights with everything rarer than Uncommon multiplied by `scale` (private
+-- servers with few players, see MonetizationService). The weight taken away goes to
+-- Common, so zones that only roll rares (the Far Sandbar) scale too.
+function Items.scaleRare(weights: { [string]: number }, scale: number): { [string]: number }
+	if scale >= 1 then
+		return weights
+	end
+	local scaled = {}
+	local removed = 0
+	for rarity, weight in weights do
+		if rarity == "Common" or rarity == "Uncommon" then
+			scaled[rarity] = weight
+		else
+			scaled[rarity] = weight * scale
+			removed += weight - weight * scale
+		end
+	end
+	scaled.Common = (scaled.Common or 0) + removed
+	return scaled
+end
+
 function Items.rollRarity(weights: { [string]: number }, rng: Random): string
 	local total = 0
 	for _, rarity in Items.Rarities do
