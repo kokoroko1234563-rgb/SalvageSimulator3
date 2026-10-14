@@ -5,6 +5,16 @@ local Config = {}
 
 Config.MaxPlayers = 20
 
+-- Who can use the admin console (F2). Add your Roblox UserId to UserIds.
+-- The place owner (or rank 254+ in the owning group) is always an admin, and anyone
+-- testing in Studio is too.
+Config.Admins = {
+	UserIds = {} :: { number },
+	AllowOwner = true,
+	OwnerGroupMinRank = 254,
+	AllowStudio = true,
+}
+
 -- World layout. The beach runs along +X starting at the shop (X = 0).
 -- Dry sand is at Z < 0, the sea is at Z > 0 and gets deeper the further out you go.
 Config.Beach = {

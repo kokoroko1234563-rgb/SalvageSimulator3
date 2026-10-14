@@ -9,6 +9,8 @@ local cfg = Config.Waves
 
 local Waves = {}
 
+Waves.ScaleAttribute = "WavePushScale" -- set by the admin console; 1 = normal
+
 local SHORE = Vector3.new(0, 0, -1)
 
 -- Z position of the current wave front at a given X.
@@ -28,7 +30,8 @@ function Waves.getPush(position: Vector3, now: number, frontX: number): Vector3
 		return Vector3.zero
 	end
 
-	local depthFactor = 0.7 + math.clamp(position.Z, 0, 60) / 60 * 0.6
+	local depthFactor = (0.7 + math.clamp(position.Z, 0, 60) / 60 * 0.6)
+		* (workspace:GetAttribute(Waves.ScaleAttribute) or 1)
 	local waveZ = Waves.frontZ(position.X, now)
 	local behind = position.Z - waveZ
 

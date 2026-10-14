@@ -37,6 +37,30 @@ Test with **Test → Clients and Servers** (2 or more players) to check bumping 
 
 All tuning numbers are in `src/shared/Config.luau`, `Gear.luau` and `Items.luau`.
 
+## Admin console
+
+Press **F2** (or the gold **Admin** button, top right) to open it. Type `help` for every
+command. Admins are: anyone in Studio, the place owner (or rank 254+ in the owning group),
+and any UserId added to `Config.Admins.UserIds` in `src/shared/Config.luau`. Every command
+is checked on the server, so non-admins can't use it even with exploits.
+
+| Command | What it does |
+| --- | --- |
+| `status` | Tide phase, item counts, wave strength, players |
+| `coins <n> [player]` / `addcoins <n> [player]` | Set or add coins |
+| `give <tool or vessel> [player]` | e.g. `give boathook`, `give beachwagon` |
+| `vessel <vessel> [player]` | Spawn a vessel next to the player |
+| `spawn <item or rarity> [count]` | e.g. `spawn rare 5`, `spawn anchor` |
+| `clearitems [all]` | Remove unclaimed items (or all items) |
+| `tide <out\|hold\|in> [percent]` | Jump the tide, e.g. `tide in 90` |
+| `tidespeed <scale>` | 1 = real 25 min cycle, 0.1 = 2.5 min |
+| `waves <multiplier>` | Wave strength, 0 = calm |
+| `tp <shop\|zone\|player> [who]` | Teleport |
+| `heal`, `god`, `speed <n>` | Health/breath, toggle no-drowning, walk speed |
+| `resetdata <player>`, `kick <player> [reason]` | Wipe a save, kick |
+
+Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down recalls history.
+
 ## Layout
 
 The beach runs along +X from the shop (X = 0). Each zone is 400 studs. The waterline is at

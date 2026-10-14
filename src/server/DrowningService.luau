@@ -25,7 +25,7 @@ local function tick()
 		end
 
 		local breath = player:GetAttribute("Breath") or 1
-		if Beach.isDeep(root.Position, frontX) then
+		if Beach.isDeep(root.Position, frontX) and not player:GetAttribute("AdminGod") then
 			breath = math.max(0, breath - TICK / cfg.BreathTime)
 			if breath <= 0 then
 				humanoid:TakeDamage(cfg.DamagePerSecond * TICK)

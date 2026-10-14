@@ -9,6 +9,7 @@ local Config = require(script.Parent.Config)
 local Tide = {}
 
 Tide.StartAttribute = "TideCycleStart"
+Tide.ScaleAttribute = "TideTimeScale" -- set by the admin console; overrides Config.Tide.TimeScale
 
 local cfg = Config.Tide
 local beach = Config.Beach
@@ -23,7 +24,7 @@ local function smoothstep(t: number): number
 end
 
 function Tide.durations()
-	local scale = cfg.TimeScale
+	local scale = Workspace:GetAttribute(Tide.ScaleAttribute) or cfg.TimeScale
 	return cfg.OutTime * scale, cfg.HoldTime * scale, cfg.InTime * scale
 end
 
@@ -87,6 +88,20 @@ function Tide.getState(now: number?): State
 			Cycle = cycle,
 		}
 	end
+end
+
+-- The cycle start time that puts the tide at `progress` (0-1) through `phase` right now.
+function Tide.startFor(phase: string, progress: number, now: number?): number
+	local outTime, holdTime, inTime = Tide.durations()
+	local offset
+	if phase == "Out" then
+		offset = outTime * progress
+	elseif phase == "Hold" then
+		offset = outTime + holdTime * progress
+	else
+		offset = outTime + holdTime + inTime * progress
+	end
+	return (now or Tide.now()) - offset
 end
 
 function Tide.frontX(now: number?): number

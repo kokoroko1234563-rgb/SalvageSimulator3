@@ -174,6 +174,10 @@ local function createItem(def, zoneIndex: number, position: Vector3): BasePart
 	return part
 end
 
+function ItemService.spawnAt(def, zoneIndex: number, position: Vector3): BasePart
+	return createItem(def, zoneIndex, position)
+end
+
 function ItemService.spawnInZone(zoneIndex: number, frontX: number): BasePart?
 	local zone = Config.Zones[zoneIndex]
 	local startX, endX = Beach.zoneRange(zoneIndex)

@@ -213,6 +213,22 @@ function DataService.addCoins(player: Player, amount: number)
 	publish(player)
 end
 
+function DataService.setCoins(player: Player, amount: number)
+	local profile = profiles[player]
+	if profile then
+		profile.Coins = math.max(0, math.floor(amount))
+		publish(player)
+	end
+end
+
+-- Wipes a player's progress back to a new save (saved on the next autosave or leave).
+function DataService.reset(player: Player)
+	if profiles[player] then
+		profiles[player] = defaultProfile()
+		publish(player)
+	end
+end
+
 function DataService.trySpend(player: Player, amount: number): boolean
 	local profile = profiles[player]
 	if not profile or profile.Coins < amount then

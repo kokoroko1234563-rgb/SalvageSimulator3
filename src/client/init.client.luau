@@ -1,5 +1,6 @@
 -- Salvage Simulator 3, Milestone 1 client entry point.
 
+local AdminConsole = require(script.AdminConsole)
 local HUD = require(script.HUD)
 local TideController = require(script.TideController)
 local WaveController = require(script.WaveController)
@@ -9,3 +10,4 @@ HUD.init()
 TideController.init()
 WaveController.init()
 GrabController.init()
+AdminConsole.init()

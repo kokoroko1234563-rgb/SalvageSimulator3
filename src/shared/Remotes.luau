@@ -9,6 +9,7 @@ local FUNCTIONS = {
 	"GrabRequest", -- (part) -> ok, reason
 	"Buy", -- (category, id) -> ok, reason
 	"SpawnVessel", -- (id) -> ok, reason
+	"AdminCommand", -- (commandLine) -> { output lines } (admins only)
 }
 
 local EVENTS = {

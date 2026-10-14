@@ -6,6 +6,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
 
+local AdminService = require(script.AdminService)
 local BeachBuilder = require(script.BeachBuilder)
 local CollisionGroups = require(script.CollisionGroups)
 local DataService = require(script.DataService)
@@ -35,3 +36,4 @@ VesselService.init(notify)
 GrabService.init(notify)
 ShopService.init(map, notify)
 DrowningService.init()
+AdminService.init()

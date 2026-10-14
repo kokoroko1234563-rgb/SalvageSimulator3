@@ -283,7 +283,8 @@ local function destroyVessel(player: Player, reason: string?)
 	end
 end
 
-function VesselService.spawn(player: Player, kind: string): (boolean, string?)
+-- `at` is where the bottom of the vessel goes; defaults to the shop's vessel pad.
+function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolean, string?)
 	local def = Gear.getVessel(kind)
 	local build = def and builders[kind]
 	if not def or not build then
@@ -306,8 +307,8 @@ function VesselService.spawn(player: Player, kind: string): (boolean, string?)
 	local pad = Workspace.Map.Shop.VesselPad :: BasePart
 	local model = Instance.new("Model")
 	model.Name = player.Name .. "'s " .. def.Name
-	local at = CFrame.new(pad.Position.X, pad.Position.Y, pad.Position.Z)
-	local handle = build(model, at)
+	local origin = at or CFrame.new(pad.Position.X, pad.Position.Y, pad.Position.Z)
+	local handle = build(model, origin)
 
 	local vesselId = HttpService:GenerateGUID(false)
 	model:SetAttribute("VesselId", vesselId)
