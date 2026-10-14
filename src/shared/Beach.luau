@@ -43,8 +43,10 @@ function Beach.groundY(z: number): number
 	if z <= 0 then
 		return 0
 	end
-	if z >= sandbar.ChannelStart and z < sandbar.ChannelEnd then
-		return -z * beach.Slope - sandbar.ChannelDepth
+	if z > sandbar.ChannelStart and z < sandbar.ChannelEnd then
+		-- A smooth dip with sloping banks, so you can wade in and climb back out.
+		local t = (z - sandbar.ChannelStart) / (sandbar.ChannelEnd - sandbar.ChannelStart)
+		return -z * beach.Slope - sandbar.ChannelDepth * math.sin(t * math.pi)
 	end
 	return -z * beach.Slope
 end

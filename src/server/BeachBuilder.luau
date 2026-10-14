@@ -132,16 +132,14 @@ function BeachBuilder.build(): Folder
 	)
 	sand.Color = SAND
 	sand.Parent = map
-	slopedBlock(
-		"Channel",
-		-half,
-		half,
-		sandbar.ChannelStart,
-		Beach.groundY(sandbar.ChannelStart),
-		sandbar.ChannelEnd,
-		Beach.groundY(sandbar.ChannelEnd - 0.01)
-	).Parent =
-		map
+	-- The channel follows Beach.groundY's curved dip in short straight pieces.
+	local pieces = 10
+	local step = (sandbar.ChannelEnd - sandbar.ChannelStart) / pieces
+	for i = 0, pieces - 1 do
+		local z0 = sandbar.ChannelStart + i * step
+		local z1 = z0 + step
+		slopedBlock("Channel", -half, half, z0, Beach.groundY(z0), z1, Beach.groundY(z1)).Parent = map
+	end
 	local bar = slopedBlock(
 		"FarSandbar",
 		-half,
