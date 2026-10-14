@@ -338,27 +338,45 @@ local function setLighting()
 		return created
 	end
 
+	-- A clearer, bluer air: light haze that brightens toward the horizon, and a warm glare
+	-- from the sun.
 	local atmosphere = ensure("Atmosphere") :: Atmosphere
-	atmosphere.Density = 0.32
-	atmosphere.Offset = 0.2
-	atmosphere.Color = Color3.fromRGB(200, 228, 242)
-	atmosphere.Decay = Color3.fromRGB(110, 170, 210)
-	atmosphere.Glare = 0.25
-	atmosphere.Haze = 1.4
+	atmosphere.Density = 0.2
+	atmosphere.Offset = 0.35
+	atmosphere.Color = Color3.fromRGB(190, 225, 250)
+	atmosphere.Decay = Color3.fromRGB(120, 185, 235)
+	atmosphere.Glare = 0.4
+	atmosphere.Haze = 0.9
 
+	-- A sky with no stars, and a few soft clouds drifting high over the beach.
+	local sky = ensure("Sky") :: Sky
+	sky.StarCount = 0
+
+	local clouds = Workspace.Terrain:FindFirstChildOfClass("Clouds")
+	if not clouds then
+		clouds = Instance.new("Clouds")
+		clouds.Parent = Workspace.Terrain
+	end
+	clouds.Enabled = true
+	clouds.Cover = 0.5
+	clouds.Density = 0.35
+	clouds.Color = Color3.fromRGB(255, 255, 255)
+
+	-- Warm, lively colour: a little more saturated, with a sunny tint.
 	local correction = ensure("ColorCorrectionEffect") :: ColorCorrectionEffect
-	correction.Saturation = 0.25
-	correction.Contrast = 0.08
-	correction.Brightness = 0.02
-	correction.TintColor = Color3.fromRGB(255, 246, 230)
+	correction.Saturation = 0.35
+	correction.Contrast = 0.05
+	correction.Brightness = 0.04
+	correction.TintColor = Color3.fromRGB(255, 244, 226)
 
+	-- Sparkle on the water and warm sun rays through the haze.
 	local bloom = ensure("BloomEffect") :: BloomEffect
-	bloom.Intensity = 0.35
+	bloom.Intensity = 0.45
 	bloom.Size = 18
 	bloom.Threshold = 0.9
 
 	local sunRays = ensure("SunRaysEffect") :: SunRaysEffect
-	sunRays.Intensity = 0.12
+	sunRays.Intensity = 0.18
 	sunRays.Spread = 0.8
 end
 
@@ -373,9 +391,13 @@ function BeachBuilder.build(): Folder
 		end
 	end
 
-	Lighting.ClockTime = 13.5
-	Lighting.Brightness = 2.5
-	Lighting.OutdoorAmbient = Color3.fromRGB(160, 150, 130)
+	-- Late afternoon: the sun is lower and warmer, with soft shadows and bright, even light.
+	Lighting.ClockTime = 15.2
+	Lighting.Brightness = 2.6
+	Lighting.ExposureCompensation = 0.1
+	Lighting.ShadowSoftness = 0.5
+	Lighting.Ambient = Color3.fromRGB(120, 118, 115)
+	Lighting.OutdoorAmbient = Color3.fromRGB(185, 178, 165)
 	setLighting()
 
 	local map = Instance.new("Folder")
