@@ -87,6 +87,8 @@ local function build(secret, origin: Vector3)
 		)
 	end
 
+	-- Normal secrets glow in their coin's colour; exotic ones (a lootbox) in the exotic colour.
+	local accent = if secret.Coin then Secrets.CoinColors[secret.Coin] else Color3.fromRGB(40, 225, 200)
 	local chest = block(
 		root,
 		"Chest",
@@ -100,15 +102,15 @@ local function build(secret, origin: Vector3)
 		"ChestLid",
 		CFrame.new(origin + course.Chest + Vector3.new(0, 1.2, 0)),
 		Vector3.new(3.1, 0.4, 2.1),
-		Secrets.CoinColors[secret.Coin],
+		accent,
 		{ Material = Enum.Material.Neon }
 	)
 	local glow = Instance.new("PointLight")
-	glow.Color = Secrets.CoinColors[secret.Coin]
+	glow.Color = accent
 	glow.Range = 16
 	glow.Parent = chest
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Open chest"
+	prompt.ActionText = if secret.Coin then "Open chest" else "Open lootbox"
 	prompt.HoldDuration = 0.3
 	prompt.MaxActivationDistance = 8
 	prompt.RequiresLineOfSight = false
@@ -146,7 +148,14 @@ function SecretController.init()
 			if not secret then
 				return
 			end
-			build(secret, info.Origin)
+			local built, err = pcall(build, secret, info.Origin)
+			if not built then
+				-- Tell the server straight away so it cancels the run and returns the unlock item.
+				warn("[SecretController] couldn't build " .. tostring(info.Secret) .. ": " .. tostring(err))
+				cleanup()
+				readyRemote:FireServer(false)
+				return
+			end
 			run = { course = secret.Course, origin = info.Origin, duration = info.Duration, startedAt = nil }
 			-- This client owns the character's physics, so it moves the character in itself.
 			local character = Players.LocalPlayer.Character
@@ -157,7 +166,7 @@ function SecretController.init()
 					root.AssemblyLinearVelocity = Vector3.zero
 				end
 			end
-			readyRemote:FireServer()
+			readyRemote:FireServer(true)
 		elseif kind == "go" and run then
 			run.startedAt = info.StartedAt
 			HUD.banner("The vault is flooding. Climb!")

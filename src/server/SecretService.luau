@@ -144,11 +144,22 @@ function SecretService.tryEnter(player: Player, secretId: string, returnTo: CFra
 	run.openedAt = os.clock()
 end
 
-local function onReady(player: Player)
+local function onReady(player: Player, ok: any)
 	local run = runs[player]
-	if run then
-		run.ready = true
+	if not run or run.startedAt then
+		return
 	end
+	if ok == false then
+		-- The client couldn't build the course: our fault, so give the unlock item back.
+		DataService.addItem(player, run.secret.Unlock, "refund")
+		endRun(
+			player,
+			"Couldn't open the secret. Your " .. Items.get(run.secret.Unlock).Name .. " was returned.",
+			true
+		)
+		return
+	end
+	run.ready = true
 end
 
 local function onClaim(player: Player)
