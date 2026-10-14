@@ -178,75 +178,68 @@ function ItemService.spawnAt(def, zoneIndex: number, position: Vector3): BasePar
 	return createItem(def, zoneIndex, position)
 end
 
-function ItemService.spawnInZone(zoneIndex: number, frontX: number): BasePart?
-	local zone = Config.Zones[zoneIndex]
-	local startX, endX = Beach.zoneRange(zoneIndex)
-	local maxX = math.min(endX, frontX - 15) - 4
-	local minX = startX + 4
-	if maxX <= minX then
+-- Washes one item up somewhere in the surf around the current waterline. The zone (and so
+-- the value and rarity) comes from where it lands, so low tide brings richer loot.
+function ItemService.spawnInSurf(waterline: number): BasePart?
+	local beach = Config.Beach
+	-- Heavy things sit out in deeper water; lighter ones anywhere from the wet sand out.
+	local heavyRoll = rng:NextNumber()
+	local depth = if heavyRoll < 0.3
+		then rng:NextNumber(beach.ShallowDepth, beach.WaistDepth - 0.3)
+		else rng:NextNumber(-0.3, beach.WaistDepth - 0.3)
+	local z = Beach.zForDepth(depth, waterline)
+	local zoneIndex = Beach.zoneAt(z)
+	if not zoneIndex or zoneIndex < 1 then
 		return nil
 	end
 
-	local rarity = Items.rollRarity(zone.Rarity, rng)
-	local choices = Items.ofRarity(rarity)
+	local rarity = Items.rollRarity(Config.Zones[zoneIndex].Rarity, rng)
+	local choices = {}
+	for _, def in Items.ofRarity(rarity) do
+		-- Only heavy items in the deeper spots, only lighter ones in the shallows.
+		if (def.Class >= 3) == (heavyRoll < 0.3) then
+			table.insert(choices, def)
+		end
+	end
 	if #choices == 0 then
 		return nil
 	end
 	local def = choices[rng:NextInteger(1, #choices)]
 
-	local beach = Config.Beach
-	local minZ = if def.Class >= 3 then beach.ShallowEnd + 4 else 2
-	local z = rng:NextNumber(minZ, beach.WaistEnd - 3)
-	local x = rng:NextNumber(minX, maxX)
+	local x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
 	local y = Beach.groundY(z) + def.Size.Y / 2
 	return createItem(def, zoneIndex, Vector3.new(x, y, z))
 end
 
-local function counts(): ({ [number]: number }, number)
-	local perZone = {}
-	local total = 0
+local function spawnTick()
+	local waterline = Tide.waterline()
+	local total, inSurf = 0, 0
 	for item in all do
 		total += 1
 		if ItemService.getState(item) == "Unclaimed" and item:GetAttribute("Fresh") then
-			local zone = item:GetAttribute("Zone")
-			perZone[zone] = (perZone[zone] or 0) + 1
+			local depth = Beach.depthAt(item.Position, waterline)
+			if depth > -1 and depth < Config.Beach.WaistDepth then
+				inSurf += 1
+			end
 		end
 	end
-	return perZone, total
-end
-
-local function spawnTick()
-	local perZone, total = counts()
-	if total >= cfg.MaxTotal then
-		return
-	end
-	local frontX = Tide.frontX()
-	local bestZone, bestDeficit = nil, 0
-	for zoneIndex = 1, Config.Beach.ActiveZones do
-		local startX, endX = Beach.zoneRange(zoneIndex)
-		local exposed = math.clamp((frontX - 15 - startX) / (endX - startX), 0, 1)
-		local target = math.floor(cfg.MaxUnclaimedPerZone * exposed)
-		local deficit = target - (perZone[zoneIndex] or 0)
-		if deficit > bestDeficit then
-			bestZone, bestDeficit = zoneIndex, deficit
-		end
-	end
-	if bestZone then
-		ItemService.spawnInZone(bestZone, frontX)
+	if total < cfg.MaxTotal and inSurf < cfg.MaxSurfItems then
+		ItemService.spawnInSurf(waterline)
 	end
 end
 
 local function maintenanceTick()
 	local t = now()
-	local frontX = Tide.frontX(t)
+	local waterline = Tide.waterline(t)
 	for item in all do
 		local position = item.Position
 		local state = ItemService.getState(item)
 		local since = item:GetAttribute("Since") or t
 
-		local lost = position.Y < -40 or position.Z > Config.Beach.LostZ
-		local flooded = Beach.isFlooded(position, frontX) and (state == "Unclaimed" or state == "Loose")
-		if lost or flooded then
+		local fellOut = position.Y < Beach.groundY(position.Z) - 30
+			or math.abs(position.X) > Beach.HalfWidth + 40
+		local drowned = Beach.isLost(position, waterline) and (state == "Unclaimed" or state == "Loose")
+		if fellOut or drowned then
 			ItemService.destroy(item)
 		elseif state == "Unclaimed" then
 			local lifetime = if item:GetAttribute("Fresh") then cfg.FreshLifetime else cfg.TimedOutLifetime
@@ -271,9 +264,9 @@ function ItemService.init(map: Instance)
 	-- Server simulates loose items, so the server pushes them with the waves.
 	RunService.Heartbeat:Connect(function(dt)
 		local t = now()
-		local frontX = Tide.frontX(t)
+		local waterline = Tide.waterline(t)
 		for item in loose do
-			Waves.applyToPart(item, dt, t, frontX)
+			Waves.applyToPart(item, dt, t, waterline)
 		end
 	end)
 

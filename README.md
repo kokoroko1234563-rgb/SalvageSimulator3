@@ -31,8 +31,8 @@ Test with **Test → Clients and Servers** (2 or more players) to check bumping 
 | Vessels | `VesselService`: Wheelbarrow (one wheel, tips easily) and Beach Wagon (4 wheels). Tow them by the handle. Items fall out when the vessel spills, and other players can't touch the vessel or what's in it (collision groups). A vessel covered by deep water is lost with everything in it, and you can respawn it free at the shop. |
 | Shop and selling | `ShopService`: shopkeeper prompt, fixed prices, Bare Hands → Grabber Claw (plus Boat Hook, so Heavy items can be tested). Drop items, or park your vessel, on the yellow sell pad. |
 | Items | `src/shared/Items.luau` has 14 placeholder items across Light, Medium and Heavy, with each zone's value multiplier applied. |
-| Tide | `src/shared/Tide.luau`: the tide travels down the beach, holds, then returns, over 3 zones. The cycle is shortened ×0.4 (10 min) for testing. There's a warning when the tide turns each way and no on-screen clock; Studio shows a debug readout in the bottom-right. |
-| Drowning | `DrowningService`: you lose breath in deep water (far out, or under the tide) and then take damage. What you were carrying drops when you die. |
+| Tide | `src/shared/Tide.luau`: the sea level falls, uncovering the outer zones, holds at low tide, then rises again. The cycle is shortened ×0.4 (10 min) for testing. The sea surface and the foam line at the waterline are drawn on each client from the shared clock. There's a warning when the tide turns each way and no on-screen clock; Studio shows a debug readout in the bottom-right. |
+| Drowning | `DrowningService`: you lose breath in water deeper than waist height, which moves in and out with the tide, and then take damage. What you were carrying drops when you die. |
 | Saving | `DataService`: coins and gear are saved with UpdateAsync and a session lock, with retries, on PlayerRemoving, BindToClose and every 2 minutes. |
 
 All tuning numbers are in `src/shared/Config.luau`, `Gear.luau` and `Items.luau`.
@@ -63,13 +63,32 @@ Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down 
 
 ## Layout
 
-The beach runs along +X from the shop (X = 0). Each zone is 400 studs. The waterline is at
-Z = 0 and the sea is toward +Z. Depth bands are measured out from the waterline:
-shallow < 15, knee-deep < 30, waist < 45, and deep (drowning) beyond that.
+```
+            dunes
+   +--------------------------+   Z < 0: shop, sell pad, vessel pad (flat)
+   |  shop   sell   vessels   |
+ ==+==========================+== Z = 0: top of the beach
+   |  zone 1  Shopside Shore  |   the sand slopes gently down toward +Z
+   |..........................|   <- waterline at high tide (Z = 60)
+   |  zone 2  Sunny Stretch   |
+   |                          |
+   |  zone 3  Middle Banks    |
+   |..........................|   <- waterline at low tide (Z = 560)
+   |  open sea                |
+   +--------------------------+
+ headland     X ->     headland
+```
+
+The shoreline runs along X (320 studs wide, between two rocky headlands). The zones are
+200-stud bands running out to sea along +Z. The sand slopes down 0.06 studs per stud, so
+the tide is simply the sea level rising and falling: as it drops, the waterline moves out
+and uncovers the richer zones. Items wash up in the surf around the current waterline, and
+their zone (value and rarity) depends on where they land. Water depth sets the bands:
+shallow < 1.5, knee-deep < 3, waist < 4.5, and deep (drowning, vessels lost) beyond that.
 
 ## Known simplifications
 
 - Your own character passes through your vessel, as well as other players' vessels. Giving each player a separate character group would need 40+ collision groups, and Roblox allows 32.
 - Unclaimed items sit still. They don't follow scripted movement in the surf yet.
-- Deep water is a gameplay region with a visual-only water part. There is no terrain water or swimming.
+- The sea is a visual-only part; depth comes from the sea level and the beach slope. There is no terrain water or swimming.
 - The server doesn't check character walk speed yet. Held items are leashed by distance and speed.

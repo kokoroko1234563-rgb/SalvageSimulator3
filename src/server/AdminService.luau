@@ -184,11 +184,11 @@ command("status", "status", "Tide, item and player summary", function()
 	end
 	return {
 		string.format(
-			"Tide: %s %.0f%% (%.0fs left), front x=%.0f, cycle %.0fs, time scale %.2f",
+			"Tide: %s %.0f%% (%.0fs left), waterline z=%.0f, cycle %.0fs, time scale %.2f",
 			state.Phase,
 			state.PhaseProgress * 100,
 			state.PhaseRemaining,
-			state.FrontX,
+			state.Waterline,
 			Tide.cycleLength(),
 			Workspace:GetAttribute(Tide.ScaleAttribute) or Config.Tide.TimeScale
 		),
@@ -259,7 +259,7 @@ command("vessel", "vessel <vessel> [player]", "Spawn a vessel next to the player
 		if root then
 			local look = root.CFrame.LookVector
 			local spot = root.Position + Vector3.new(look.X, 0, look.Z).Unit * 8
-			local groundY = if spot.X < 0 then 1 else Beach.groundY(spot.Z)
+			local groundY = if spot.Z < 0 then 1 else Beach.groundY(spot.Z)
 			at = CFrame.new(spot.X, groundY + 0.2, spot.Z)
 		end
 		local ok, reason = VesselService.spawn(target, entry.Id, at)
@@ -286,13 +286,13 @@ command(
 		end
 		local look = root.CFrame.LookVector
 		local forward = Vector3.new(look.X, 0, look.Z).Unit
-		local zone = math.clamp(Beach.zoneAt(root.Position.X) or 1, 1, Config.Beach.ActiveZones)
+		local zone = math.clamp(Beach.zoneAt(root.Position.Z) or 1, 1, Config.Beach.ActiveZones)
 		for i = 1, count do
 			local def = defs[rng:NextInteger(1, #defs)]
 			local spot = root.Position
 				+ forward * (6 + i * 0.5)
 				+ Vector3.new(rng:NextNumber(-4, 4), 0, rng:NextNumber(-4, 4))
-			local groundY = if spot.X < 0 then 1 else Beach.groundY(spot.Z)
+			local groundY = if spot.Z < 0 then 1 else Beach.groundY(spot.Z)
 			ItemService.spawnAt(def, zone, Vector3.new(spot.X, groundY + def.Size.Y / 2, spot.Z))
 		end
 		return { string.format("Spawned %d item(s) with zone %d value", count, zone) }
@@ -327,10 +327,10 @@ command("tide", "tide <out|hold|in> [percent]", "Jump the tide, e.g. tide in 90"
 	local state = Tide.getState()
 	return {
 		string.format(
-			"Tide set to %s %.0f%%, front x=%.0f",
+			"Tide set to %s %.0f%%, waterline z=%.0f",
 			state.Phase,
 			state.PhaseProgress * 100,
-			state.FrontX
+			state.Waterline
 		),
 	}
 end)
@@ -368,11 +368,12 @@ command(
 		local where = (args[1] or ""):lower()
 		local destination: Vector3?
 		if where == "shop" then
-			destination = Vector3.new(-60, 4, -40)
+			destination = Vector3.new(0, 5, -45)
 		elseif tonumber(where) then
 			local zone = math.clamp(math.floor(tonumber(where) :: number), 1, Config.Beach.ActiveZones)
-			local startX, endX = Beach.zoneRange(zone)
-			destination = Vector3.new((startX + endX) / 2, 4, -10)
+			local startZ = Beach.zoneRange(zone)
+			local z = startZ + 10
+			destination = Vector3.new(0, Beach.groundY(z) + 4, z)
 		elseif where ~= "" then
 			local targets, err = findPlayers(caller, where)
 			local root = targets[1] and rootOf(targets[1])

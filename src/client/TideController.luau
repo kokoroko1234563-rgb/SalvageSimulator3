@@ -1,5 +1,6 @@
--- Draws the tide locally (it's computed from the shared clock, so no replication is
--- needed), warns when it turns, and shows which zone the player is in.
+-- Draws the sea locally. The tide is computed from the shared clock, so no replication is
+-- needed: a flat sea surface rises and falls over the sloping beach, which moves the
+-- waterline in and out. Also warns when the tide turns and shows which zone you're in.
 -- There's deliberately no on-screen tide clock; Studio shows a debug readout only.
 
 local Players = game:GetService("Players")
@@ -17,12 +18,9 @@ local player = Players.LocalPlayer
 
 local TideController = {}
 
-local RAMP_LENGTH = 40
-local RAMP_START_Y = 0.4
-local FLOOD_TOP_Y = 6
-local THICKNESS = 14
+local THICKNESS = 4
 
-local function waterPart(name: string): Part
+local function waterPart(name: string, props: { [string]: any }): Part
 	local part = Instance.new("Part")
 	part.Name = name
 	part.Anchored = true
@@ -30,55 +28,52 @@ local function waterPart(name: string): Part
 	part.CanQuery = false
 	part.CanTouch = false
 	part.CastShadow = false
-	part.Material = Enum.Material.Glass
-	part.Color = Color3.fromRGB(50, 140, 190)
-	part.Transparency = 0.35
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
+	for key, value in props do
+		(part :: any)[key] = value
+	end
 	return part
 end
 
 function TideController.init()
 	local folder = Instance.new("Folder")
-	folder.Name = "LocalTide"
+	folder.Name = "LocalSea"
 	folder.Parent = Workspace
 
 	local beach = Config.Beach
-	local zMin = -beach.DryWidth - 40
-	local zMax = beach.SeaExtent
-	local depthZ = zMax - zMin
-	local midZ = (zMin + zMax) / 2
+	local zMin = -beach.ShopDepth - 60
+	local zMax = Beach.Depth + beach.SeaExtent + 200
+	local width = beach.Width + 800
 
-	local ramp = waterPart("TideRamp")
-	local rise = FLOOD_TOP_Y - RAMP_START_Y
-	local rampAngle = math.atan2(rise, RAMP_LENGTH)
-	local rampLength = math.sqrt(RAMP_LENGTH * RAMP_LENGTH + rise * rise)
-	ramp.Size = Vector3.new(rampLength, THICKNESS, depthZ)
-	ramp.Parent = folder
+	local sea = waterPart("SeaSurface", {
+		Size = Vector3.new(width, THICKNESS, zMax - zMin),
+		Material = Enum.Material.Glass,
+		Color = Color3.fromRGB(50, 150, 195),
+		Transparency = 0.3,
+	})
+	sea.Parent = folder
 
-	local flood = waterPart("TideFlood")
-	local floodEnd = Beach.Length + 400
-	flood.Parent = folder
+	local foam = waterPart("Foam", {
+		Size = Vector3.new(beach.Width, 0.15, 3),
+		Material = Enum.Material.SmoothPlastic,
+		Color = Color3.new(1, 1, 1),
+		Transparency = 0.35,
+	})
+	foam.Parent = folder
 
 	local lastPhase: string? = nil
 	local lastZone: number? = -1
 
 	RunService.RenderStepped:Connect(function()
 		local state = Tide.getState()
-		local frontX = state.FrontX
 
-		local rampOrientation = CFrame.Angles(0, 0, rampAngle)
-		local rampTop = Vector3.new(frontX + RAMP_LENGTH / 2, (RAMP_START_Y + FLOOD_TOP_Y) / 2, midZ)
-		ramp.CFrame = CFrame.new(rampTop - rampOrientation.UpVector * THICKNESS / 2) * rampOrientation
-
-		local floodStart = frontX + RAMP_LENGTH
-		local floodLength = math.max(floodEnd - floodStart, 1)
-		flood.Size = Vector3.new(floodLength, THICKNESS, depthZ)
-		flood.CFrame = CFrame.new(floodStart + floodLength / 2, FLOOD_TOP_Y - THICKNESS / 2, midZ)
+		sea.CFrame = CFrame.new(0, state.WaterY - THICKNESS / 2, (zMin + zMax) / 2)
+		foam.CFrame = CFrame.new(0, state.WaterY + 0.05, state.Waterline)
 
 		if lastPhase and state.Phase ~= lastPhase then
 			if state.Phase == "In" then
-				HUD.banner("The tide is turning. Head back!")
+				HUD.banner("The tide is turning. Head back to shore!")
 			elseif state.Phase == "Out" then
 				HUD.banner("The tide is going out again.")
 			end
@@ -88,7 +83,7 @@ function TideController.init()
 		local character = player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if root then
-			local zone = Beach.zoneAt(root.Position.X)
+			local zone = Beach.zoneAt(root.Position.Z)
 			if zone ~= lastZone then
 				lastZone = zone
 				if zone == 0 then
@@ -97,7 +92,7 @@ function TideController.init()
 					local info = Config.Zones[zone]
 					HUD.setZone(string.format("Zone %d · %s · x%d", zone, info.Name, info.Multiplier))
 				else
-					HUD.setZone("")
+					HUD.setZone("Open sea")
 				end
 			end
 		end
@@ -105,11 +100,11 @@ function TideController.init()
 		if RunService:IsStudio() then
 			HUD.setDebug(
 				string.format(
-					"[studio] tide %s %.0f%% · %.0fs left · front x=%.0f",
+					"[studio] tide %s %.0f%% · %.0fs left · waterline z=%.0f",
 					state.Phase,
 					state.PhaseProgress * 100,
 					state.PhaseRemaining,
-					frontX
+					state.Waterline
 				)
 			)
 		end

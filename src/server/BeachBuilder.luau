@@ -1,6 +1,8 @@
 -- Builds the placeholder beach from code so the test build runs from an empty place.
 -- Swap this for a hand-built map later; gameplay only depends on the coordinates in
--- Config.Beach (beach along +X, waterline at Z = 0, sea toward +Z).
+-- Config.Beach: shoreline along X, shop at Z < 0, sand sloping into the sea toward +Z,
+-- zones as bands running out to sea. The sea itself is drawn by each client (it moves
+-- with the tide), see TideController.
 
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
@@ -15,7 +17,7 @@ local BeachBuilder = {}
 
 local SAND = Color3.fromRGB(236, 215, 160)
 local WET_SAND = Color3.fromRGB(196, 170, 120)
-local SEA = Color3.fromRGB(60, 160, 200)
+local ROCK = Color3.fromRGB(120, 115, 105)
 
 local function makePart(props: { [string]: any }): Part
 	local part = Instance.new("Part")
@@ -91,75 +93,87 @@ function BeachBuilder.build(): Folder
 	local map = Instance.new("Folder")
 	map.Name = "Map"
 
-	local x0 = -beach.ShopLength
-	local x1 = Beach.Length + 200 -- a little beach past the end, under the tide
-	local width = x1 - x0
-	local midX = (x0 + x1) / 2
+	local half = Beach.HalfWidth
+	local seaEnd = Beach.Depth + beach.SeaExtent
 
-	-- Dry sand.
+	-- Flat dry ground behind the shoreline (shop area).
 	makePart({
 		Name = "DrySand",
-		Size = Vector3.new(width, 10, beach.DryWidth),
-		CFrame = CFrame.new(midX, -5, -beach.DryWidth / 2),
+		Size = Vector3.new(beach.Width, 10, beach.ShopDepth),
+		CFrame = CFrame.new(0, -5, -beach.ShopDepth / 2),
 		Color = SAND,
 		Material = Enum.Material.Sand,
 	}).Parent =
 		map
 
-	-- Dunes behind the beach.
+	-- Dunes behind the shop.
 	makePart({
 		Name = "Dunes",
-		Size = Vector3.new(width, 14, 30),
-		CFrame = CFrame.new(midX, 0, -beach.DryWidth - 15),
+		Size = Vector3.new(beach.Width + 60, 16, 40),
+		CFrame = CFrame.new(0, 0, -beach.ShopDepth - 20),
 		Color = SAND,
 		Material = Enum.Material.Sand,
 	}).Parent =
 		map
 
-	-- Seabed: slope, then a flat floor out to sea.
-	slopedBlock("SeabedSlope", x0, x1, 0, 0, beach.SlopeRun, -beach.SlopeDrop).Parent = map
-	local floorDepth = beach.SeaExtent - beach.SlopeRun
-	makePart({
-		Name = "SeaFloor",
-		Size = Vector3.new(width, 6, floorDepth),
-		CFrame = CFrame.new(midX, -beach.SlopeDrop - 3, beach.SlopeRun + floorDepth / 2),
-		Color = WET_SAND,
-		Material = Enum.Material.Sand,
-	}).Parent =
+	-- The beach: one long slope from the shoreline out under the sea. The tide uncovers more
+	-- or less of it.
+	local sand = slopedBlock("Beach", -half, half, 0, 0, Beach.Depth, Beach.groundY(Beach.Depth))
+	sand.Color = SAND
+	sand.Parent = map
+	slopedBlock(
+		"Seabed",
+		-half - 300,
+		half + 300,
+		Beach.Depth,
+		Beach.groundY(Beach.Depth),
+		seaEnd,
+		Beach.groundY(seaEnd)
+	).Parent =
 		map
 
-	-- Static sea surface (visual only).
-	makePart({
-		Name = "SeaSurface",
-		Size = Vector3.new(width, 0.4, beach.SeaExtent),
-		CFrame = CFrame.new(midX, beach.WaterLevel - 0.2, beach.SeaExtent / 2),
-		Color = SEA,
-		Material = Enum.Material.Glass,
-		Transparency = 0.45,
-		CanCollide = false,
-		CanQuery = false,
-		CanTouch = false,
-		CastShadow = false,
-	}).Parent =
-		map
+	-- Rocky headlands on both sides make the beach a cove.
+	for side = -1, 1, 2 do
+		local length = seaEnd + beach.ShopDepth + 40
+		makePart({
+			Name = "Headland",
+			Size = Vector3.new(40, 120, length),
+			CFrame = CFrame.new(side * (half + 20), -40, -beach.ShopDepth - 40 + length / 2),
+			Color = ROCK,
+			Material = Enum.Material.Slate,
+		}).Parent =
+			map
+	end
 
-	-- Zone markers: a flag post at the start of each zone with its name and multiplier.
+	-- Zone markers: a tall post at each side of the beach where each zone starts.
 	for index = 1, beach.ActiveZones do
 		local zone = Config.Zones[index]
-		local startX = Beach.zoneRange(index)
-		local post = makePart({
-			Name = "ZoneMarker" .. index,
-			Size = Vector3.new(1, 14, 1),
-			CFrame = CFrame.new(startX, 7, -8),
-			Color = Color3.fromRGB(240, 240, 240),
-			Material = Enum.Material.Wood,
-		})
-		label(
-			post,
-			string.format("Zone %d · %s · x%d", index, zone.Name, zone.Multiplier),
-			Vector3.new(0, 9, 0)
-		)
-		post.Parent = map
+		local startZ = Beach.zoneRange(index) + 1
+		local groundY = Beach.groundY(startZ)
+		local topY = 14
+		for side = -1, 1, 2 do
+			local post = makePart({
+				Name = "ZoneMarker" .. index,
+				Size = Vector3.new(1.2, topY - groundY, 1.2),
+				CFrame = CFrame.new(side * (half - 8), (topY + groundY) / 2, startZ),
+				Color = Color3.fromRGB(240, 240, 240),
+				Material = Enum.Material.Wood,
+			})
+			local flag = makePart({
+				Name = "Flag",
+				Size = Vector3.new(0.2, 2.5, 4),
+				CFrame = CFrame.new(side * (half - 8), topY - 1.5, startZ + 2.2),
+				Color = Color3.fromHSV((index - 1) / beach.ActiveZones * 0.6, 0.7, 1),
+				CanCollide = false,
+			})
+			flag.Parent = post
+			label(
+				post,
+				string.format("Zone %d · %s · x%d", index, zone.Name, zone.Multiplier),
+				Vector3.new(0, post.Size.Y / 2 + 3, 0)
+			)
+			post.Parent = map
+		end
 	end
 
 	-- Shop area.
@@ -169,8 +183,8 @@ function BeachBuilder.build(): Folder
 
 	makePart({
 		Name = "Boardwalk",
-		Size = Vector3.new(beach.ShopLength - 10, 1, 60),
-		CFrame = CFrame.new(-beach.ShopLength / 2, 0.5, -32),
+		Size = Vector3.new(120, 1, beach.ShopDepth - 10),
+		CFrame = CFrame.new(0, 0.5, -beach.ShopDepth / 2 - 2),
 		Color = Color3.fromRGB(160, 115, 75),
 		Material = Enum.Material.WoodPlanks,
 	}).Parent =
@@ -179,7 +193,7 @@ function BeachBuilder.build(): Folder
 	local shopkeeper = makePart({
 		Name = "Shopkeeper",
 		Size = Vector3.new(3, 6, 2),
-		CFrame = CFrame.new(-45, 4, -45),
+		CFrame = CFrame.new(-25, 4, -62) * CFrame.Angles(0, math.pi, 0),
 		Color = Color3.fromRGB(255, 170, 90),
 	})
 	label(shopkeeper, "Shopkeeper", Vector3.new(0, 4.5, 0))
@@ -195,7 +209,7 @@ function BeachBuilder.build(): Folder
 	local sellZone = makePart({
 		Name = "SellZone",
 		Size = Vector3.new(30, 0.2, 22),
-		CFrame = CFrame.new(-25, 1.1, -14),
+		CFrame = CFrame.new(28, 1.1, -24),
 		Color = Color3.fromRGB(255, 210, 60),
 		Material = Enum.Material.Neon,
 		Transparency = 0.5,
@@ -208,7 +222,7 @@ function BeachBuilder.build(): Folder
 	local vesselPad = makePart({
 		Name = "VesselPad",
 		Size = Vector3.new(16, 0.2, 16),
-		CFrame = CFrame.new(-75, 1.1, -14),
+		CFrame = CFrame.new(-30, 1.1, -22),
 		Color = Color3.fromRGB(90, 180, 255),
 		Material = Enum.Material.Neon,
 		Transparency = 0.5,
@@ -222,7 +236,7 @@ function BeachBuilder.build(): Folder
 	spawn.Name = "BeachSpawn"
 	spawn.Anchored = true
 	spawn.Size = Vector3.new(10, 1, 10)
-	spawn.CFrame = CFrame.new(-60, 1.1, -45)
+	spawn.CFrame = CFrame.new(0, 1.1, -50)
 	spawn.Transparency = 1
 	spawn.CanCollide = false
 	spawn.Neutral = true

@@ -1,4 +1,4 @@
--- Players slowly drown in deep water (far out at sea, or under the returning tide).
+-- Players slowly drown in deep water (out past the waist-deep band, which moves with the tide).
 -- Breath is a 0-1 player attribute the HUD shows.
 
 local Players = game:GetService("Players")
@@ -14,7 +14,7 @@ local TICK = 0.2
 local DrowningService = {}
 
 local function tick()
-	local frontX = Tide.frontX()
+	local waterline = Tide.waterline()
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -25,7 +25,7 @@ local function tick()
 		end
 
 		local breath = player:GetAttribute("Breath") or 1
-		if Beach.isDeep(root.Position, frontX) and not player:GetAttribute("AdminGod") then
+		if Beach.isDeep(root.Position, waterline) and not player:GetAttribute("AdminGod") then
 			breath = math.max(0, breath - TICK / cfg.BreathTime)
 			if breath <= 0 then
 				humanoid:TakeDamage(cfg.DamagePerSecond * TICK)

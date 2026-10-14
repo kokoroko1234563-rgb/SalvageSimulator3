@@ -21,6 +21,7 @@ local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
+local Tide = require(Shared.Tide)
 
 local HUD = require(script.Parent.HUD)
 
@@ -317,7 +318,9 @@ local function describe(part: BasePart): (string, Color3)
 	if not Gear.canLift(tool, class) then
 		return line .. " (too heavy)", Color3.fromRGB(255, 120, 110)
 	end
-	if state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(part.Position.Z)) then
+	if
+		state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(part.Position, Tide.waterline()))
+	then
 		return line .. " (too deep)", Color3.fromRGB(255, 120, 110)
 	end
 	local rarityColor = Items.RarityColors[part:GetAttribute("Rarity") or "Common"]

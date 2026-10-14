@@ -15,23 +15,23 @@ Config.Admins = {
 	AllowStudio = true,
 }
 
--- World layout. The beach runs along +X starting at the shop (X = 0).
--- Dry sand is at Z < 0, the sea is at Z > 0 and gets deeper the further out you go.
+-- World layout. The shoreline runs along X (the beach is Width studs wide, centred on X = 0).
+-- The shop and dunes are at Z < 0. From Z = 0 the sand slopes gently down into the sea toward
+-- +Z, and the zones are bands running out to sea: zone 1 nearest the shop, the last zone
+-- furthest out, only uncovered at low tide.
 Config.Beach = {
-	ZoneLength = 400, -- studs per zone (full game: 5 zones over ~2,000-2,500 studs)
-	ActiveZones = 3, -- test build only builds and tides over the first 3 zones
-	DryWidth = 70, -- dry sand between the dunes and the waterline
-	ShopLength = 110, -- shop area at X < 0
-	SlopeRun = 60, -- seabed slopes down over this many studs from the waterline...
-	SlopeDrop = 5, -- ...dropping this far
-	SeaExtent = 260, -- how far the sea floor extends past the waterline
-	WaterLevel = 1, -- Y of the sea surface
+	Width = 320, -- studs along the shoreline
+	ZoneLength = 200, -- studs each zone runs out to sea
+	ActiveZones = 3, -- test build only uses the first 3 zones
+	ShopDepth = 80, -- dry ground behind Z = 0 for the shop and boardwalk
+	Slope = 0.06, -- studs of drop per stud out to sea
+	SeaExtent = 300, -- seabed continues this far past the last zone
 
-	-- Depth bands, measured as distance out from the waterline (Z).
-	ShallowEnd = 15,
-	KneeEnd = 30,
-	WaistEnd = 45, -- past this the water is deep: players drown and vessels are lost
-	LostZ = 75, -- loose items that drift past this are gone
+	-- Depth bands, by how deep the water is at a spot.
+	ShallowDepth = 1.5,
+	KneeDepth = 3,
+	WaistDepth = 4.5, -- deeper than this drowns players and swallows vessels
+	LostDepth = 7, -- unclaimed and loose items this deep are lost to the tide
 }
 
 Config.Zones = {
@@ -50,22 +50,24 @@ Config.Zones = {
 	{ Name = "The Far Sandbar", Multiplier = 15, Rarity = { Rare = 60, VeryRare = 40 } },
 }
 
--- Tide: travels down the beach, holds at the far end, then returns. Times are in seconds
--- and multiplied by TimeScale, so the test build can run a shorter cycle than the full 25 minutes.
+-- Tide: the sea level falls (uncovering the outer zones), holds at low tide, then rises
+-- again. The waterline is where the sea meets the sand, measured as a Z position.
+-- Times are in seconds and multiplied by TimeScale, so the test build can run a shorter
+-- cycle than the full 25 minutes.
 Config.Tide = {
 	OutTime = 600,
 	HoldTime = 300,
 	InTime = 600,
 	TimeScale = 0.4, -- 0.4 => 10 minute cycle for testing. Set to 1 for the real 25 minutes.
-	DeepOffset = 10, -- the first studs past the tide front are wadeable; deeper than that drowns you
-	FloodOffset = 5, -- items this far past the front are lost to the tide
+	HighWaterline = 60, -- waterline Z at high tide (inside zone 1)
+	LowWaterlineFromEnd = 40, -- at low tide the waterline is this far before the end of the last zone
 }
 
 Config.Waves = {
 	Period = 7, -- seconds between waves
 	Speed = 14, -- studs/s the wave front travels toward shore
-	StartZ = 70, -- where each wave starts (out at sea)
-	EndZ = -6, -- how far up the dry sand a wave washes
+	StartOffset = 70, -- where each wave starts, studs seaward of the waterline
+	EndOffset = -6, -- how far up the dry sand past the waterline a wave washes
 	BandWidth = 10, -- thickness of the pushing band behind the front
 	Push = 16, -- studs/s shoreward push at the leading edge
 	Backwash = 4, -- studs/s seaward pull in the water between waves
@@ -79,7 +81,7 @@ Config.Waves = {
 
 Config.Items = {
 	SpawnInterval = 1.25, -- seconds between spawn attempts
-	MaxUnclaimedPerZone = 28,
+	MaxSurfItems = 45, -- unclaimed items kept washing around the current waterline
 	MaxTotal = 450,
 	LooseTimeout = 25, -- a claimed item left alone this long freezes and becomes unclaimed
 	TimedOutLifetime = 90, -- a timed-out item despawns if nobody grabs it within this

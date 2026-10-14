@@ -14,9 +14,10 @@ Tide.ScaleAttribute = "TideTimeScale" -- set by the admin console; overrides Con
 local cfg = Config.Tide
 local beach = Config.Beach
 
--- The tide front never covers zone 1; at full extent it uncovers the far end of the beach.
-Tide.MinFrontX = beach.ZoneLength
-Tide.MaxFrontX = beach.ZoneLength * beach.ActiveZones
+-- Waterline Z at high and low tide. Zone 1 is always partly uncovered; low tide uncovers
+-- most of the last zone.
+Tide.HighWaterline = cfg.HighWaterline
+Tide.LowWaterline = beach.ZoneLength * beach.ActiveZones - cfg.LowWaterlineFromEnd
 
 local function smoothstep(t: number): number
 	t = math.clamp(t, 0, 1)
@@ -45,14 +46,15 @@ export type State = {
 	Phase: "Out" | "Hold" | "In",
 	PhaseProgress: number,
 	PhaseRemaining: number,
-	FrontX: number,
+	Waterline: number, -- Z where the sea meets the sand
+	WaterY: number, -- height of the sea surface
 	Cycle: number,
 }
 
--- Phase "Out": the water is travelling down the beach, uncovering it.
--- Phase "Hold": the far end is reachable.
--- Phase "In": the water is returning toward the shop.
-function Tide.getState(now: number?): State
+-- Phase "Out": the tide is going out, uncovering the outer zones.
+-- Phase "Hold": low tide, the far zone is reachable.
+-- Phase "In": the tide is coming back in toward the shop.
+local function rawState(now: number?): State
 	local outTime, holdTime, inTime = Tide.durations()
 	local length = outTime + holdTime + inTime
 	local elapsed = (now or Tide.now()) - Tide.cycleStart()
@@ -65,8 +67,9 @@ function Tide.getState(now: number?): State
 			Phase = "Out",
 			PhaseProgress = p,
 			PhaseRemaining = outTime - t,
-			FrontX = Tide.MinFrontX + (Tide.MaxFrontX - Tide.MinFrontX) * smoothstep(p),
+			Waterline = Tide.HighWaterline + (Tide.LowWaterline - Tide.HighWaterline) * smoothstep(p),
 			Cycle = cycle,
+			WaterY = 0,
 		}
 	elseif t < outTime + holdTime then
 		local h = t - outTime
@@ -74,8 +77,9 @@ function Tide.getState(now: number?): State
 			Phase = "Hold",
 			PhaseProgress = h / holdTime,
 			PhaseRemaining = holdTime - h,
-			FrontX = Tide.MaxFrontX,
+			Waterline = Tide.LowWaterline,
 			Cycle = cycle,
+			WaterY = 0,
 		}
 	else
 		local i = t - outTime - holdTime
@@ -84,8 +88,9 @@ function Tide.getState(now: number?): State
 			Phase = "In",
 			PhaseProgress = p,
 			PhaseRemaining = inTime - i,
-			FrontX = Tide.MaxFrontX - (Tide.MaxFrontX - Tide.MinFrontX) * smoothstep(p),
+			Waterline = Tide.LowWaterline - (Tide.LowWaterline - Tide.HighWaterline) * smoothstep(p),
 			Cycle = cycle,
+			WaterY = 0,
 		}
 	end
 end
@@ -104,8 +109,15 @@ function Tide.startFor(phase: string, progress: number, now: number?): number
 	return (now or Tide.now()) - offset
 end
 
-function Tide.frontX(now: number?): number
-	return Tide.getState(now).FrontX
+function Tide.getState(now: number?): State
+	local state = rawState(now)
+	-- The beach is a straight slope, so the sea surface is the ground height at the waterline.
+	state.WaterY = -state.Waterline * beach.Slope
+	return state
+end
+
+function Tide.waterline(now: number?): number
+	return rawState(now).Waterline
 end
 
 return Tide

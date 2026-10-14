@@ -338,14 +338,17 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 end
 
 local function tick()
-	local frontX = Tide.frontX()
+	local waterline = Tide.waterline()
 	for player, vessel in vesselOf do
 		local base = vessel.PrimaryPart
 		if not base or not vessel.Parent then
 			destroyVessel(player, nil)
 			continue
 		end
-		if Beach.isDeep(base.Position, frontX) or base.Position.Y < -40 then
+		if
+			Beach.isDeep(base.Position, waterline)
+			or base.Position.Y < Beach.groundY(base.Position.Z) - 30
+		then
 			destroyVessel(
 				player,
 				"Your vessel was lost to the water, along with everything in it. Respawn it free at the shop."

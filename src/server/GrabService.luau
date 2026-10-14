@@ -9,6 +9,7 @@ local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 local Gear = require(Shared.Gear)
 local Remotes = require(Shared.Remotes)
+local Tide = require(Shared.Tide)
 
 local ItemService = require(script.Parent.ItemService)
 local VesselService = require(script.Parent.VesselService)
@@ -61,7 +62,9 @@ local function grabItem(player: Player, item: BasePart, root: BasePart): (boolea
 	if not Gear.canLift(tool, item:GetAttribute("Class") or 1) then
 		return false, "Too heavy for your " .. tool.Name
 	end
-	if state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(item.Position.Z)) then
+	if
+		state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(item.Position, Tide.waterline()))
+	then
 		return false, "Too deep for your " .. tool.Name
 	end
 

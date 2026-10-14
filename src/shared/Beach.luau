@@ -1,21 +1,24 @@
 -- Beach geometry helpers shared by server and client.
+-- Layout: the shoreline runs along X. The shop is at Z < 0 on flat ground; from Z = 0 the
+-- sand slopes down toward +Z into the sea, and the zones are bands running out to sea.
+-- The tide moves the waterline (where sea meets sand) in and out along Z.
 
 local Config = require(script.Parent.Config)
 local Gear = require(script.Parent.Gear)
-local Tide = require(script.Parent.Tide)
 
 local beach = Config.Beach
 
 local Beach = {}
 
-Beach.Length = beach.ZoneLength * beach.ActiveZones
+Beach.Depth = beach.ZoneLength * beach.ActiveZones -- how far out the playable zones reach
+Beach.HalfWidth = beach.Width / 2
 
--- Zone index for an X position: 0 in the shop area, nil past the built beach.
-function Beach.zoneAt(x: number): number?
-	if x < 0 then
+-- Zone index for a Z position: 0 at the shop, nil past the playable zones.
+function Beach.zoneAt(z: number): number?
+	if z < 0 then
 		return 0
 	end
-	local index = math.floor(x / beach.ZoneLength) + 1
+	local index = math.floor(z / beach.ZoneLength) + 1
 	if index > beach.ActiveZones then
 		return nil
 	end
@@ -26,43 +29,51 @@ function Beach.zoneRange(index: number): (number, number)
 	return (index - 1) * beach.ZoneLength, index * beach.ZoneLength
 end
 
--- Height of the sand/seabed surface at a given distance out from the waterline.
+-- Height of the sand/seabed surface at a given Z.
 function Beach.groundY(z: number): number
 	if z <= 0 then
 		return 0
 	end
-	return -math.min(z, beach.SlopeRun) / beach.SlopeRun * beach.SlopeDrop
+	return -z * beach.Slope
 end
 
-function Beach.depthBand(z: number): number
-	if z <= 0 then
+-- Height of the sea surface for a waterline position.
+function Beach.waterY(waterline: number): number
+	return -waterline * beach.Slope
+end
+
+-- How deep the water is over the seabed at a position (0 or less on dry sand).
+function Beach.depthAt(position: Vector3, waterline: number): number
+	return Beach.waterY(waterline) - Beach.groundY(position.Z)
+end
+
+function Beach.depthBand(position: Vector3, waterline: number): number
+	local depth = Beach.depthAt(position, waterline)
+	if depth <= 0 then
 		return Gear.Depth.Dry
-	elseif z < beach.ShallowEnd then
+	elseif depth < beach.ShallowDepth then
 		return Gear.Depth.Shallow
-	elseif z < beach.KneeEnd then
+	elseif depth < beach.KneeDepth then
 		return Gear.Depth.KneeDeep
-	elseif z < beach.WaistEnd then
+	elseif depth < beach.WaistDepth then
 		return Gear.Depth.Waist
 	end
 	return Gear.Depth.Deep
 end
 
--- Deep water drowns players and swallows vessels: far out at sea, or under the tide.
-function Beach.isDeep(position: Vector3, frontX: number): boolean
-	return position.Z >= beach.WaistEnd or position.X > frontX + Config.Tide.DeepOffset
+-- Deep water drowns players and swallows vessels.
+function Beach.isDeep(position: Vector3, waterline: number): boolean
+	return Beach.depthAt(position, waterline) >= beach.WaistDepth
 end
 
-function Beach.isFlooded(position: Vector3, frontX: number): boolean
-	return position.X > frontX + Config.Tide.FloodOffset
+-- Unclaimed and loose items this deep are lost to the tide.
+function Beach.isLost(position: Vector3, waterline: number): boolean
+	return Beach.depthAt(position, waterline) >= beach.LostDepth
 end
 
-function Beach.isInSea(position: Vector3): boolean
-	return position.Z > 0
-end
-
--- Convenience for callers that don't already have the front position.
-function Beach.isDeepNow(position: Vector3): boolean
-	return Beach.isDeep(position, Tide.frontX())
+-- Z where the water reaches a given depth.
+function Beach.zForDepth(depth: number, waterline: number): number
+	return waterline + depth / beach.Slope
 end
 
 return Beach
