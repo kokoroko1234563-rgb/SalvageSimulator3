@@ -219,6 +219,19 @@ function BeachBuilder.build(): Folder
 	label(sellZone, "SELL: drop items or park your vessel here", Vector3.new(0, 5, 0))
 	sellZone.Parent = shop
 
+	local bankPad = makePart({
+		Name = "BankPad",
+		Size = Vector3.new(14, 0.2, 14),
+		CFrame = CFrame.new(0, 1.1, -16),
+		Color = Color3.fromRGB(190, 110, 255),
+		Material = Enum.Material.Neon,
+		Transparency = 0.5,
+		CanCollide = false,
+		CanQuery = false,
+	})
+	label(bankPad, "BANK: bring unlock items here to keep them safe", Vector3.new(0, 4, 0))
+	bankPad.Parent = shop
+
 	local vesselPad = makePart({
 		Name = "VesselPad",
 		Size = Vector3.new(16, 0.2, 16),

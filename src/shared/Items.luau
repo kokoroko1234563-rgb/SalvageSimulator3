@@ -12,6 +12,7 @@ local Items = {}
 Items.Rarities = { "Common", "Uncommon", "Rare", "VeryRare" }
 
 Items.RarityColors = {
+	Unlock = Color3.fromRGB(255, 205, 60),
 	Common = Color3.fromRGB(235, 235, 235),
 	Uncommon = Color3.fromRGB(120, 220, 120),
 	Rare = Color3.fromRGB(90, 160, 255),
@@ -89,6 +90,29 @@ Items.Catalog = {
 		Shape = "Ball",
 		Color = Color3.fromRGB(250, 250, 255),
 		Material = Enum.Material.SmoothPlastic,
+	},
+	{
+		Id = "BeachBall",
+		Name = "Beach Ball",
+		Class = Light,
+		Rarity = "Common",
+		Value = 7,
+		Size = Vector3.new(1.6, 1.6, 1.6),
+		Shape = "Ball",
+		Color = Color3.fromRGB(255, 90, 90),
+	},
+	-- Unlock items: never rolled as normal loot, never sold, banked at the shore.
+	{
+		Id = "GoldenSpade",
+		Name = "Golden Spade",
+		Class = Light,
+		Rarity = "Unlock",
+		Unlock = "SandcastleFlats",
+		Value = 0,
+		Size = Vector3.new(0.6, 0.4, 2.6),
+		Shape = "Block",
+		Color = Color3.fromRGB(255, 200, 50),
+		Material = Enum.Material.Foil,
 	},
 	-- Medium
 	{
@@ -188,7 +212,9 @@ for _, rarity in Items.Rarities do
 end
 for _, item in Items.Catalog do
 	byId[item.Id] = item
-	table.insert(byRarity[item.Rarity], item)
+	if byRarity[item.Rarity] then
+		table.insert(byRarity[item.Rarity], item)
+	end
 end
 
 function Items.get(id: string)

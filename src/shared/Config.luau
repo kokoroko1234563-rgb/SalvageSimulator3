@@ -9,7 +9,7 @@ Config.MaxPlayers = 20
 -- The place owner (or rank 254+ in the owning group) is always an admin, and anyone
 -- testing in Studio is too.
 Config.Admins = {
-	UserIds = {} :: { number },
+	UserIds = { 430130259 } :: { number },
 	AllowOwner = true,
 	OwnerGroupMinRank = 254,
 	AllowStudio = true,
@@ -77,6 +77,37 @@ Config.Waves = {
 	ItemFactor = 2.5, -- multiplier on push for physical items (acceleration)
 	Buoyancy = 0.55, -- fraction of gravity cancelled for submerged items
 	MinPushFraction = 0.3, -- future stat stacking can never reduce waves below this
+}
+
+-- Biomes: each tide cycle, every zone rolls whether it becomes a biome (see Biomes.luau).
+Config.Biomes = {
+	RollChance = 0.5, -- test build: each zone has this chance of rolling Sandcastle Flats per cycle
+}
+
+-- Rare unlock items for secrets.
+Config.Unlocks = {
+	SpawnChance = 0.02, -- chance that a surf spawn in a biome zone is that biome's unlock item
+	MaxOnMap = 1, -- of each unlock item at once
+}
+
+Config.Secrets = {
+	Origin = Vector3.new(-6000, 500, -3000), -- courses are built far off the map, one per player slot
+	Spacing = 400,
+	ReadyTimeout = 5, -- seconds to wait for the client to build the course
+	MinRunTime = 12, -- a chest claimed faster than this is rejected as implausible
+	MinFlood = 60, -- the course floods over at least this many seconds...
+	MaxFlood = 180, -- ...and at most this many, depending on when in the tide cycle you enter
+}
+
+Config.Rebirth = {
+	BaseCost = 100000,
+	CostGrowth = 1.5, -- each rebirth costs this much more than the last
+	MultiplierStep = 0.5, -- coin multiplier gained per rebirth
+	MaxPicks = 5, -- reward picks at the first 5 rebirths
+}
+
+Config.Pockets = {
+	Slots = 3,
 }
 
 Config.Items = {

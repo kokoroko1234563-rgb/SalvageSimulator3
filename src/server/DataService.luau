@@ -13,6 +13,9 @@ local RunService = game:GetService("RunService")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
+local Items = require(Shared.Items)
+local Rebirth = require(Shared.Rebirth)
+local Secrets = require(Shared.Secrets)
 
 local cfg = Config.Data
 
@@ -23,6 +26,11 @@ export type Profile = {
 	Coins: number,
 	Tools: { [string]: boolean },
 	Vessels: { [string]: boolean },
+	Rebirths: number,
+	Rewards: { [string]: boolean },
+	PendingPick: { string }?, -- reward options waiting for the player to choose one
+	UnlockItems: { [string]: number }, -- banked unlock items by item id
+	ColoredCoins: { [string]: boolean },
 }
 
 local function defaultProfile(): Profile
@@ -31,6 +39,11 @@ local function defaultProfile(): Profile
 		Coins = 0,
 		Tools = { BareHands = true },
 		Vessels = {},
+		Rebirths = 0,
+		Rewards = {},
+		PendingPick = nil,
+		UnlockItems = {},
+		ColoredCoins = {},
 	}
 end
 
@@ -66,6 +79,40 @@ local function reconcile(data: any): Profile
 			end
 		end
 	end
+	if type(data.Rebirths) == "number" then
+		profile.Rebirths = math.max(0, math.floor(data.Rebirths))
+	end
+	if type(data.Rewards) == "table" then
+		for id, owned in data.Rewards do
+			if owned == true and Rebirth.Rewards[id] then
+				profile.Rewards[id] = true
+			end
+		end
+	end
+	if type(data.PendingPick) == "table" then
+		local pick = {}
+		for _, id in data.PendingPick do
+			if Rebirth.Rewards[id] and not profile.Rewards[id] then
+				table.insert(pick, id)
+			end
+		end
+		profile.PendingPick = if #pick > 0 then pick else nil
+	end
+	if type(data.UnlockItems) == "table" then
+		for id, count in data.UnlockItems do
+			local def = Items.get(id)
+			if def and def.Unlock and type(count) == "number" and count > 0 then
+				profile.UnlockItems[id] = math.floor(count)
+			end
+		end
+	end
+	if type(data.ColoredCoins) == "table" then
+		for color, owned in data.ColoredCoins do
+			if owned == true and Secrets.CoinColors[color] then
+				profile.ColoredCoins[color] = true
+			end
+		end
+	end
 	return profile
 end
 
@@ -75,6 +122,11 @@ local function serialize(profile: Profile, release: boolean)
 		Coins = profile.Coins,
 		Tools = profile.Tools,
 		Vessels = profile.Vessels,
+		Rebirths = profile.Rebirths,
+		Rewards = profile.Rewards,
+		PendingPick = profile.PendingPick,
+		UnlockItems = profile.UnlockItems,
+		ColoredCoins = profile.ColoredCoins,
 		Lock = if release then nil else { JobId = game.JobId, Time = os.time() },
 	}
 end
@@ -89,6 +141,11 @@ local function csv(set: { [string]: boolean }, list): string
 	return table.concat(ids, ",")
 end
 
+local rewardList = {}
+for _, id in Rebirth.Order do
+	table.insert(rewardList, Rebirth.Rewards[id])
+end
+
 -- Mirrors the profile onto player attributes so clients can show it.
 local function publish(player: Player)
 	local profile = profiles[player]
@@ -99,6 +156,23 @@ local function publish(player: Player)
 	player:SetAttribute("Tool", Gear.bestTool(profile.Tools).Id)
 	player:SetAttribute("OwnedTools", csv(profile.Tools, Gear.Tools))
 	player:SetAttribute("OwnedVessels", csv(profile.Vessels, Gear.Vessels))
+	player:SetAttribute("Rebirths", profile.Rebirths)
+	player:SetAttribute("Multiplier", Rebirth.multiplier(profile.Rebirths))
+	player:SetAttribute("Rewards", csv(profile.Rewards, rewardList))
+	player:SetAttribute("PendingPick", table.concat(profile.PendingPick or {}, ","))
+	local unlocks = {}
+	for id, count in profile.UnlockItems do
+		table.insert(unlocks, id .. ":" .. count)
+	end
+	table.sort(unlocks)
+	player:SetAttribute("UnlockItems", table.concat(unlocks, ","))
+	local coins = {}
+	for _, color in Secrets.CoinOrder do
+		if profile.ColoredCoins[color] then
+			table.insert(coins, color)
+		end
+	end
+	player:SetAttribute("ColoredCoins", table.concat(coins, ","))
 end
 
 local function load(player: Player): (Profile?, boolean)
@@ -193,6 +267,9 @@ local function save(player: Player, release: boolean): boolean
 	return false
 end
 
+-- Call after changing a profile directly, so clients see the change.
+DataService.changed = publish
+
 function DataService.get(player: Player): Profile?
 	return profiles[player]
 end
@@ -237,6 +314,25 @@ function DataService.trySpend(player: Player, amount: number): boolean
 	profile.Coins -= amount
 	publish(player)
 	return true
+end
+
+function DataService.grantUnlock(player: Player, id: string, count: number)
+	local profile = profiles[player]
+	if profile then
+		profile.UnlockItems[id] = math.max(0, (profile.UnlockItems[id] or 0) + count)
+		if profile.UnlockItems[id] == 0 then
+			profile.UnlockItems[id] = nil
+		end
+		publish(player)
+	end
+end
+
+function DataService.grantColoredCoin(player: Player, color: string)
+	local profile = profiles[player]
+	if profile then
+		profile.ColoredCoins[color] = true
+		publish(player)
+	end
 end
 
 function DataService.grantTool(player: Player, id: string)

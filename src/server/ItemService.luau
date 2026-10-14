@@ -15,6 +15,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
+local Biomes = require(Shared.Biomes)
 local Items = require(Shared.Items)
 local Tide = require(Shared.Tide)
 local Waves = require(Shared.Waves)
@@ -155,6 +156,16 @@ function ItemService.setInVessel(item: BasePart, vesselId: string, owner: Player
 	trySetNetworkOwner(item, owner)
 end
 
+function ItemService.countOf(itemId: string): number
+	local count = 0
+	for item in all do
+		if item:GetAttribute("ItemId") == itemId then
+			count += 1
+		end
+	end
+	return count
+end
+
 function ItemService.itemsOwnedBy(player: Player): { BasePart }
 	local result = {}
 	for item in all do
@@ -187,6 +198,18 @@ local function createItem(def, zoneIndex: number, position: Vector3): BasePart
 	part:SetAttribute("Rarity", def.Rarity)
 	part:SetAttribute("Zone", zoneIndex)
 	part:SetAttribute("Value", math.floor(def.Value * Config.Zones[zoneIndex].Multiplier))
+	if def.Unlock then
+		-- Unlock items glow so they're findable, and are banked rather than sold.
+		part:SetAttribute("Unlock", def.Unlock)
+		local light = Instance.new("PointLight")
+		light.Color = def.Color
+		light.Range = 10
+		light.Brightness = 2
+		light.Parent = part
+		local sparkles = Instance.new("Sparkles")
+		sparkles.SparkleColor = def.Color
+		sparkles.Parent = part
+	end
 	ItemService.setUnclaimed(part, false)
 	CollectionService:AddTag(part, ItemService.Tag)
 	part.Parent = folder
@@ -213,20 +236,34 @@ function ItemService.spawnInSurf(waterline: number): BasePart?
 		return nil
 	end
 
-	local rarity = Items.rollRarity(Config.Zones[zoneIndex].Rarity, rng)
-	local choices = {}
-	for _, def in Items.ofRarity(rarity) do
-		-- Only heavy items in the deeper spots, only lighter ones in the shallows.
-		if (def.Class >= 3) == (heavyRoll < 0.3) then
-			table.insert(choices, def)
+	local x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
+
+	-- A biome zone sometimes washes up its secret's unlock item, and mostly its own loot.
+	local biome = Biomes.activeIn(zoneIndex)
+	local def
+	if biome and biome.UnlockItem and rng:NextNumber() < Config.Unlocks.SpawnChance then
+		if ItemService.countOf(biome.UnlockItem) < Config.Unlocks.MaxOnMap then
+			def = Items.get(biome.UnlockItem)
 		end
 	end
-	if #choices == 0 then
-		return nil
+	if not def and biome and rng:NextNumber() < biome.LootShare then
+		def = Items.get(biome.Loot[rng:NextInteger(1, #biome.Loot)])
 	end
-	local def = choices[rng:NextInteger(1, #choices)]
+	if not def then
+		local rarity = Items.rollRarity(Config.Zones[zoneIndex].Rarity, rng)
+		local choices = {}
+		for _, candidate in Items.ofRarity(rarity) do
+			-- Only heavy items in the deeper spots, only lighter ones in the shallows.
+			if (candidate.Class >= 3) == (heavyRoll < 0.3) then
+				table.insert(choices, candidate)
+			end
+		end
+		if #choices == 0 then
+			return nil
+		end
+		def = choices[rng:NextInteger(1, #choices)]
+	end
 
-	local x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
 	local y = Beach.groundY(z) + def.Size.Y / 2
 	return createItem(def, zoneIndex, Vector3.new(x, y, z))
 end

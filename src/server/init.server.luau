@@ -1,4 +1,4 @@
--- Salvage Simulator 3, Milestone 1 server entry point.
+-- Salvage Simulator 3 server entry point (Milestones 1 and 2).
 
 local Workspace = game:GetService("Workspace")
 
@@ -8,11 +8,15 @@ local Tide = require(Shared.Tide)
 
 local AdminService = require(script.AdminService)
 local BeachBuilder = require(script.BeachBuilder)
+local BiomeService = require(script.BiomeService)
 local CollisionGroups = require(script.CollisionGroups)
 local DataService = require(script.DataService)
 local DrowningService = require(script.DrowningService)
 local GrabService = require(script.GrabService)
 local ItemService = require(script.ItemService)
+local PocketService = require(script.PocketService)
+local RebirthService = require(script.RebirthService)
+local SecretService = require(script.SecretService)
 local ShopService = require(script.ShopService)
 local VesselService = require(script.VesselService)
 
@@ -34,6 +38,10 @@ DataService.init()
 ItemService.init(map)
 VesselService.init(notify)
 GrabService.init(notify)
+PocketService.init(notify)
 ShopService.init(map, notify)
 DrowningService.init()
+SecretService.init(notify)
+BiomeService.init(SecretService.tryEnter)
+RebirthService.init(notify, ShopService.nearShop)
 AdminService.init()

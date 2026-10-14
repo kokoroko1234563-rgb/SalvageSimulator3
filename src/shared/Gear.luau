@@ -147,6 +147,16 @@ Gear.Vessels = {
 		Note = "Fastest and most stable",
 		Available = false,
 	},
+	{
+		-- Magical vessel from a rebirth reward: never sold in the shop, kept through rebirths.
+		Id = "FloatingClamshell",
+		Name = "Floating Clamshell",
+		Price = 0,
+		Capacity = 8,
+		Note = "Magical: hovers behind you, never tips",
+		Available = false,
+		Magical = true,
+	},
 }
 
 local toolsById = {}

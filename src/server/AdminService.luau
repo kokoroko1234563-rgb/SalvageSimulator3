@@ -7,6 +7,9 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
+local Biomes = require(Shared.Biomes)
+local Rebirth = require(Shared.Rebirth)
+local Secrets = require(Shared.Secrets)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
@@ -14,7 +17,9 @@ local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
 local Waves = require(Shared.Waves)
 
+local BiomeService = require(script.Parent.BiomeService)
 local DataService = require(script.Parent.DataService)
+local RebirthService = require(script.Parent.RebirthService)
 local ItemService = require(script.Parent.ItemService)
 local VesselService = require(script.Parent.VesselService)
 
@@ -454,6 +459,194 @@ command("kick", "kick <player> [reason]", "Kick a player", function(caller, args
 			target:Kick(if reason ~= "" then reason else "Kicked by an admin")
 			table.insert(lines, "Kicked " .. target.Name)
 		end
+	end) or lines
+end)
+
+command("biomes", "biomes", "Show each zone's biome and the biomes that exist", function()
+	local lines = {}
+	for zone = 1, Config.Beach.ActiveZones do
+		local biome = Biomes.activeIn(zone)
+		table.insert(lines, string.format("Zone %d: %s", zone, if biome then biome.Name else "(none)"))
+	end
+	local biomeIds = {}
+	for id in Biomes.List do
+		table.insert(biomeIds, id)
+	end
+	table.sort(biomeIds)
+	table.insert(lines, "Biomes: " .. table.concat(biomeIds, ", "))
+	return lines
+end)
+
+command(
+	"biome",
+	"biome <zone|all> <biome|none|reroll>",
+	"Set a zone's biome, e.g. biome 2 sandcastle, biome all none, biome all reroll",
+	function(_, args)
+		local which, choice = (args[1] or ""):lower(), (args[2] or ""):lower()
+		if which == "" or choice == "" then
+			return { "Usage: biome <zone|all> <biome|none|reroll>" }
+		end
+		if choice == "reroll" then
+			BiomeService.reroll()
+			return { "Rerolled every zone. Type biomes to see the result." }
+		end
+		local biomeId: string? = nil
+		if choice ~= "none" then
+			local biome = Biomes.find(choice)
+			if not biome then
+				return { "Unknown biome '" .. choice .. "'. Type biomes for the list." }
+			end
+			biomeId = biome.Id
+		end
+		local zones = {}
+		if which == "all" then
+			for zone = 1, Config.Beach.ActiveZones do
+				table.insert(zones, zone)
+			end
+		else
+			local zone = tonumber(which)
+			if not zone or zone < 1 or zone > Config.Beach.ActiveZones then
+				return { "Zone must be 1-" .. Config.Beach.ActiveZones .. " or all" }
+			end
+			table.insert(zones, math.floor(zone))
+		end
+		for _, zone in zones do
+			BiomeService.set(zone, biomeId)
+		end
+		return {
+			string.format(
+				"Zone %s is now %s (until the next tide cycle rerolls it)",
+				which,
+				if biomeId then Biomes.List[biomeId].Name else "no biome"
+			),
+		}
+	end
+)
+
+command(
+	"unlock",
+	"unlock <item> [count] [player]",
+	"Bank unlock items, e.g. unlock goldenspade 3",
+	function(caller, args)
+		local defs = findItems(args[1] or "")
+		local def = defs[1]
+		if not def or not def.Unlock then
+			return { "Usage: unlock <item> [count] [player], e.g. unlock goldenspade" }
+		end
+		local count = math.floor(tonumber(args[2]) or 1)
+		local lines = {}
+		return eachTarget(caller, args[3], function(target)
+			DataService.grantUnlock(target, def.Id, count)
+			table.insert(lines, string.format("%s: %+d %s (banked)", target.Name, count, def.Name))
+		end) or lines
+	end
+)
+
+command(
+	"colorcoin",
+	"colorcoin <color|all|none> [player]",
+	"Give or clear colored coins",
+	function(caller, args)
+		local choice = (args[1] or ""):lower()
+		local colors = {}
+		if choice == "all" or choice == "none" then
+			colors = Secrets.CoinOrder
+		else
+			for _, color in Secrets.CoinOrder do
+				if color:lower() == choice then
+					colors = { color }
+				end
+			end
+		end
+		if #colors == 0 then
+			return { "Usage: colorcoin <yellow|orange|blue|green|pink|all|none> [player]" }
+		end
+		local lines = {}
+		return eachTarget(caller, args[2], function(target)
+			local profile = DataService.get(target)
+			if profile then
+				for _, color in colors do
+					profile.ColoredCoins[color] = if choice == "none" then nil else true
+				end
+				DataService.changed(target)
+				table.insert(lines, target.Name .. ": coins updated")
+			end
+		end) or lines
+	end
+)
+
+command(
+	"rebirth",
+	"rebirth [player]",
+	"Rebirth for free (normal reset and reward pick)",
+	function(caller, args)
+		local lines = {}
+		return eachTarget(caller, args[1], function(target)
+			local ok, reason = RebirthService.rebirth(target, true)
+			table.insert(lines, target.Name .. ": " .. (if ok then "reborn" else tostring(reason)))
+		end) or lines
+	end
+)
+
+command("rebirths", "rebirths <n> [player]", "Set the rebirth count (and multiplier)", function(caller, args)
+	local n = tonumber(args[1])
+	if not n then
+		return { "Usage: rebirths <n> [player]" }
+	end
+	local lines = {}
+	return eachTarget(caller, args[2], function(target)
+		local profile = DataService.get(target)
+		if profile then
+			profile.Rebirths = math.max(0, math.floor(n))
+			DataService.changed(target)
+			table.insert(
+				lines,
+				string.format(
+					"%s: %d rebirths (x%.1f)",
+					target.Name,
+					profile.Rebirths,
+					Rebirth.multiplier(profile.Rebirths)
+				)
+			)
+		end
+	end) or lines
+end)
+
+command("reward", "reward <id|all|none> [player]", "Grant or clear rebirth rewards", function(caller, args)
+	local choice = (args[1] or ""):lower():gsub("[%s%-_]", "")
+	local ids = {}
+	if choice == "all" or choice == "none" then
+		ids = Rebirth.Order
+	else
+		for _, id in Rebirth.Order do
+			if id:lower() == choice then
+				ids = { id }
+			end
+		end
+	end
+	if #ids == 0 then
+		return { "Usage: reward <swiftfeet|deeppockets|floatingclamshell|all|none> [player]" }
+	end
+	local lines = {}
+	return eachTarget(caller, args[2], function(target)
+		local profile = DataService.get(target)
+		if not profile then
+			return
+		end
+		for _, id in ids do
+			if choice == "none" then
+				profile.Rewards[id] = nil
+				if id == "FloatingClamshell" then
+					profile.Vessels.FloatingClamshell = nil
+				end
+			else
+				RebirthService.grantReward(target, id)
+			end
+		end
+		profile.PendingPick = nil
+		DataService.changed(target)
+		RebirthService.applyEffects(target)
+		table.insert(lines, target.Name .. ": rewards updated")
 	end) or lines
 end)
 

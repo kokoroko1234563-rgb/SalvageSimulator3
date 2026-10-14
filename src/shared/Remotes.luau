@@ -10,6 +10,8 @@ local FUNCTIONS = {
 	"Buy", -- (category, id) -> ok, reason
 	"SpawnVessel", -- (id) -> ok, reason
 	"AdminCommand", -- (commandLine) -> { output lines } (admins only)
+	"Rebirth", -- () -> ok, reason
+	"ChooseReward", -- (rewardId) -> ok, reason
 }
 
 local EVENTS = {
@@ -17,6 +19,10 @@ local EVENTS = {
 	"SendToVessel", -- client -> server (part)
 	"Notify", -- server -> client (text, kind?)
 	"OpenShop", -- server -> client ()
+	"SecretEvent", -- server -> client ("start", info) | ("end")
+	"SecretReady", -- client -> server () course built, ready to teleport
+	"ClaimChest", -- client -> server ()
+	"Pocket", -- client -> server ("store", part) | ("drop")
 }
 
 local Remotes = {}

@@ -133,6 +133,7 @@ local builders = {}
 local stability = {
 	Wheelbarrow = 0.6,
 	BeachWagon = 1.2,
+	FloatingClamshell = 1,
 }
 
 -- One wheel at the front, two legs at the back: tips easily, lifts by the handles.
@@ -161,6 +162,41 @@ function builders.Wheelbarrow(model: Model, at: CFrame)
 	)
 	weld(base, handle)
 	wheel(model, base, "FrontWheel", Vector3.new(0, -1, -3), 1.8, 0.5)
+	return handle
+end
+
+-- Magical: a pearly shell that hovers behind its owner (driven by the owner's client, see
+-- GrabController). No wheels or skids; the handle only exists so the model has one.
+function builders.FloatingClamshell(model: Model, at: CFrame)
+	local color = Color3.fromRGB(255, 220, 230)
+	local base = tray(model, at * CFrame.new(0, 3, 0), Vector3.new(5, 0, 5), 1.2, color)
+	for _, child in model:GetChildren() do
+		if child:IsA("BasePart") and child.Name ~= "Cargo" then
+			child.Material = Enum.Material.Pearl
+		end
+	end
+	local lid = part(
+		model,
+		"Lid",
+		Vector3.new(5.6, 0.3, 3),
+		base.CFrame * CFrame.new(0, 2.6, 3.4) * CFrame.Angles(math.rad(-55), 0, 0),
+		color,
+		{ Material = Enum.Material.Pearl, CanCollide = false }
+	)
+	weld(base, lid)
+	local glow = Instance.new("PointLight")
+	glow.Color = Color3.fromRGB(255, 200, 255)
+	glow.Range = 8
+	glow.Parent = base
+	local handle = part(
+		model,
+		"Handle",
+		Vector3.new(1, 0.3, 1),
+		base.CFrame * CFrame.new(0, -0.2, 0),
+		color,
+		{ Transparency = 1, CanCollide = false }
+	)
+	weld(base, handle)
 	return handle
 end
 
@@ -300,6 +336,17 @@ local function destroyVessel(player: Player, reason: string?)
 end
 
 -- `at` is where the bottom of the vessel goes; defaults to the shop's vessel pad.
+-- Removes the player's vessel; anything in it is dropped as loose items.
+function VesselService.despawn(player: Player)
+	local vessel = VesselService.getVessel(player)
+	if vessel then
+		for _, item in VesselService.contents(vessel) do
+			ItemService.setLoose(item)
+		end
+	end
+	destroyVessel(player, nil)
+end
+
 function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolean, string?)
 	local def = Gear.getVessel(kind)
 	local build = def and builders[kind]
@@ -332,6 +379,7 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 	model:SetAttribute("Owner", player.UserId)
 	model:SetAttribute("Capacity", def.Capacity)
 	model:SetAttribute("Stability", stability[def.Id] or 1)
+	model:SetAttribute("Hover", def.Magical == true)
 	handle:SetAttribute("VesselId", vesselId)
 	-- A little above its resting height, so the wheelbarrow's legs lift clear of the sand.
 	handle:SetAttribute("HandleHeight", handle.Position.Y - origin.Position.Y + 0.5)
