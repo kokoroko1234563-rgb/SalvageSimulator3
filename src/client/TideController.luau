@@ -63,7 +63,7 @@ function TideController.init()
 	foam.Parent = folder
 
 	local lastPhase: string? = nil
-	local lastZone: number? = -1
+	local lastZone: number? = -2
 
 	RunService.RenderStepped:Connect(function()
 		local state = Tide.getState()
@@ -83,10 +83,15 @@ function TideController.init()
 		local character = player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if root then
-			local zone = Beach.zoneAt(root.Position.Z)
+			-- Secret courses are built high above everything, far off the map.
+			local zone = if root.Position.Y > Config.Secrets.Origin.Y - 100
+				then -1
+				else Beach.zoneAt(root.Position.Z)
 			if zone ~= lastZone then
 				lastZone = zone
-				if zone == 0 then
+				if zone == -1 then
+					HUD.setZone("A secret")
+				elseif zone == 0 then
 					HUD.setZone("The Shop")
 				elseif zone then
 					local info = Config.Zones[zone]

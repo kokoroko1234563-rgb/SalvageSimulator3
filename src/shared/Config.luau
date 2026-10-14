@@ -137,6 +137,8 @@ Config.Grab = {
 	BrakeAcceleration = 30,
 	BrakeSlip = 3, -- if waves shove a parked vessel this far, it re-parks where it ended up
 	StabilizerTorque = 600, -- per unit of mass, times the vessel's Stability; keeps vessels upright
+	HoverHeight = 3.5, -- the Floating Clamshell hovers this high, behind its owner
+	HoverAcceleration = 400,
 }
 
 Config.Drowning = {

@@ -35,6 +35,15 @@ Test with **Test → Clients and Servers** (2 or more players) to check bumping 
 | Drowning | `DrowningService`: you lose breath in water deeper than waist height, which moves in and out with the tide, and then take damage. What you were carrying drops when you die. |
 | Saving | `DataService`: coins and gear are saved with UpdateAsync and a session lock, with retries, on PlayerRemoving, BindToClose and every 2 minutes. |
 
+## What's in Milestone 2
+
+| Doc item | Where |
+| --- | --- |
+| Biomes | `BiomeService` rolls each zone every tide cycle (test build: Sandcastle Flats or nothing, `Config.Biomes.RollChance`). A biome zone gets sandcastle decor, mostly its own loot (`Biomes.luau`), and the giant sandcastle with the secret's door. |
+| Unlock item | The Golden Spade sometimes washes up in a Sandcastle Flats zone (`Config.Unlocks`). It glows, can be bumped and lost like any item, and is only safe once dropped on the purple **bank pad** at the shore. It is never sold. |
+| Secret course | Use a banked spade at the sandcastle door (always used up). You go to your own copy of the Sandcastle Vault, built only on your client (`SecretController`, layout in `Secrets.luau`): a spiral climb while the sea floods in. The flood time depends on when the real tide would cover the door. `SecretService` verifies the run from your position (checkpoints in order, above the water, plausible time, at the chest) before granting the yellow coin. |
+| Rebirth | In the shop: costs 100,000 coins, ×1.5 more each time. Resets coins, tools and shop vessels, adds ×0.5 coin multiplier. At each of the first 5 rebirths you pick a reward you don't have yet: Swift Feet, Deep Pockets (press **Q** or **Pocket** to pocket a Light item; pockets sell on the sell pad) or the Floating Clamshell (a magical vessel that hovers behind you). |
+
 All tuning numbers are in `src/shared/Config.luau`, `Gear.luau` and `Items.luau`.
 
 ## Admin console
@@ -58,6 +67,12 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `tp <shop\|zone\|player> [who]` | Teleport |
 | `heal`, `god`, `speed <n>` | Health/breath, toggle no-drowning, walk speed |
 | `resetdata <player>`, `kick <player> [reason]` | Wipe a save, kick |
+| `biomes` | Show each zone's biome and the biomes that exist |
+| `biome <zone\|all> <biome\|none\|reroll>` | e.g. `biome 1 sandcastle`, `biome all none`, `biome all reroll` |
+| `unlock <item> [count] [player]` | Bank unlock items, e.g. `unlock goldenspade 3` |
+| `colorcoin <color\|all\|none> [player]` | Give or clear colored coins |
+| `rebirth [player]`, `rebirths <n> [player]` | Free rebirth (with reward pick), or set the count |
+| `reward <id\|all\|none> [player]` | `swiftfeet`, `deeppockets`, `floatingclamshell` |
 
 Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down recalls history.
 

@@ -19,6 +19,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
+local Rebirth = require(Shared.Rebirth)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
@@ -135,9 +136,10 @@ local function grabbableFrom(part: Instance?): (BasePart?, ("item" | "vessel")?)
 	if CollectionService:HasTag(part, "SalvageItem") then
 		return part, "item"
 	end
-	-- Any part of your own vessel tows it by its handle.
+	-- Any part of your own vessel tows it by its handle (hovering magical vessels follow you
+	-- on their own and can't be towed).
 	local vessel = ownVesselFrom(part)
-	if vessel then
+	if vessel and not vessel:GetAttribute("Hover") then
 		for _, child in vessel:GetChildren() do
 			if CollectionService:HasTag(child, "VesselHandle") then
 				return child :: BasePart, "vessel"
@@ -208,6 +210,22 @@ local function loadedMass(vessel: Model): number
 	return mass
 end
 
+local function hasReward(id: string): boolean
+	return string.find("," .. (player:GetAttribute("Rewards") or "") .. ",", "," .. id .. ",", 1, true) ~= nil
+end
+
+-- Whether the held item could go in Deep Pockets (the server checks again).
+local function canPocket(): boolean
+	local current = held
+	if not current or current.kind ~= "item" or not hasReward("DeepPockets") then
+		return false
+	end
+	local part = current.part
+	return part:GetAttribute("Class") == Gear.WeightClass.Light
+		and not part:GetAttribute("Unlock")
+		and (player:GetAttribute("Pockets") or 0) < Config.Pockets.Slots
+end
+
 local function cleanup()
 	if not held then
 		return
@@ -227,6 +245,19 @@ function GrabController.release()
 	if current.kind == "item" then
 		releaseRemote:FireServer(current.part)
 	end
+end
+
+-- Deep Pockets: put the held Light item in your pockets. The server destroys the item,
+-- and update() notices it's gone and cleans up.
+function GrabController.pocket()
+	local current = held
+	if not current or current.kind ~= "item" then
+		return
+	end
+	if not hasReward("DeepPockets") then
+		return
+	end
+	Remotes.get("Pocket"):FireServer("store", current.part)
 end
 
 function GrabController.sendToVessel()
@@ -262,6 +293,7 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 	align.Attachment0 = attachment
 	align.Responsiveness = 25
 	align.MaxVelocity = 60
+		* (if hasReward("SwiftFeet") and kind == "vessel" then Rebirth.SwiftFeetSpeed else 1)
 	if kind == "item" then
 		align.ApplyAtCenterOfMass = true
 		-- part.Mass, not AssemblyMass: the item may still read as anchored on this client for a
@@ -285,6 +317,21 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 		startedAt = os.clock(),
 		farFor = 0,
 	}
+end
+
+-- Height of the map surface (sand, seabed or boardwalk) under a position.
+local function groundBelow(position: Vector3): number
+	local map = Workspace:FindFirstChild("Map")
+	if map then
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { map }
+		local hit = Workspace:Raycast(position + Vector3.new(0, 30, 0), Vector3.new(0, -100, 0), params)
+		if hit then
+			return hit.Position.Y
+		end
+	end
+	return Beach.groundY(position.Z)
 end
 
 -- Parking brake: while you aren't towing your vessel, hold it where you left it so it
@@ -354,12 +401,32 @@ local function updateBrake()
 	end
 
 	local current = brake :: any
+	local mass = loadedMass(vessel)
+
+	-- Magical hovering vessel: follow behind the player, upright and facing the same way.
+	if vessel:GetAttribute("Hover") then
+		local root = getRoot()
+		if root then
+			local look = root.CFrame.LookVector
+			local flatLook = Vector3.new(look.X, 0, look.Z).Unit
+			local spot = root.Position - flatLook * 7
+			current.align.Position = Vector3.new(spot.X, groundBelow(spot) + grabCfg.HoverHeight, spot.Z)
+			current.upright.CFrame =
+				CFrame.fromMatrix(Vector3.zero, Vector3.yAxis, flatLook:Cross(Vector3.yAxis))
+		end
+		local force = mass * grabCfg.HoverAcceleration
+		current.align.MaxAxesForce = Vector3.new(force, force, force)
+		current.align.Enabled = true
+		current.upright.PrimaryAxisOnly = false
+		current.upright.MaxTorque = mass * grabCfg.StabilizerTorque * 3
+		return
+	end
+
 	local towing = held ~= nil and held.kind == "vessel"
 	local offset = base.Position - current.park
 	if towing or Vector3.new(offset.X, 0, offset.Z).Magnitude > grabCfg.BrakeSlip then
 		current.park = base.Position
 	end
-	local mass = loadedMass(vessel)
 	local force = mass * grabCfg.BrakeAcceleration
 	current.align.MaxAxesForce = Vector3.new(force, 0, force)
 	current.upright.MaxTorque = mass * grabCfg.StabilizerTorque * (vessel:GetAttribute("Stability") or 1)
@@ -373,22 +440,7 @@ local function enterLifted()
 		return
 	end
 	current.mode = "lifted"
-	HUD.setHoldButtons(true, current.kind == "item" and myVessel() ~= nil)
-end
-
--- Height of the map surface (sand, seabed or boardwalk) under a position.
-local function groundBelow(position: Vector3): number
-	local map = Workspace:FindFirstChild("Map")
-	if map then
-		local params = RaycastParams.new()
-		params.FilterType = Enum.RaycastFilterType.Include
-		params.FilterDescendantsInstances = { map }
-		local hit = Workspace:Raycast(position + Vector3.new(0, 30, 0), Vector3.new(0, -100, 0), params)
-		if hit then
-			return hit.Position.Y
-		end
-	end
-	return Beach.groundY(position.Z)
+	HUD.setHoldButtons(true, current.kind == "item" and myVessel() ~= nil, canPocket())
 end
 
 local function targetPosition(current: Held, root: BasePart): Vector3
@@ -493,7 +545,7 @@ local function update(dt: number)
 		end
 
 		if current.mode == "lifted" then
-			HUD.setHoldButtons(true, myVessel() ~= nil)
+			HUD.setHoldButtons(true, myVessel() ~= nil, canPocket())
 		end
 	end
 end
@@ -724,7 +776,12 @@ function GrabController.init()
 	releaseRemote = Remotes.get("Release")
 	sendRemote = Remotes.get("SendToVessel")
 
-	HUD.bindHoldButtons(GrabController.release, GrabController.sendToVessel)
+	HUD.bindHoldButtons(GrabController.release, GrabController.sendToVessel, GrabController.pocket)
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if not processed and input.KeyCode == Enum.KeyCode.Q then
+			GrabController.pocket()
+		end
+	end)
 
 	UserInputService.InputBegan:Connect(onInputBegan)
 	UserInputService.InputChanged:Connect(onInputChanged)

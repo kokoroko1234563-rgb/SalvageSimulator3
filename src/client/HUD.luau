@@ -7,6 +7,8 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Gear = require(Shared.Gear)
+local Items = require(Shared.Items)
+local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
 
 local player = Players.LocalPlayer
@@ -30,6 +32,10 @@ local shopFrame: Frame
 local shopRows: ScrollingFrame
 local shopCoinsLabel: TextLabel
 
+local pocketFrame: Frame
+local pocketLabel: TextLabel
+local rewardFrame: Frame
+local onPocket: () -> () = function() end
 local onDrop: () -> () = function() end
 local onSendToVessel: () -> () = function() end
 
@@ -87,12 +93,97 @@ local function refreshStats()
 	local tool = Gear.getTool(player:GetAttribute("Tool"))
 	local vesselId = player:GetAttribute("ActiveVessel")
 	local vessel = vesselId and Gear.getVessel(vesselId)
-	statsLabel.Text = string.format(
-		"Coins: %s\nTool: %s\nVessel: %s",
-		formatNumber(player:GetAttribute("Coins") or 0),
-		tool.Name,
-		if vessel then vessel.Name else "Arms"
-	)
+	local lines = {
+		"Coins: " .. formatNumber(player:GetAttribute("Coins") or 0),
+		"Tool: " .. tool.Name,
+		"Vessel: " .. (if vessel then vessel.Name else "Arms"),
+	}
+	local rebirths = player:GetAttribute("Rebirths") or 0
+	if rebirths > 0 then
+		table.insert(
+			lines,
+			string.format("Rebirths: %d (coins x%.1f)", rebirths, player:GetAttribute("Multiplier") or 1)
+		)
+	end
+	for entry in string.gmatch(player:GetAttribute("UnlockItems") or "", "[^,]+") do
+		local id, count = entry:match("^(.-):(%d+)$")
+		local def = id and Items.get(id)
+		if def then
+			table.insert(lines, string.format("Banked: %s x%s", def.Name, count))
+		end
+	end
+	local coins = player:GetAttribute("ColoredCoins") or ""
+	if coins ~= "" then
+		table.insert(lines, "Colored coins: " .. coins:gsub(",", ", "))
+	end
+	statsLabel.Text = table.concat(lines, "\n")
+
+	-- Deep Pockets
+	local hasPockets = string.find(
+		"," .. (player:GetAttribute("Rewards") or "") .. ",",
+		",DeepPockets,",
+		1,
+		true
+	) ~= nil
+	pocketFrame.Visible = hasPockets
+	if hasPockets then
+		local count = player:GetAttribute("Pockets") or 0
+		local contents = player:GetAttribute("PocketItems") or ""
+		pocketLabel.Text =
+			string.format("Pockets %d/3%s", count, if contents ~= "" then ": " .. contents else "")
+	end
+end
+
+-- The reward choice after a rebirth stays up until one is picked.
+local function refreshRewardPick()
+	for _, child in rewardFrame:GetChildren() do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+	local options = {}
+	for id in string.gmatch(player:GetAttribute("PendingPick") or "", "[^,]+") do
+		table.insert(options, id)
+	end
+	rewardFrame.Visible = #options > 0
+	for index, id in options do
+		local reward = Rebirth.Rewards[id]
+		local choice = make("TextButton", {
+			Text = "",
+			BackgroundColor3 = Color3.fromRGB(40, 70, 90),
+			Size = UDim2.new(1, -24, 0, 70),
+			Position = UDim2.new(0, 12, 0, 50 + (index - 1) * 78),
+			AutoButtonColor = true,
+		}, rewardFrame)
+		corner(choice, 8)
+		text({
+			Text = reward.Name .. "  ·  " .. reward.Type,
+			Size = UDim2.new(1, -20, 0, 26),
+			Position = UDim2.fromOffset(10, 6),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextSize = 20,
+			TextStrokeTransparency = 1,
+		}, choice)
+		text({
+			Text = reward.Description,
+			Size = UDim2.new(1, -20, 0, 34),
+			Position = UDim2.fromOffset(10, 32),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			TextWrapped = true,
+			TextSize = 14,
+			Font = Enum.Font.GothamMedium,
+			TextStrokeTransparency = 1,
+			TextColor3 = Color3.fromRGB(190, 210, 225),
+		}, choice)
+		choice.Activated:Connect(function()
+			local ok, reason = Remotes.get("ChooseReward"):InvokeServer(id)
+			if not ok and reason then
+				HUD.notify(reason)
+			end
+		end)
+	end
+	rewardFrame.Size = UDim2.fromOffset(420, 60 + #options * 78)
 end
 
 function HUD.notify(message: string)
@@ -167,15 +258,18 @@ function HUD.setTooltip(message: string?, color: Color3?, screenPosition: Vector
 	tooltip.Position = UDim2.fromOffset(screenPosition.X + 16, screenPosition.Y + 8)
 end
 
-function HUD.setHoldButtons(visible: boolean, canSendToVessel: boolean?)
+function HUD.setHoldButtons(visible: boolean, canSendToVessel: boolean?, canPocket: boolean?)
 	holdButtons.Visible = visible
 	local send = holdButtons:FindFirstChild("SendToVessel") :: TextButton
 	send.Visible = canSendToVessel == true
+	local pocket = holdButtons:FindFirstChild("Pocket") :: TextButton
+	pocket.Visible = canPocket == true
 end
 
-function HUD.bindHoldButtons(drop: () -> (), sendToVessel: () -> ())
+function HUD.bindHoldButtons(drop: () -> (), sendToVessel: () -> (), pocket: () -> ())
 	onDrop = drop
 	onSendToVessel = sendToVessel
+	onPocket = pocket
 end
 
 local function owned(attribute: string): { [string]: boolean }
@@ -228,7 +322,7 @@ local function refreshShop()
 	local order = 0
 	local function row(category: string, entry)
 		order += 1
-		local available = entry.Available
+		local available = entry.Available or (entry.Magical and ownedVessels[entry.Id])
 		local frame = make("Frame", {
 			Size = UDim2.new(1, -8, 0, if available then 70 else 40),
 			BackgroundColor3 = ROW_BG,
@@ -322,6 +416,70 @@ local function refreshShop()
 		end
 	end
 
+	-- Rebirth
+	order += 1
+	sectionHeader("REBIRTH", order)
+	do
+		order += 1
+		local rebirths = player:GetAttribute("Rebirths") or 0
+		local cost = Rebirth.cost(rebirths)
+		local pending = (player:GetAttribute("PendingPick") or "") ~= ""
+		local frame = make("Frame", {
+			Size = UDim2.new(1, -8, 0, 70),
+			BackgroundColor3 = ROW_BG,
+			LayoutOrder = order,
+		}, shopRows)
+		corner(frame, 8)
+		text({
+			Text = "Rebirth #" .. (rebirths + 1),
+			Size = UDim2.new(1, -160, 0, 26),
+			Position = UDim2.fromOffset(12, 6),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextSize = 20,
+			TextStrokeTransparency = 1,
+		}, frame)
+		text({
+			Text = string.format(
+				"Coins earn x%.1f, then x%.1f\nResets coins, tools and shop vessels",
+				Rebirth.multiplier(rebirths),
+				Rebirth.multiplier(rebirths + 1)
+			),
+			Size = UDim2.new(1, -160, 0, 34),
+			Position = UDim2.fromOffset(12, 32),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			TextSize = 14,
+			TextWrapped = true,
+			Font = Enum.Font.GothamMedium,
+			TextStrokeTransparency = 1,
+			TextColor3 = MUTED,
+		}, frame)
+		local affordable = coins >= cost and not pending
+		local b = button(
+			if pending
+				then "Pick reward"
+				elseif affordable then "Rebirth · " .. formatNumber(cost)
+				else formatNumber(cost) .. " coins",
+			if affordable then BUY else DISABLED,
+			frame
+		)
+		b.Size = UDim2.fromOffset(136, 40)
+		b.Position = UDim2.new(1, -148, 0.5, -20)
+		b.TextSize = 15
+		if affordable then
+			b.Activated:Connect(function()
+				local ok, reason = Remotes.get("Rebirth"):InvokeServer()
+				if not ok and reason then
+					HUD.notify(reason)
+				end
+				refreshShop()
+			end)
+		else
+			b.AutoButtonColor = false
+			b.TextColor3 = Color3.fromRGB(200, 205, 210)
+		end
+	end
+
 	order += 1
 	sectionHeader("GRABBING TOOLS", order)
 	for _, tool in Gear.Tools do
@@ -332,7 +490,9 @@ local function refreshShop()
 	order += 1
 	sectionHeader("VESSELS", order)
 	for _, vessel in Gear.Vessels do
-		row("Vessel", vessel)
+		if not vessel.Magical or ownedVessels[vessel.Id] then
+			row("Vessel", vessel)
+		end
 	end
 end
 
@@ -351,7 +511,7 @@ function HUD.init()
 	})
 
 	statsLabel = text({
-		Size = UDim2.fromOffset(260, 80),
+		Size = UDim2.fromOffset(300, 80),
 		Position = UDim2.fromOffset(12, 12),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
@@ -423,7 +583,53 @@ function HUD.init()
 	send.Activated:Connect(function()
 		onSendToVessel()
 	end)
+	local pocket = button("Pocket (Q)", Color3.fromRGB(150, 100, 200), holdButtons)
+	pocket.Name = "Pocket"
+	pocket.Size = UDim2.new(1, 0, 0, 44)
+	pocket.Visible = false
+	pocket.Activated:Connect(function()
+		onPocket()
+	end)
+	holdButtons.Size = UDim2.fromOffset(150, 150)
 
+	pocketFrame = make("Frame", {
+		Size = UDim2.fromOffset(300, 30),
+		Position = UDim2.fromOffset(12, 172),
+		BackgroundTransparency = 1,
+		Visible = false,
+	}, gui)
+	pocketLabel = text({
+		Size = UDim2.new(1, -80, 1, 0),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextSize = 16,
+		TextStrokeTransparency = 0.3,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+	}, pocketFrame)
+	local empty = button("Take out", Color3.fromRGB(150, 100, 200), pocketFrame)
+	empty.TextSize = 14
+	empty.Size = UDim2.fromOffset(74, 26)
+	empty.Position = UDim2.new(1, -74, 0, 2)
+	empty.Activated:Connect(function()
+		Remotes.get("Pocket"):FireServer("drop")
+	end)
+
+	rewardFrame = make("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(420, 300),
+		BackgroundColor3 = BG,
+		Visible = false,
+		ZIndex = 15,
+	}, gui)
+	corner(rewardFrame, 12)
+	make("UIStroke", { Color = Color3.fromRGB(255, 215, 120), Thickness = 2 }, rewardFrame)
+	text({
+		Text = "Choose your rebirth reward",
+		Size = UDim2.new(1, 0, 0, 44),
+		TextSize = 24,
+		TextStrokeTransparency = 1,
+		TextColor3 = Color3.fromRGB(255, 215, 120),
+	}, rewardFrame)
 	tooltip = text({
 		Size = UDim2.fromOffset(260, 24),
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -490,10 +696,27 @@ function HUD.init()
 
 	gui.Parent = player:WaitForChild("PlayerGui")
 
-	for _, attribute in { "Coins", "Tool", "ActiveVessel" } do
+	for _, attribute in
+		{
+			"Coins",
+			"Tool",
+			"ActiveVessel",
+			"Rebirths",
+			"Multiplier",
+			"UnlockItems",
+			"ColoredCoins",
+			"Rewards",
+			"Pockets",
+			"PocketItems",
+		}
+	do
 		player:GetAttributeChangedSignal(attribute):Connect(refreshStats)
 	end
-	for _, attribute in { "Coins", "Tool", "ActiveVessel", "OwnedTools", "OwnedVessels" } do
+	player:GetAttributeChangedSignal("PendingPick"):Connect(refreshRewardPick)
+	refreshRewardPick()
+	for _, attribute in
+		{ "Coins", "Tool", "ActiveVessel", "OwnedTools", "OwnedVessels", "Rebirths", "PendingPick" }
+	do
 		player:GetAttributeChangedSignal(attribute):Connect(function()
 			if shopFrame.Visible then
 				refreshShop()
