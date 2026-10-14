@@ -260,15 +260,7 @@ command("vessel", "vessel <vessel> [player]", "Spawn a vessel next to the player
 	end
 	local lines = {}
 	return eachTarget(caller, args[2], function(target)
-		local root = rootOf(target)
-		local at: CFrame? = nil
-		if root then
-			local look = root.CFrame.LookVector
-			local spot = root.Position + Vector3.new(look.X, 0, look.Z).Unit * 8
-			local groundY = if spot.Z < 0 then 1 else Beach.groundY(spot.Z)
-			at = CFrame.new(spot.X, groundY + 0.2, spot.Z)
-		end
-		local ok, reason = VesselService.spawn(target, entry.Id, at)
+		local ok, reason = VesselService.spawn(target, entry.Id)
 		table.insert(
 			lines,
 			if ok then "Spawned " .. entry.Name .. " for " .. target.Name else "Failed: " .. tostring(reason)

@@ -9,6 +9,7 @@ local HttpService = game:GetService("HttpService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
+local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Tide = require(Shared.Tide)
 
@@ -335,7 +336,35 @@ local function destroyVessel(player: Player, reason: string?)
 	end
 end
 
--- `at` is where the bottom of the vessel goes; defaults to the shop's vessel pad.
+-- `at` is where the bottom of the vessel goes; defaults to in front of the player.
+-- Where a vessel called by this player appears: 8 studs in front of them, on the ground,
+-- facing the way they face. Nil (with a reason) inside a secret or over deep water.
+function VesselService.spotNear(player: Player): (CFrame?, string?)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return nil, "You need to be on the beach"
+	end
+	if root.Position.Y > Config.Secrets.Origin.Y - 100 then
+		return nil, "You can't call a vessel in here"
+	end
+	local look = root.CFrame.LookVector
+	local forward = Vector3.new(look.X, 0, look.Z)
+	forward = if forward.Magnitude > 0.01 then forward.Unit else Vector3.new(0, 0, -1)
+	local spot = root.Position + forward * 8
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { Workspace.Map }
+	local hit = Workspace:Raycast(spot + Vector3.new(0, 30, 0), Vector3.new(0, -120, 0), params)
+	local groundY = if hit then hit.Position.Y else Beach.groundY(spot.Z)
+	local ground = Vector3.new(spot.X, groundY, spot.Z)
+	if Beach.isDeep(ground, Tide.waterline()) then
+		return nil, "The water is too deep for a vessel here"
+	end
+	return CFrame.lookAt(ground, ground + forward)
+end
+
 -- Removes the player's vessel; anything in it is dropped as loose items.
 function VesselService.despawn(player: Player)
 	local vessel = VesselService.getVessel(player)
@@ -358,6 +387,15 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 		return false, "No vessel slot"
 	end
 
+	local origin = at
+	if not origin then
+		local spot, reason = VesselService.spotNear(player)
+		if not spot then
+			return false, reason
+		end
+		origin = spot
+	end
+
 	-- Respawning replaces the old one. Its contents are dropped as loose items.
 	local old = VesselService.getVessel(player)
 	if old then
@@ -367,11 +405,9 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 		destroyVessel(player, nil)
 	end
 
-	local pad = Workspace.Map.Shop.VesselPad :: BasePart
 	local model = Instance.new("Model")
 	model.Name = player.Name .. "'s " .. def.Name
-	local origin = at or CFrame.new(pad.Position.X, pad.Position.Y, pad.Position.Z)
-	local handle = build(model, origin)
+	local handle = build(model, origin :: CFrame)
 
 	local vesselId = HttpService:GenerateGUID(false)
 	model:SetAttribute("VesselId", vesselId)
@@ -418,7 +454,7 @@ local function tick()
 		then
 			destroyVessel(
 				player,
-				"Your vessel was lost to the water, along with everything in it. Respawn it free at the shop."
+				"Your vessel was lost to the water, along with everything in it. Spawn it again for free from your inventory (I)."
 			)
 			continue
 		end

@@ -68,7 +68,7 @@ local function onBuy(player: Player, category: any, id: any): (boolean, string?)
 		end
 		DataService.addItem(player, id, "shop")
 		VesselService.spawn(player, id)
-		notify(player, "Bought " .. vessel.Name .. "! It's on the blue pad, and in your inventory (I).")
+		notify(player, "Bought " .. vessel.Name .. "! Spawn it any time from your inventory (I).")
 		return true
 	end
 	return false, "Invalid"
@@ -81,9 +81,6 @@ function ShopService.spawnVessel(player: Player, id: any): (boolean, string?)
 	local profile = DataService.get(player)
 	if not profile or DataService.countItemType(player, id) == 0 then
 		return false, "You don't own that"
-	end
-	if not ShopService.nearShop(player) then
-		return false, "Vessels respawn at the shop"
 	end
 	return VesselService.spawn(player, id)
 end

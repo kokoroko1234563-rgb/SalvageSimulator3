@@ -232,19 +232,6 @@ function BeachBuilder.build(): Folder
 	label(bankPad, "BANK: bring unlock items here to keep them safe", Vector3.new(0, 4, 0))
 	bankPad.Parent = shop
 
-	local vesselPad = makePart({
-		Name = "VesselPad",
-		Size = Vector3.new(16, 0.2, 16),
-		CFrame = CFrame.new(-30, 1.1, -22),
-		Color = Color3.fromRGB(90, 180, 255),
-		Material = Enum.Material.Neon,
-		Transparency = 0.5,
-		CanCollide = false,
-		CanQuery = false,
-	})
-	label(vesselPad, "Vessels spawn here", Vector3.new(0, 4, 0))
-	vesselPad.Parent = shop
-
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "BeachSpawn"
 	spawn.Anchored = true

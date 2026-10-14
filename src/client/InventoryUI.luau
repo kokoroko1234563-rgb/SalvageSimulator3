@@ -156,16 +156,13 @@ local function itemCard(group, order: number)
 	if group.Count > 1 then
 		title ..= "  x" .. group.Count
 	end
-	label(
-		{
-			Text = title,
-			Font = FONT,
-			TextSize = 17,
-			Position = UDim2.fromOffset(8, 12),
-			Size = UDim2.new(1, -16, 0, 22),
-		},
-		card
-	)
+	label({
+		Text = title,
+		Font = FONT,
+		TextSize = 17,
+		Position = UDim2.fromOffset(8, 12),
+		Size = UDim2.new(1, -16, 0, 22),
+	}, card)
 
 	local sub = entry.Category .. " · " .. (if entry.Rarity == "VeryRare" then "Very rare" else entry.Rarity)
 	if item.Variant then
@@ -174,16 +171,13 @@ local function itemCard(group, order: number)
 	if item.Serial then
 		sub ..= string.format(" · #%d of %d", item.Serial, item.Of or 0)
 	end
-	label(
-		{
-			Text = sub,
-			TextSize = 12,
-			TextColor3 = Items.RarityColors[entry.Rarity] or MUTED,
-			Position = UDim2.fromOffset(8, 34),
-			Size = UDim2.new(1, -16, 0, 16),
-		},
-		card
-	)
+	label({
+		Text = sub,
+		TextSize = 12,
+		TextColor3 = Items.RarityColors[entry.Rarity] or MUTED,
+		Position = UDim2.fromOffset(8, 34),
+		Size = UDim2.new(1, -16, 0, 16),
+	}, card)
 
 	local lines = { entry.Description }
 	if settings.ShowResetText then
@@ -314,30 +308,24 @@ local function showRewards()
 		)
 		corner(card, 8)
 		border(card, "TrueRebirth")
-		label(
-			{
-				Text = reward.Name .. "  ·  " .. reward.Type,
-				Font = FONT,
-				TextSize = 17,
-				Position = UDim2.fromOffset(10, 6),
-				Size = UDim2.new(1, -20, 0, 22),
-			},
-			card
-		)
+		label({
+			Text = reward.Name .. "  ·  " .. reward.Type,
+			Font = FONT,
+			TextSize = 17,
+			Position = UDim2.fromOffset(10, 6),
+			Size = UDim2.new(1, -20, 0, 22),
+		}, card)
 		local desc = reward.Description
 		if snapshot.Settings and snapshot.Settings.ShowResetText then
 			desc ..= "  (" .. Catalog.ResetText.TrueRebirth .. ")"
 		end
-		label(
-			{
-				Text = desc,
-				TextSize = 13,
-				TextColor3 = MUTED,
-				Position = UDim2.fromOffset(10, 30),
-				Size = UDim2.new(1, -20, 0, 30),
-			},
-			card
-		)
+		label({
+			Text = desc,
+			TextSize = 13,
+			TextColor3 = MUTED,
+			Position = UDim2.fromOffset(10, 30),
+			Size = UDim2.new(1, -20, 0, 30),
+		}, card)
 	end
 end
 
@@ -400,16 +388,13 @@ local function refreshPockets()
 				Remotes.get("Pocket"):FireServer("drop", slot)
 			end)
 		else
-			label(
-				{
-					Text = "Empty pocket",
-					TextSize = 12,
-					TextColor3 = MUTED,
-					Position = UDim2.fromOffset(8, 14),
-					Size = UDim2.new(1, -16, 0, 16),
-				},
-				frame
-			)
+			label({
+				Text = "Empty pocket",
+				TextSize = 12,
+				TextColor3 = MUTED,
+				Position = UDim2.fromOffset(8, 14),
+				Size = UDim2.new(1, -16, 0, 16),
+			}, frame)
 		end
 	end
 end
@@ -465,17 +450,14 @@ function InventoryUI.init()
 	make("UIStroke", { Color = ACCENT, Thickness = 2, Transparency = 0.3 }, panel)
 	corner(panel, 12)
 
-	label(
-		{
-			Text = "Inventory",
-			Font = FONT,
-			TextSize = 26,
-			Position = UDim2.fromOffset(16, 10),
-			Size = UDim2.fromOffset(200, 32),
-			TextYAlignment = Enum.TextYAlignment.Center,
-		},
-		panel
-	)
+	label({
+		Text = "Inventory",
+		Font = FONT,
+		TextSize = 26,
+		Position = UDim2.fromOffset(16, 10),
+		Size = UDim2.fromOffset(200, 32),
+		TextYAlignment = Enum.TextYAlignment.Center,
+	}, panel)
 	local close = button("X", Color3.fromRGB(200, 80, 70), panel)
 	close.Size = UDim2.fromOffset(34, 34)
 	close.Position = UDim2.new(1, -46, 0, 10)
@@ -504,15 +486,11 @@ function InventoryUI.init()
 		{ BackgroundTransparency = 1, Position = UDim2.fromOffset(16, 90), Size = UDim2.new(1, -32, 0, 28) },
 		panel
 	)
-	make(
-		"UIListLayout",
-		{
-			FillDirection = Enum.FillDirection.Horizontal,
-			Padding = UDim.new(0, 8),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-		},
-		filterRow
-	)
+	make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, filterRow)
 	local legend = label({
 		Text = "Border: orange = lost on rebirth · purple = lost on true rebirth · none = never lost",
 		TextSize = 12,
@@ -534,36 +512,25 @@ function InventoryUI.init()
 		ScrollBarImageColor3 = ACCENT,
 	}, panel)
 
-	pocketsRow = make(
-		"Frame",
-		{
-			BackgroundTransparency = 1,
-			Position = UDim2.new(0, 16, 1, -60),
-			Size = UDim2.new(1, -32, 0, 44),
-			Visible = false,
-		},
-		panel
-	)
-	make(
-		"UIListLayout",
-		{
-			FillDirection = Enum.FillDirection.Horizontal,
-			Padding = UDim.new(0, 8),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-		},
-		pocketsRow
-	)
-	label(
-		{
-			Text = "Pockets",
-			Font = FONT,
-			TextSize = 16,
-			TextYAlignment = Enum.TextYAlignment.Center,
-			Size = UDim2.fromOffset(70, 44),
-			LayoutOrder = 0,
-		},
-		pocketsRow
-	)
+	pocketsRow = make("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 16, 1, -60),
+		Size = UDim2.new(1, -32, 0, 44),
+		Visible = false,
+	}, panel)
+	make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, pocketsRow)
+	label({
+		Text = "Pockets",
+		Font = FONT,
+		TextSize = 16,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		Size = UDim2.fromOffset(70, 44),
+		LayoutOrder = 0,
+	}, pocketsRow)
 
 	gui.Parent = player:WaitForChild("PlayerGui")
 
