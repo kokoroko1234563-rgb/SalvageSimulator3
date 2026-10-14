@@ -36,6 +36,7 @@ for _, name in
 		"Biomes",
 		"Secrets",
 		"Rebirth",
+		"Hotbar",
 		"Traders",
 		"Tide",
 		"Beach",
@@ -175,6 +176,27 @@ test("round items float", function()
 	assert(part:GetAttribute("Floats") == true, "spawned items carry the Floats attribute")
 end)
 
+test("hotbar slots", function()
+	local Hotbar = h.require("Shared/Hotbar")
+	local bar = Hotbar.empty()
+	local owned = { BeachRake = true, TideMagnet = true }
+	assert(Hotbar.autoAdd(bar, "TideMagnet", owned) and bar[1] == "TideMagnet", "first free slot")
+	assert(not Hotbar.autoAdd(bar, "TideMagnet", owned), "no duplicates")
+	Hotbar.place(bar, 4, "TideMagnet")
+	assert(bar[1] == "" and bar[4] == "TideMagnet", "placing moves it")
+	bar[1] = "BoatHook" -- not owned any more (rebirth): its slot is free for new tools
+	assert(Hotbar.autoAdd(bar, "BeachRake", owned) and bar[1] == "BeachRake", "reuses unowned slots")
+	local round = Hotbar.decode(Hotbar.encode(bar))
+	for i = 1, Hotbar.Slots do
+		assert(round[i] == bar[i], "encode/decode round trip")
+	end
+	local clean = Hotbar.sanitize({ "TideMagnet", "TideMagnet", "NotATool", 5 })
+	assert(
+		clean[1] == "TideMagnet" and clean[2] == "" and clean[3] == "" and #clean == Hotbar.Slots,
+		"sanitize"
+	)
+end)
+
 test("build the bell tower", function()
 	local map = Harness.wrap(roblox.Instance.new("Folder"))
 	local door = h.require("Server/FarSandbarService").build(map)
@@ -213,6 +235,7 @@ for _, name in
 		"TraderUI",
 		"AuctionUI",
 		"SkyBeamController",
+		"HotbarUI",
 	}
 do
 	test("load Client/" .. name, function()

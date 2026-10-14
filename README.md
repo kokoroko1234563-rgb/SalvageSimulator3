@@ -172,6 +172,11 @@ Press **I** (or the purple bag button) to open it.
 - **Item rules:** `src/shared/Catalog.luau` gives each item type its category, rarity, whether it can be traded, and which reset removes it. Shop gear is lost on rebirth. The Floating Clamshell is lost on a true rebirth. Unlock items are never lost.
 - **Cards:** the colour band is the item's rarity. The border shows when it's lost: orange on a rebirth, purple on a true rebirth, none if never. The **Reset text** setting adds the same as a line of text, and **Hide shop gear** hides tools and vessels. Both settings are saved.
 - **Shop gear:** once bought, it lives in the inventory, not the shop. Tools are equipped there, and vessels are spawned there and appear in front of you.
+- **Hotbar:** a custom bar of 6 slots at the bottom of the screen replaces Roblox's backpack bar. It holds grabbing tools of every kind: shop, magical and exotic. Press **1** to **6**, or click or tap a slot, to equip that tool. The equipped tool has a gold outline.
+  - New tools go into the first free slot.
+  - To place a tool yourself, press **+ Hotbar** (or **Slot N**) on its inventory card, then click the slot you want. A tool already on the bar swaps places. The prompt above the bar also has **Take off bar** and **Cancel**.
+  - Right-click a slot to empty it.
+  - A tool keeps its slot through a rebirth, so buying it back puts it where it was. Until then, the slot shows as empty and new tools can use it.
 - **Other tabs:** **Coins** shows the five colored-coin slots and attunement cores. **Rewards** shows rebirth rewards. Deep Pockets slots run along the bottom and are saved.
 
 All tuning numbers are in `src/shared/Config.luau`, `Gear.luau` and `Items.luau`.

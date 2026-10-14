@@ -357,6 +357,11 @@ function Gear.getTool(id: string?)
 	return toolsById[id or ""] or Gear.Tools[1]
 end
 
+-- Like getTool, but nil for an unknown id instead of falling back to bare hands.
+function Gear.findTool(id: any)
+	return if type(id) == "string" then toolsById[id] else nil
+end
+
 function Gear.getVessel(id: string?)
 	return vesselsById[id or ""]
 end

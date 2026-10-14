@@ -681,7 +681,7 @@ function HUD.init()
 
 	breathFrame = make("Frame", {
 		Size = UDim2.new(0, 240, 0, 14),
-		Position = UDim2.new(0.5, -120, 1, -110),
+		Position = UDim2.new(0.5, -120, 1, -150), -- above the hotbar
 		BackgroundColor3 = Palette.UI.Track,
 		Visible = false,
 	}, gui)
