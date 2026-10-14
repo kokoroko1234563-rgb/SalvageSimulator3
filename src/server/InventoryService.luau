@@ -9,6 +9,7 @@ local Players = game:GetService("Players")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Catalog = require(Shared.Catalog)
 local Gear = require(Shared.Gear)
+local Hotbar = require(Shared.Hotbar)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
 local Secrets = require(Shared.Secrets)
@@ -179,6 +180,33 @@ local function onAction(player: Player, action: any, arg: any, value: any): (boo
 		profile.Attunements[record.Id] = true
 		DataService.changed(player)
 		return true, "Attuned to " .. entry.Name .. "!"
+	elseif action == "equipTool" then
+		-- From the hotbar: tools are owned per type, so it names the tool, not a copy.
+		local tool = Gear.findTool(arg)
+		if not tool or not DataService.ownedTypes(player)[tool.Id] then
+			return false, "You don't have that tool"
+		end
+		if not DataService.canUse(player, tool.Id) then
+			return false, "Attune to " .. tool.Name .. " first (1 attunement core)"
+		end
+		profile.EquippedTool = tool.Id
+		DataService.changed(player)
+		return true
+	elseif action == "hotbar" then
+		-- Put a tool in a hotbar slot ("" empties it). A tool already on the bar swaps places.
+		local slot = tonumber(arg)
+		if not slot or slot ~= math.floor(slot) or slot < 1 or slot > Hotbar.Slots then
+			return false, "No such hotbar slot"
+		end
+		if value ~= "" then
+			local tool = Gear.findTool(value)
+			if not tool or not DataService.ownedTypes(player)[tool.Id] then
+				return false, "Only tools you own go on the hotbar"
+			end
+		end
+		Hotbar.place(profile.Hotbar, slot, value)
+		DataService.changed(player)
+		return true
 	elseif action == "setting" then
 		if (arg == "HideShopGear" or arg == "ShowResetText") and type(value) == "boolean" then
 			profile.Settings[arg] = value

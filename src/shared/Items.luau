@@ -97,7 +97,7 @@ Items.Catalog = {
 		Shape = "Ball",
 		Color = Color3.fromRGB(255, 90, 90),
 	},
-	-- Unlock items: never rolled as normal loot, never sold, banked at the shore.
+	-- Unlock items: never rolled as normal loot, never sold, banked at the bank house.
 	{
 		Id = "GoldenSpade",
 		Name = "Golden Spade",

@@ -19,6 +19,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Catalog = require(Shared.Catalog)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
+local Hotbar = require(Shared.Hotbar)
 local Items = require(Shared.Items)
 local Rebirth = require(Shared.Rebirth)
 local Secrets = require(Shared.Secrets)
@@ -59,6 +60,7 @@ export type Profile = {
 	Pockets: { PocketEntry }, -- Deep Pockets contents
 	Settings: { HideShopGear: boolean, ShowResetText: boolean },
 	Receipts: { string }, -- recent Robux purchase ids, already granted (MonetizationService)
+	Hotbar: { string }, -- tool id per hotbar slot, "" = empty (see Hotbar.luau)
 }
 
 local function defaultProfile(): Profile
@@ -81,6 +83,7 @@ local function defaultProfile(): Profile
 		Pockets = {},
 		Settings = { HideShopGear = false, ShowResetText = false },
 		Receipts = {},
+		Hotbar = Hotbar.empty(),
 	}
 end
 
@@ -231,6 +234,9 @@ local function reconcile(data: any): Profile
 		profile.Settings.HideShopGear = data.Settings.HideShopGear == true
 		profile.Settings.ShowResetText = data.Settings.ShowResetText == true
 	end
+	if type(data.Hotbar) == "table" then
+		profile.Hotbar = Hotbar.sanitize(data.Hotbar)
+	end
 	if type(data.Receipts) == "table" then
 		for _, id in data.Receipts do
 			if type(id) == "string" then
@@ -261,6 +267,7 @@ local function serialize(profile: Profile, release: boolean)
 		Pockets = profile.Pockets,
 		Settings = profile.Settings,
 		Receipts = profile.Receipts,
+		Hotbar = profile.Hotbar,
 		Lock = if release then nil else { JobId = game.JobId, Time = os.time() },
 	}
 end
@@ -348,6 +355,7 @@ local function publish(player: Player)
 	local owned = ownedTypes(profile)
 	player:SetAttribute("Coins", profile.Coins)
 	player:SetAttribute("Tool", activeTool(profile).Id)
+	player:SetAttribute(Hotbar.Attribute, Hotbar.encode(profile.Hotbar))
 	player:SetAttribute("OwnedTools", csv(owned, Gear.Tools))
 	player:SetAttribute("OwnedVessels", csv(owned, Gear.Vessels))
 	player:SetAttribute("Rebirths", profile.Rebirths)
@@ -614,6 +622,7 @@ function DataService.addItem(player: Player, id: string, source: string, extra: 
 	end
 	local uid = newUid()
 	profile.Items[uid] = record
+	Hotbar.autoAdd(profile.Hotbar, id, ownedTypes(profile))
 	print(string.format("[Inventory] %s +%s (%s)", player.Name, id, source))
 	publish(player)
 	return uid
@@ -700,8 +709,10 @@ function DataService.executeTrade(
 
 	local function move(from: Profile, to: Profile, offer: TradeOffer)
 		for uid in offer.Items do
-			to.Items[uid] = from.Items[uid]
+			local record = from.Items[uid]
+			to.Items[uid] = record
 			from.Items[uid] = nil
+			Hotbar.autoAdd(to.Hotbar, record.Id, ownedTypes(to))
 		end
 		from.Coins -= offer.Coins
 		to.Coins += math.floor(offer.Coins * (1 - taxRate))
@@ -715,6 +726,17 @@ function DataService.executeTrade(
 	task.spawn(save, a, false)
 	task.spawn(save, b, false)
 	return true
+end
+
+-- Puts every owned tool that isn't on the hotbar into a free slot, in shop order (saves
+-- from before the hotbar existed start with their tools on it).
+function DataService.fillHotbar(profile: Profile)
+	local owned = ownedTypes(profile)
+	for _, tool in Gear.Tools do
+		if owned[tool.Id] and not table.find(profile.Hotbar, tool.Id) then
+			Hotbar.autoAdd(profile.Hotbar, tool.Id, owned)
+		end
+	end
 end
 
 -- For tools/tests: install a profile for a stand-in player.
@@ -761,6 +783,7 @@ function DataService.init()
 		end
 		profiles[player] = profile
 		canSave[player] = saving
+		DataService.fillHotbar(profile)
 		publish(player)
 		player:SetAttribute("DataLoaded", true)
 		for _, callback in loadedCallbacks do

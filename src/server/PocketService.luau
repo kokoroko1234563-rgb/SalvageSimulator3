@@ -1,6 +1,7 @@
 -- Pockets: store Light items safe from bumps and waves. 3 slots from Deep Pockets (rebirth
--- reward), 3 more from a worn Deckhand's Satchel (exotic, attuned). Pockets are saved, sold automatically on the sell pad, can be taken out one at
--- a time, and drop where you die if you drown. Unlock items can't be pocketed.
+-- reward), 3 more from a worn Deckhand's Satchel (exotic, attuned). Pockets are saved, sold
+-- when you talk to the buyer (from anywhere), can be taken out one at a time, and drop where
+-- you die if you drown. Unlock items can't be pocketed.
 
 local Players = game:GetService("Players")
 
@@ -48,7 +49,7 @@ local function store(player: Player, part: any)
 		return
 	end
 	if item:GetAttribute("Unlock") then
-		notify(player, "Unlock items can't go in your pockets. Bank them at the shore.")
+		notify(player, "Unlock items can't go in your pockets. Bank them at the bank house.")
 		return
 	end
 	if (item:GetAttribute("Class") or 1) ~= Gear.WeightClass.Light then

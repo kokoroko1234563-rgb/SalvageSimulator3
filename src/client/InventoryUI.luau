@@ -12,6 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Palette = require(Shared.Palette)
 local Catalog = require(Shared.Catalog)
+local Hotbar = require(Shared.Hotbar)
 local Items = require(Shared.Items)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
@@ -19,6 +20,7 @@ local Secrets = require(Shared.Secrets)
 local Traders = require(Shared.Traders)
 
 local HUD = require(script.Parent.HUD)
+local HotbarUI = require(script.Parent.HotbarUI)
 
 local player = Players.LocalPlayer
 
@@ -252,6 +254,17 @@ local function itemCard(group, order: number)
 		actionButton.Size = UDim2.new(1, -16, 0, 30)
 		actionButton.Position = UDim2.new(0, 8, 1, -38)
 	end
+	if entry.Category == "Tool" and actionButton then
+		-- Tools also go on the hotbar: this picks (or moves to) a slot there.
+		local slot = table.find(Hotbar.decode(player:GetAttribute(Hotbar.Attribute)), item.Id)
+		actionButton.Size = UDim2.new(0.55, -12, 0, 30)
+		local barButton = button(if slot then "Slot " .. slot else "+ Hotbar", Palette.UI.Tab, card)
+		barButton.Size = UDim2.new(0.45, -8, 0, 30)
+		barButton.Position = UDim2.new(0.55, 0, 1, -38)
+		barButton.Activated:Connect(function()
+			HotbarUI.beginPlace(item.Id)
+		end)
+	end
 end
 
 local function showItems()
@@ -275,7 +288,7 @@ local function showItems()
 		label({
 			Text = if hideShop and #snapshot.Items > 0
 				then 'Only shop gear here, and it\'s hidden. Turn off "Hide shop gear" to see it.'
-				else "Nothing yet. Bank unlock items at the shore, or buy gear at the shop.",
+				else "Nothing yet. Bank unlock items at the bank house, or buy gear at the shop.",
 			Size = UDim2.fromOffset(340, 60),
 			TextColor3 = MUTED,
 		}, content)

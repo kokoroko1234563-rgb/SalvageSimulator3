@@ -681,7 +681,7 @@ function HUD.init()
 
 	breathFrame = make("Frame", {
 		Size = UDim2.new(0, 240, 0, 14),
-		Position = UDim2.new(0.5, -120, 1, -110),
+		Position = UDim2.new(0.5, -120, 1, -150), -- above the hotbar
 		BackgroundColor3 = Palette.UI.Track,
 		Visible = false,
 	}, gui)
@@ -863,7 +863,7 @@ function HUD.init()
 		local character = player.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local shopkeeper = workspace:FindFirstChild("Map") and workspace.Map.Shop:FindFirstChild("Shopkeeper")
-		if root and shopkeeper and (root.Position - shopkeeper.Position).Magnitude > 26 then
+		if root and shopkeeper and (root.Position - shopkeeper:GetPivot().Position).Magnitude > 26 then
 			shopFrame.Visible = false
 		end
 	end)

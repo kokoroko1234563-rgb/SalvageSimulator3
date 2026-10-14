@@ -1,4 +1,5 @@
--- The main shopkeeper: buying gear, respawning vessels, and the sell zone.
+-- The main shopkeeper (buying gear, respawning vessels), the buyer (selling what's on the sell
+-- pad, and your pockets) and the banker (unlock items on the bank floor go into the inventory).
 
 local Players = game:GetService("Players")
 
@@ -18,14 +19,17 @@ local VesselService = require(script.Parent.VesselService)
 local ShopService = {}
 
 local notify: (Player, string) -> () = function(_player: Player, _text: string) end
-local shopkeeper: BasePart
+local shopkeeper: Model
+local buyer: Model
+local banker: Model
 local sellZone: BasePart
 local bankPad: BasePart
 
 function ShopService.nearShop(player: Player): boolean
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	return root ~= nil and (root.Position - shopkeeper.Position).Magnitude <= Config.Selling.ShopkeeperRange
+	local target = shopkeeper:GetPivot().Position
+	return root ~= nil and (root.Position - target).Magnitude <= Config.Selling.ShopkeeperRange
 end
 
 local function onBuy(player: Player, category: any, id: any): (boolean, string?)
@@ -99,69 +103,89 @@ local function inSellZone(position: Vector3): boolean
 	return inPad(sellZone, position)
 end
 
-local function sellTick()
-	local earned: { [Player]: number } = {}
+-- Banking happens when you talk to the banker. Banks every unlock item of yours on the bank
+-- floor, so items lying there are safe in the inventory from now on.
+local function bankFromFloor(player: Player)
+	local count = 0
 	for item in ItemService.all() do
-		local ownerId = ItemService.getOwnerId(item)
-		local owner = ownerId ~= 0 and Players:GetPlayerByUserId(ownerId)
-		if not owner then
-			continue
-		end
-		local unlock = item:GetAttribute("Unlock")
-		if unlock and inPad(bankPad, item.Position) then
-			-- Unlock items are banked, never sold: safe in the inventory from now on.
+		if
+			ItemService.getOwnerId(item) == player.UserId
+			and item:GetAttribute("Unlock")
+			and inPad(bankPad, item.Position)
+		then
 			local itemId = item:GetAttribute("ItemId")
-			item:SetAttribute("BankedBy", owner.DisplayName)
+			item:SetAttribute("BankedBy", player.DisplayName)
 			ItemService.destroy(item)
-			DataService.addItem(owner, itemId, "beach")
-			notify(owner, "Banked a " .. Items.get(itemId).Name .. "!")
-		elseif not unlock and inSellZone(item.Position) then
-			earned[owner] = (earned[owner] or 0) + (item:GetAttribute("Value") or 0)
+			DataService.addItem(player, itemId, "beach")
+			notify(player, "Banked a " .. Items.get(itemId).Name .. "!")
+			count += 1
+		end
+	end
+	if count == 0 then
+		notify(player, "Nothing to bank. Drop unlock items on the purple floor, then talk to the banker.")
+	end
+end
+
+-- Selling happens only when you talk to the buyer. Sells every item of yours on the sell pad,
+-- and everything in your pockets wherever you're standing.
+local function sellFromPad(player: Player)
+	local earned = 0
+	local count = 0
+	for item in ItemService.all() do
+		if
+			ItemService.getOwnerId(item) == player.UserId
+			and not item:GetAttribute("Unlock")
+			and inSellZone(item.Position)
+		then
+			earned += item:GetAttribute("Value") or 0
+			count += 1
 			ItemService.destroy(item)
 		end
 	end
-	-- Pockets empty themselves when you stand on the sell pad.
-	for _, player in Players:GetPlayers() do
-		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if root and (player:GetAttribute("Pockets") or 0) > 0 and inSellZone(root.Position) then
-			for _, entry in PocketService.takeAll(player) do
-				earned[player] = (earned[player] or 0) + entry.Value
-			end
-		end
+	for _, entry in PocketService.takeAll(player) do
+		earned += entry.Value
+		count += 1
 	end
-	for player, amount in earned do
-		local profile = DataService.get(player)
-		local total = math.floor(
-			amount
-				* Rebirth.multiplier(if profile then profile.Rebirths else 0)
-				* MonetizationService.sellMultiplier(player)
-		)
-		DataService.addCoins(player, total)
-		notify(player, "+" .. total .. " coins")
+
+	if count == 0 then
+		notify(player, "Nothing on the sell pad. Drop items on the yellow pad, then talk to the buyer.")
+		return
 	end
+	local profile = DataService.get(player)
+	local total = math.floor(
+		earned
+			* Rebirth.multiplier(if profile then profile.Rebirths else 0)
+			* MonetizationService.sellMultiplier(player)
+	)
+	DataService.addCoins(player, total)
+	local plural = if count == 1 then "" else "s"
+	notify(player, string.format("Sold %d item%s for +%d coins", count, plural, total))
 end
 
 function ShopService.init(map: Instance, notifyFn: (Player, string) -> ())
 	notify = notifyFn
-	shopkeeper = map:WaitForChild("Shop"):WaitForChild("Shopkeeper") :: BasePart
-	sellZone = map.Shop:WaitForChild("SellZone") :: BasePart
-	bankPad = map.Shop:WaitForChild("BankPad") :: BasePart
+	local shop = map:WaitForChild("Shop")
+	shopkeeper = shop:WaitForChild("Shopkeeper") :: Model
+	sellZone = shop:WaitForChild("SellZone") :: BasePart
+	bankPad = shop:WaitForChild("BankPad") :: BasePart
+	buyer = shop:WaitForChild("Buyer") :: Model
+	banker = shop:WaitForChild("Banker") :: Model
 
 	Remotes.handle("Buy", onBuy)
 	Remotes.handle("SpawnVessel", ShopService.spawnVessel)
 
 	local openShop = Remotes.get("OpenShop")
-	local prompt = shopkeeper:WaitForChild("ShopPrompt") :: ProximityPrompt
+	local prompt = shopkeeper:WaitForChild("HumanoidRootPart"):WaitForChild("ShopPrompt") :: ProximityPrompt
 	prompt.Triggered:Connect(function(player)
 		openShop:FireClient(player)
 	end)
 
-	task.spawn(function()
-		while true do
-			task.wait(0.25)
-			sellTick()
-		end
-	end)
+	local buyerPrompt = buyer:WaitForChild("HumanoidRootPart"):WaitForChild("BuyerPrompt") :: ProximityPrompt
+	buyerPrompt.Triggered:Connect(sellFromPad)
+
+	local bankerRoot = banker:WaitForChild("HumanoidRootPart")
+	local bankerPrompt = bankerRoot:WaitForChild("BankerPrompt") :: ProximityPrompt
+	bankerPrompt.Triggered:Connect(bankFromFloor)
 end
 
 return ShopService

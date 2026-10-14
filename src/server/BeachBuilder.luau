@@ -12,42 +12,28 @@ local Palette = require(Shared.Palette)
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 
+local BeachDressing = require(script.Parent.BeachDressing)
+local Buildings = require(script.Parent.Buildings)
+local MapParts = require(script.Parent.MapParts)
+
 local beach = Config.Beach
 
 local BeachBuilder = {}
 
-local SAND = Color3.fromRGB(236, 215, 160)
-local WET_SAND = Color3.fromRGB(196, 170, 120)
-local ROCK = Color3.fromRGB(120, 115, 105)
+local SAND = Palette.World.Sand
+local WET_SAND = Palette.World.WetSand
+local ROCK = Palette.World.Rock
 
-local function makePart(props: { [string]: any }): Part
-	local part = Instance.new("Part")
-	part.Anchored = true
-	part.TopSurface = Enum.SurfaceType.Smooth
-	part.BottomSurface = Enum.SurfaceType.Smooth
-	for key, value in props do
-		(part :: any)[key] = value
-	end
-	return part
-end
-
-local function label(parent: BasePart, text: string, offset: Vector3)
-	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(240, 50)
-	gui.StudsOffset = offset
-	gui.AlwaysOnTop = false
-	gui.MaxDistance = 250
-	local textLabel = Instance.new("TextLabel")
-	textLabel.Size = UDim2.fromScale(1, 1)
-	textLabel.BackgroundTransparency = 1
-	textLabel.Font = Palette.Font.Title
-	textLabel.TextScaled = true
-	textLabel.TextColor3 = Color3.new(1, 1, 1)
-	textLabel.TextStrokeTransparency = 0.4
-	textLabel.Text = text
-	textLabel.Parent = gui
-	gui.Parent = parent
-end
+-- Where the shop buildings stand, on the dry sand behind the shoreline.
+local HOUSE_Z = -50
+local HOUSE_WIDTH = 48
+local HOUSE_DEPTH = 36
+local SHOP_X = -200
+local BANK_X = 200
+local SELL_PAD = Vector3.new(90, 1.1, -30)
+local SELL_PAD_SIZE = Vector3.new(30, 0.2, 22)
+local BANK_PAD_SIZE = Vector3.new(32, 0.2, 16)
+local BUYER_X = 68
 
 -- A block whose top face slopes down from (zStart, yStart) to (zEnd, yEnd).
 local function slopedBlock(
@@ -57,7 +43,8 @@ local function slopedBlock(
 	zStart: number,
 	yStart: number,
 	zEnd: number,
-	yEnd: number
+	yEnd: number,
+	color: Color3
 )
 	local run = zEnd - zStart
 	local drop = yStart - yEnd
@@ -67,13 +54,312 @@ local function slopedBlock(
 	local topCenter = Vector3.new((x0 + x1) / 2, (yStart + yEnd) / 2, (zStart + zEnd) / 2)
 	local orientation = CFrame.Angles(angle, 0, 0)
 	local center = topCenter - orientation.UpVector * thickness / 2
-	return makePart({
+	return MapParts.part({
 		Name = name,
 		Size = Vector3.new(x1 - x0, thickness, length + 0.2),
 		CFrame = CFrame.new(center) * orientation,
-		Color = WET_SAND,
+		Color = color,
 		Material = Palette.Material.Sand,
 	})
+end
+
+-- The beach is cut into strips along Z. Each strip is a little darker the further out it is
+-- (wetter), with some variation, so the sand reads as sand rather than one flat colour.
+local function buildBeach(map: Folder)
+	local rng = Random.new(11)
+	local stripLength = 30
+	local sandbar = beach.FarSandbar
+	local z = 0
+	while z < Beach.Depth do
+		local nextZ = math.min(z + stripLength, Beach.Depth)
+		if z >= sandbar.ChannelStart and z < sandbar.ChannelEnd then
+			-- The channel to the Far Sandbar is a curved dip (Beach.groundY): short pieces.
+			nextZ = math.min(z + 4, sandbar.ChannelEnd)
+		elseif z < sandbar.ChannelStart and nextZ > sandbar.ChannelStart then
+			nextZ = sandbar.ChannelStart
+		end
+		local wetness = (z / Beach.Depth) * 0.6 + rng:NextNumber(0, 0.25)
+		local color = SAND:Lerp(WET_SAND, wetness)
+		slopedBlock(
+			"Beach",
+			-Beach.HalfWidth,
+			Beach.HalfWidth,
+			z,
+			Beach.groundY(z),
+			nextZ,
+			Beach.groundY(nextZ),
+			color
+		).Parent =
+			map
+		z = nextZ
+	end
+end
+
+-- Flat patches of lighter and darker sand scattered over the beach, so it isn't one colour.
+local function buildSandPatches(map: Folder)
+	local folder = Instance.new("Folder")
+	folder.Name = "SandPatches"
+	folder.Parent = map
+	local rng = Random.new(23)
+	local tilt = math.atan(beach.Slope)
+	local bleached = SAND:Lerp(Color3.new(1, 1, 1), 0.35)
+	local damp = SAND:Lerp(WET_SAND, 0.45)
+	for _ = 1, 420 do
+		local x = rng:NextNumber(-Beach.HalfWidth + 4, Beach.HalfWidth - 4)
+		local z = rng:NextNumber(2, Beach.Depth + 40)
+		local diameter = rng:NextNumber(3, 8)
+		local color = if rng:NextNumber() < 0.5 then bleached else damp
+		MapParts.part({
+			Name = "SandPatch",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.15, diameter, diameter),
+			CFrame = CFrame.new(x, Beach.groundY(z) + 0.05, z)
+				* CFrame.Angles(tilt, rng:NextNumber() * math.pi * 2, 0)
+				* CFrame.Angles(0, 0, math.pi / 2),
+			Color = color,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+		}).Parent =
+			folder
+	end
+end
+
+local function buildSea(map: Folder)
+	local seaEnd = Beach.Depth + beach.SeaExtent
+	slopedBlock(
+		"Seabed",
+		-Beach.HalfWidth - 300,
+		Beach.HalfWidth + 300,
+		Beach.Depth,
+		Beach.groundY(Beach.Depth),
+		seaEnd,
+		Beach.groundY(seaEnd),
+		SAND
+	).Parent =
+		map
+end
+
+-- Zone markers: a tall post at each side of the beach where each zone starts, with its name
+-- on a sign across the post.
+local function buildZoneMarkers(map: Folder)
+	local half = Beach.HalfWidth
+	for index = 1, beach.ActiveZones do
+		local zone = Config.Zones[index]
+		local startZ = Beach.zoneRange(index) + 1
+		local groundY = Beach.groundY(startZ)
+		local topY = 14
+		for side = -1, 1, 2 do
+			local x = side * (half - 8)
+			local post = MapParts.part({
+				Name = "ZoneMarker" .. index,
+				Size = Vector3.new(1.2, topY - groundY, 1.2),
+				CFrame = CFrame.new(x, (topY + groundY) / 2, startZ),
+				Color = Palette.World.Post,
+				Material = Palette.Material.Wood,
+			})
+			post.Parent = map
+			local flag = MapParts.part({
+				Name = "Flag",
+				Size = Vector3.new(0.2, 2.5, 4),
+				CFrame = CFrame.new(x, topY - 1.5, startZ + 2.2),
+				Color = Color3.fromHSV((index - 1) / beach.ActiveZones * 0.6, 0.7, 1),
+				CanCollide = false,
+			})
+			flag.Parent = post
+			MapParts.sign(
+				post,
+				string.format("Zone %d · %s · x%d", index, zone.Name, zone.Multiplier),
+				CFrame.new(x, 11, startZ),
+				16,
+				3
+			)
+		end
+	end
+end
+
+-- The Far Sandbar's marker, on the near edge of the sandbar.
+local function buildSandbarMarker(map: Folder)
+	local sandbar = beach.FarSandbar
+	local zone = Config.Zones[sandbar.Zone]
+	local z = sandbar.ChannelEnd + 1
+	local groundY = Beach.groundY(z)
+	for side = -1, 1, 2 do
+		local x = side * (Beach.HalfWidth - 8)
+		local post = MapParts.part({
+			Name = "ZoneMarkerFarSandbar",
+			Size = Vector3.new(1.2, 14 - groundY, 1.2),
+			CFrame = CFrame.new(x, (14 + groundY) / 2, z),
+			Color = Palette.World.Post,
+			Material = Palette.Material.Wood,
+		})
+		post.Parent = map
+		MapParts.sign(
+			post,
+			string.format("%s · x%d", zone.Name, zone.Multiplier),
+			CFrame.new(x, 11, z),
+			16,
+			3
+		)
+	end
+end
+
+-- The shop: the shopkeeper's house, the buyer by the sell pad, and the bank house.
+local function buildShop(map: Folder)
+	local shop = Instance.new("Folder")
+	shop.Name = "Shop"
+	shop.Parent = map
+
+	MapParts.part({
+		Name = "Boardwalk",
+		Size = Vector3.new(120, 2, beach.ShopDepth - 10),
+		CFrame = CFrame.new(0, 0, -beach.ShopDepth / 2 - 2),
+		Color = Palette.World.Boardwalk,
+		Material = Palette.Material.WoodPlanks,
+	}).Parent =
+		shop
+
+	-- Shopkeeper's house: the shopkeeper stands behind the counter, facing the door.
+	Buildings.house(shop, "ShopHouse", Vector3.new(SHOP_X, 0, HOUSE_Z), HOUSE_WIDTH, HOUSE_DEPTH, "SHOP")
+	Buildings.counter(shop, Vector3.new(SHOP_X, Buildings.FLOOR, HOUSE_Z + 4), 22, "SHOPKEEPER")
+	local shopkeeper = Buildings.person(
+		shop,
+		"Shopkeeper",
+		CFrame.new(SHOP_X, Buildings.FLOOR, HOUSE_Z - 2) * CFrame.Angles(0, math.pi, 0),
+		Palette.World.Shopkeeper
+	)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "ShopPrompt"
+	prompt.ActionText = "Shop"
+	prompt.ObjectText = "Shopkeeper"
+	prompt.MaxActivationDistance = 14
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = shopkeeper.PrimaryPart
+
+	-- The sell pad, its sign, and the buyer who sells what's on it when you talk to them.
+	local sellZone = MapParts.part({
+		Name = "SellZone",
+		Size = SELL_PAD_SIZE,
+		CFrame = CFrame.new(SELL_PAD),
+		Color = Palette.World.SellPad,
+		Material = Palette.Material.Neon,
+		Transparency = 0.5,
+		CanCollide = false,
+		CanQuery = false,
+	})
+	sellZone.Parent = shop
+	MapParts.sign(
+		shop,
+		"SELL: drop items on the yellow pad, then talk to the buyer",
+		CFrame.new(SELL_PAD.X, 5, SELL_PAD.Z - SELL_PAD_SIZE.Z / 2 - 2),
+		26,
+		2.6,
+		0
+	)
+
+	local buyer = Buildings.person(
+		shop,
+		"Buyer",
+		CFrame.new(BUYER_X, 0, SELL_PAD.Z) * CFrame.Angles(0, -math.pi / 2, 0),
+		Palette.World.Buyer
+	)
+	MapParts.sign(shop, "BUYER", CFrame.new(BUYER_X - 4, 5, SELL_PAD.Z - 10), 12, 2.4, 0)
+	local buyerPrompt = Instance.new("ProximityPrompt")
+	buyerPrompt.Name = "BuyerPrompt"
+	buyerPrompt.ActionText = "Sell"
+	buyerPrompt.ObjectText = "Buyer"
+	buyerPrompt.MaxActivationDistance = Config.Selling.BuyerRange
+	buyerPrompt.RequiresLineOfSight = false
+	buyerPrompt.Parent = buyer.PrimaryPart
+
+	-- The bank house: unlock items dropped on the purple floor inside are banked when you talk to
+	-- the banker.
+	Buildings.house(shop, "BankHouse", Vector3.new(BANK_X, 0, HOUSE_Z), HOUSE_WIDTH, HOUSE_DEPTH, "BANK")
+	Buildings.counter(shop, Vector3.new(BANK_X, Buildings.FLOOR, HOUSE_Z - 8), 22, "BANKER")
+	local banker = Buildings.person(
+		shop,
+		"Banker",
+		CFrame.new(BANK_X, Buildings.FLOOR, HOUSE_Z - 12) * CFrame.Angles(0, math.pi, 0),
+		Palette.World.Banker
+	)
+	local bankerPrompt = Instance.new("ProximityPrompt")
+	bankerPrompt.Name = "BankerPrompt"
+	bankerPrompt.ActionText = "Bank"
+	bankerPrompt.ObjectText = "Banker"
+	bankerPrompt.MaxActivationDistance = Config.Banking.BankerRange
+	bankerPrompt.RequiresLineOfSight = false
+	bankerPrompt.Parent = banker.PrimaryPart
+
+	local bankPad = MapParts.part({
+		Name = "BankPad",
+		Size = BANK_PAD_SIZE,
+		CFrame = CFrame.new(BANK_X, Buildings.FLOOR + 0.1, HOUSE_Z + 4),
+		Color = Palette.World.BankPad,
+		Material = Palette.Material.Neon,
+		Transparency = 0.5,
+		CanCollide = false,
+		CanQuery = false,
+	})
+	bankPad.Parent = shop
+	MapParts.sign(
+		shop,
+		"BANK: drop unlock items on the purple floor, then talk to the banker",
+		CFrame.new(BANK_X, 12, HOUSE_Z - HOUSE_DEPTH / 2 + 1.6),
+		HOUSE_WIDTH * 0.6,
+		3
+	)
+
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "BeachSpawn"
+	spawn.Anchored = true
+	spawn.Size = Vector3.new(10, 1, 10)
+	spawn.CFrame = CFrame.new(0, 1.1, -50)
+	spawn.Transparency = 1
+	spawn.CanCollide = false
+	spawn.Neutral = true
+	spawn.Duration = 0
+	spawn.Parent = shop
+end
+
+-- The look: haze over the far part of the map, and Roblox's own lighting effects for a bright,
+-- saturated, sunny feel. These are engine objects, not assets. Each is made once and reused.
+local function setLighting()
+	Lighting.FogStart = beach.Fog.Start
+	Lighting.FogEnd = beach.Fog.End
+	Lighting.FogColor = beach.Fog.Color
+
+	local function ensure(className: string): Instance
+		local existing = Lighting:FindFirstChildOfClass(className)
+		if existing then
+			return existing
+		end
+		local created = Instance.new(className)
+		created.Parent = Lighting
+		return created
+	end
+
+	local atmosphere = ensure("Atmosphere") :: Atmosphere
+	atmosphere.Density = 0.32
+	atmosphere.Offset = 0.2
+	atmosphere.Color = Color3.fromRGB(200, 228, 242)
+	atmosphere.Decay = Color3.fromRGB(110, 170, 210)
+	atmosphere.Glare = 0.25
+	atmosphere.Haze = 1.4
+
+	local correction = ensure("ColorCorrectionEffect") :: ColorCorrectionEffect
+	correction.Saturation = 0.25
+	correction.Contrast = 0.08
+	correction.Brightness = 0.02
+	correction.TintColor = Color3.fromRGB(255, 246, 230)
+
+	local bloom = ensure("BloomEffect") :: BloomEffect
+	bloom.Intensity = 0.35
+	bloom.Size = 18
+	bloom.Threshold = 0.9
+
+	local sunRays = ensure("SunRaysEffect") :: SunRaysEffect
+	sunRays.Intensity = 0.12
+	sunRays.Spread = 0.8
 end
 
 function BeachBuilder.build(): Folder
@@ -90,6 +376,7 @@ function BeachBuilder.build(): Folder
 	Lighting.ClockTime = 13.5
 	Lighting.Brightness = 2.5
 	Lighting.OutdoorAmbient = Color3.fromRGB(160, 150, 130)
+	setLighting()
 
 	local map = Instance.new("Folder")
 	map.Name = "Map"
@@ -98,202 +385,48 @@ function BeachBuilder.build(): Folder
 	local seaEnd = Beach.Depth + beach.SeaExtent
 
 	-- Flat dry ground behind the shoreline (shop area).
-	makePart({
+	MapParts.part({
 		Name = "DrySand",
 		Size = Vector3.new(beach.Width, 10, beach.ShopDepth),
 		CFrame = CFrame.new(0, -5, -beach.ShopDepth / 2),
-		Color = SAND,
+		Color = Palette.World.Sand,
 		Material = Palette.Material.Sand,
 	}).Parent =
 		map
 
-	-- Dunes behind the shop.
-	makePart({
+	-- Low dunes behind the shop, so the cove stays open.
+	MapParts.part({
 		Name = "Dunes",
-		Size = Vector3.new(beach.Width + 60, 16, 40),
+		Size = Vector3.new(beach.Width + 60, 8, 40),
 		CFrame = CFrame.new(0, 0, -beach.ShopDepth - 20),
-		Color = SAND,
+		Color = Palette.World.Sand,
 		Material = Palette.Material.Sand,
 	}).Parent =
 		map
 
 	-- The beach: one long slope from the shoreline out under the sea. The tide uncovers more
 	-- or less of it.
-	-- The beach out to the last zone, the deep channel, then the Far Sandbar.
-	local sandbar = beach.FarSandbar
-	local sand = slopedBlock(
-		"Beach",
-		-half,
-		half,
-		0,
-		0,
-		sandbar.ChannelStart,
-		Beach.groundY(sandbar.ChannelStart - 0.01)
-	)
-	sand.Color = SAND
-	sand.Parent = map
-	-- The channel follows Beach.groundY's curved dip in short straight pieces.
-	local pieces = 10
-	local step = (sandbar.ChannelEnd - sandbar.ChannelStart) / pieces
-	for i = 0, pieces - 1 do
-		local z0 = sandbar.ChannelStart + i * step
-		local z1 = z0 + step
-		slopedBlock("Channel", -half, half, z0, Beach.groundY(z0), z1, Beach.groundY(z1)).Parent = map
-	end
-	local bar = slopedBlock(
-		"FarSandbar",
-		-half,
-		half,
-		sandbar.ChannelEnd,
-		Beach.groundY(sandbar.ChannelEnd),
-		sandbar.End,
-		Beach.groundY(sandbar.End)
-	)
-	bar.Color = SAND
-	bar.Parent = map
-	slopedBlock(
-		"Seabed",
-		-half - 300,
-		half + 300,
-		Beach.Depth,
-		Beach.groundY(Beach.Depth),
-		seaEnd,
-		Beach.groundY(seaEnd)
-	).Parent =
-		map
+	buildBeach(map)
+	buildSandPatches(map)
+	buildSea(map)
 
-	-- Rocky headlands on both sides make the beach a cove.
+	-- Rocky headlands on both sides, pushed out and kept low so the cove reads as open.
 	for side = -1, 1, 2 do
 		local length = seaEnd + beach.ShopDepth + 40
-		makePart({
+		MapParts.part({
 			Name = "Headland",
-			Size = Vector3.new(40, 120, length),
-			CFrame = CFrame.new(side * (half + 20), -40, -beach.ShopDepth - 40 + length / 2),
+			Size = Vector3.new(80, 70, length),
+			CFrame = CFrame.new(side * (half + 60), -25, -beach.ShopDepth - 40 + length / 2),
 			Color = ROCK,
 			Material = Palette.Material.Rock,
 		}).Parent =
 			map
 	end
 
-	-- Zone markers: a tall post at each side of the beach where each zone starts.
-	for index = 1, beach.ActiveZones do
-		local zone = Config.Zones[index]
-		local startZ = Beach.zoneRange(index) + 1
-		local groundY = Beach.groundY(startZ)
-		local topY = 14
-		for side = -1, 1, 2 do
-			local post = makePart({
-				Name = "ZoneMarker" .. index,
-				Size = Vector3.new(1.2, topY - groundY, 1.2),
-				CFrame = CFrame.new(side * (half - 8), (topY + groundY) / 2, startZ),
-				Color = Color3.fromRGB(240, 240, 240),
-				Material = Palette.Material.Wood,
-			})
-			local flag = makePart({
-				Name = "Flag",
-				Size = Vector3.new(0.2, 2.5, 4),
-				CFrame = CFrame.new(side * (half - 8), topY - 1.5, startZ + 2.2),
-				Color = Color3.fromHSV((index - 1) / beach.ActiveZones * 0.6, 0.7, 1),
-				CanCollide = false,
-			})
-			flag.Parent = post
-			label(
-				post,
-				string.format("Zone %d · %s · x%d", index, zone.Name, zone.Multiplier),
-				Vector3.new(0, post.Size.Y / 2 + 3, 0)
-			)
-			post.Parent = map
-		end
-	end
-
-	-- The Far Sandbar's marker, on the near edge of the sandbar.
-	do
-		local zone = Config.Zones[sandbar.Zone]
-		local z = sandbar.ChannelEnd + 1
-		local groundY = Beach.groundY(z)
-		for side = -1, 1, 2 do
-			local post = makePart({
-				Name = "ZoneMarkerFarSandbar",
-				Size = Vector3.new(1.2, 14 - groundY, 1.2),
-				CFrame = CFrame.new(side * (half - 8), (14 + groundY) / 2, z),
-				Color = Palette.World.Post,
-				Material = Palette.Material.Wood,
-			})
-			label(
-				post,
-				string.format("%s · x%d", zone.Name, zone.Multiplier),
-				Vector3.new(0, post.Size.Y / 2 + 3, 0)
-			)
-			post.Parent = map
-		end
-	end
-
-	-- Shop area.
-	local shop = Instance.new("Folder")
-	shop.Name = "Shop"
-	shop.Parent = map
-
-	makePart({
-		Name = "Boardwalk",
-		Size = Vector3.new(120, 1, beach.ShopDepth - 10),
-		CFrame = CFrame.new(0, 0.5, -beach.ShopDepth / 2 - 2),
-		Color = Color3.fromRGB(160, 115, 75),
-		Material = Palette.Material.WoodPlanks,
-	}).Parent =
-		shop
-
-	local shopkeeper = makePart({
-		Name = "Shopkeeper",
-		Size = Vector3.new(3, 6, 2),
-		CFrame = CFrame.new(-25, 4, -62) * CFrame.Angles(0, math.pi, 0),
-		Color = Color3.fromRGB(255, 170, 90),
-	})
-	label(shopkeeper, "Shopkeeper", Vector3.new(0, 4.5, 0))
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.Name = "ShopPrompt"
-	prompt.ActionText = "Shop"
-	prompt.ObjectText = "Shopkeeper"
-	prompt.MaxActivationDistance = 14
-	prompt.RequiresLineOfSight = false
-	prompt.Parent = shopkeeper
-	shopkeeper.Parent = shop
-
-	local sellZone = makePart({
-		Name = "SellZone",
-		Size = Vector3.new(30, 0.2, 22),
-		CFrame = CFrame.new(28, 1.1, -24),
-		Color = Color3.fromRGB(255, 210, 60),
-		Material = Palette.Material.Neon,
-		Transparency = 0.5,
-		CanCollide = false,
-		CanQuery = false,
-	})
-	label(sellZone, "SELL: drop items or park your vessel here", Vector3.new(0, 5, 0))
-	sellZone.Parent = shop
-
-	local bankPad = makePart({
-		Name = "BankPad",
-		Size = Vector3.new(14, 0.2, 14),
-		CFrame = CFrame.new(0, 1.1, -16),
-		Color = Color3.fromRGB(190, 110, 255),
-		Material = Palette.Material.Neon,
-		Transparency = 0.5,
-		CanCollide = false,
-		CanQuery = false,
-	})
-	label(bankPad, "BANK: bring unlock items here to keep them safe", Vector3.new(0, 4, 0))
-	bankPad.Parent = shop
-
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name = "BeachSpawn"
-	spawn.Anchored = true
-	spawn.Size = Vector3.new(10, 1, 10)
-	spawn.CFrame = CFrame.new(0, 1.1, -50)
-	spawn.Transparency = 1
-	spawn.CanCollide = false
-	spawn.Neutral = true
-	spawn.Duration = 0
-	spawn.Parent = shop
+	buildZoneMarkers(map)
+	buildSandbarMarker(map)
+	buildShop(map)
+	BeachDressing.build(map, Random.new(7))
 
 	map.Parent = Workspace
 	return map
