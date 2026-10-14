@@ -248,7 +248,9 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 	align.MaxVelocity = 60
 	if kind == "item" then
 		align.ApplyAtCenterOfMass = true
-		align.MaxForce = part.AssemblyMass * currentTool().Grip
+		-- part.Mass, not AssemblyMass: the item may still read as anchored on this client for a
+		-- moment after the server lets go of it, and an anchored assembly's mass isn't usable.
+		align.MaxForce = part.Mass * currentTool().Grip
 	else
 		local vessel = part.Parent :: Model
 		align.ApplyAtCenterOfMass = false
