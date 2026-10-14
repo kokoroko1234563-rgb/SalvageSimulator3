@@ -221,14 +221,32 @@ local function enterLifted()
 	HUD.setHoldButtons(true, current.kind == "item" and myVessel() ~= nil)
 end
 
+-- Height of the map surface (sand, seabed or boardwalk) under a position.
+local function groundBelow(position: Vector3): number
+	local map = Workspace:FindFirstChild("Map")
+	if map then
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { map }
+		local hit = Workspace:Raycast(position + Vector3.new(0, 30, 0), Vector3.new(0, -100, 0), params)
+		if hit then
+			return hit.Position.Y
+		end
+	end
+	return Beach.groundY(position.Z)
+end
+
 local function targetPosition(current: Held, root: BasePart): Vector3
 	local reach = if current.kind == "item" then currentTool().Reach else grabCfg.VesselHandleReach
 	local look = root.CFrame.LookVector
 	local flatLook = Vector3.new(look.X, 0, look.Z).Unit
 
+	local handleHeight = current.part:GetAttribute("HandleHeight") or grabCfg.DefaultHandleHeight
+
 	if current.mode == "lifted" then
 		if current.kind == "vessel" then
-			return root.Position + flatLook * 3.5 - Vector3.new(0, 0.6, 0)
+			local spot = root.Position + flatLook * 3.5
+			return Vector3.new(spot.X, groundBelow(spot) + handleHeight, spot.Z)
 		end
 		local size = current.part.Size.Magnitude / 2
 		return root.Position + flatLook * (2.5 + size) + Vector3.new(0, 2.5, 0)
@@ -241,8 +259,13 @@ local function targetPosition(current: Held, root: BasePart): Vector3
 	if offset.Magnitude > reach then
 		target = root.Position + offset.Unit * reach
 	end
-	-- Don't drive items into the ground.
-	local floor = Beach.groundY(target.Z) + current.part.Size.Y / 2
+	-- The pointer ray usually ends at the ground, which would press things into the sand
+	-- and pin them with friction. Keep items lifted clear of it, and handles at towing height.
+	local ground = groundBelow(target)
+	if current.kind == "vessel" then
+		return Vector3.new(target.X, ground + handleHeight, target.Z)
+	end
+	local floor = ground + current.part.Size.Y / 2 + grabCfg.HoldLift
 	if target.Y < floor then
 		target = Vector3.new(target.X, floor, target.Z)
 	end

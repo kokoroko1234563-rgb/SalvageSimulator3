@@ -161,7 +161,11 @@ local function createItem(def, zoneIndex: number, position: Vector3): BasePart
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
 	part.CustomPhysicalProperties = PhysicalProperties.new(Items.ClassDensity[def.Class], 0.4, 0.1)
-	part.CFrame = CFrame.new(position) * CFrame.Angles(0, rng:NextNumber() * math.pi * 2, 0)
+	-- `position` assumes the catalog size; Roblox can resize some shapes (balls are always
+	-- round), so rest the real part on the surface instead of sinking it into the sand.
+	local restY = position.Y - def.Size.Y / 2 + part.Size.Y / 2 + 0.05
+	part.CFrame = CFrame.new(position.X, restY, position.Z)
+		* CFrame.Angles(0, rng:NextNumber() * math.pi * 2, 0)
 	part:SetAttribute("ItemId", def.Id)
 	part:SetAttribute("Class", def.Class)
 	part:SetAttribute("Rarity", def.Rarity)

@@ -99,6 +99,8 @@ Config.Grab = {
 	TowAcceleration = 260,
 	GripBreakTime = 0.35, -- an item pulled this far from your hand for this long is knocked loose
 	MinHoldDistance = 4,
+	HoldLift = 1.5, -- dragged items are held at least this far above the ground
+	DefaultHandleHeight = 2.4, -- towed vessel handles are held this high above the ground
 }
 
 Config.Drowning = {

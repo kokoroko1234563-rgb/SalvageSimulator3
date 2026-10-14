@@ -316,6 +316,8 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 	model:SetAttribute("Owner", player.UserId)
 	model:SetAttribute("Capacity", def.Capacity)
 	handle:SetAttribute("VesselId", vesselId)
+	-- A little above its resting height, so the wheelbarrow's legs lift clear of the sand.
+	handle:SetAttribute("HandleHeight", handle.Position.Y - origin.Position.Y + 0.5)
 	CollectionService:AddTag(model, VesselService.Tag)
 	CollectionService:AddTag(handle, VesselService.HandleTag)
 
