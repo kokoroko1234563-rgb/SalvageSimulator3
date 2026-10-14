@@ -5,7 +5,6 @@
 --     tower. Players with a complete lexicon can climb up and claim the Tall Top Hat from
 --     him: untradeable, never lost, worn from the inventory.
 
-local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
@@ -36,57 +35,6 @@ local function makePart(parent: Instance, props: { [string]: any }): Part
 	end
 	part.Parent = parent
 	return part
-end
-
--- The hat, as an Accessory that attaches to the head's HatAttachment.
-function LexiconService.buildHat(): Accessory
-	local accessory = Instance.new("Accessory")
-	accessory.Name = "TallTopHat"
-	local handle = Instance.new("Part")
-	handle.Name = "Handle"
-	handle.Shape = Enum.PartType.Cylinder
-	handle.Size = Vector3.new(2.4, 1.3, 1.3) -- a cylinder's length is along X
-	handle.Color = Palette.World.Hat
-	handle.Material = Palette.Material.Fabric
-	handle.CanCollide = false
-	handle.Massless = true
-	handle.Parent = accessory
-	local brim = Instance.new("Part")
-	brim.Name = "Brim"
-	brim.Shape = Enum.PartType.Cylinder
-	brim.Size = Vector3.new(0.15, 2, 2)
-	brim.CFrame = handle.CFrame * CFrame.new(-1.15, 0, 0)
-	brim.Color = Palette.World.Hat
-	brim.Material = Palette.Material.Fabric
-	brim.CanCollide = false
-	brim.Massless = true
-	brim.Parent = accessory
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = handle
-	weld.Part1 = brim
-	weld.Parent = handle
-	-- The hat's bottom sits on the head, and its length (X) points up.
-	local attachment = Instance.new("Attachment")
-	attachment.Name = "HatAttachment"
-	attachment.CFrame = CFrame.new(-1.15, 0, 0) * CFrame.Angles(0, 0, math.rad(-90))
-	attachment.Parent = handle
-	return accessory
-end
-
--- Puts the player's chosen cosmetic on their character (or takes it off).
-local function dressCharacter(player: Player)
-	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if not character or not humanoid then
-		return
-	end
-	local old = character:FindFirstChild("TallTopHat")
-	if old then
-		old:Destroy()
-	end
-	if player:GetAttribute("Cosmetic") == HAT then
-		humanoid:AddAccessory(LexiconService.buildHat())
-	end
 end
 
 local function claim(player: Player)
@@ -208,20 +156,6 @@ function LexiconService.init(notifyFn: (Player, string) -> ())
 			end
 		end
 	end)
-
-	local function onPlayer(player: Player)
-		player.CharacterAdded:Connect(function(character)
-			character:WaitForChild("Humanoid")
-			dressCharacter(player)
-		end)
-		player:GetAttributeChangedSignal("Cosmetic"):Connect(function()
-			dressCharacter(player)
-		end)
-	end
-	Players.PlayerAdded:Connect(onPlayer)
-	for _, player in Players:GetPlayers() do
-		onPlayer(player)
-	end
 end
 
 return LexiconService

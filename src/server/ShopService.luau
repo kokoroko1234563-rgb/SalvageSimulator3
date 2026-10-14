@@ -110,6 +110,7 @@ local function sellTick()
 		if unlock and inPad(bankPad, item.Position) then
 			-- Unlock items are banked, never sold: safe in the inventory from now on.
 			local itemId = item:GetAttribute("ItemId")
+			item:SetAttribute("BankedBy", owner.DisplayName)
 			ItemService.destroy(item)
 			DataService.addItem(owner, itemId, "beach")
 			notify(owner, "Banked a " .. Items.get(itemId).Name .. "!")

@@ -94,6 +94,26 @@ All six from the design doc are defined in `src/shared/Traders.luau`.
 | Barnacle Boots | waves push 10% less, never below 30% | `WaveController` |
 | Frostrunner Wax | +20% vessel speed | `GrabController` towing and hover |
 
+## The sky-beam item
+
+The **Beacon Pearl** is the rarest unlock item. Your doc doesn't name it, so the name is a placeholder.
+
+- **Spawning:** it only washes up in the outermost zone, at a 0.05% chance per surf spawn there (`Config.SkyBeam`), and only one at a time.
+- **The beam:** every client draws a tall beam of light over it (`SkyBeamController`). The beam follows the pearl wherever it goes (in the surf, in someone's hands, in a vessel) until it's banked.
+- **Announcements:** the server tells everyone when it washes up, who picks it up, and when it's banked or lost (`SkyBeamService`).
+- **What it opens:** the Sunken Bell Tower on the Far Sandbar, which is zone 5 and not built yet.
+
+## The global auction
+
+Press **U** (or the **Auction** button).
+
+- **Lots:** one lot at a time, the same on every server, on a fixed schedule (`Config.Auction`: 10-minute lots for testing). Each lot is a scarce cosmetic: the one-of-a-kind **Crown of Tides**, or numbered **Captain's Tricorns** (50) and **Sea-Glass Circlets** (25).
+- **Bidding:** bids are held in escrow. Your coins leave your save when you bid, and raising a bid only takes the difference.
+- **When a lot ends:** exactly one server resolves it. The winner gets the item with its serial number ("#3 of 50") and their name on it, and every other bid is refunded. Both reach the player on whichever server they're on, through a ledger (`AuctionService`). The winning bid is destroyed, which makes the auction the main coin sink.
+- **Rebirth:** a rebirth (normal or true) cancels your bid and refunds it before the reset, so bids can't park coins.
+- **Where it's stored:** live lots in MemoryStoreService, ledgers, serial counters and recent winners in DataStores, and announcements over MessagingService. In Studio without API access it falls back to running on one server, so you can still test it.
+- **Tests:** `tools/tests` cover escrow, outbidding, raising, wins with serials, refunds, double-collect, and rebirth cancellation.
+
 ## Trading
 
 Press **T** (or the orange **Trade** button). Invite anyone on the server. They get a message and can accept or decline from their trade screen.
@@ -144,6 +164,7 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `rebirth [player]`, `rebirths <n> [player]` | Free rebirth (with reward pick), or set the count |
 | `reward <id\|all\|none> [player]` | `swiftfeet`, `deeppockets`, `floatingclamshell` |
 | `inv [player]` | List a player's inventory |
+| `auction [end]` | Show the current auction lot, or end it now (the next one starts) |
 | `towerman [zone]`, `lexicon <all\|none> [player]` | Make the tower man appear; fill or clear the lexicon |
 | `trader <id> [zone]`, `upgrade <id> <level> [player]` | Make a trader appear (`gary`, `rusty`, ...); set an upgrade level |
 | `give <item> [player] [variant]` | Any inventory item: `give anchorhook`, `give deckhandssatchel me Barnacled` |

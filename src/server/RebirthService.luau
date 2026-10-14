@@ -12,6 +12,7 @@ local Remotes = require(Shared.Remotes)
 local Secrets = require(Shared.Secrets)
 local Traders = require(Shared.Traders)
 
+local AuctionService = require(script.Parent.AuctionService)
 local DataService = require(script.Parent.DataService)
 local VesselService = require(script.Parent.VesselService)
 
@@ -47,6 +48,8 @@ function RebirthService.rebirth(player: Player, free: boolean): (boolean, string
 	if not free and profile.Coins < cost then
 		return false, "You need " .. cost .. " coins to rebirth"
 	end
+	-- Bids can't be used to park coins through a rebirth: cancel and refund first.
+	AuctionService.cancelBid(player)
 
 	profile.Coins = 0
 	profile.EquippedTool = nil
@@ -91,6 +94,7 @@ function RebirthService.trueRebirth(player: Player, free: boolean): (boolean, st
 		end
 	end
 
+	AuctionService.cancelBid(player)
 	profile.Coins = 0
 	profile.Rebirths = 0
 	profile.Rewards = {}

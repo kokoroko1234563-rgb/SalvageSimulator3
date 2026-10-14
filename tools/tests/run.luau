@@ -70,6 +70,9 @@ test("load server services", function()
 			"LexiconService",
 			"TraderService",
 			"TradeService",
+			"AuctionService",
+			"SkyBeamService",
+			"CosmeticService",
 		}
 	do
 		h.require("Server/" .. name)
@@ -150,6 +153,8 @@ for _, name in
 		"AdminConsole",
 		"TradeUI",
 		"TraderUI",
+		"AuctionUI",
+		"SkyBeamController",
 	}
 do
 	test("load Client/" .. name, function()
@@ -245,18 +250,26 @@ test("trade rejects shop gear, missing items and too many coins", function()
 end)
 
 -- 10. Lexicon, tower man, hat and traders.
-test("build the tower man and the hat", function()
+test("build the tower man", function()
 	local LexiconService = h.require("Server/LexiconService")
 	local folder = Harness.wrap(roblox.Instance.new("Folder"))
 	folder.Parent = h.game.Workspace
 	local tower = LexiconService.buildTower(folder, roblox.Vector3.new(0, 0, 100))
 	assert(tower:FindFirstChild("Man"), "no man on the tower")
-	local hat = LexiconService.buildHat()
-	assert(hat:IsA("Accessory"), "the hat must be an Accessory")
-	local handle = hat:FindFirstChild("Handle")
-	assert(handle and handle:FindFirstChild("HatAttachment"), "the hat needs a Handle with a HatAttachment")
 	folder:Destroy()
 end)
+
+for _, cosmetic in h.require("Shared/Gear").Cosmetics do
+	test("build cosmetic " .. cosmetic.Id, function()
+		local hat = h.require("Server/CosmeticService").build(cosmetic)
+		assert(hat:IsA("Accessory"), "a cosmetic must be an Accessory")
+		local handle = hat:FindFirstChild("Handle")
+		assert(
+			handle and handle:FindFirstChild("HatAttachment"),
+			"a cosmetic needs a Handle with a HatAttachment"
+		)
+	end)
+end
 
 local Traders = h.require("Shared/Traders")
 for id, trader in Traders.List do
@@ -295,6 +308,74 @@ test("lexicon records each item once and knows when it's complete", function()
 		DataService.recordLexicon(p :: any, item.Id)
 	end
 	assert(DataService.lexiconComplete(p :: any), "should be complete")
+end)
+
+-- 11. Global auction: escrow, outbids, resolution, ledgers, rebirth cancel (one-server store).
+test("auction: escrow, outbid, win, refunds", function()
+	local DataService = h.require("Server/DataService")
+	local AuctionService = h.require("Server/AuctionService")
+	AuctionService._useStore(AuctionService._localStore())
+	local a, b = fakePlayer("Ann", 11), fakePlayer("Bob", 12)
+	DataService._setProfile(a, { Coins = 100000 })
+	DataService._setProfile(b, { Coins = 100000 })
+	local pa, pb = DataService.get(a :: any), DataService.get(b :: any)
+
+	local state = AuctionService._stateFor(a :: any)
+	local start = state.StartingBid
+	assert(
+		not AuctionService._bid(a :: any, state.LotId, start - 1),
+		"a bid under the starting bid must fail"
+	)
+	assert(AuctionService._bid(a :: any, state.LotId, start), "Ann's first bid")
+	assert(pa.Coins == 100000 - start, "Ann's coins are held")
+	assert(not AuctionService._bid(b :: any, state.LotId, start + 1), "too small an increment must fail")
+	local beat = AuctionService.minNextBid(start, start)
+	assert(AuctionService._bid(b :: any, state.LotId, beat), "Bob outbids")
+	assert(pb.Coins == 100000 - beat, "Bob's coins are held")
+	assert(not AuctionService._bid(a :: any, "lot_0", 999999), "bidding on an old lot must fail")
+
+	-- Ann raises: only the difference is taken.
+	local raise = AuctionService.minNextBid(beat, start)
+	assert(AuctionService._bid(a :: any, state.LotId, raise), "Ann raises")
+	assert(pa.Coins == 100000 - raise, "only the difference was taken")
+
+	-- The lot ends: Ann wins, Bob is refunded through the ledger.
+	AuctionService._resolve(AuctionService._lotIndex())
+	AuctionService._resolve(AuctionService._lotIndex()) -- a second resolve does nothing
+	AuctionService._collect(a :: any)
+	AuctionService._collect(b :: any)
+	assert(pb.Coins == 100000, "Bob gets his whole bid back")
+	assert(pa.Coins == 100000 - raise, "Ann's winning bid is destroyed")
+	local won
+	for _, record in pa.Items do
+		won = record
+	end
+	assert(
+		won and won.Id == state.ItemId and won.Serial == 1 and won.Winner == "Ann",
+		"Ann gets item #1 with her name"
+	)
+	AuctionService._collect(a :: any)
+	local count = 0
+	for _ in pa.Items do
+		count += 1
+	end
+	assert(count == 1, "collecting twice must not give a second item")
+end)
+
+test("auction: a rebirth cancels and refunds the bid first", function()
+	local DataService = h.require("Server/DataService")
+	local AuctionService = h.require("Server/AuctionService")
+	AuctionService._useStore(AuctionService._localStore())
+	local c = fakePlayer("Cat", 13)
+	DataService._setProfile(c, { Coins = 60000 })
+	local pc = DataService.get(c :: any)
+	local state = AuctionService._stateFor(c :: any)
+	assert(AuctionService._bid(c :: any, state.LotId, state.StartingBid), "bid")
+	AuctionService.cancelBid(c :: any)
+	assert(pc.Coins == 60000, "the bid is refunded")
+	AuctionService._resolve(AuctionService._lotIndex())
+	AuctionService._collect(c :: any)
+	assert(pc.Coins == 60000 and next(pc.Items) == nil, "a cancelled bid can't win or be refunded twice")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failures))

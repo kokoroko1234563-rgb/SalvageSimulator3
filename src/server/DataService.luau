@@ -35,6 +35,7 @@ export type ItemRecord = {
 	Variant: string?, -- cosmetic variant, e.g. "Frosted"
 	Serial: number?, -- numbered auction items: #Serial of Of
 	Of: number?,
+	Winner: string?, -- auction items: who won it
 }
 
 export type PocketEntry = { ItemId: string, Zone: number, Value: number }
@@ -180,6 +181,7 @@ local function reconcile(data: any): Profile
 					Variant = if type(record.Variant) == "string" then record.Variant else nil,
 					Serial = if type(record.Serial) == "number" then record.Serial else nil,
 					Of = if type(record.Of) == "number" then record.Of else nil,
+					Winner = if type(record.Winner) == "string" then record.Winner else nil,
 				}
 			end
 		end

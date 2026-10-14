@@ -1,12 +1,14 @@
 -- Salvage Simulator 3 client entry point (Milestones 1 and 2).
 
 local AdminConsole = require(script.AdminConsole)
+local AuctionUI = require(script.AuctionUI)
 local HUD = require(script.HUD)
 local InventoryUI = require(script.InventoryUI)
 local TideController = require(script.TideController)
 local WaveController = require(script.WaveController)
 local GrabController = require(script.GrabController)
 local SecretController = require(script.SecretController)
+local SkyBeamController = require(script.SkyBeamController)
 local TradeUI = require(script.TradeUI)
 local TraderUI = require(script.TraderUI)
 
@@ -16,6 +18,8 @@ TideController.init()
 WaveController.init()
 GrabController.init()
 SecretController.init()
+SkyBeamController.init()
 TradeUI.init()
 TraderUI.init()
+AuctionUI.init()
 AdminConsole.init()

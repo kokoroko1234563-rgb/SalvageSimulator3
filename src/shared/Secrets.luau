@@ -95,6 +95,11 @@ Secrets.List = {
 	},
 }
 
+-- Secrets that unlock items already point at, but that aren't built yet.
+Secrets.Planned = {
+	FarSandbar = "The Sunken Bell Tower, on the Far Sandbar (zone 5)",
+}
+
 Secrets.CoinColors = Palette.Coin
 Secrets.CoinOrder = { "Yellow", "Orange", "Blue", "Green", "Pink" }
 

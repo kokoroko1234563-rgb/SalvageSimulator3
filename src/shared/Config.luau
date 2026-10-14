@@ -119,6 +119,11 @@ Config.Traders = {
 	MinWavePush = 0.3, -- stacked wave resistance never takes waves below 30%
 }
 
+Config.SkyBeam = {
+	SpawnChance = 0.0005, -- chance a surf spawn in the outermost zone is the Beacon Pearl
+	Height = 600, -- studs of light above it
+}
+
 Config.Hazards = {
 	BarrelPeriod = 6, -- Shipwreck Shallows: a barrel rolls down the sand this often (learnable timer)
 	BarrelSpeed = 16,
@@ -129,6 +134,18 @@ Config.Trading = {
 	CoinTax = 0.10, -- share of traded coins that leaves the game (stops "parking" coins)
 	InviteTimeout = 30,
 	MaxItemsPerSide = 30,
+}
+
+-- The global auction: one lot at a time, the same on every server, on a fixed schedule.
+Config.Auction = {
+	LotDuration = 600, -- seconds per lot (10 minutes for testing)
+	Epoch = 1767225600, -- 2026-01-01: lots are numbered from here
+	Lots = { "CaptainsTricorn", "SeaGlassCirclet", "CaptainsTricorn", "CrownOfTides" }, -- the rotation
+	MinIncrement = 100, -- a new top bid beats the old one by at least this...
+	MinIncrementFraction = 0.05, -- ...or this share of it, whichever is more
+	PollInterval = 3, -- seconds between reading the shared lot
+	LedgerInterval = 30, -- seconds between collecting refunds and wins from other servers
+	Recent = 8, -- results kept for the "recent winners" list
 }
 
 Config.Rebirth = {

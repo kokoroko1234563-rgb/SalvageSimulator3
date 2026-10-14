@@ -52,6 +52,7 @@ Palette.Rarity = {
 	VeryRare = rgb(200, 110, 255),
 	Unlock = rgb(255, 205, 60),
 	Exotic = rgb(40, 225, 200),
+	Auction = rgb(255, 120, 60),
 }
 
 Palette.Coin = {

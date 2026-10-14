@@ -14,6 +14,8 @@ local FUNCTIONS = {
 	"TrueRebirth", -- () -> ok, reason
 	"Trade", -- (action, ...) -> ok, reason (see TradeService)
 	"TraderBuy", -- (encounterId) -> ok, reason
+	"AuctionBid", -- (lotId, amount) -> ok, reason
+	"AuctionState", -- () -> current lot, your bid, recent winners
 	"ChooseReward", -- (rewardId) -> ok, reason
 	"GetInventory", -- () -> snapshot (see InventoryService)
 	"InventoryAction", -- (action, arg, value?) -> ok, reason

@@ -36,6 +36,7 @@ function InventoryService.snapshot(player: Player)
 			Variant = record.Variant,
 			Serial = record.Serial,
 			Of = record.Of,
+			Winner = record.Winner,
 		})
 	end
 	table.sort(items, function(a, b)

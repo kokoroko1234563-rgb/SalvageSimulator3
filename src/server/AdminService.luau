@@ -19,6 +19,7 @@ local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
 local Waves = require(Shared.Waves)
 
+local AuctionService = require(script.Parent.AuctionService)
 local BiomeService = require(script.Parent.BiomeService)
 local DataService = require(script.Parent.DataService)
 local LexiconService = require(script.Parent.LexiconService)
@@ -852,6 +853,28 @@ command(
 		end) or lines
 	end
 )
+
+command("auction", "auction [end]", "Show the current auction lot, or end it now", function(caller, args)
+	if (args[1] or ""):lower() == "end" then
+		local state = AuctionService._stateFor(caller)
+		Workspace:SetAttribute(
+			AuctionService.OffsetAttribute,
+			(Workspace:GetAttribute(AuctionService.OffsetAttribute) or 0) + math.max(0, state.TimeLeft) + 1
+		)
+		return { "Ended " .. state.Name .. ". It's resolved within a few seconds and the next lot starts." }
+	end
+	local state = AuctionService._stateFor(caller)
+	return {
+		string.format("%s (%s), %ds left", state.Name, state.LotId, state.TimeLeft),
+		string.format(
+			"Top bid %d by %s, minimum next %d",
+			state.TopBid,
+			tostring(state.TopName),
+			state.MinNext
+		),
+		string.format("%d of %d already won", state.Issued, state.Of),
+	}
+end)
 
 -- Remote --------------------------------------------------------------------------
 

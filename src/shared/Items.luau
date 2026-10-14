@@ -121,6 +121,21 @@ Items.Catalog = {
 		Color = Color3.fromRGB(80, 200, 190),
 		Material = Palette.Material.Metal,
 	},
+	{
+		-- The rarest unlock item: a beam of light follows it until it's banked.
+		Id = "BeaconPearl",
+		Name = "Beacon Pearl",
+		Class = Light,
+		Rarity = "Unlock",
+		Unlock = "FarSandbar",
+		UnlockNote = "Opens the Sunken Bell Tower on the Far Sandbar (coming later). A beam of light follows it until it's banked",
+		SkyBeam = true,
+		Value = 0,
+		Size = Vector3.new(1, 1, 1),
+		Shape = "Ball",
+		Color = Color3.fromRGB(255, 245, 200),
+		Material = Palette.Material.Neon,
+	},
 	-- Medium
 	{
 		Id = "Bucket",

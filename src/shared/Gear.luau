@@ -211,13 +211,49 @@ Gear.Accessories = {
 	},
 }
 
--- Worn for looks only.
+-- Worn for looks only. Each is a hat: a cylinder of Height and Width, with an optional
+-- brim of diameter Brim. Auction cosmetics are scarce: Of = how many will ever exist.
 Gear.Cosmetics = {
 	{
 		Id = "TallTopHat",
 		Name = "Tall Top Hat",
 		Rarity = "VeryRare",
 		Note = "From the man on the dirt tower, for completing the lexicon. Wear it with pride",
+		Tradeable = false,
+		Hat = { Height = 2.4, Width = 1.3, Brim = 2, Color = Color3.fromRGB(25, 25, 30), Material = "Fabric" },
+	},
+	{
+		Id = "CrownOfTides",
+		Name = "Crown of Tides",
+		Rarity = "Auction",
+		Note = "One of a kind. Won at the global auction",
+		Tradeable = true,
+		Hat = { Height = 0.8, Width = 1.5, Color = Color3.fromRGB(255, 200, 60), Material = "Foil" },
+		Auction = { Of = 1, StartingBid = 50000 },
+	},
+	{
+		Id = "CaptainsTricorn",
+		Name = "Captain's Tricorn",
+		Rarity = "Auction",
+		Note = "A numbered tricorn from the global auction",
+		Tradeable = true,
+		Hat = {
+			Height = 0.7,
+			Width = 1.6,
+			Brim = 2.6,
+			Color = Color3.fromRGB(35, 30, 40),
+			Material = "Fabric",
+		},
+		Auction = { Of = 50, StartingBid = 10000 },
+	},
+	{
+		Id = "SeaGlassCirclet",
+		Name = "Sea-Glass Circlet",
+		Rarity = "Auction",
+		Note = "A numbered circlet of sea glass from the global auction",
+		Tradeable = true,
+		Hat = { Height = 0.35, Width = 1.6, Color = Color3.fromRGB(130, 220, 200), Material = "Glass" },
+		Auction = { Of = 25, StartingBid = 20000 },
 	},
 }
 
@@ -240,6 +276,15 @@ end
 
 function Gear.getAccessory(id: string?)
 	return accessoriesById[id or ""]
+end
+
+local cosmeticsById = {}
+for _, cosmetic in Gear.Cosmetics do
+	cosmeticsById[cosmetic.Id] = cosmetic
+end
+
+function Gear.getCosmetic(id: string?)
+	return cosmeticsById[id or ""]
 end
 
 function Gear.getTool(id: string?)

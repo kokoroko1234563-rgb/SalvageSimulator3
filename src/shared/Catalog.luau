@@ -111,7 +111,7 @@ for _, cosmetic in Gear.Cosmetics do
 		Name = cosmetic.Name,
 		Category = "Cosmetic",
 		Rarity = cosmetic.Rarity,
-		Tradeable = false,
+		Tradeable = cosmetic.Tradeable == true,
 		Resets = "Never",
 		ShopItem = false,
 		Exotic = false,
@@ -130,7 +130,7 @@ for _, item in Items.Catalog do
 			Resets = "Never",
 			ShopItem = false,
 			Exotic = false,
-			Description = "Opens a secret. Used up when you go in, win or lose.",
+			Description = (item.UnlockNote or "Opens a secret") .. ". Used up when you go in, win or lose.",
 		})
 	end
 end

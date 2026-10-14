@@ -62,7 +62,7 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		check(type(item.Value) == "number", where .. ": missing Value")
 		if item.Unlock then
 			check(
-				Biomes.List[item.Unlock] ~= nil,
+				Biomes.List[item.Unlock] ~= nil or Secrets.Planned[item.Unlock] ~= nil,
 				where .. ": unlocks unknown biome " .. tostring(item.Unlock)
 			)
 			check(Catalog.get(item.Id) ~= nil, where .. ": unlock item missing from the inventory catalog")
@@ -213,7 +213,25 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 
 	-- Cosmetics
 	for _, cosmetic in Gear.Cosmetics do
-		check(Palette.Rarity[cosmetic.Rarity] ~= nil, "Cosmetic " .. cosmetic.Id .. ": rarity has no colour")
+		local where = "Cosmetic " .. cosmetic.Id
+		check(Palette.Rarity[cosmetic.Rarity] ~= nil, where .. ": rarity has no colour")
+		local hat = cosmetic.Hat
+		check(
+			hat and type(hat.Height) == "number" and type(hat.Width) == "number",
+			where .. ": needs a Hat shape"
+		)
+		check(hat and isColor(hat.Color), where .. ": Hat.Color must be a Color3")
+		check(
+			hat and Palette.Material[hat.Material] ~= nil,
+			where .. ": Hat.Material must be a Palette material"
+		)
+		if cosmetic.Auction then
+			check(
+				type(cosmetic.Auction.Of) == "number" and cosmetic.Auction.Of >= 1,
+				where .. ": Auction.Of must be 1 or more"
+			)
+			check(type(cosmetic.Auction.StartingBid) == "number", where .. ": Auction needs a StartingBid")
+		end
 	end
 
 	-- Traders: each sells a real upgrade; traders whose biome exists must be payable with
@@ -235,6 +253,15 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 	end
 	for _, id in Traders.UpgradeOrder do
 		check(Traders.Upgrades[id] ~= nil, "Upgrade " .. id .. " is listed but not defined")
+	end
+
+	-- Auction: every lot is an auctionable cosmetic.
+	for _, id in Config.Auction.Lots do
+		local cosmetic = Gear.getCosmetic(id)
+		check(
+			cosmetic ~= nil and cosmetic.Auction ~= nil,
+			"Auction lot " .. id .. " isn't an auction cosmetic"
+		)
 	end
 
 	-- Rebirth

@@ -35,6 +35,7 @@ local all: { [BasePart]: boolean } = {}
 local loose: { [BasePart]: boolean } = {}
 local rng = Random.new()
 local destroyedCallbacks = {}
+local createdCallbacks = {}
 
 local function now(): number
 	return Tide.now()
@@ -66,6 +67,10 @@ end
 
 function ItemService.isOwnedBy(item: BasePart, player: Player): boolean
 	return ItemService.getOwnerId(item) == player.UserId
+end
+
+function ItemService.onCreated(callback: (BasePart) -> ())
+	table.insert(createdCallbacks, callback)
 end
 
 function ItemService.onDestroyed(callback: (BasePart) -> ())
@@ -211,10 +216,16 @@ local function createItem(def, zoneIndex: number, position: Vector3): BasePart
 		sparkles.SparkleColor = def.Color
 		sparkles.Parent = part
 	end
+	if def.SkyBeam then
+		CollectionService:AddTag(part, "SkyBeam")
+	end
 	ItemService.setUnclaimed(part, false)
 	CollectionService:AddTag(part, ItemService.Tag)
 	part.Parent = folder
 	all[part] = true
+	for _, callback in createdCallbacks do
+		task.spawn(callback, part)
+	end
 	return part
 end
 
@@ -249,6 +260,15 @@ function ItemService.spawnInSurf(waterline: number): BasePart?
 		if ItemService.countOf(biome.UnlockItem) < Config.Unlocks.MaxOnMap then
 			def = Items.get(biome.UnlockItem)
 		end
+	end
+	-- The sky-beam item only ever washes up in the outermost zone, and only one at a time.
+	if
+		not def
+		and zoneIndex == Config.Beach.ActiveZones
+		and rng:NextNumber() < Config.SkyBeam.SpawnChance
+		and ItemService.countOf("BeaconPearl") == 0
+	then
+		def = Items.get("BeaconPearl")
 	end
 	if not def and biome and rng:NextNumber() < biome.LootShare then
 		def = Items.get(biome.Loot[rng:NextInteger(1, #biome.Loot)])
