@@ -111,6 +111,13 @@ Config.Hazards = {
 	BarrelSpeed = 16,
 }
 
+Config.Trading = {
+	Countdown = 5, -- seconds after any change before either player can accept
+	CoinTax = 0.10, -- share of traded coins that leaves the game (stops "parking" coins)
+	InviteTimeout = 30,
+	MaxItemsPerSide = 30,
+}
+
 Config.Rebirth = {
 	BaseCost = 100000,
 	CostGrowth = 1.5, -- each rebirth costs this much more than the last

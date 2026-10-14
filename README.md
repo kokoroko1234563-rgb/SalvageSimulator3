@@ -69,6 +69,17 @@ Two more safeguards live in the game itself:
 | True rebirth | In the shop: redeem all 5 colored coins (two clicks). It resets coins, gear, rebirths, multiplier, rewards, magical vessels, colored coins and pockets. It keeps unlock items, exotic items, cores and attunements, and gives **1 attunement core**. |
 | Attunement | Exotic items can't be used until you spend a core on them (**Attune** on the inventory card). Attunement is to the item type, so trading the copy away and getting another later still works. |
 
+## Trading
+
+Press **T** (or the orange **Trade** button). Invite anyone on the server. They get a message and can accept or decline from their trade screen.
+
+- **Offering:** both sides offer items and coins. Only tradeable items can be offered: unlock items and exotic items. Shop gear, colored coins and attunement cores can't be traded.
+- **Accepting:** any change clears both accepts and restarts a 5-second countdown (`Config.Trading`) before either player can accept.
+- **The swap:** when both accept, `DataService.executeTrade` re-checks every item and coin, then swaps everything in one step. Items keep their unique id, variant and serial number. Both saves are written straight away. If anything is no longer valid, nothing changes and the trade is cancelled.
+- **Coin tax:** 10% of coins in every trade leave the game. That stops players parking coins with a friend before a rebirth, and acts as a coin sink.
+- **Vessels:** a vessel that changes hands is put away for its old owner.
+- **Tests:** `tools/tests` cover the swap: items move rather than copy, the coin tax is applied, a replayed trade fails, and trades with shop gear, missing items or too many coins change nothing.
+
 ## Inventory
 
 Press **I** (or the purple bag button) to open it.

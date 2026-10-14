@@ -12,6 +12,7 @@ local FUNCTIONS = {
 	"AdminCommand", -- (commandLine) -> { output lines } (admins only)
 	"Rebirth", -- () -> ok, reason
 	"TrueRebirth", -- () -> ok, reason
+	"Trade", -- (action, ...) -> ok, reason (see TradeService)
 	"ChooseReward", -- (rewardId) -> ok, reason
 	"GetInventory", -- () -> snapshot (see InventoryService)
 	"InventoryAction", -- (action, arg, value?) -> ok, reason
@@ -27,6 +28,7 @@ local EVENTS = {
 	"ClaimChest", -- client -> server ()
 	"Pocket", -- client -> server ("store", part) | ("drop", slot?)
 	"InventorySync", -- server -> client (snapshot) whenever the inventory changes
+	"TradeSync", -- server -> client (trade state) whenever a trade or invite changes
 }
 
 local Remotes = {}

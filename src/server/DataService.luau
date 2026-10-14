@@ -566,6 +566,67 @@ function DataService.removeItemsOfType(player: Player, id: string, count: number
 end
 
 -- Removes every item a reset of this kind takes away ("Rebirth" or "TrueRebirth").
+export type TradeOffer = { Items: { [string]: boolean }, Coins: number }
+
+-- Swaps two offers between two loaded players in one step: everything is re-checked first,
+-- then items move (keeping their unique ids, variants and serials) and coins move minus
+-- the tax. Nothing changes unless all of it is valid. Both saves are written straight away.
+function DataService.executeTrade(
+	a: Player,
+	b: Player,
+	offerA: TradeOffer,
+	offerB: TradeOffer,
+	taxRate: number
+): (boolean, string?)
+	local pa, pb = profiles[a], profiles[b]
+	if not pa or not pb or a == b then
+		return false, "Both players must be loaded"
+	end
+	for _, side in { { pa, offerA, a }, { pb, offerB, b } } do
+		local profile, offer, player = side[1], side[2], side[3]
+		for uid in offer.Items do
+			local record = profile.Items[uid]
+			local entry = record and Catalog.get(record.Id)
+			if not record or not entry then
+				return false, player.Name .. " no longer has an offered item"
+			end
+			if not entry.Tradeable then
+				return false, entry.Name .. " can't be traded"
+			end
+		end
+		if type(offer.Coins) ~= "number" or offer.Coins < 0 or offer.Coins ~= math.floor(offer.Coins) then
+			return false, "Invalid coin amount"
+		end
+		if offer.Coins > profile.Coins then
+			return false, player.Name .. " doesn't have that many coins any more"
+		end
+	end
+
+	local function move(from: Profile, to: Profile, offer: TradeOffer)
+		for uid in offer.Items do
+			to.Items[uid] = from.Items[uid]
+			from.Items[uid] = nil
+		end
+		from.Coins -= offer.Coins
+		to.Coins += math.floor(offer.Coins * (1 - taxRate))
+	end
+	move(pa, pb, offerA)
+	move(pb, pa, offerB)
+
+	print(string.format("[Trade] %s <-> %s completed", a.Name, b.Name))
+	publish(a)
+	publish(b)
+	task.spawn(save, a, false)
+	task.spawn(save, b, false)
+	return true
+end
+
+-- For tools/tests: install a profile for a stand-in player.
+function DataService._setProfile(player: any, data: any)
+	profiles[player] = reconcile(data)
+	canSave[player] = false
+end
+
 function DataService.removeItemsLostOn(player: Player, reset: string)
 	local profile = profiles[player]
 	if not profile then

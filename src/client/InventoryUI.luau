@@ -467,6 +467,16 @@ local function setOpen(open: boolean)
 	refresh()
 end
 
+-- The latest inventory snapshot (the trade screen lists your tradeable items from it).
+function InventoryUI.getSnapshot()
+	return snapshot
+end
+
+local changedCallbacks = {}
+function InventoryUI.onChanged(callback: () -> ())
+	table.insert(changedCallbacks, callback)
+end
+
 function InventoryUI.init()
 	local gui = make("ScreenGui", {
 		Name = "Inventory",
@@ -586,6 +596,9 @@ function InventoryUI.init()
 	Remotes.get("InventorySync").OnClientEvent:Connect(function(data)
 		snapshot = data
 		refresh()
+		for _, callback in changedCallbacks do
+			task.spawn(callback)
+		end
 	end)
 	-- The first snapshot: the profile may still be loading, so ask until there is one.
 	task.spawn(function()

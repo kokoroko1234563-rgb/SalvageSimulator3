@@ -136,11 +136,100 @@ for id, secret in Secrets.List do
 end
 
 -- 8. Client UI modules load.
-for _, name in { "HUD", "InventoryUI", "TideController", "WaveController", "GrabController", "AdminConsole" } do
+for _, name in
+	{ "HUD", "InventoryUI", "TideController", "WaveController", "GrabController", "AdminConsole", "TradeUI" }
+do
 	test("load Client/" .. name, function()
 		h.require("Client/" .. name)
 	end)
 end
+
+-- 9. Trading: the swap is all-or-nothing and never duplicates anything.
+local function fakePlayer(name: string, userId: number)
+	local attributes = {}
+	return {
+		Name = name,
+		DisplayName = name,
+		UserId = userId,
+		Parent = true,
+		SetAttribute = function(_, key, value)
+			attributes[key] = value
+		end,
+		GetAttribute = function(_, key)
+			return attributes[key]
+		end,
+	}
+end
+local function countItems(profile)
+	local count = 0
+	for _ in profile.Items do
+		count += 1
+	end
+	return count
+end
+
+test("trade swaps items and taxed coins", function()
+	local DataService = h.require("Server/DataService")
+	local a, b = fakePlayer("A", 1), fakePlayer("B", 2)
+	DataService._setProfile(a, {
+		Coins = 1000,
+		Items = { u1 = { Id = "GoldenSpade" }, u3 = { Id = "BoatHook" } },
+	})
+	DataService._setProfile(b, { Coins = 0, Items = { u2 = { Id = "AnchorHook", Variant = "Barnacled" } } })
+	local ok, reason = DataService.executeTrade(
+		a :: any,
+		b :: any,
+		{ Items = { u1 = true }, Coins = 500 },
+		{ Items = { u2 = true }, Coins = 0 },
+		0.1
+	)
+	assert(ok, reason)
+	local pa, pb = DataService.get(a :: any), DataService.get(b :: any)
+	assert(pa.Items.u2 and pa.Items.u2.Variant == "Barnacled", "A should have B's item, variant kept")
+	assert(pb.Items.u1 and not pa.Items.u1, "the spade should have moved, not been copied")
+	assert(pa.Coins == 500 and pb.Coins == 450, string.format("coins A=%d B=%d", pa.Coins, pb.Coins))
+	assert(countItems(pa) == 2 and countItems(pb) == 1, "item counts changed")
+
+	-- Replaying the same trade fails: A no longer has u1.
+	local again = DataService.executeTrade(
+		a :: any,
+		b :: any,
+		{ Items = { u1 = true }, Coins = 0 },
+		{ Items = {}, Coins = 0 },
+		0.1
+	)
+	assert(not again, "a replayed trade must fail")
+	assert(pb.Items.u1 and not pa.Items.u1, "a failed trade must change nothing")
+end)
+
+test("trade rejects shop gear, missing items and too many coins", function()
+	local DataService = h.require("Server/DataService")
+	local a, b = fakePlayer("C", 3), fakePlayer("D", 4)
+	DataService._setProfile(
+		a,
+		{ Coins = 100, Items = { g = { Id = "BoatHook" }, k = { Id = "CaptainsKey" } } }
+	)
+	DataService._setProfile(b, { Coins = 0, Items = {} })
+	local empty = { Items = {}, Coins = 0 }
+	assert(
+		not DataService.executeTrade(a :: any, b :: any, { Items = { g = true }, Coins = 0 }, empty, 0.1),
+		"shop gear traded"
+	)
+	assert(
+		not DataService.executeTrade(a :: any, b :: any, { Items = { nope = true }, Coins = 0 }, empty, 0.1),
+		"missing item traded"
+	)
+	assert(
+		not DataService.executeTrade(a :: any, b :: any, { Items = { k = true }, Coins = 101 }, empty, 0.1),
+		"overspent"
+	)
+	assert(
+		not DataService.executeTrade(a :: any, b :: any, { Items = {}, Coins = -5 }, empty, 0.1),
+		"negative coins"
+	)
+	local pa = DataService.get(a :: any)
+	assert(pa.Coins == 100 and pa.Items.k and pa.Items.g, "rejected trades must change nothing")
+end)
 
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)
