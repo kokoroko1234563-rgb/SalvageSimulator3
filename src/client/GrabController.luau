@@ -271,6 +271,50 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 	}
 end
 
+-- Parking brake: while you aren't towing your vessel, hold it where you left it so it
+-- doesn't slide down the beach. Horizontal only, so it still sits on the ground and can tip.
+-- This client simulates its own vessel, so the brake lives here like the tow constraint.
+local brake: { vessel: Model, align: AlignPosition, attachment: Attachment, park: Vector3 }? = nil
+
+local function updateBrake()
+	local vessel = myVessel()
+	local base = vessel and vessel.PrimaryPart
+	if brake and (brake.vessel ~= vessel or not brake.align.Parent) then
+		brake.align:Destroy()
+		brake.attachment:Destroy()
+		brake = nil
+	end
+	if not vessel or not base then
+		return
+	end
+	if not brake then
+		local attachment = Instance.new("Attachment")
+		attachment.Name = "BrakeAttachment"
+		attachment.Parent = base
+		local align = Instance.new("AlignPosition")
+		align.Name = "ParkingBrake"
+		align.Mode = Enum.PositionAlignmentMode.OneAttachment
+		align.Attachment0 = attachment
+		align.ApplyAtCenterOfMass = true
+		align.ForceLimitMode = Enum.ForceLimitMode.PerAxis
+		local force = vesselMass(vessel) * grabCfg.BrakeAcceleration
+		align.MaxAxesForce = Vector3.new(force, 0, force)
+		align.Responsiveness = 15
+		align.Position = base.Position
+		align.Parent = base
+		brake = { vessel = vessel, align = align, attachment = attachment, park = base.Position }
+	end
+
+	local current = brake :: any
+	local towing = held ~= nil and held.kind == "vessel"
+	local offset = base.Position - current.park
+	if towing or Vector3.new(offset.X, 0, offset.Z).Magnitude > grabCfg.BrakeSlip then
+		current.park = base.Position
+	end
+	current.align.Enabled = not towing
+	current.align.Position = current.park
+end
+
 local function enterLifted()
 	local current = held
 	if not current then
@@ -601,6 +645,7 @@ function GrabController.init()
 
 	RunService.RenderStepped:Connect(function(dt)
 		update(dt)
+		updateBrake()
 		updateHover()
 	end)
 

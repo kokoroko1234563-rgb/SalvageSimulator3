@@ -101,6 +101,10 @@ Config.Grab = {
 	MinHoldDistance = 4,
 	HoldLift = 1.5, -- dragged items are held at least this far above the ground
 	DefaultHandleHeight = 2.4, -- towed vessel handles are held this high above the ground
+	-- A parked vessel is held in place sideways with this much acceleration. The slope only
+	-- pulls with ~12, waves push with up to ~40, so it stays parked but waves can still move it.
+	BrakeAcceleration = 30,
+	BrakeSlip = 3, -- if waves shove a parked vessel this far, it re-parks where it ended up
 }
 
 Config.Drowning = {
