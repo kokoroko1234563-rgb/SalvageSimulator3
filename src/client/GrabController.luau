@@ -287,7 +287,19 @@ end
 -- Parking brake: while you aren't towing your vessel, hold it where you left it so it
 -- doesn't slide down the beach. Horizontal only, so it still sits on the ground and can tip.
 -- This client simulates its own vessel, so the brake lives here like the tow constraint.
-local brake: { vessel: Model, align: AlignPosition, attachment: Attachment, park: Vector3 }? = nil
+-- The same client also keeps its vessel upright: an AlignOrientation that only aligns the
+-- vessel's up axis with world up, so it can still turn freely but resists flipping.
+local UPRIGHT = CFrame.fromMatrix(Vector3.zero, Vector3.yAxis, Vector3.xAxis) -- X axis = up
+
+local brake: {
+	vessel: Model,
+	align: AlignPosition,
+	attachment: Attachment,
+	upright: AlignOrientation,
+	uprightAttachment: Attachment,
+	park: Vector3,
+}? =
+	nil
 
 local function updateBrake()
 	local vessel = myVessel()
@@ -295,6 +307,8 @@ local function updateBrake()
 	if brake and (brake.vessel ~= vessel or not brake.align.Parent) then
 		brake.align:Destroy()
 		brake.attachment:Destroy()
+		brake.upright:Destroy()
+		brake.uprightAttachment:Destroy()
 		brake = nil
 	end
 	if not vessel or not base then
@@ -313,7 +327,27 @@ local function updateBrake()
 		align.Responsiveness = 15
 		align.Position = base.Position
 		align.Parent = base
-		brake = { vessel = vessel, align = align, attachment = attachment, park = base.Position }
+		local uprightAttachment = Instance.new("Attachment")
+		uprightAttachment.Name = "UprightAttachment"
+		uprightAttachment.CFrame = UPRIGHT
+		uprightAttachment.Parent = base
+		local upright = Instance.new("AlignOrientation")
+		upright.Name = "Upright"
+		upright.Mode = Enum.OrientationAlignmentMode.OneAttachment
+		upright.Attachment0 = uprightAttachment
+		upright.PrimaryAxisOnly = true
+		upright.CFrame = UPRIGHT
+		upright.Responsiveness = 15
+		upright.Parent = base
+
+		brake = {
+			vessel = vessel,
+			align = align,
+			attachment = attachment,
+			upright = upright,
+			uprightAttachment = uprightAttachment,
+			park = base.Position,
+		}
 	end
 
 	local current = brake :: any
@@ -322,8 +356,10 @@ local function updateBrake()
 	if towing or Vector3.new(offset.X, 0, offset.Z).Magnitude > grabCfg.BrakeSlip then
 		current.park = base.Position
 	end
-	local force = loadedMass(vessel) * grabCfg.BrakeAcceleration
+	local mass = loadedMass(vessel)
+	local force = mass * grabCfg.BrakeAcceleration
 	current.align.MaxAxesForce = Vector3.new(force, 0, force)
+	current.upright.MaxTorque = mass * grabCfg.StabilizerTorque * (vessel:GetAttribute("Stability") or 1)
 	current.align.Enabled = not towing
 	current.align.Position = current.park
 end

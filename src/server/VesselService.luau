@@ -128,6 +128,13 @@ end
 
 local builders = {}
 
+-- How hard each vessel's owner keeps it upright (see GrabController). The wheelbarrow is
+-- meant to tip more easily than the wagon.
+local stability = {
+	Wheelbarrow = 0.6,
+	BeachWagon = 1.2,
+}
+
 -- One wheel at the front, two legs at the back: tips easily, lifts by the handles.
 function builders.Wheelbarrow(model: Model, at: CFrame)
 	local color = Color3.fromRGB(70, 140, 90)
@@ -223,19 +230,6 @@ function VesselService.isOverCargo(vessel: Model, position: Vector3): boolean
 		and rel.Y <= half.Y + 8
 end
 
-local function isOutsideCargo(vessel: Model, position: Vector3): boolean
-	local cargo = vessel:FindFirstChild("Cargo") :: BasePart?
-	if not cargo then
-		return true
-	end
-	local rel = cargo.CFrame:PointToObjectSpace(position)
-	local half = cargo.Size / 2
-	return math.abs(rel.X) > half.X + 1.5
-		or math.abs(rel.Z) > half.Z + 1.5
-		or rel.Y < -half.Y - 2
-		or rel.Y > half.Y + 8
-end
-
 -- Puts an item into the player's vessel. Returns ok, reason.
 function VesselService.load(player: Player, item: BasePart): (boolean, string?)
 	local vessel = VesselService.getVessel(player)
@@ -252,17 +246,39 @@ function VesselService.load(player: Player, item: BasePart): (boolean, string?)
 		return false, "No vessel slot"
 	end
 
-	-- Drop it in from just above the middle of the cargo space so it settles on the pile.
-	local count = #VesselService.contents(vessel)
-	local spread = cargo.Size / 2 - Vector3.new(0.6, 0, 0.6)
+	-- Each item gets its own slot in a 2-wide grid over the cargo floor and is welded there,
+	-- so odd shapes can't jam, bounce out or stop the vessel holding its full capacity.
+	local capacity = vessel:GetAttribute("Capacity") or 1
+	local used = {}
+	for _, other in VesselService.contents(vessel) do
+		used[other:GetAttribute("Slot") or 0] = true
+	end
+	local slot = 1
+	while used[slot] do
+		slot += 1
+	end
+	local columns = math.min(2, capacity)
+	local rows = math.ceil(capacity / columns)
+	local column = (slot - 1) % columns
+	local row = math.floor((slot - 1) / columns)
+	local cellX, cellZ = cargo.Size.X / columns, cargo.Size.Z / rows
 	local offset = Vector3.new(
-		((count % 2) * 2 - 1) * math.max(spread.X, 0) * 0.5,
-		cargo.Size.Y / 2 + item.Size.Y / 2,
-		((math.floor(count / 2) % 3) - 1) * math.max(spread.Z, 0) * 0.6
+		-cargo.Size.X / 2 + cellX * (column + 0.5),
+		-cargo.Size.Y / 2 + item.Size.Y / 2 + 0.05,
+		-cargo.Size.Z / 2 + cellZ * (row + 0.5)
 	)
+
 	item.CFrame = cargo.CFrame * CFrame.new(offset)
 	item.AssemblyLinearVelocity = base.AssemblyLinearVelocity
 	item.AssemblyAngularVelocity = Vector3.zero
+	item.Massless = true
+	item.CanCollide = false
+	local slotWeld = Instance.new("WeldConstraint")
+	slotWeld.Name = "VesselWeld"
+	slotWeld.Part0 = base
+	slotWeld.Part1 = item
+	slotWeld.Parent = item
+	item:SetAttribute("Slot", slot)
 	ItemService.setInVessel(item, vessel:GetAttribute("VesselId"), player, group)
 	return true
 end
@@ -315,6 +331,7 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 	model:SetAttribute("Kind", def.Id)
 	model:SetAttribute("Owner", player.UserId)
 	model:SetAttribute("Capacity", def.Capacity)
+	model:SetAttribute("Stability", stability[def.Id] or 1)
 	handle:SetAttribute("VesselId", vesselId)
 	-- A little above its resting height, so the wheelbarrow's legs lift clear of the sand.
 	handle:SetAttribute("HandleHeight", handle.Position.Y - origin.Position.Y + 0.5)
@@ -357,16 +374,15 @@ local function tick()
 			)
 			continue
 		end
-		-- Anything that fell out of the cargo space is spilled onto the beach.
-		local spilled = 0
-		for _, item in VesselService.contents(vessel) do
-			if isOutsideCargo(vessel, item.Position) then
+		-- Cargo is welded in, so it only comes out if the vessel actually tips over.
+		if base.CFrame.UpVector.Y < 0.25 then
+			local contents = VesselService.contents(vessel)
+			for _, item in contents do
 				ItemService.setLoose(item)
-				spilled += 1
 			end
-		end
-		if spilled > 0 then
-			notify(player, if spilled == 1 then "An item spilled out!" else spilled .. " items spilled out!")
+			if #contents > 0 then
+				notify(player, "Your vessel tipped over and spilled its load!")
+			end
 		end
 	end
 end

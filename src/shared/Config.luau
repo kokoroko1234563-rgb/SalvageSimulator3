@@ -105,6 +105,7 @@ Config.Grab = {
 	-- pulls with ~12, waves push with up to ~40, so it stays parked but waves can still move it.
 	BrakeAcceleration = 30,
 	BrakeSlip = 3, -- if waves shove a parked vessel this far, it re-parks where it ended up
+	StabilizerTorque = 600, -- per unit of mass, times the vessel's Stability; keeps vessels upright
 }
 
 Config.Drowning = {

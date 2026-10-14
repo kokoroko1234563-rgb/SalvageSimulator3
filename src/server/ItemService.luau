@@ -95,8 +95,20 @@ function ItemService.dropToGround(item: BasePart)
 		* CFrame.Angles(0, yaw, 0)
 end
 
+-- Items in a vessel are welded into a slot (see VesselService.load); undo that.
+local function detachFromVessel(item: BasePart)
+	local weld = item:FindFirstChild("VesselWeld")
+	if weld then
+		weld:Destroy()
+	end
+	item.Massless = false
+	item.CanCollide = true
+	item:SetAttribute("Slot", nil)
+end
+
 function ItemService.setUnclaimed(item: BasePart, timedOut: boolean)
 	loose[item] = nil
+	detachFromVessel(item)
 	item.Anchored = true
 	item.AssemblyLinearVelocity = Vector3.zero
 	item.AssemblyAngularVelocity = Vector3.zero
@@ -110,6 +122,7 @@ end
 
 function ItemService.setHeld(item: BasePart, player: Player)
 	loose[item] = nil
+	detachFromVessel(item)
 	item.Anchored = false
 	item.CollisionGroup = CollisionGroups.Items
 	item:SetAttribute("Owner", player.UserId)
@@ -121,6 +134,7 @@ function ItemService.setHeld(item: BasePart, player: Player)
 end
 
 function ItemService.setLoose(item: BasePart)
+	detachFromVessel(item)
 	item.Anchored = false
 	item.CollisionGroup = CollisionGroups.Items
 	item:SetAttribute("State", "Loose")
@@ -293,8 +307,8 @@ function ItemService.init(map: Instance)
 	-- Items a player leaves on the beach become unclaimed where they lie.
 	Players.PlayerRemoving:Connect(function(player)
 		for _, item in ItemService.itemsOwnedBy(player) do
-			ItemService.dropToGround(item)
 			ItemService.setUnclaimed(item, true)
+			ItemService.dropToGround(item)
 		end
 	end)
 end
