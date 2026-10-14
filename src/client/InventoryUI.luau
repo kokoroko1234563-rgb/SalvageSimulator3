@@ -185,6 +185,9 @@ local function itemCard(group, order: number)
 	}, card)
 
 	local lines = { entry.Description }
+	if item.Winner then
+		table.insert(lines, "Won at auction by " .. item.Winner)
+	end
 	if settings.ShowResetText then
 		table.insert(lines, Catalog.ResetText[entry.Resets])
 	end
