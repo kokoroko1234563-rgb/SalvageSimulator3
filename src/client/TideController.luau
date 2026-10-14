@@ -8,6 +8,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Palette = require(Shared.Palette)
 local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Tide = require(Shared.Tide)
@@ -48,16 +49,16 @@ function TideController.init()
 
 	local sea = waterPart("SeaSurface", {
 		Size = Vector3.new(width, THICKNESS, zMax - zMin),
-		Material = Enum.Material.Glass,
-		Color = Color3.fromRGB(50, 150, 195),
+		Material = Palette.Material.Glass,
+		Color = Palette.World.Sea,
 		Transparency = 0.3,
 	})
 	sea.Parent = folder
 
 	local foam = waterPart("Foam", {
 		Size = Vector3.new(beach.Width, 0.15, 3),
-		Material = Enum.Material.SmoothPlastic,
-		Color = Color3.new(1, 1, 1),
+		Material = Palette.Material.Smooth,
+		Color = Palette.World.Foam,
 		Transparency = 0.35,
 	})
 	foam.Parent = folder

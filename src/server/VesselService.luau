@@ -8,6 +8,7 @@ local CollectionService = game:GetService("CollectionService")
 local HttpService = game:GetService("HttpService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Palette = require(Shared.Palette)
 local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
@@ -174,7 +175,7 @@ function builders.FloatingClamshell(model: Model, at: CFrame)
 	local base = tray(model, at * CFrame.new(0, 3, 0), Vector3.new(5, 0, 5), 1.2, color)
 	for _, child in model:GetChildren() do
 		if child:IsA("BasePart") and child.Name ~= "Cargo" then
-			child.Material = Enum.Material.SmoothPlastic
+			child.Material = Palette.Material.Smooth
 			child.Reflectance = 0.25 -- pearly sheen
 		end
 	end
@@ -184,7 +185,7 @@ function builders.FloatingClamshell(model: Model, at: CFrame)
 		Vector3.new(5.6, 0.3, 3),
 		base.CFrame * CFrame.new(0, 2.6, 3.4) * CFrame.Angles(math.rad(-55), 0, 0),
 		color,
-		{ Material = Enum.Material.SmoothPlastic, Reflectance = 0.25, CanCollide = false }
+		{ Material = Palette.Material.Smooth, Reflectance = 0.25, CanCollide = false }
 	)
 	weld(base, lid)
 	local glow = Instance.new("PointLight")
@@ -209,7 +210,7 @@ function builders.CaptainsLongboat(model: Model, at: CFrame)
 	local base = tray(model, at * CFrame.new(0, 1.1, 0), Vector3.new(4.6, 0, 10.5), 1.4, color)
 	for _, child in model:GetChildren() do
 		if child:IsA("BasePart") and child.Name ~= "Cargo" then
-			child.Material = Enum.Material.WoodPlanks
+			child.Material = Palette.Material.WoodPlanks
 		end
 	end
 	local bow = part(
@@ -218,7 +219,7 @@ function builders.CaptainsLongboat(model: Model, at: CFrame)
 		Vector3.new(3.4, 1.6, 3.4),
 		base.CFrame * CFrame.new(0, 0.6, -6.4) * CFrame.Angles(0, math.rad(45), 0),
 		color,
-		{ Material = Enum.Material.WoodPlanks }
+		{ Material = Palette.Material.WoodPlanks }
 	)
 	weld(base, bow)
 	local handle = part(
@@ -227,7 +228,7 @@ function builders.CaptainsLongboat(model: Model, at: CFrame)
 		Vector3.new(0.5, 0.5, 2.6),
 		base.CFrame * CFrame.new(0, 0.8, -9),
 		Color3.fromRGB(200, 180, 120),
-		{ Material = Enum.Material.Fabric }
+		{ Material = Palette.Material.Fabric }
 	)
 	weld(base, handle)
 	-- Skids along the keel: the same low-friction balls the wheels use, just no wheels.
@@ -522,6 +523,9 @@ local function tick()
 		end
 	end
 end
+
+-- For the data validator and tools/tests.
+VesselService._builders = builders
 
 function VesselService.init(notifyFn: (Player, string) -> ())
 	notify = notifyFn

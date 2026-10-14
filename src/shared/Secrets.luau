@@ -4,6 +4,7 @@
 -- All positions are relative to the course origin.
 
 local Config = require(script.Parent.Config)
+local Palette = require(script.Parent.Palette)
 
 local Secrets = {}
 
@@ -94,13 +95,7 @@ Secrets.List = {
 	},
 }
 
-Secrets.CoinColors = {
-	Yellow = Color3.fromRGB(255, 215, 40),
-	Orange = Color3.fromRGB(255, 140, 40),
-	Blue = Color3.fromRGB(60, 140, 255),
-	Green = Color3.fromRGB(70, 200, 90),
-	Pink = Color3.fromRGB(255, 120, 200),
-}
+Secrets.CoinColors = Palette.Coin
 Secrets.CoinOrder = { "Yellow", "Orange", "Blue", "Green", "Pink" }
 
 -- Rolls a lootbox: an item id from the secret's pool, and maybe its cosmetic variant.

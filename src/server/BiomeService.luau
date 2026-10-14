@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Palette = require(Shared.Palette)
 local Beach = require(Shared.Beach)
 local Biomes = require(Shared.Biomes)
 local Config = require(Shared.Config)
@@ -28,7 +29,7 @@ local function makePart(props: { [string]: any }): Part
 	part.Anchored = true
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
-	part.Material = Enum.Material.Sand
+	part.Material = Palette.Material.Sand
 	for key, value in props do
 		(part :: any)[key] = value
 	end
@@ -80,7 +81,7 @@ function decorBuilders.Wreck(zoneFolder: Folder, biome, startZ: number, endZ: nu
 			CFrame = CFrame.new(x, Beach.groundY(z) + 0.2, z)
 				* CFrame.Angles(math.rad(rng:NextNumber(-12, 12)), rng:NextNumber() * math.pi, 0),
 			Color = biome.Decor,
-			Material = Enum.Material.WoodPlanks,
+			Material = Palette.Material.WoodPlanks,
 			CanCollide = false,
 			CanQuery = false,
 		}).Parent =
@@ -118,7 +119,7 @@ function entranceBuilders.Sandcastle(castle: Model, biome, x: number, z: number,
 		Size = Vector3.new(5, 8, 0.6),
 		CFrame = CFrame.new(x, groundY + 4, z - 11.2),
 		Color = Color3.fromRGB(70, 45, 25),
-		Material = Enum.Material.Wood,
+		Material = Palette.Material.Wood,
 	})
 end
 
@@ -129,7 +130,7 @@ function entranceBuilders.Wreck(wreck: Model, biome, x: number, z: number, groun
 		Size = Vector3.new(30, 12, 12),
 		CFrame = CFrame.new(x, groundY + 4, z) * CFrame.Angles(0, 0, math.rad(18)),
 		Color = biome.Decor,
-		Material = Enum.Material.WoodPlanks,
+		Material = Palette.Material.WoodPlanks,
 	})
 	hull.Parent = wreck
 	makePart({
@@ -137,7 +138,7 @@ function entranceBuilders.Wreck(wreck: Model, biome, x: number, z: number, groun
 		Size = Vector3.new(1.4, 22, 1.4),
 		CFrame = CFrame.new(x + 6, groundY + 10, z + 2) * CFrame.Angles(0, 0, math.rad(-35)),
 		Color = Color3.fromRGB(80, 55, 35),
-		Material = Enum.Material.Wood,
+		Material = Palette.Material.Wood,
 	}).Parent =
 		wreck
 	wreck.PrimaryPart = hull
@@ -146,7 +147,7 @@ function entranceBuilders.Wreck(wreck: Model, biome, x: number, z: number, groun
 		Size = Vector3.new(4.5, 5, 0.6),
 		CFrame = CFrame.new(x, groundY + 3, z - 6.2),
 		Color = Color3.fromRGB(40, 30, 20),
-		Material = Enum.Material.Wood,
+		Material = Palette.Material.Wood,
 	})
 end
 
@@ -196,7 +197,7 @@ local function rollBarrel(zoneFolder: Folder, zone: number)
 			fromZ
 		),
 		Color = Color3.fromRGB(120, 80, 45),
-		Material = Enum.Material.Wood,
+		Material = Palette.Material.Wood,
 		Anchored = false,
 		CustomPhysicalProperties = PhysicalProperties.new(2, 0.3, 0.2),
 	})
@@ -267,6 +268,12 @@ function BiomeService.reroll()
 		BiomeService.set(zone, if picked and Biomes.List[picked] then picked else nil)
 	end
 end
+
+-- For the data validator and tools/tests.
+BiomeService._entranceBuilders = entranceBuilders
+BiomeService._decorBuilders = decorBuilders
+BiomeService._hazards = { Barrels = rollBarrel }
+BiomeService._buildEntrance = buildEntrance
 
 function BiomeService.init(entranceCallback: (Player, string, CFrame) -> (), notifyFn: (Player, string) -> ())
 	onEntrance = entranceCallback

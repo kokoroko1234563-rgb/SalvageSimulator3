@@ -21,6 +21,21 @@ Set **Max Players to 20** in Game Settings: each player gets one vessel collisio
 
 Test with **Test → Clients and Servers** (2 or more players) to check bumping and ownership.
 
+## Checks
+
+Run `bash tools/check.sh` before pushing. It checks:
+
+1. **Formatting:** StyLua formatting.
+2. **Lint:** selene lint.
+3. **Roblox API names:** `tools/check_api.py` checks every `Enum.X.Y`, class name, service and instance property against Roblox's real API. The API comes from the `@rbxts/types` npm package, downloaded once into `tools/.cache`.
+4. **Lune tests:** `tools/tests/run.luau` uses [Lune](https://lune-org.github.io), which ships Roblox's API database. It loads every module the way Roblox does, runs the data validator, and builds every item, vessel, biome (decor, entrance, hazard), secret course and the beach with real instances. A wrong property, Enum item or value type (such as `nil` where a colour is needed) fails here, just as it would in Studio.
+5. **Rojo build:** `rojo build` succeeds.
+
+Two more safeguards live in the game itself:
+
+- **Palette:** `src/shared/Palette.luau` holds every shared colour, material and font by name. Code uses `Palette.UI.Accent` or `Palette.Material.Wood`, never inline values, so one look changes in one place.
+- **Data validator:** `src/shared/Validate.luau` checks that the data fits together when the server starts. For example: every secret has a coin *or* a loot table, every loot item exists, every rarity has a colour, and every ownable vessel has a builder. Problems print to Output as `[Validate]` warnings.
+
 ## What's in Milestone 1
 
 | Doc item | Where |

@@ -6,15 +6,16 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Palette = require(Shared.Palette)
 local Remotes = require(Shared.Remotes)
 
 local player = Players.LocalPlayer
 
 local AdminConsole = {}
 
-local FONT = Enum.Font.Code
-local BG = Color3.fromRGB(18, 24, 30)
-local ACCENT = Color3.fromRGB(255, 215, 120)
+local FONT = Palette.Font.Code
+local BG = Palette.UI.Console
+local ACCENT = Palette.UI.Accent
 local MAX_LINES = 200
 
 local panel: Frame
@@ -45,7 +46,7 @@ local function addLine(text: string, color: Color3?)
 		Text = text,
 		Font = FONT,
 		TextSize = 15,
-		TextColor3 = color or Color3.fromRGB(220, 230, 235),
+		TextColor3 = color or Palette.UI.Soft,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextWrapped = true,
 		AutomaticSize = Enum.AutomaticSize.Y,
@@ -92,12 +93,12 @@ local function run(line: string)
 	end
 	local ok, result = pcall(remote.InvokeServer, remote, line)
 	if not ok then
-		addLine("Error: " .. tostring(result), Color3.fromRGB(255, 120, 110))
+		addLine("Error: " .. tostring(result), Palette.UI.Bad)
 		return
 	end
 	for _, out in result or {} do
 		local isError = out:sub(1, 6) == "Error:" or out:sub(1, 7) == "Unknown" or out:sub(1, 6) == "Usage:"
-		addLine(out, if isError then Color3.fromRGB(255, 160, 120) else nil)
+		addLine(out, if isError then Palette.UI.Warn else nil)
 	end
 end
 
@@ -142,7 +143,7 @@ local function build()
 
 	local toggle = make("TextButton", {
 		Text = "Admin",
-		Font = Enum.Font.FredokaOne,
+		Font = Palette.Font.Title,
 		TextSize = 16,
 		TextColor3 = BG,
 		BackgroundColor3 = ACCENT,
@@ -165,7 +166,7 @@ local function build()
 
 	make("TextLabel", {
 		Text = "ADMIN CONSOLE   (F2 to toggle)",
-		Font = Enum.Font.GothamBold,
+		Font = Palette.Font.Bold,
 		TextSize = 13,
 		TextColor3 = ACCENT,
 		TextXAlignment = Enum.TextXAlignment.Left,
@@ -175,10 +176,10 @@ local function build()
 	}, panel)
 	local close = make("TextButton", {
 		Text = "X",
-		Font = Enum.Font.GothamBold,
+		Font = Palette.Font.Bold,
 		TextSize = 14,
-		TextColor3 = Color3.new(1, 1, 1),
-		BackgroundColor3 = Color3.fromRGB(200, 80, 70),
+		TextColor3 = Palette.UI.Text,
+		BackgroundColor3 = Palette.UI.Danger,
 		Size = UDim2.fromOffset(24, 24),
 		Position = UDim2.new(1, -32, 0, 6),
 	}, panel)
@@ -199,13 +200,13 @@ local function build()
 	input = make("TextBox", {
 		Text = "",
 		PlaceholderText = "Type a command, e.g. help",
-		PlaceholderColor3 = Color3.fromRGB(120, 135, 145),
+		PlaceholderColor3 = Palette.UI.Placeholder,
 		ClearTextOnFocus = false,
 		Font = FONT,
 		TextSize = 16,
-		TextColor3 = Color3.new(1, 1, 1),
+		TextColor3 = Palette.UI.Text,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		BackgroundColor3 = Color3.fromRGB(32, 42, 52),
+		BackgroundColor3 = Palette.UI.Input,
 		Position = UDim2.new(0, 10, 1, -62),
 		Size = UDim2.new(1, -20, 0, 32),
 	}, panel)
@@ -216,7 +217,7 @@ local function build()
 		Text = "Type help for the command list",
 		Font = FONT,
 		TextSize = 13,
-		TextColor3 = Color3.fromRGB(150, 165, 175),
+		TextColor3 = Palette.UI.Hint,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		BackgroundTransparency = 1,

@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Palette = require(Shared.Palette)
 local Remotes = require(Shared.Remotes)
 local Secrets = require(Shared.Secrets)
 local Tide = require(Shared.Tide)
@@ -33,7 +34,7 @@ local function block(
 	part.CFrame = cframe
 	part.Size = size
 	part.Color = color
-	part.Material = Enum.Material.Sand
+	part.Material = Palette.Material.Sand
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
 	if props then
@@ -82,20 +83,20 @@ local function build(secret, origin: Vector3)
 			"Checkpoint" .. index,
 			CFrame.new(origin + checkpoint + Vector3.new(0, 2.5, 0)),
 			Vector3.new(0.4, 4, 0.4),
-			Color3.fromRGB(120, 230, 255),
-			{ Material = Enum.Material.Neon, CanCollide = false, CanQuery = false }
+			Palette.UI.Checkpoint,
+			{ Material = Palette.Material.Neon, CanCollide = false, CanQuery = false }
 		)
 	end
 
 	-- Normal secrets glow in their coin's colour; exotic ones (a lootbox) in the exotic colour.
-	local accent = if secret.Coin then Secrets.CoinColors[secret.Coin] else Color3.fromRGB(40, 225, 200)
+	local accent = if secret.Coin then Secrets.CoinColors[secret.Coin] else Palette.Rarity.Exotic
 	local chest = block(
 		root,
 		"Chest",
 		CFrame.new(origin + course.Chest),
 		Vector3.new(3, 2, 2),
-		Color3.fromRGB(120, 75, 35),
-		{ Material = Enum.Material.Wood }
+		Palette.World.ChestWood,
+		{ Material = Palette.Material.Wood }
 	)
 	block(
 		root,
@@ -103,7 +104,7 @@ local function build(secret, origin: Vector3)
 		CFrame.new(origin + course.Chest + Vector3.new(0, 1.2, 0)),
 		Vector3.new(3.1, 0.4, 2.1),
 		accent,
-		{ Material = Enum.Material.Neon }
+		{ Material = Palette.Material.Neon }
 	)
 	local glow = Instance.new("PointLight")
 	glow.Color = accent
@@ -124,9 +125,9 @@ local function build(secret, origin: Vector3)
 		"Flood",
 		CFrame.new(origin + Vector3.new(0, course.FloodFrom - 100, 0)),
 		Vector3.new(half * 2, 200, half * 2),
-		Color3.fromRGB(40, 120, 170),
+		Palette.World.Flood,
 		{
-			Material = Enum.Material.Glass,
+			Material = Palette.Material.Glass,
 			Transparency = 0.35,
 			CanCollide = false,
 			CanQuery = false,
@@ -138,6 +139,9 @@ local function build(secret, origin: Vector3)
 	root.Parent = Workspace
 	folder = root
 end
+
+-- For tools/tests.
+SecretController._build = build
 
 function SecretController.init()
 	local readyRemote = Remotes.get("SecretReady")

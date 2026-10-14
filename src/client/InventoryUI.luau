@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Palette = require(Shared.Palette)
 local Catalog = require(Shared.Catalog)
 local Items = require(Shared.Items)
 local Rebirth = require(Shared.Rebirth)
@@ -22,16 +23,13 @@ local player = Players.LocalPlayer
 
 local InventoryUI = {}
 
-local FONT = Enum.Font.FredokaOne
-local BODY = Enum.Font.GothamMedium
-local BG = Color3.fromRGB(25, 45, 60)
-local CARD = Color3.fromRGB(34, 58, 76)
-local MUTED = Color3.fromRGB(170, 195, 210)
-local ACCENT = Color3.fromRGB(255, 215, 120)
-local BORDER = {
-	Rebirth = Color3.fromRGB(255, 150, 40),
-	TrueRebirth = Color3.fromRGB(175, 110, 255),
-}
+local FONT = Palette.Font.Title
+local BODY = Palette.Font.Body
+local BG = Palette.UI.Background
+local CARD = Palette.UI.Card
+local MUTED = Palette.UI.Muted
+local ACCENT = Palette.UI.Accent
+local BORDER = Palette.Reset
 
 local snapshot: any = nil
 local tab = "Items"
@@ -61,7 +59,7 @@ local function label(props: { [string]: any }, parent: Instance): TextLabel
 	local defaults = {
 		BackgroundTransparency = 1,
 		Font = BODY,
-		TextColor3 = Color3.new(1, 1, 1),
+		TextColor3 = Palette.UI.Text,
 		TextSize = 14,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
@@ -78,7 +76,7 @@ local function button(text: string, color: Color3, parent: Instance): TextButton
 		Text = text,
 		Font = FONT,
 		TextSize = 15,
-		TextColor3 = Color3.new(1, 1, 1),
+		TextColor3 = Palette.UI.Text,
 		BackgroundColor3 = color,
 		AutoButtonColor = true,
 	}, parent)
@@ -152,7 +150,7 @@ local function itemCard(group, order: number)
 	border(card, if entry.Resets ~= "Never" then entry.Resets else nil)
 
 	local band = make("Frame", {
-		BackgroundColor3 = Items.RarityColors[entry.Rarity] or Color3.new(1, 1, 1),
+		BackgroundColor3 = Items.RarityColors[entry.Rarity] or Palette.UI.Text,
 		Size = UDim2.new(1, 0, 0, 8),
 		BorderSizePixel = 0,
 	}, card)
@@ -207,7 +205,7 @@ local function itemCard(group, order: number)
 		local hasCore = (snapshot.Cores or 0) > 0
 		actionButton = button(
 			if hasCore then "Attune · 1 core" else "Needs a core",
-			if hasCore then Color3.fromRGB(40, 190, 170) else Color3.fromRGB(70, 80, 90),
+			if hasCore then Palette.UI.Attune else Palette.UI.Disabled,
 			card
 		)
 		if hasCore then
@@ -217,7 +215,7 @@ local function itemCard(group, order: number)
 		end
 	elseif entry.Category == "Accessory" then
 		local worn = snapshot.EquippedAccessory == item.Id
-		actionButton = button(if worn then "Take off" else "Wear", Color3.fromRGB(150, 100, 200), card);
+		actionButton = button(if worn then "Take off" else "Wear", Palette.UI.Pocket, card);
 		(actionButton :: TextButton).Activated:Connect(function()
 			act(if worn then "unequip" else "equip", item.Uid)
 		end)
@@ -225,7 +223,7 @@ local function itemCard(group, order: number)
 		local equipped = snapshot.EquippedTool == item.Id
 		actionButton = button(
 			if equipped then "Equipped" else "Equip",
-			if equipped then Color3.fromRGB(60, 160, 90) else Color3.fromRGB(235, 150, 40),
+			if equipped then Palette.UI.Equipped else Palette.UI.Buy,
 			card
 		)
 		if not equipped then
@@ -235,7 +233,7 @@ local function itemCard(group, order: number)
 		end
 	elseif entry.Category == "Vessel" then
 		local out = snapshot.ActiveVessel == item.Id
-		actionButton = button(if out then "Respawn" else "Spawn", Color3.fromRGB(60, 140, 220), card);
+		actionButton = button(if out then "Respawn" else "Spawn", Palette.UI.Spawn, card);
 		(actionButton :: TextButton).Activated:Connect(function()
 			act("spawn", item.Uid)
 		end)
@@ -304,7 +302,7 @@ local function showCoins()
 		label({
 			Text = color .. (if owned[color] then "" else "\nnot found"),
 			TextXAlignment = Enum.TextXAlignment.Center,
-			TextColor3 = if owned[color] then Color3.new(1, 1, 1) else MUTED,
+			TextColor3 = if owned[color] then Palette.UI.Text else MUTED,
 			Position = UDim2.fromOffset(0, 74),
 			Size = UDim2.new(1, 0, 0, 36),
 		}, slot)
@@ -385,7 +383,7 @@ local function refreshFilters()
 		local on = settings[key] == true
 		local b = button(
 			name .. ": " .. (if on then "On" else "Off"),
-			if on then Color3.fromRGB(60, 140, 90) else Color3.fromRGB(70, 80, 90),
+			if on then Palette.UI.ToggleOn else Palette.UI.Disabled,
 			filterRow
 		)
 		b.Size = UDim2.fromOffset(170, 28)
@@ -425,7 +423,7 @@ local function refreshPockets()
 				Position = UDim2.fromOffset(6, 4),
 				Size = UDim2.new(1, -46, 1, -8),
 			}, frame)
-			local out = button("Out", Color3.fromRGB(150, 100, 200), frame)
+			local out = button("Out", Palette.UI.Pocket, frame)
 			out.TextSize = 13
 			out.Size = UDim2.fromOffset(36, 28)
 			out.Position = UDim2.new(1, -40, 0.5, -14)
@@ -449,7 +447,7 @@ local function refresh()
 		return
 	end
 	for name, b in tabButtons do
-		b.BackgroundColor3 = if name == tab then Color3.fromRGB(235, 150, 40) else Color3.fromRGB(60, 80, 95)
+		b.BackgroundColor3 = if name == tab then Palette.UI.Buy else Palette.UI.Tab
 	end
 	filterRow.Visible = tab == "Items"
 	refreshFilters()
@@ -477,7 +475,7 @@ function InventoryUI.init()
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	})
 
-	local bag = button("Inventory (I)", Color3.fromRGB(150, 100, 200), gui)
+	local bag = button("Inventory (I)", Palette.UI.Pocket, gui)
 	bag.Size = UDim2.fromOffset(120, 34)
 	bag.Position = UDim2.new(0, 12, 1, -46)
 	bag.Activated:Connect(function()
@@ -503,7 +501,7 @@ function InventoryUI.init()
 		Size = UDim2.fromOffset(200, 32),
 		TextYAlignment = Enum.TextYAlignment.Center,
 	}, panel)
-	local close = button("X", Color3.fromRGB(200, 80, 70), panel)
+	local close = button("X", Palette.UI.Danger, panel)
 	close.Size = UDim2.fromOffset(34, 34)
 	close.Position = UDim2.new(1, -46, 0, 10)
 	close.Activated:Connect(function()
@@ -517,7 +515,7 @@ function InventoryUI.init()
 	)
 	make("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8) }, tabs)
 	for _, name in { "Items", "Coins", "Rewards" } do
-		local b = button(name, Color3.fromRGB(60, 80, 95), tabs)
+		local b = button(name, Palette.UI.Tab, tabs)
 		b.Size = UDim2.fromOffset(100, 32)
 		b.Activated:Connect(function()
 			tab = name

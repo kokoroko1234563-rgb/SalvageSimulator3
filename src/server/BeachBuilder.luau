@@ -8,6 +8,7 @@ local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Palette = require(Shared.Palette)
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 
@@ -39,7 +40,7 @@ local function label(parent: BasePart, text: string, offset: Vector3)
 	local textLabel = Instance.new("TextLabel")
 	textLabel.Size = UDim2.fromScale(1, 1)
 	textLabel.BackgroundTransparency = 1
-	textLabel.Font = Enum.Font.FredokaOne
+	textLabel.Font = Palette.Font.Title
 	textLabel.TextScaled = true
 	textLabel.TextColor3 = Color3.new(1, 1, 1)
 	textLabel.TextStrokeTransparency = 0.4
@@ -71,7 +72,7 @@ local function slopedBlock(
 		Size = Vector3.new(x1 - x0, thickness, length + 0.2),
 		CFrame = CFrame.new(center) * orientation,
 		Color = WET_SAND,
-		Material = Enum.Material.Sand,
+		Material = Palette.Material.Sand,
 	})
 end
 
@@ -102,7 +103,7 @@ function BeachBuilder.build(): Folder
 		Size = Vector3.new(beach.Width, 10, beach.ShopDepth),
 		CFrame = CFrame.new(0, -5, -beach.ShopDepth / 2),
 		Color = SAND,
-		Material = Enum.Material.Sand,
+		Material = Palette.Material.Sand,
 	}).Parent =
 		map
 
@@ -112,7 +113,7 @@ function BeachBuilder.build(): Folder
 		Size = Vector3.new(beach.Width + 60, 16, 40),
 		CFrame = CFrame.new(0, 0, -beach.ShopDepth - 20),
 		Color = SAND,
-		Material = Enum.Material.Sand,
+		Material = Palette.Material.Sand,
 	}).Parent =
 		map
 
@@ -140,7 +141,7 @@ function BeachBuilder.build(): Folder
 			Size = Vector3.new(40, 120, length),
 			CFrame = CFrame.new(side * (half + 20), -40, -beach.ShopDepth - 40 + length / 2),
 			Color = ROCK,
-			Material = Enum.Material.Slate,
+			Material = Palette.Material.Rock,
 		}).Parent =
 			map
 	end
@@ -157,7 +158,7 @@ function BeachBuilder.build(): Folder
 				Size = Vector3.new(1.2, topY - groundY, 1.2),
 				CFrame = CFrame.new(side * (half - 8), (topY + groundY) / 2, startZ),
 				Color = Color3.fromRGB(240, 240, 240),
-				Material = Enum.Material.Wood,
+				Material = Palette.Material.Wood,
 			})
 			local flag = makePart({
 				Name = "Flag",
@@ -186,7 +187,7 @@ function BeachBuilder.build(): Folder
 		Size = Vector3.new(120, 1, beach.ShopDepth - 10),
 		CFrame = CFrame.new(0, 0.5, -beach.ShopDepth / 2 - 2),
 		Color = Color3.fromRGB(160, 115, 75),
-		Material = Enum.Material.WoodPlanks,
+		Material = Palette.Material.WoodPlanks,
 	}).Parent =
 		shop
 
@@ -211,7 +212,7 @@ function BeachBuilder.build(): Folder
 		Size = Vector3.new(30, 0.2, 22),
 		CFrame = CFrame.new(28, 1.1, -24),
 		Color = Color3.fromRGB(255, 210, 60),
-		Material = Enum.Material.Neon,
+		Material = Palette.Material.Neon,
 		Transparency = 0.5,
 		CanCollide = false,
 		CanQuery = false,
@@ -224,7 +225,7 @@ function BeachBuilder.build(): Folder
 		Size = Vector3.new(14, 0.2, 14),
 		CFrame = CFrame.new(0, 1.1, -16),
 		Color = Color3.fromRGB(190, 110, 255),
-		Material = Enum.Material.Neon,
+		Material = Palette.Material.Neon,
 		Transparency = 0.5,
 		CanCollide = false,
 		CanQuery = false,

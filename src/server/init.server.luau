@@ -4,6 +4,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Remotes = require(Shared.Remotes)
+local Validate = require(Shared.Validate)
 local Tide = require(Shared.Tide)
 
 local AdminService = require(script.AdminService)
@@ -22,6 +23,21 @@ local ShopService = require(script.ShopService)
 local VesselService = require(script.VesselService)
 
 Remotes.init()
+
+-- Check that the game's data fits together before anything uses it.
+do
+	local problems = Validate.run({
+		VesselBuilders = VesselService._builders,
+		Entrances = BiomeService._entranceBuilders,
+		Hazards = BiomeService._hazards,
+	})
+	for _, problem in problems do
+		warn("[Validate] " .. problem)
+	end
+	if #problems > 0 then
+		task.spawn(error, string.format("[Validate] %d data problem(s), see the warnings above", #problems))
+	end
+end
 
 local notifyRemote = Remotes.get("Notify")
 local function notify(player: Player, text: string)

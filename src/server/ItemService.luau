@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Palette = require(Shared.Palette)
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 local Biomes = require(Shared.Biomes)
@@ -182,7 +183,7 @@ local function createItem(def, zoneIndex: number, position: Vector3): BasePart
 	part.Shape = Enum.PartType[def.Shape]
 	part.Size = def.Size
 	part.Color = def.Color
-	part.Material = def.Material or Enum.Material.SmoothPlastic
+	part.Material = def.Material or Palette.Material.Smooth
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
 	part.CustomPhysicalProperties = PhysicalProperties.new(Items.ClassDensity[def.Class], 0.4, 0.1)

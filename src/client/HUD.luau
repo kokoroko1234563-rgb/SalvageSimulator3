@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Palette = require(Shared.Palette)
 local Gear = require(Shared.Gear)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
@@ -14,8 +15,8 @@ local player = Players.LocalPlayer
 
 local HUD = {}
 
-local FONT = Enum.Font.FredokaOne
-local BG = Color3.fromRGB(25, 45, 60)
+local FONT = Palette.Font.Title
+local BG = Palette.UI.Background
 
 local gui: ScreenGui
 local statsLabel: TextLabel
@@ -62,7 +63,7 @@ local function text(props: { [string]: any }, parent: Instance): TextLabel
 	local defaults = {
 		BackgroundTransparency = 1,
 		Font = FONT,
-		TextColor3 = Color3.new(1, 1, 1),
+		TextColor3 = Palette.UI.Text,
 		TextStrokeTransparency = 0.6,
 		TextScaled = false,
 		TextSize = 18,
@@ -78,7 +79,7 @@ local function button(label: string, color: Color3, parent: Instance): TextButto
 		Text = label,
 		Font = FONT,
 		TextSize = 18,
-		TextColor3 = Color3.new(1, 1, 1),
+		TextColor3 = Palette.UI.Text,
 		BackgroundColor3 = color,
 		AutoButtonColor = true,
 	}, parent)
@@ -129,7 +130,7 @@ local function refreshRewardPick()
 		local reward = Rebirth.Rewards[id]
 		local choice = make("TextButton", {
 			Text = "",
-			BackgroundColor3 = Color3.fromRGB(40, 70, 90),
+			BackgroundColor3 = Palette.UI.CardRaised,
 			Size = UDim2.new(1, -24, 0, 70),
 			Position = UDim2.new(0, 12, 0, 50 + (index - 1) * 78),
 			AutoButtonColor = true,
@@ -151,9 +152,9 @@ local function refreshRewardPick()
 			TextYAlignment = Enum.TextYAlignment.Top,
 			TextWrapped = true,
 			TextSize = 14,
-			Font = Enum.Font.GothamMedium,
+			Font = Palette.Font.Body,
 			TextStrokeTransparency = 1,
-			TextColor3 = Color3.fromRGB(190, 210, 225),
+			TextColor3 = Palette.UI.Soft,
 		}, choice)
 		choice.Activated:Connect(function()
 			local ok, reason = Remotes.get("ChooseReward"):InvokeServer(id)
@@ -233,7 +234,7 @@ function HUD.setTooltip(message: string?, color: Color3?, screenPosition: Vector
 	end
 	tooltip.Visible = true
 	tooltip.Text = message
-	tooltip.TextColor3 = color or Color3.new(1, 1, 1)
+	tooltip.TextColor3 = color or Palette.UI.Text
 	tooltip.Position = UDim2.fromOffset(screenPosition.X + 16, screenPosition.Y + 8)
 end
 
@@ -263,10 +264,10 @@ local CLASS_NAMES = { "Light", "Medium", "Heavy", "Very heavy" }
 local DEPTH_NAMES =
 	{ [0] = "Dry sand", [1] = "Shallows", [2] = "Knee-deep", [3] = "Waist-deep", [4] = "Deep" }
 
-local ROW_BG = Color3.fromRGB(34, 58, 76)
-local MUTED = Color3.fromRGB(170, 195, 210)
-local BUY = Color3.fromRGB(235, 150, 40)
-local DISABLED = Color3.fromRGB(70, 80, 90)
+local ROW_BG = Palette.UI.Card
+local MUTED = Palette.UI.Muted
+local BUY = Palette.UI.Buy
+local DISABLED = Palette.UI.Disabled
 
 local function sectionHeader(label: string, order: number)
 	text({
@@ -274,7 +275,7 @@ local function sectionHeader(label: string, order: number)
 		Size = UDim2.new(1, -8, 0, 26),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextSize = 15,
-		TextColor3 = Color3.fromRGB(255, 215, 120),
+		TextColor3 = Palette.UI.Accent,
 		TextStrokeTransparency = 1,
 		LayoutOrder = order,
 	}, shopRows)
@@ -312,7 +313,7 @@ local function refreshShop()
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextSize = 20,
 			TextStrokeTransparency = 1,
-			TextColor3 = if available then Color3.new(1, 1, 1) else MUTED,
+			TextColor3 = if available then Palette.UI.Text else MUTED,
 		}, frame)
 
 		if not available then
@@ -322,7 +323,7 @@ local function refreshShop()
 				Position = UDim2.new(1, -152, 0, 0),
 				TextXAlignment = Enum.TextXAlignment.Right,
 				TextSize = 15,
-				Font = Enum.Font.GothamMedium,
+				Font = Palette.Font.Body,
 				TextStrokeTransparency = 1,
 				TextColor3 = MUTED,
 			}, frame)
@@ -345,7 +346,7 @@ local function refreshShop()
 			TextYAlignment = Enum.TextYAlignment.Top,
 			TextSize = 14,
 			TextWrapped = true,
-			Font = Enum.Font.GothamMedium,
+			Font = Palette.Font.Body,
 			TextStrokeTransparency = 1,
 			TextColor3 = MUTED,
 		}, frame)
@@ -374,7 +375,7 @@ local function refreshShop()
 			end)
 		else
 			b.AutoButtonColor = false
-			b.TextColor3 = Color3.fromRGB(200, 205, 210)
+			b.TextColor3 = Palette.UI.DisabledText
 		end
 	end
 
@@ -412,7 +413,7 @@ local function refreshShop()
 			TextYAlignment = Enum.TextYAlignment.Top,
 			TextSize = 14,
 			TextWrapped = true,
-			Font = Enum.Font.GothamMedium,
+			Font = Palette.Font.Body,
 			TextStrokeTransparency = 1,
 			TextColor3 = MUTED,
 		}, frame)
@@ -438,7 +439,7 @@ local function refreshShop()
 			end)
 		else
 			b.AutoButtonColor = false
-			b.TextColor3 = Color3.fromRGB(200, 205, 210)
+			b.TextColor3 = Palette.UI.DisabledText
 		end
 	end
 
@@ -454,7 +455,7 @@ local function refreshShop()
 			LayoutOrder = order,
 		}, shopRows)
 		corner(frame, 8)
-		make("UIStroke", { Color = Color3.fromRGB(175, 110, 255), Thickness = 2 }, frame)
+		make("UIStroke", { Color = Palette.Reset.TrueRebirth, Thickness = 2 }, frame)
 		text({
 			Text = string.format("Redeem colored coins (%d/5)", have),
 			Size = UDim2.new(1, -160, 0, 26),
@@ -471,14 +472,14 @@ local function refreshShop()
 			TextYAlignment = Enum.TextYAlignment.Top,
 			TextSize = 12,
 			TextWrapped = true,
-			Font = Enum.Font.GothamMedium,
+			Font = Palette.Font.Body,
 			TextStrokeTransparency = 1,
 			TextColor3 = MUTED,
 		}, frame)
 		local ready = have >= 5
 		local b = button(
 			if ready then "True rebirth" else have .. "/5 coins",
-			if ready then Color3.fromRGB(150, 90, 230) else DISABLED,
+			if ready then Palette.UI.TrueRebirth else DISABLED,
 			frame
 		)
 		b.Size = UDim2.fromOffset(136, 40)
@@ -507,7 +508,7 @@ local function refreshShop()
 			end)
 		else
 			b.AutoButtonColor = false
-			b.TextColor3 = Color3.fromRGB(200, 205, 210)
+			b.TextColor3 = Palette.UI.DisabledText
 		end
 	end
 
@@ -531,7 +532,7 @@ local function refreshShop()
 		Size = UDim2.new(1, -8, 0, 40),
 		TextWrapped = true,
 		TextSize = 14,
-		Font = Enum.Font.GothamMedium,
+		Font = Palette.Font.Body,
 		TextStrokeTransparency = 1,
 		TextColor3 = MUTED,
 		LayoutOrder = order,
@@ -574,7 +575,7 @@ function HUD.init()
 		TextSize = 34,
 		TextTransparency = 1,
 		TextStrokeTransparency = 1,
-		TextColor3 = Color3.fromRGB(255, 240, 200),
+		TextColor3 = Palette.UI.Banner,
 	}, gui)
 
 	toastList = make("Frame", {
@@ -592,13 +593,13 @@ function HUD.init()
 	breathFrame = make("Frame", {
 		Size = UDim2.new(0, 240, 0, 14),
 		Position = UDim2.new(0.5, -120, 1, -110),
-		BackgroundColor3 = Color3.fromRGB(20, 30, 40),
+		BackgroundColor3 = Palette.UI.Track,
 		Visible = false,
 	}, gui)
 	corner(breathFrame, 7)
 	breathFill = make("Frame", {
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.fromRGB(120, 210, 255),
+		BackgroundColor3 = Palette.UI.Breath,
 	}, breathFrame)
 	corner(breathFill, 7)
 	text(
@@ -613,19 +614,19 @@ function HUD.init()
 		Visible = false,
 	}, gui)
 	make("UIListLayout", { Padding = UDim.new(0, 8) }, holdButtons)
-	local drop = button("Drop", Color3.fromRGB(200, 80, 70), holdButtons)
+	local drop = button("Drop", Palette.UI.Danger, holdButtons)
 	drop.Name = "Drop"
 	drop.Size = UDim2.new(1, 0, 0, 44)
 	drop.Activated:Connect(function()
 		onDrop()
 	end)
-	local send = button("To vessel", Color3.fromRGB(60, 140, 220), holdButtons)
+	local send = button("To vessel", Palette.UI.Spawn, holdButtons)
 	send.Name = "SendToVessel"
 	send.Size = UDim2.new(1, 0, 0, 44)
 	send.Activated:Connect(function()
 		onSendToVessel()
 	end)
-	local pocket = button("Pocket (Q)", Color3.fromRGB(150, 100, 200), holdButtons)
+	local pocket = button("Pocket (Q)", Palette.UI.Pocket, holdButtons)
 	pocket.Name = "Pocket"
 	pocket.Size = UDim2.new(1, 0, 0, 44)
 	pocket.Visible = false
@@ -643,13 +644,13 @@ function HUD.init()
 		ZIndex = 15,
 	}, gui)
 	corner(rewardFrame, 12)
-	make("UIStroke", { Color = Color3.fromRGB(255, 215, 120), Thickness = 2 }, rewardFrame)
+	make("UIStroke", { Color = Palette.UI.Accent, Thickness = 2 }, rewardFrame)
 	text({
 		Text = "Choose your rebirth reward",
 		Size = UDim2.new(1, 0, 0, 44),
 		TextSize = 24,
 		TextStrokeTransparency = 1,
-		TextColor3 = Color3.fromRGB(255, 215, 120),
+		TextColor3 = Palette.UI.Accent,
 	}, rewardFrame)
 	tooltip = text({
 		Size = UDim2.fromOffset(260, 24),
@@ -665,7 +666,7 @@ function HUD.init()
 		Position = UDim2.new(1, -310, 1, -28),
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextSize = 14,
-		TextColor3 = Color3.fromRGB(255, 255, 160),
+		TextColor3 = Palette.UI.Debug,
 		Visible = false,
 	}, gui)
 
@@ -679,7 +680,7 @@ function HUD.init()
 		ZIndex = 10,
 	}, gui)
 	make("UISizeConstraint", { MaxSize = Vector2.new(540, 620) }, shopFrame)
-	make("UIStroke", { Color = Color3.fromRGB(255, 215, 120), Thickness = 2, Transparency = 0.3 }, shopFrame)
+	make("UIStroke", { Color = Palette.UI.Accent, Thickness = 2, Transparency = 0.3 }, shopFrame)
 	corner(shopFrame, 12)
 	text({
 		Text = "Shopkeeper",
@@ -695,9 +696,9 @@ function HUD.init()
 		TextXAlignment = Enum.TextXAlignment.Right,
 		TextSize = 20,
 		TextStrokeTransparency = 1,
-		TextColor3 = Color3.fromRGB(255, 215, 120),
+		TextColor3 = Palette.UI.Accent,
 	}, shopFrame)
-	local close = button("X", Color3.fromRGB(200, 80, 70), shopFrame)
+	local close = button("X", Palette.UI.Danger, shopFrame)
 	close.Size = UDim2.fromOffset(36, 36)
 	close.Position = UDim2.new(1, -48, 0, 10)
 	close.Activated:Connect(function()
@@ -711,7 +712,7 @@ function HUD.init()
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 		ScrollBarThickness = 6,
-		ScrollBarImageColor3 = Color3.fromRGB(255, 215, 120),
+		ScrollBarImageColor3 = Palette.UI.Accent,
 	}, shopFrame)
 	make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, shopRows)
 
@@ -758,9 +759,7 @@ function HUD.init()
 		local breath = player:GetAttribute("Breath") or 1
 		breathFrame.Visible = breath < 0.999
 		breathFill.Size = UDim2.fromScale(breath, 1)
-		breathFill.BackgroundColor3 = if breath < 0.25
-			then Color3.fromRGB(255, 90, 80)
-			else Color3.fromRGB(120, 210, 255)
+		breathFill.BackgroundColor3 = if breath < 0.25 then Palette.UI.BreathLow else Palette.UI.Breath
 	end)
 
 	Remotes.get("Notify").OnClientEvent:Connect(HUD.notify)

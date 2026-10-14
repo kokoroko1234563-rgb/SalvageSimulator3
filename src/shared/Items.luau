@@ -2,6 +2,7 @@
 -- zone multiplier. Shapes and colors are stand-ins until real models exist.
 
 local Gear = require(script.Parent.Gear)
+local Palette = require(script.Parent.Palette)
 
 local Light = Gear.WeightClass.Light
 local Medium = Gear.WeightClass.Medium
@@ -11,14 +12,7 @@ local Items = {}
 
 Items.Rarities = { "Common", "Uncommon", "Rare", "VeryRare" }
 
-Items.RarityColors = {
-	Unlock = Color3.fromRGB(255, 205, 60),
-	Exotic = Color3.fromRGB(40, 225, 200),
-	Common = Color3.fromRGB(235, 235, 235),
-	Uncommon = Color3.fromRGB(120, 220, 120),
-	Rare = Color3.fromRGB(90, 160, 255),
-	VeryRare = Color3.fromRGB(200, 110, 255),
-}
+Items.RarityColors = Palette.Rarity
 
 -- Density (g/cm^3 in Roblox units) gives each class a different feel when dragged.
 Items.ClassDensity = {
@@ -48,7 +42,7 @@ Items.Catalog = {
 		Size = Vector3.new(1.6, 0.6, 0.6),
 		Shape = "Cylinder",
 		Color = Color3.fromRGB(110, 190, 140),
-		Material = Enum.Material.Glass,
+		Material = Palette.Material.Glass,
 	},
 	{
 		Id = "FlipFlop",
@@ -79,7 +73,7 @@ Items.Catalog = {
 		Size = Vector3.new(1.8, 0.7, 0.7),
 		Shape = "Cylinder",
 		Color = Color3.fromRGB(160, 220, 255),
-		Material = Enum.Material.Glass,
+		Material = Palette.Material.Glass,
 	},
 	{
 		Id = "Pearl",
@@ -90,7 +84,7 @@ Items.Catalog = {
 		Size = Vector3.new(0.7, 0.7, 0.7),
 		Shape = "Ball",
 		Color = Color3.fromRGB(250, 250, 255),
-		Material = Enum.Material.SmoothPlastic,
+		Material = Palette.Material.Smooth,
 	},
 	{
 		Id = "BeachBall",
@@ -113,7 +107,7 @@ Items.Catalog = {
 		Size = Vector3.new(0.6, 0.4, 2.6),
 		Shape = "Block",
 		Color = Color3.fromRGB(255, 200, 50),
-		Material = Enum.Material.Foil,
+		Material = Palette.Material.Foil,
 	},
 	{
 		Id = "CaptainsKey",
@@ -125,7 +119,7 @@ Items.Catalog = {
 		Size = Vector3.new(0.5, 0.3, 1.8),
 		Shape = "Block",
 		Color = Color3.fromRGB(80, 200, 190),
-		Material = Enum.Material.Metal,
+		Material = Palette.Material.Metal,
 	},
 	-- Medium
 	{
@@ -147,7 +141,7 @@ Items.Catalog = {
 		Size = Vector3.new(2, 2, 2),
 		Shape = "Block",
 		Color = Color3.fromRGB(170, 120, 70),
-		Material = Enum.Material.WoodPlanks,
+		Material = Palette.Material.WoodPlanks,
 	},
 	{
 		Id = "Lantern",
@@ -158,7 +152,7 @@ Items.Catalog = {
 		Size = Vector3.new(1.2, 2, 1.2),
 		Shape = "Block",
 		Color = Color3.fromRGB(200, 150, 60),
-		Material = Enum.Material.Metal,
+		Material = Palette.Material.Metal,
 	},
 	{
 		Id = "Spyglass",
@@ -169,7 +163,7 @@ Items.Catalog = {
 		Size = Vector3.new(2.6, 0.7, 0.7),
 		Shape = "Cylinder",
 		Color = Color3.fromRGB(190, 160, 80),
-		Material = Enum.Material.Metal,
+		Material = Palette.Material.Metal,
 	},
 	-- Heavy
 	{
@@ -181,7 +175,7 @@ Items.Catalog = {
 		Size = Vector3.new(3, 2.4, 2.4),
 		Shape = "Cylinder",
 		Color = Color3.fromRGB(130, 85, 50),
-		Material = Enum.Material.Wood,
+		Material = Palette.Material.Wood,
 	},
 	{
 		Id = "BigCrate",
@@ -192,7 +186,7 @@ Items.Catalog = {
 		Size = Vector3.new(3.2, 3.2, 3.2),
 		Shape = "Block",
 		Color = Color3.fromRGB(150, 100, 55),
-		Material = Enum.Material.WoodPlanks,
+		Material = Palette.Material.WoodPlanks,
 	},
 	{
 		Id = "Anchor",
@@ -203,7 +197,7 @@ Items.Catalog = {
 		Size = Vector3.new(2.4, 3, 0.8),
 		Shape = "Block",
 		Color = Color3.fromRGB(80, 85, 95),
-		Material = Enum.Material.CorrodedMetal,
+		Material = Palette.Material.Rust,
 	},
 	{
 		Id = "ShipWheel",
@@ -214,7 +208,7 @@ Items.Catalog = {
 		Size = Vector3.new(0.6, 3.4, 3.4),
 		Shape = "Cylinder",
 		Color = Color3.fromRGB(120, 75, 40),
-		Material = Enum.Material.Wood,
+		Material = Palette.Material.Wood,
 	},
 }
 

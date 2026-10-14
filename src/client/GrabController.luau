@@ -16,6 +16,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Palette = require(Shared.Palette)
 local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
@@ -562,19 +563,19 @@ local function describe(part: BasePart): (string, Color3)
 		string.format("%s · %s coins · %s", name, HUD.formatNumber(value), CLASS_NAMES[class] or "?")
 
 	if state ~= "Unclaimed" and ownerId ~= player.UserId then
-		return line .. " (claimed)", Color3.fromRGB(180, 180, 180)
+		return line .. " (claimed)", Palette.UI.Claimed
 	end
 	local tool = currentTool()
 	if not Gear.canLift(tool, class) then
-		return line .. " (too heavy)", Color3.fromRGB(255, 120, 110)
+		return line .. " (too heavy)", Palette.UI.Bad
 	end
 	if
 		state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(part.Position, Tide.waterline()))
 	then
-		return line .. " (too deep)", Color3.fromRGB(255, 120, 110)
+		return line .. " (too deep)", Palette.UI.Bad
 	end
 	local rarityColor = Items.RarityColors[part:GetAttribute("Rarity") or "Common"]
-	return line, rarityColor or Color3.new(1, 1, 1)
+	return line, rarityColor or Palette.UI.Text
 end
 
 local function updateHover()
@@ -590,11 +591,7 @@ local function updateHover()
 		local message, color = describe(part)
 		HUD.setTooltip(message, color, screen)
 	elseif part and kind == "vessel" then
-		HUD.setTooltip(
-			"Your vessel · drag to tow, release items over it to load",
-			Color3.new(1, 1, 1),
-			screen
-		)
+		HUD.setTooltip("Your vessel · drag to tow, release items over it to load", Palette.UI.Text, screen)
 	else
 		HUD.setTooltip(nil)
 	end
