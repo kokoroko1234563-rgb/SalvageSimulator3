@@ -53,6 +53,9 @@ type Press = {
 
 local held: Held? = nil
 local press: Press? = nil
+-- On touch screens a touch that starts while something is lifted might be a camera pan,
+-- so it's only treated as a tap (and acted on) once it ends short and still.
+local liftedTouch: Press? = nil
 local pointer = Vector2.zero -- screen position (no GUI inset) of the active pointer
 
 local grabRemote
@@ -566,6 +569,16 @@ local function onInputBegan(input: InputObject, processed: boolean)
 
 	-- While something is lifted, the next tap decides where it goes.
 	local current = held
+	if current and current.mode == "lifted" and input.UserInputType == Enum.UserInputType.Touch then
+		liftedTouch = {
+			input = input,
+			startedAt = os.clock(),
+			startPosition = screen,
+			ended = false,
+			moved = 0,
+		}
+		return
+	end
 	if current and current.mode == "lifted" then
 		local hit = raycastFrom(screen)
 		if current.kind == "item" and hit and ownVesselFrom(hit.Instance) then
@@ -634,6 +647,11 @@ local function onInputBegan(input: InputObject, processed: boolean)
 end
 
 local function onInputChanged(input: InputObject)
+	local touch = liftedTouch
+	if touch and input == touch.input then
+		local position = Vector2.new(input.Position.X, input.Position.Y)
+		touch.moved = math.max(touch.moved, (position - touch.startPosition).Magnitude)
+	end
 	if input.UserInputType == Enum.UserInputType.MouseWheel then
 		local current = held
 		if current and current.mode == "drag" then
@@ -656,6 +674,22 @@ local function onInputChanged(input: InputObject)
 end
 
 local function onInputEnded(input: InputObject)
+	local touch = liftedTouch
+	if touch and input == touch.input then
+		liftedTouch = nil
+		touch.endedAt = os.clock()
+		local current = held
+		-- Only a real tap on your own vessel sends the item there. Pans and swipes do
+		-- nothing, and dropping is the Drop button, so moving the camera never drops it.
+		if current and current.mode == "lifted" and current.kind == "item" and isTap(touch) then
+			local hit = raycastFrom(touch.startPosition)
+			if hit and ownVesselFrom(hit.Instance) then
+				GrabController.sendToVessel()
+			end
+		end
+		return
+	end
+
 	local p = press
 	if not p then
 		return
