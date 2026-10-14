@@ -2,6 +2,7 @@
 -- their copy), raises the flood, and lets the player claim the chest at the top. The
 -- server checks everything; this side is only what the player sees and touches.
 
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
@@ -147,6 +148,15 @@ function SecretController.init()
 			end
 			build(secret, info.Origin)
 			run = { course = secret.Course, origin = info.Origin, duration = info.Duration, startedAt = nil }
+			-- This client owns the character's physics, so it moves the character in itself.
+			local character = Players.LocalPlayer.Character
+			if character then
+				character:PivotTo(CFrame.new(info.Origin + secret.Course.Spawn))
+				local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+				if root then
+					root.AssemblyLinearVelocity = Vector3.zero
+				end
+			end
 			readyRemote:FireServer()
 		elseif kind == "go" and run then
 			run.startedAt = info.StartedAt

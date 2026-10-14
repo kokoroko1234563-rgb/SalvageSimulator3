@@ -31,7 +31,9 @@ type Run = {
 	returnTo: CFrame,
 	startedAt: number?, -- nil until the player has been teleported in
 	nextCheckpoint: number,
-	ready: boolean, -- the client has built the course
+	ready: boolean, -- the client has built the course and moved the character in
+	openedAt: number, -- os.clock() when the door was used
+	nudged: boolean, -- the server has tried moving the character in itself
 	finished: boolean,
 }
 
@@ -128,6 +130,8 @@ function SecretService.tryEnter(player: Player, secretId: string, returnTo: CFra
 		startedAt = nil,
 		nextCheckpoint = 1,
 		ready = false,
+		openedAt = os.clock(),
+		nudged = false,
 		finished = false,
 	}
 	runs[player] = run
@@ -137,25 +141,7 @@ function SecretService.tryEnter(player: Player, secretId: string, returnTo: CFra
 		{ Secret = secret.Id, Origin = run.origin, Duration = run.duration }
 	)
 
-	-- Wait for the client to build the course (or give up waiting), then send them in.
-	task.spawn(function()
-		local deadline = os.clock() + cfg.ReadyTimeout
-		while runs[player] == run and not run.ready and os.clock() < deadline do
-			task.wait(0.1)
-		end
-		if runs[player] ~= run then
-			return
-		end
-		local character = player.Character
-		if not character then
-			endRun(player, nil, false)
-			return
-		end
-		character:PivotTo(CFrame.new(run.origin + secret.Course.Spawn))
-		run.startedAt = Tide.now()
-		eventRemote:FireClient(player, "go", { StartedAt = run.startedAt })
-		notify(player, "Climb to the chest before the sea floods the vault!")
-	end)
+	run.openedAt = os.clock()
 end
 
 local function onReady(player: Player)
@@ -212,10 +198,51 @@ local function onClaim(player: Player)
 	end
 end
 
+local function insideCourse(run: Run, position: Vector3): boolean
+	local rel = position - run.origin
+	local half = run.secret.Course.HalfSize + 6
+	return math.abs(rel.X) <= half and math.abs(rel.Z) <= half and rel.Y > -15 and rel.Y < 200
+end
+
+-- A run starts only once the server actually sees the character inside the course. The
+-- client moves its own character there (it owns the character's physics, so a server-side
+-- move can be overwritten by the client's last position); the server only nudges as a
+-- fallback, and gives the unlock item back if the player never arrives.
+local function waitForArrival(player: Player, run: Run)
+	local root = rootOf(player)
+	if root and run.ready and insideCourse(run, root.Position) then
+		run.startedAt = Tide.now() + cfg.FloodDelay -- the water waits a moment before rising
+		eventRemote:FireClient(player, "go", { StartedAt = run.startedAt })
+		notify(player, "Climb to the chest before the sea floods in!")
+		return
+	end
+	local waited = os.clock() - run.openedAt
+	if root and run.ready and waited > 1.5 and not run.nudged then
+		run.nudged = true
+		local character = player.Character
+		if character then
+			character:PivotTo(CFrame.new(run.origin + run.secret.Course.Spawn))
+		end
+	end
+	if waited > cfg.ReadyTimeout + 3 then
+		-- Our fault, not theirs: give the unlock item back.
+		DataService.addItem(player, run.secret.Unlock, "refund")
+		endRun(
+			player,
+			"Couldn't open the secret. Your " .. Items.get(run.secret.Unlock).Name .. " was returned.",
+			true
+		)
+	end
+end
+
 local function tick()
 	local now = Tide.now()
 	for player, run in runs do
-		if not run.startedAt or run.finished then
+		if run.finished then
+			continue
+		end
+		if not run.startedAt then
+			waitForArrival(player, run)
 			continue
 		end
 		local root, humanoid = rootOf(player)
