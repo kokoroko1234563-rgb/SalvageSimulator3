@@ -51,6 +51,20 @@ function Remotes.init()
 	folder.Parent = ReplicatedStorage
 end
 
+-- Server: answers a RemoteFunction with `handler`, which returns (ok, reason). If the
+-- handler errors, the error goes to Output and the player gets a message instead of the
+-- button silently doing nothing.
+function Remotes.handle(name: string, handler: (Player, ...any) -> (boolean, string?))
+	Remotes.get(name).OnServerInvoke = function(player: Player, ...)
+		local called, ok, reason = pcall(handler, player, ...)
+		if not called then
+			warn(string.format("[Remotes] %s from %s errored: %s", name, player.Name, tostring(ok)))
+			return false, "Something went wrong (server error, see Output)"
+		end
+		return ok, reason
+	end
+end
+
 function Remotes.get(name: string): any
 	local folder = ReplicatedStorage:WaitForChild(FOLDER_NAME)
 	return folder:WaitForChild(name)

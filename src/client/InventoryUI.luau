@@ -87,9 +87,13 @@ local function button(text: string, color: Color3, parent: Instance): TextButton
 end
 
 local function act(action: string, arg: any, value: any?)
-	local ok, reason = Remotes.get("InventoryAction"):InvokeServer(action, arg, value)
-	if not ok and reason then
-		HUD.notify(reason)
+	local called, ok, reason = pcall(function()
+		return Remotes.get("InventoryAction"):InvokeServer(action, arg, value)
+	end)
+	if not called then
+		HUD.notify("That didn't work: " .. tostring(ok))
+	elseif not ok then
+		HUD.notify(reason or "That didn't work")
 	end
 end
 

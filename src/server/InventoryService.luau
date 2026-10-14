@@ -127,7 +127,7 @@ function InventoryService.init()
 	Remotes.get("GetInventory").OnServerInvoke = function(player)
 		return InventoryService.snapshot(player)
 	end
-	Remotes.get("InventoryAction").OnServerInvoke = onAction
+	Remotes.handle("InventoryAction", onAction)
 
 	DataService.onChanged(function(player)
 		scheduleSync(player)

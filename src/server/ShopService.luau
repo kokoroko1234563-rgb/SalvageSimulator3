@@ -138,8 +138,8 @@ function ShopService.init(map: Instance, notifyFn: (Player, string) -> ())
 	sellZone = map.Shop:WaitForChild("SellZone") :: BasePart
 	bankPad = map.Shop:WaitForChild("BankPad") :: BasePart
 
-	Remotes.get("Buy").OnServerInvoke = onBuy
-	Remotes.get("SpawnVessel").OnServerInvoke = ShopService.spawnVessel
+	Remotes.handle("Buy", onBuy)
+	Remotes.handle("SpawnVessel", ShopService.spawnVessel)
 
 	local openShop = Remotes.get("OpenShop")
 	local prompt = shopkeeper:WaitForChild("ShopPrompt") :: ProximityPrompt

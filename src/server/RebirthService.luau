@@ -111,8 +111,8 @@ end
 function RebirthService.init(notifyFn: (Player, string) -> (), nearShopFn: (Player) -> boolean)
 	notify = notifyFn
 	nearShop = nearShopFn
-	Remotes.get("Rebirth").OnServerInvoke = onRebirth
-	Remotes.get("ChooseReward").OnServerInvoke = onChoose
+	Remotes.handle("Rebirth", onRebirth)
+	Remotes.handle("ChooseReward", onChoose)
 
 	local function onPlayer(player: Player)
 		player.CharacterAdded:Connect(function(character)

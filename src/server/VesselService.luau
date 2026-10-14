@@ -173,7 +173,8 @@ function builders.FloatingClamshell(model: Model, at: CFrame)
 	local base = tray(model, at * CFrame.new(0, 3, 0), Vector3.new(5, 0, 5), 1.2, color)
 	for _, child in model:GetChildren() do
 		if child:IsA("BasePart") and child.Name ~= "Cargo" then
-			child.Material = Enum.Material.Pearl
+			child.Material = Enum.Material.SmoothPlastic
+			child.Reflectance = 0.25 -- pearly sheen
 		end
 	end
 	local lid = part(
@@ -182,7 +183,7 @@ function builders.FloatingClamshell(model: Model, at: CFrame)
 		Vector3.new(5.6, 0.3, 3),
 		base.CFrame * CFrame.new(0, 2.6, 3.4) * CFrame.Angles(math.rad(-55), 0, 0),
 		color,
-		{ Material = Enum.Material.Pearl, CanCollide = false }
+		{ Material = Enum.Material.SmoothPlastic, Reflectance = 0.25, CanCollide = false }
 	)
 	weld(base, lid)
 	local glow = Instance.new("PointLight")
