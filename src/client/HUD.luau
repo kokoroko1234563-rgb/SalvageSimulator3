@@ -27,7 +27,8 @@ local holdButtons: Frame
 local tooltip: TextLabel
 local debugLabel: TextLabel
 local shopFrame: Frame
-local shopRows: Frame
+local shopRows: ScrollingFrame
+local shopCoinsLabel: TextLabel
 
 local onDrop: () -> () = function() end
 local onSendToVessel: () -> () = function() end
@@ -185,73 +186,128 @@ local function owned(attribute: string): { [string]: boolean }
 	return set
 end
 
+local CLASS_NAMES = { "Light", "Medium", "Heavy", "Very heavy" }
+local DEPTH_NAMES =
+	{ [0] = "Dry sand", [1] = "Shallows", [2] = "Knee-deep", [3] = "Waist-deep", [4] = "Deep" }
+
+local ROW_BG = Color3.fromRGB(34, 58, 76)
+local MUTED = Color3.fromRGB(170, 195, 210)
+local BUY = Color3.fromRGB(235, 150, 40)
+local SPAWN = Color3.fromRGB(60, 140, 220)
+local EQUIPPED = Color3.fromRGB(60, 160, 90)
+local DISABLED = Color3.fromRGB(70, 80, 90)
+
+local function sectionHeader(label: string, order: number)
+	text({
+		Text = label,
+		Size = UDim2.new(1, -8, 0, 26),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextSize = 15,
+		TextColor3 = Color3.fromRGB(255, 215, 120),
+		TextStrokeTransparency = 1,
+		LayoutOrder = order,
+	}, shopRows)
+end
+
 local function refreshShop()
 	for _, child in shopRows:GetChildren() do
-		if child:IsA("Frame") then
+		if child:IsA("GuiObject") then
 			child:Destroy()
 		end
 	end
+	local coins = player:GetAttribute("Coins") or 0
+	shopCoinsLabel.Text = formatNumber(coins) .. " coins"
+
 	local ownedTools = owned("OwnedTools")
 	local ownedVessels = owned("OwnedVessels")
+	local equippedTool = player:GetAttribute("Tool")
+	local activeVessel = player:GetAttribute("ActiveVessel")
 	local buyRemote = Remotes.get("Buy")
 	local spawnRemote = Remotes.get("SpawnVessel")
 
 	local order = 0
 	local function row(category: string, entry)
 		order += 1
+		local available = entry.Available
 		local frame = make("Frame", {
-			Size = UDim2.new(1, -8, 0, 48),
-			BackgroundColor3 = Color3.fromRGB(40, 70, 90),
+			Size = UDim2.new(1, -8, 0, if available then 70 else 40),
+			BackgroundColor3 = ROW_BG,
+			BackgroundTransparency = if available then 0 else 0.5,
 			LayoutOrder = order,
 		}, shopRows)
-		corner(frame, 6)
-		local detail = entry.Note or ""
-		if category == "Tool" then
-			detail = string.format(
-				"Reach %d · lifts %s · %s",
-				entry.Reach,
-				({ "Light", "Medium", "Heavy", "Very heavy" })[entry.Lift],
-				detail
-			)
-		else
-			detail = string.format("Holds %d · %s", entry.Capacity, detail)
-		end
+		corner(frame, 8)
+
 		text({
 			Text = entry.Name,
-			Size = UDim2.new(0.62, 0, 0.55, 0),
-			Position = UDim2.fromOffset(10, 2),
+			Size = UDim2.new(1, -160, 0, 26),
+			Position = UDim2.fromOffset(12, if available then 6 else 7),
 			TextXAlignment = Enum.TextXAlignment.Left,
+			TextSize = 20,
+			TextStrokeTransparency = 1,
+			TextColor3 = if available then Color3.new(1, 1, 1) else MUTED,
 		}, frame)
+
+		if not available then
+			text({
+				Text = "Coming later",
+				Size = UDim2.new(0, 140, 1, 0),
+				Position = UDim2.new(1, -152, 0, 0),
+				TextXAlignment = Enum.TextXAlignment.Right,
+				TextSize = 15,
+				Font = Enum.Font.GothamMedium,
+				TextStrokeTransparency = 1,
+				TextColor3 = MUTED,
+			}, frame)
+			return
+		end
+
+		local stats = if category == "Tool"
+			then string.format(
+				"Reach %d  ·  Lifts %s  ·  %s",
+				entry.Reach,
+				CLASS_NAMES[entry.Lift],
+				DEPTH_NAMES[entry.Depth]
+			)
+			else string.format("Holds %d items", entry.Capacity)
 		text({
-			Text = detail,
-			Size = UDim2.new(0.62, 0, 0.4, 0),
-			Position = UDim2.new(0, 10, 0.55, 0),
+			Text = stats .. "\n" .. (entry.Note or ""),
+			Size = UDim2.new(1, -160, 0, 34),
+			Position = UDim2.fromOffset(12, 32),
 			TextXAlignment = Enum.TextXAlignment.Left,
-			TextSize = 13,
-			Font = Enum.Font.Gotham,
-			TextColor3 = Color3.fromRGB(200, 220, 230),
+			TextYAlignment = Enum.TextYAlignment.Top,
+			TextSize = 14,
+			TextWrapped = true,
+			Font = Enum.Font.GothamMedium,
+			TextStrokeTransparency = 1,
+			TextColor3 = MUTED,
 		}, frame)
 
 		local isOwned = if category == "Tool" then ownedTools[entry.Id] else ownedVessels[entry.Id]
 		local label, color, action
-		if not entry.Available then
-			label, color = "Coming later", Color3.fromRGB(90, 90, 90)
-		elseif isOwned and category == "Vessel" then
-			label, color = "Spawn", Color3.fromRGB(60, 140, 220)
+		if category == "Tool" and isOwned then
+			if entry.Id == equippedTool then
+				label, color = "Equipped", EQUIPPED
+			else
+				label, color = "Owned", DISABLED
+			end
+		elseif isOwned then
+			label, color = if activeVessel == entry.Id then "Respawn" else "Spawn", SPAWN
 			action = function()
 				return spawnRemote:InvokeServer(entry.Id)
 			end
-		elseif isOwned then
-			label, color = "Owned", Color3.fromRGB(70, 120, 80)
-		else
-			label, color = formatNumber(entry.Price) .. " coins", Color3.fromRGB(230, 150, 40)
+		elseif coins >= entry.Price then
+			label, color = "Buy · " .. formatNumber(entry.Price), BUY
 			action = function()
 				return buyRemote:InvokeServer(category, entry.Id)
 			end
+		else
+			label, color = formatNumber(entry.Price) .. " coins", DISABLED
 		end
+
 		local b = button(label, color, frame)
-		b.Size = UDim2.new(0.34, 0, 0, 34)
-		b.Position = UDim2.new(0.64, 0, 0.5, -17)
+		b.Size = UDim2.fromOffset(136, 40)
+		b.Position = UDim2.new(1, -148, 0.5, -20)
+		b.TextSize = 17
 		if action then
 			b.Activated:Connect(function()
 				local ok, reason = action()
@@ -262,14 +318,19 @@ local function refreshShop()
 			end)
 		else
 			b.AutoButtonColor = false
+			b.TextColor3 = Color3.fromRGB(200, 205, 210)
 		end
 	end
 
+	order += 1
+	sectionHeader("GRABBING TOOLS", order)
 	for _, tool in Gear.Tools do
 		if tool.Price > 0 then
 			row("Tool", tool)
 		end
 	end
+	order += 1
+	sectionHeader("VESSELS", order)
 	for _, vessel in Gear.Vessels do
 		row("Vessel", vessel)
 	end
@@ -281,7 +342,13 @@ function HUD.openShop()
 end
 
 function HUD.init()
-	gui = make("ScreenGui", { Name = "SalvageHUD", ResetOnSpawn = false, IgnoreGuiInset = false })
+	gui = make("ScreenGui", {
+		Name = "SalvageHUD",
+		ResetOnSpawn = false,
+		IgnoreGuiInset = false,
+		-- Children draw above their parents (code-made ScreenGuis default to Global).
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	})
 
 	statsLabel = text({
 		Size = UDim2.fromOffset(260, 80),
@@ -312,6 +379,7 @@ function HUD.init()
 		Size = UDim2.new(0, 360, 0, 200),
 		Position = UDim2.new(0.5, -180, 1, -330),
 		BackgroundTransparency = 1,
+		ZIndex = 20, -- above the shop so purchase errors are visible
 	}, gui)
 	make("UIListLayout", {
 		VerticalAlignment = Enum.VerticalAlignment.Bottom,
@@ -376,32 +444,47 @@ function HUD.init()
 
 	-- Shop panel.
 	shopFrame = make("Frame", {
-		Size = UDim2.new(0, 460, 0.7, 0),
-		Position = UDim2.new(0.5, -230, 0.15, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Size = UDim2.fromScale(0.92, 0.8),
+		Position = UDim2.fromScale(0.5, 0.5),
 		BackgroundColor3 = BG,
-		BackgroundTransparency = 0.05,
 		Visible = false,
-		ZIndex = 2,
+		ZIndex = 10,
 	}, gui)
+	make("UISizeConstraint", { MaxSize = Vector2.new(540, 620) }, shopFrame)
+	make("UIStroke", { Color = Color3.fromRGB(255, 215, 120), Thickness = 2, Transparency = 0.3 }, shopFrame)
 	corner(shopFrame, 12)
 	text({
 		Text = "Shopkeeper",
-		Size = UDim2.new(1, 0, 0, 40),
-		TextSize = 26,
+		Size = UDim2.new(0.5, 0, 0, 44),
+		Position = UDim2.fromOffset(16, 6),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextSize = 28,
+		TextStrokeTransparency = 1,
+	}, shopFrame)
+	shopCoinsLabel = text({
+		Size = UDim2.new(0.5, -70, 0, 44),
+		Position = UDim2.new(0.5, 0, 0, 6),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextSize = 20,
+		TextStrokeTransparency = 1,
+		TextColor3 = Color3.fromRGB(255, 215, 120),
 	}, shopFrame)
 	local close = button("X", Color3.fromRGB(200, 80, 70), shopFrame)
-	close.Size = UDim2.fromOffset(32, 32)
-	close.Position = UDim2.new(1, -40, 0, 6)
+	close.Size = UDim2.fromOffset(36, 36)
+	close.Position = UDim2.new(1, -48, 0, 10)
 	close.Activated:Connect(function()
 		shopFrame.Visible = false
 	end)
 	shopRows = make("ScrollingFrame", {
-		Size = UDim2.new(1, -16, 1, -56),
-		Position = UDim2.fromOffset(8, 48),
+		Size = UDim2.new(1, -20, 1, -66),
+		Position = UDim2.fromOffset(12, 56),
 		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = Color3.fromRGB(255, 215, 120),
 	}, shopFrame)
 	make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, shopRows)
 
@@ -410,7 +493,7 @@ function HUD.init()
 	for _, attribute in { "Coins", "Tool", "ActiveVessel" } do
 		player:GetAttributeChangedSignal(attribute):Connect(refreshStats)
 	end
-	for _, attribute in { "Coins", "OwnedTools", "OwnedVessels" } do
+	for _, attribute in { "Coins", "Tool", "ActiveVessel", "OwnedTools", "OwnedVessels" } do
 		player:GetAttributeChangedSignal(attribute):Connect(function()
 			if shopFrame.Visible then
 				refreshShop()
