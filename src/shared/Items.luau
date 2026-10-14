@@ -1,5 +1,6 @@
--- Placeholder beach loot for the test build. Value is the base sell price before the
--- zone multiplier. Shapes and colors are stand-ins until real models exist.
+-- Beach loot. Value is the base sell price before the zone multiplier. Size, Shape and
+-- Color set the physics body and the colour the item is named by; the visible model is
+-- built from them in src/server/ItemModels.luau.
 
 local Gear = require(script.Parent.Gear)
 local Palette = require(script.Parent.Palette)
