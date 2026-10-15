@@ -279,7 +279,7 @@ Items.Catalog = {
 		Planned = true,
 		Value = 0,
 		Size = Vector3.new(1.1, 0.4, 1.1),
-		Shape = "Cylinder",
+		Shape = "Block", -- a flat disc: a cylinder body would lie along X as a thin rod
 		Color = Color3.fromRGB(180, 225, 245),
 		Material = Palette.Material.Glass,
 	},

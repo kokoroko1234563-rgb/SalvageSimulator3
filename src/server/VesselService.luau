@@ -937,20 +937,12 @@ function builders.JellyRaft(model: Model, at: CFrame)
 	local glowColor = Color3.fromRGB(255, 170, 250)
 	local base = tray(model, at * CFrame.new(0, 3, 0), Vector3.new(5.4, 0, 6.4), 0.8, jelly)
 	dress(model, { Material = Palette.Material.Glass, Transparency = 0.35 })
-	attach(
-		model,
-		base,
-		"Bell",
-		Vector3.new(7, 1.6, 8),
-		CFrame.new(0, -0.7, 0),
-		jelly,
-		{
-			Shape = Enum.PartType.Ball,
-			Material = Palette.Material.Glass,
-			Transparency = 0.45,
-			CanCollide = false,
-		}
-	)
+	attach(model, base, "Bell", Vector3.new(7, 1.6, 8), CFrame.new(0, -0.7, 0), jelly, {
+		Shape = Enum.PartType.Ball,
+		Material = Palette.Material.Glass,
+		Transparency = 0.45,
+		CanCollide = false,
+	})
 	for index = 1, 8 do
 		local angle = (index / 8) * math.pi * 2
 		local x, z = math.cos(angle) * 2.6, math.sin(angle) * 3

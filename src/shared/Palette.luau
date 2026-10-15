@@ -226,6 +226,17 @@ Palette.ItemModel = {
 	LanternGlass = rgb(255, 230, 160),
 	Glow = rgb(255, 250, 225), -- the Beacon Pearl's halo
 	Glint = rgb(255, 210, 235), -- a pearl's shine
+	Gold = rgb(235, 190, 70), -- trims, locks, the compass case
+	Needle = rgb(215, 45, 45), -- the compass needle's north end
+	Barnacle = rgb(215, 210, 190),
+	Jelly = rgb(255, 140, 220), -- the glowing jellyfish in the jar
+	Magma = rgb(255, 120, 40), -- the obsidian egg's cracks
+	Rubber = rgb(40, 45, 50), -- snorkel mouthpiece and mask
+	MaskGlass = rgb(150, 210, 235),
+	Fish = rgb(120, 150, 170),
+	Float = rgb(240, 140, 50), -- the net's floats
+	Rock = rgb(110, 105, 100),
+	Moss = rgb(95, 140, 75),
 }
 
 Palette.Font = {
