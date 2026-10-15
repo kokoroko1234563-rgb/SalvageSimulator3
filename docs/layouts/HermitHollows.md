@@ -6,7 +6,7 @@ Draft, not in use. A maze of rock walls about 12 studs wide, with alternating ga
 
 Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` raised sand, `.` flat, `~` floods at mid-tide, `=` cart ramp, `o` entrance flat.
 
-<!-- map Biomes/Planned/HermitHollows@1 -->
+<!-- map Biomes/HermitHollows@1 -->
 ```text
 ..............===....................................==.................
 .............==.......................................==................
@@ -25,7 +25,7 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 ..^^^^^^^^^^^^^==^^^^^^^^^^^^^^^^^ .. ^^^^^^^^^^^^^^^== ^^^^^^^^^^^^^^..
 ```
 <!-- /map -->
-<!-- map Biomes/Planned/HermitHollows@2 -->
+<!-- map Biomes/HermitHollows@2 -->
 ```text
 ..............===....................................==.................
 .............==.......................................==................
@@ -44,7 +44,7 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 ...............==....................................==.................
 ```
 <!-- /map -->
-<!-- map Biomes/Planned/HermitHollows@3 -->
+<!-- map Biomes/HermitHollows@3 -->
 ```text
 ..............===....................................==.................
 .............==.......................................==................
@@ -63,7 +63,7 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 ...............==....................................==.................
 ```
 <!-- /map -->
-<!-- map Biomes/Planned/HermitHollows@4 -->
+<!-- map Biomes/HermitHollows@4 -->
 ```text
 ..............===....................................==.................
 .............==.......................................==................
@@ -87,16 +87,16 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 
 As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
 
-<!-- floods Biomes/Planned/HermitHollows@1 -->
+<!-- floods Biomes/HermitHollows@1 -->
 
 <!-- /floods -->
-<!-- floods Biomes/Planned/HermitHollows@2 -->
+<!-- floods Biomes/HermitHollows@2 -->
 
 <!-- /floods -->
-<!-- floods Biomes/Planned/HermitHollows@3 -->
+<!-- floods Biomes/HermitHollows@3 -->
 
 <!-- /floods -->
-<!-- floods Biomes/Planned/HermitHollows@4 -->
+<!-- floods Biomes/HermitHollows@4 -->
 
 <!-- /floods -->
 

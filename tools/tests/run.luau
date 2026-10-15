@@ -39,6 +39,7 @@ for _, name in
 		"Hotbar",
 		"WaterObstacles",
 		"Layouts",
+		"Hazards",
 		"Traders",
 		"Tide",
 		"Beach",
@@ -106,7 +107,8 @@ test("data validates", function()
 	local problems = h.require("Shared/Validate").run({
 		VesselBuilders = VesselService._builders,
 		Entrances = BiomeService._entranceBuilders,
-		Hazards = BiomeService._hazards,
+		Hazards = h.require("Server/HazardService").Builders,
+		Scenery = BiomeService._decorBuilders,
 	})
 	assert(#problems == 0, table.concat(problems, "\n      "))
 end)
@@ -258,17 +260,23 @@ test("beach cheer is scenery only", function()
 	end
 end)
 
--- 6. Every biome's decor, entrance and hazard build.
+-- 6. Every biome's decor, entrance and hazards build, and its hazards run.
 local Biomes = h.require("Shared/Biomes")
 for id, biome in Biomes.List do
 	test("build biome " .. id, function()
+		local HazardService = h.require("Server/HazardService")
 		local folder = Harness.wrap(roblox.Instance.new("Folder"))
 		folder.Parent = h.game.Workspace
-		BiomeService._decorBuilders[biome.Entrance](folder, biome, 200, 400)
-		BiomeService._buildEntrance(folder, biome, 2)
-		assert(folder:FindFirstChild("SecretEntrance"), "no entrance was built")
-		if biome.Hazard then
-			BiomeService._hazards[biome.Hazard](folder, 1)
+		local decor = biome.Scenery and BiomeService._decorBuilders[biome.Scenery]
+			or BiomeService._decorBuilders.Mounds
+		decor(folder, biome, 200, 400)
+		if biome.Secret then
+			BiomeService._buildEntrance(folder, biome, 2)
+			assert(folder:FindFirstChild("SecretEntrance"), "no entrance was built")
+		end
+		HazardService.start(2, biome, folder)
+		for step = 1, 20 do
+			HazardService._step(step * 0.7, 0.7) -- through every kind's timer
 		end
 		folder:Destroy()
 	end)
@@ -766,6 +774,7 @@ for _, name in
 		"GearEffects",
 		"MistController",
 		"FishController",
+		"HazardController",
 	}
 do
 	test("load Client/" .. name, function()
@@ -1185,9 +1194,10 @@ local function layoutGrid()
 		grid.shop[layoutKey(ix, -1)] = Beach.groundAt(ix * LAYOUT_GRID, -LAYOUT_GRID)
 	end
 	for zone = 1, Config.Beach.ActiveZones do
+		-- Each biome in the zones it can roll in (Biomes.List[id].Zones).
 		local names = { "Base" }
-		for id in Biomes.List do
-			if Layouts.forBiome(id, zone) then
+		for id, biome in Biomes.List do
+			if Layouts.forBiome(id, zone) and biome.Zones and (biome.Zones[zone] or 0) > 0 then
 				table.insert(names, id)
 			end
 		end
@@ -1210,21 +1220,25 @@ local function layoutGrid()
 	return grid
 end
 
--- Calls fn(choice) once for every combination: choice[zone] is an index into that zone's options.
+-- Calls fn(choice) for the base layouts everywhere, then once for each other option of each
+-- zone with the base layouts around it: choice[zone] is an index into that zone's options.
+-- Tiles meet along a strip of flat ground at every edge (the shapes fade out there), so a
+-- route can cross from one tile to the next anywhere along it: every mix of options works if
+-- each option can be crossed on its own, and there's no need to try every mix.
 local function eachLayoutChoice(grid, fn)
 	local Config = h.require("Shared/Config")
 	local choice = {}
-	local function walk(zone)
-		if zone > Config.Beach.ActiveZones then
-			fn(choice)
-			return
-		end
-		for index in grid.options[zone] do
-			choice[zone] = index
-			walk(zone + 1)
-		end
+	for zone = 1, Config.Beach.ActiveZones do
+		choice[zone] = 1
 	end
-	walk(1)
+	fn(choice)
+	for zone = 1, Config.Beach.ActiveZones do
+		for index = 2, #grid.options[zone] do
+			choice[zone] = index
+			fn(choice)
+		end
+		choice[zone] = 1
+	end
 	return choice
 end
 
@@ -1446,7 +1460,7 @@ test("a player on foot can reach every biome's entrance spot in every zone it ro
 			if biome then
 				seen = seen or layoutFlood(grid, choice, Config.Beach.Terrain.FootSlope)
 				local zStart = Beach.tileRange(zone)
-				for _, x in biome.EntranceSpots do
+				for _, x in biome.EntranceSpots or {} do
 					checked += 1
 					if not layoutReaches(seen, x, zStart + 30) then
 						table.insert(failures, option.name .. " in zone " .. zone .. " at x " .. x)
@@ -1561,7 +1575,7 @@ test("the pier's path and every entrance spot are clear of shapes", function()
 			end
 			local biome = Biomes.List[option.name]
 			if biome then
-				for _, x in biome.EntranceSpots do
+				for _, x in biome.EntranceSpots or {} do
 					if Beach.feature(x, zStart + 30) ~= 0 then
 						table.insert(problems, option.name .. ": entrance at x " .. x .. " is not flat")
 					end
@@ -1741,6 +1755,96 @@ test("the water meshes fit Roblox's limits", function()
 	end
 	-- Keep the water light: the editable mesh memory budget is small.
 	assert(total <= 14000, "the water has " .. total .. " triangles")
+end)
+
+test("hazards are data: kinds, settings and problems", function()
+	local Hazards = h.require("Shared/Hazards")
+	local settings = Hazards.settings({ Type = "Patrol", Count = 7 })
+	assert(settings.Count == 7 and settings.Speed == Hazards.Types.Patrol.Speed, "entries override defaults")
+	assert(#Hazards.problems({ Type = "Patrol", Count = 2 }, "x") == 0, "a good entry")
+	assert(#Hazards.problems({ Type = "Volcano" }, "x") > 0, "an unknown kind")
+	assert(#Hazards.problems({ Type = "Pulse", Speed = 3 }, "x") > 0, "a setting the kind doesn't have")
+	assert(#Hazards.problems({ Type = "Pulse", Period = "soon" }, "x") > 0, "a setting of the wrong type")
+	assert(#Hazards.problems({ Type = "Slow", Effect = "Explode" }, "x") > 0, "an unknown effect")
+end)
+
+test("patrols walk their route back and forth", function()
+	local HazardService = h.require("Server/HazardService")
+	local path = { roblox.Vector2.new(0, 0), roblox.Vector2.new(10, 0), roblox.Vector2.new(10, 10) }
+	local function near(a, b)
+		return (a - b).Magnitude < 1e-6
+	end
+	local at, heading = HazardService.alongPath(path, 5)
+	assert(
+		near(at, roblox.Vector2.new(5, 0)) and near(heading, roblox.Vector2.new(1, 0)),
+		"out along the first leg"
+	)
+	at = HazardService.alongPath(path, 15)
+	assert(near(at, roblox.Vector2.new(10, 5)), "round the corner")
+	at, heading = HazardService.alongPath(path, 25)
+	assert(near(at, roblox.Vector2.new(10, 5)) and near(heading, roblox.Vector2.new(0, -1)), "and back again")
+	at = HazardService.alongPath(path, 40)
+	assert(near(at, roblox.Vector2.new(0, 0)), "home after twice the route")
+end)
+
+test("a hazard reaches you within its radius, at about your height", function()
+	local HazardController = h.require("Client/HazardController")
+	local part = Harness.wrap(roblox.Instance.new("Part"))
+	part.Position = roblox.Vector3.new(0, 0, 0)
+	part:SetAttribute("HitRadius", 3)
+	assert(HazardController.reaches(part, roblox.Vector3.new(4, 2, 0)), "3 + the body's width")
+	assert(not HazardController.reaches(part, roblox.Vector3.new(6, 2, 0)), "too far across")
+	assert(not HazardController.reaches(part, roblox.Vector3.new(1, 12, 0)), "too far above")
+end)
+
+test("layouts place loot, entrances and hazards", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local layout = {
+		Name = "placed",
+		Primitives = {},
+		Loot = { { At = { 10, 40 }, Radius = 8 }, { At = { -50, 90 }, Radius = 6, Weight = 3 } },
+		Entrances = { { 100, 30 } },
+		Hazards = {
+			{ Type = "Patrol", Path = { { 0, 20 }, { 0, 120 } }, Count = 2 },
+			{ Type = "Pulse", At = { 60, 75 } },
+		},
+	}
+	assert(#Layouts.problems(layout) == 0, table.concat(Layouts.problems(layout), "; "))
+	local tile = 7
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, layout)
+	local loot = Layouts.lootSpots(tile, z0)
+	assert(#loot == 2 and loot[1].Z == z0 + 40 and loot[2].Weight == 3, "loot spots in world Z")
+	assert(Layouts.entrances(tile, z0)[1].Y == z0 + 30, "entrances too")
+	assert(#Layouts.hazardPlacements(tile, "Patrol") == 1, "hazards by kind")
+	assert(#Layouts.hazardPlacements(tile, "Roller") == 0, "none of a kind it doesn't place")
+	Layouts.setActive(tile, nil)
+	local bad = {
+		Name = "bad",
+		Primitives = {},
+		Loot = { { At = { 1, 2 } } },
+		Hazards = { { Type = "Pulse", Path = { { 0, 0 }, { 1, 1 } } } },
+		Extra = true,
+	}
+	assert(#Layouts.problems(bad) == 3, "catches a radius-less spot, a misplaced field and an unknown field")
+end)
+
+test("biomes roll only in their zones", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Biomes = h.require("Shared/Biomes")
+	for tile = 1, Beach.ActiveTiles do
+		local zone = Beach.zoneOfTile(tile)
+		local weights = BiomeService.weightsFor(tile)
+		assert(weights.None == Config.Biomes.NoneWeight, "none can always roll")
+		for id, biome in Biomes.List do
+			local expected = biome.Zones[zone]
+			assert(weights[id] == expected, id .. " in zone " .. zone)
+		end
+	end
+	assert(BiomeService.weightsFor(1).HermitHollows == nil, "no hermit crabs by the shop")
+	assert(BiomeService.weightsFor(Beach.ActiveTiles).HermitHollows, "but out in the Drowned Reach")
 end)
 
 test("cart ramps keep clear of the rock pools' rocks", function()

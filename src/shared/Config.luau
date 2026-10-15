@@ -266,15 +266,9 @@ Config.Water = {
 
 -- Biomes: each tide cycle, every zone rolls whether it becomes a biome (see Biomes.luau).
 Config.Biomes = {
-	-- Each cycle every tile rolls one of these (relative weights). Rare biomes are never announced.
-	Weights = {
-		None = 40,
-		SandcastleFlats = 45,
-		ShipwreckShallows = 15,
-	},
-	-- Weights for particular zones (by zone number), in place of Weights: which biomes can turn
-	-- up how deep. Rarer biomes belong further out.
-	ByZone = {},
+	-- Each cycle every tile rolls a biome from those that can turn up in its zone (each biome's
+	-- Zones weights, in Biomes.luau), or none, with this weight. Rare biomes are never announced.
+	NoneWeight = 40,
 }
 
 -- Rare unlock items for secrets.
@@ -480,11 +474,6 @@ Config.Traders = {
 Config.SkyBeam = {
 	SpawnChance = 0.0005, -- chance a surf spawn in the outermost zone is the Beacon Pearl
 	Height = 600, -- studs of light above it
-}
-
-Config.Hazards = {
-	BarrelPeriod = 6, -- Shipwreck Shallows: a barrel rolls down the sand this often (learnable timer)
-	BarrelSpeed = 16,
 }
 
 Config.Trading = {

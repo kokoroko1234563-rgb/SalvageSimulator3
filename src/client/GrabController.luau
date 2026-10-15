@@ -257,6 +257,11 @@ local function cleanup()
 	HUD.setHoldButtons(false)
 end
 
+-- Whether this client is holding something (an item or a vessel's handle).
+function GrabController.isHolding(): boolean
+	return held ~= nil
+end
+
 function GrabController.release()
 	local current = held
 	if not current then

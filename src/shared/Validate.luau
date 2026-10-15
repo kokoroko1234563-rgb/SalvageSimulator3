@@ -7,6 +7,7 @@ local Biomes = require(script.Parent.Biomes)
 local Catalog = require(script.Parent.Catalog)
 local Config = require(script.Parent.Config)
 local Gear = require(script.Parent.Gear)
+local Hazards = require(script.Parent.Hazards)
 local Items = require(script.Parent.Items)
 local Layouts = require(script.Parent.Layouts)
 local Palette = require(script.Parent.Palette)
@@ -300,13 +301,23 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 	end
 
 	-- Biomes
-	for id, weight in Config.Biomes.Weights do
-		check(id == "None" or Biomes.List[id] ~= nil, "Config.Biomes.Weights names unknown biome " .. id)
-		check(type(weight) == "number" and weight >= 0, "Config.Biomes.Weights." .. id .. " must be a number")
-	end
+	check(
+		type(Config.Biomes.NoneWeight) == "number" and Config.Biomes.NoneWeight >= 0,
+		"Config.Biomes.NoneWeight must be a number"
+	)
 	for id, biome in Biomes.List do
 		local where = "Biome " .. id
 		check(biome.Id == id, where .. ": Id doesn't match its key")
+		local rolls = false
+		for zone, weight in biome.Zones or {} do
+			check(
+				type(zone) == "number" and zone >= 1 and zone <= Config.Beach.ActiveZones,
+				where .. ": Zones names zone " .. tostring(zone) .. ", which doesn't exist"
+			)
+			check(type(weight) == "number" and weight >= 0, where .. ": Zones weights must be numbers")
+			rolls = rolls or (type(weight) == "number" and weight > 0)
+		end
+		check(rolls, where .. ": needs Zones = { [zone] = weight } to roll anywhere")
 		for _, lootId in biome.Loot do
 			check(Items.get(lootId) ~= nil, where .. ": loot item " .. lootId .. " doesn't exist")
 		end
@@ -315,23 +326,37 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 			unlock ~= nil and unlock.Unlock == id,
 			where .. ": UnlockItem must be an unlock item for this biome"
 		)
-		check(
-			Secrets.List[biome.Secret] ~= nil,
-			where .. ": secret " .. tostring(biome.Secret) .. " doesn't exist"
-		)
 		check(isColor(biome.Decor), where .. ": Decor must be a Color3")
-		check(#biome.EntranceSpots > 0, where .. ": needs at least one entrance spot")
-		if extra and extra.Entrances then
+		-- A secret needs a way in. (A biome without one has no entrance yet.)
+		if biome.Secret ~= nil then
 			check(
-				extra.Entrances[biome.Entrance] ~= nil,
-				where .. ": no entrance builder called " .. tostring(biome.Entrance)
+				Secrets.List[biome.Secret] ~= nil,
+				where .. ": secret " .. tostring(biome.Secret) .. " doesn't exist"
+			)
+			check(#(biome.EntranceSpots or {}) > 0, where .. ": needs at least one entrance spot")
+			if extra and extra.Entrances then
+				check(
+					extra.Entrances[biome.Entrance] ~= nil,
+					where .. ": no entrance builder called " .. tostring(biome.Entrance)
+				)
+			end
+		end
+		if biome.Scenery and extra and extra.Scenery then
+			check(
+				extra.Scenery[biome.Scenery] ~= nil,
+				where .. ": no scenery called " .. tostring(biome.Scenery)
 			)
 		end
-		if biome.Hazard and extra and extra.Hazards then
-			check(
-				extra.Hazards[biome.Hazard] ~= nil,
-				where .. ": no hazard called " .. tostring(biome.Hazard)
-			)
+		for index, entry in biome.Hazards or {} do
+			for _, problem in Hazards.problems(entry, where .. " hazard " .. index) do
+				check(false, problem)
+			end
+			if extra and extra.Hazards and type(entry) == "table" then
+				check(
+					extra.Hazards[entry.Type] ~= nil,
+					where .. ": no hazard builder for " .. tostring(entry.Type)
+				)
+			end
 		end
 	end
 

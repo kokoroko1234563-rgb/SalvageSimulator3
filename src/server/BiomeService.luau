@@ -4,7 +4,6 @@
 -- secret's entrance, and the biome's beach hazard.
 -- Admins can set or reroll biomes from the console (see AdminService).
 
-local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
@@ -16,9 +15,8 @@ local Items = require(Shared.Items)
 local Layouts = require(Shared.Layouts)
 local Tide = require(Shared.Tide)
 
-local CollisionGroups = require(script.Parent.CollisionGroups)
-local GrabService = require(script.Parent.GrabService)
 local GroundShift = require(script.Parent.GroundShift)
+local HazardService = require(script.Parent.HazardService)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 
 local BiomeService = {}
@@ -26,7 +24,6 @@ local BiomeService = {}
 local folder: Folder
 local rng = Random.new()
 local onEntrance: (Player, string, CFrame) -> () = function(_player: Player, _secret: string, _at: CFrame) end
-local notify: (Player, string) -> () = function(_player: Player, _text: string) end
 
 local function makePart(props: { [string]: any }): Part
 	local part = Instance.new("Part")
@@ -86,6 +83,26 @@ function decorBuilders.Wreck(tileFolder: Folder, biome, startZ: number, endZ: nu
 				* CFrame.Angles(math.rad(rng:NextNumber(-12, 12)), rng:NextNumber() * math.pi, 0),
 			Color = biome.Decor,
 			Material = Palette.Material.WoodPlanks,
+			CanCollide = false,
+			CanQuery = false,
+		}).Parent =
+			tileFolder
+	end
+end
+
+-- Any biome without scenery of its own: low mounds in its Decor colour, so you can tell it's
+-- there.
+function decorBuilders.Mounds(tileFolder: Folder, biome, startZ: number, endZ: number)
+	for _ = 1, 12 do
+		local x = rng:NextNumber(-Beach.HalfWidth + 15, Beach.HalfWidth - 15)
+		local z = rng:NextNumber(startZ + 10, endZ - 10)
+		local size = rng:NextNumber(2, 5)
+		makePart({
+			Name = "Mound",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(size, size * 0.5, size),
+			CFrame = CFrame.new(x, Beach.groundAt(x, z), z),
+			Color = biome.Decor,
 			CanCollide = false,
 			CanQuery = false,
 		}).Parent =
@@ -157,8 +174,16 @@ end
 
 local function buildEntrance(tileFolder: Folder, biome, tile: number)
 	local startZ = Beach.tileRange(tile)
-	local x = biome.EntranceSpots[rng:NextInteger(1, #biome.EntranceSpots)]
-	local z = startZ + 30 -- where the layouts keep the spots flat
+	-- The layout says where the entrance can stand, or the biome's spots across the tile.
+	local spots = Layouts.entrances(tile, startZ)
+	local x, z
+	if #spots > 0 then
+		local spot = spots[rng:NextInteger(1, #spots)]
+		x, z = spot.X, spot.Y
+	else
+		x = biome.EntranceSpots[rng:NextInteger(1, #biome.EntranceSpots)]
+		z = startZ + 30 -- where the layouts keep the spots flat
+	end
 	local groundY = Beach.groundAt(x, z)
 	local model = Instance.new("Model")
 	model.Name = "SecretEntrance"
@@ -178,52 +203,6 @@ local function buildEntrance(tileFolder: Folder, biome, tile: number)
 		onEntrance(player, biome.Secret, door.CFrame * CFrame.new(0, 0, -5))
 	end)
 	model.Parent = tileFolder
-end
-
--- Hazards ----------------------------------------------------------------------------
-
--- Shipwreck Shallows: barrels roll down the sand on a fixed timer. Getting hit knocks
--- whatever you're holding out of your hands. Learnable, so a hit feels like a mistake.
-local function rollBarrel(tileFolder: Folder, tile: number)
-	local startZ = Beach.tileRange(tile)
-	local fromZ = math.max(startZ + 5, 1)
-	if Beach.isDeep(Vector3.new(0, 0, fromZ), Tide.sea()) then
-		return -- the top of the tile is under water: nothing to roll down
-	end
-	local barrel = makePart({
-		Name = "RollingBarrel",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(3, 2.6, 2.6), -- axis along X so it rolls toward the sea
-		CFrame = (function()
-			local x = rng:NextNumber(-Beach.HalfWidth + 20, Beach.HalfWidth - 20)
-			return CFrame.new(x, Beach.groundAt(x, fromZ) + 1.5, fromZ)
-		end)(),
-		Color = Color3.fromRGB(120, 80, 45),
-		Material = Palette.Material.Wood,
-		Anchored = false,
-		CustomPhysicalProperties = PhysicalProperties.new(2, 0.3, 0.2),
-	})
-	barrel.CollisionGroup = CollisionGroups.Items
-	barrel.AssemblyLinearVelocity = Vector3.new(0, 0, Config.Hazards.BarrelSpeed)
-	barrel.AssemblyAngularVelocity = Vector3.new(Config.Hazards.BarrelSpeed / 1.3, 0, 0)
-
-	local hitRecently: { [Player]: boolean } = {}
-	barrel.Touched:Connect(function(other)
-		local player = Players:GetPlayerFromCharacter(other.Parent)
-		if player and not hitRecently[player] then
-			hitRecently[player] = true
-			if GrabService.getHeld(player) then
-				GrabService.forceRelease(player)
-				notify(player, "A barrel knocked it out of your hands!")
-			end
-		end
-	end)
-	barrel.Parent = tileFolder
-	pcall(barrel.SetNetworkOwner, barrel, nil)
-
-	task.delay(12, function()
-		barrel:Destroy()
-	end)
 end
 
 -- Public -----------------------------------------------------------------------------
@@ -268,8 +247,12 @@ function BiomeService.set(tile: number, biomeId: string?)
 		local tileFolder = Instance.new("Folder")
 		tileFolder.Name = "Tile" .. tile
 		local startZ, endZ = Beach.tileRange(tile)
-		decorBuilders[biome.Entrance](tileFolder, biome, startZ, endZ)
-		buildEntrance(tileFolder, biome, tile)
+		local decor = biome.Scenery and decorBuilders[biome.Scenery] or decorBuilders.Mounds
+		decor(tileFolder, biome, startZ, endZ)
+		if biome.Secret and biome.Entrance then
+			buildEntrance(tileFolder, biome, tile)
+		end
+		HazardService.start(tile, biome, tileFolder)
 		tileFolder.Parent = folder
 		for _, callback in setCallbacks do
 			task.spawn(callback, tile, biome, tileFolder)
@@ -277,10 +260,23 @@ function BiomeService.set(tile: number, biomeId: string?)
 	end
 end
 
--- Rolls every tile, from its zone's weights (Config.Biomes.ByZone) or Config.Biomes.Weights.
+-- The roll weights on a tile: each biome that can roll in its zone, and None.
+function BiomeService.weightsFor(tile: number): { [string]: number }
+	local zone = Beach.zoneOfTile(tile)
+	local weights = { None = Config.Biomes.NoneWeight }
+	for id, biome in Biomes.List do
+		local weight = biome.Zones and biome.Zones[zone]
+		if weight and weight > 0 then
+			weights[id] = weight
+		end
+	end
+	return weights
+end
+
+-- Rolls every tile from the biomes that can turn up in its zone.
 function BiomeService.reroll()
 	for tile = 1, Beach.ActiveTiles do
-		local weights = Config.Biomes.ByZone[Beach.zoneOfTile(tile)] or Config.Biomes.Weights
+		local weights = BiomeService.weightsFor(tile)
 		local total = 0
 		for _, weight in weights do
 			total += weight
@@ -304,12 +300,10 @@ end
 -- For the data validator and tools/tests.
 BiomeService._entranceBuilders = entranceBuilders
 BiomeService._decorBuilders = decorBuilders
-BiomeService._hazards = { Barrels = rollBarrel }
 BiomeService._buildEntrance = buildEntrance
 
-function BiomeService.init(entranceCallback: (Player, string, CFrame) -> (), notifyFn: (Player, string) -> ())
+function BiomeService.init(entranceCallback: (Player, string, CFrame) -> (), _notify: (Player, string) -> ())
 	onEntrance = entranceCallback
-	notify = notifyFn
 	folder = Instance.new("Folder")
 	folder.Name = "Biomes"
 	folder.Parent = Workspace
@@ -323,19 +317,6 @@ function BiomeService.init(entranceCallback: (Player, string, CFrame) -> (), not
 			if cycle ~= lastCycle then
 				lastCycle = cycle
 				BiomeService.reroll()
-			end
-		end
-	end)
-
-	task.spawn(function()
-		while true do
-			task.wait(Config.Hazards.BarrelPeriod)
-			for tile = 1, Beach.ActiveTiles do
-				local biome = Biomes.activeIn(tile)
-				local tileFolder = folder:FindFirstChild("Tile" .. tile)
-				if biome and biome.Hazard == "Barrels" and tileFolder then
-					rollBarrel(tileFolder :: Folder, tile)
-				end
 			end
 		end
 	end)

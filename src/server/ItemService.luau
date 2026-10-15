@@ -264,7 +264,8 @@ function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
 				then Config.Unlocks.SpawnChance
 				else Config.Unlocks.ExoticSpawnChance
 		)
-	if biome and biome.UnlockItem and rng:NextNumber() < unlockChance then
+	-- (Only once its secret is built: before that the item would open nothing.)
+	if biome and biome.UnlockItem and biome.Secret and rng:NextNumber() < unlockChance then
 		if ItemService.countOf(biome.UnlockItem) < Config.Unlocks.MaxOnMap then
 			def = Items.get(biome.UnlockItem)
 		end

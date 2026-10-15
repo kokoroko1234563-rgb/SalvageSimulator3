@@ -96,11 +96,28 @@ node tools/preview/render.cjs /tmp/out /tmp/png            # needs `playwright` 
 
 | Doc item | Where |
 | --- | --- |
-| Rare biome | **Shipwreck Shallows** (Uncommon tier) rolls by weight with the others (`Config.Biomes.Weights`) and is never announced. It has wreck debris, ship loot, and its hazard: barrels roll down the sand every 6 s (`Config.Hazards`), and a hit knocks what you hold out of your hands. |
+| Rare biome | **Shipwreck Shallows** (Uncommon tier) rolls by weight with the others (its `Zones` weights in `Biomes.luau`) and is never announced. It has wreck debris, ship loot, and its hazard: barrels roll down the sand every 6 s (a Roller hazard), and a hit knocks what you hold out of your hands. |
 | Exotic unlock item | The **Captain's Key** washes up in Shipwreck Shallows, much more rarely than common unlock items (`Config.Unlocks.ExoticSpawnChance`). It is banked like the Golden Spade. |
 | Exotic secret | The **Sunken Hold**: use a banked key at the wreck's hatch. It's a zig-zag climb up a hull while it floods, and it can be repeated. It ends in a **lootbox** (`Secrets.luau`) rolling the Anchor Hook (grabber), Captain's Longboat (vessel, holds 12) or Deckhand's Satchel (accessory, +3 pocket slots), with a 1.5% chance of the **Barnacled** cosmetic variant. Rewards go straight to the inventory. |
 | True rebirth | In the shop: redeem all 5 colored coins (two clicks). It resets coins, gear, rebirths, multiplier, rewards, magical vessels, colored coins and pockets. It keeps unlock items, exotic items, cores and attunements, and gives **1 attunement core**. |
 | Attunement | Exotic items can't be used until you spend a core on them (**Attune** on the inventory card). Attunement is to the item type, so trading the copy away and getting another later still works. |
+
+## Biomes and their hazards
+
+Every tile of the beach rolls a biome each tide cycle, from those that can turn up in its zone (`Biomes.List[id].Zones`, against `Config.Biomes.NoneWeight`). A biome is data:
+
+- **Where it rolls:** `Zones = { [zone] = weight }`. Rarer biomes roll further out.
+- **Its ground:** its layout (`src/shared/Layouts/Biomes/<Id>`), which can also place its hazards, its loot spots and its entrance.
+- **Its hazards:** a list of entries of a few generic kinds (`src/shared/Hazards.luau`), each with its own settings:
+  - **Roller:** something rolls down the tile on a timer (the Shipwreck barrels).
+  - **Patrol:** creatures walk a route back and forth, or wander (the Hermit Hollows crabs).
+  - **Pulse:** a spot erupts on a timer after a warning glow (vents, blowholes).
+  - **Slow:** patches that slow you while you're in them (sea glass, seagrass).
+- **What a hazard does** is its effect: **Knockdown** (you're knocked over and drop what you hold), **Drop** (it's knocked out of your hands) or **Slow**. The server builds and moves the hazards (`HazardService`); your own client checks your character against them and applies the effect (`HazardController`), like the waves.
+- **Its secret:** a biome without a `Secret` has no entrance yet (and doesn't wash up its unlock item).
+- **Its scenery:** a decor builder (`Scenery`), or low mounds in its colour.
+
+Biomes so far: Sandcastle Flats (zones 1-4), Shipwreck Shallows (zones 2-6, barrels) and **Hermit Hollows** (zones 4-6: a maze of rock corridors patrolled by hermit crabs that knock you flat; no secret yet). Admins can set a tile's biome with `biome <tile> <name>`.
 
 ## Lexicon and the tower man
 

@@ -31,14 +31,17 @@ local thrown = Vector3.zero -- the seaward carry when knocked over
 
 -- Knocks the character over and throws it along with the water. The humanoid stops fighting
 -- (PlatformStand), so the water carries it until it gets back up.
-local function knockDown(character: Model, humanoid: Humanoid, root: BasePart, push: Vector3)
+-- `along`: thrown the way you were pushed (a hazard), not out to sea with the water.
+local function knockDown(character: Model, humanoid: Humanoid, root: BasePart, push: Vector3, along: boolean?)
 	local now = os.clock()
 	knockedUntil = now + cfg.KnockdownTime
 	readyAt = knockedUntil + cfg.KnockdownCooldown
 	character:SetAttribute("KnockedDown", true) -- local only; GrabController drops what you hold
 	humanoid.PlatformStand = true
 	-- Whichever way the wave hit, it tumbles you and the water takes you out to sea.
-	thrown = Vector3.new(push.X * 0.3, 0, push.Magnitude) * cfg.ThrowFactor
+	thrown = if along
+		then Vector3.new(push.X, 0, push.Z) * cfg.ThrowFactor
+		else Vector3.new(push.X * 0.3, 0, push.Magnitude) * cfg.ThrowFactor
 	root.AssemblyLinearVelocity = thrown + Vector3.new(0, cfg.ThrowLift, 0)
 	root.AssemblyAngularVelocity = Vector3.new(math.random() * 6 - 3, 0, math.random() * 6 - 3)
 	task.delay(cfg.KnockdownTime, function()
@@ -50,6 +53,23 @@ local function knockDown(character: Model, humanoid: Humanoid, root: BasePart, p
 			character:SetAttribute("KnockedDown", nil)
 		end
 	end)
+end
+
+-- Hazards (HazardController) slow you by this much while you're in them.
+WaveController.hazardSlow = 1
+
+-- Knocks this client's character over and throws it along `push` (a hazard hit). Does
+-- nothing while it's already down or just got up. Returns whether it knocked you over.
+function WaveController.hit(push: Vector3): boolean
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local now = os.clock()
+	if not humanoid or not root or humanoid.Health <= 0 or now < readyAt then
+		return false
+	end
+	knockDown(character :: Model, humanoid, root, push, true)
+	return true
 end
 
 function WaveController.init()
@@ -66,7 +86,7 @@ function WaveController.init()
 			speedScale = 1 - (1 - speedScale) * (1 - wade)
 			jumpScale = 1 - (1 - jumpScale) * (1 - wade)
 			local base = humanoid:GetAttribute("BaseWalkSpeed") or Stats.walkSpeed(player)
-			humanoid.WalkSpeed = base * speedScale
+			humanoid.WalkSpeed = base * speedScale * WaveController.hazardSlow
 			local jumpBase = humanoid:GetAttribute("BaseJump")
 			if not jumpBase then
 				jumpBase = if humanoid.UseJumpPower then humanoid.JumpPower else humanoid.JumpHeight

@@ -22,12 +22,19 @@
 -- shapes have steeper faces and are built from rock. Beach.feature adds the fades at the
 -- tile edges, the cliffs and the rock pools.
 --
+-- A layout can also say where things go on its ground (all optional, in tile coordinates):
+--   Loot      = { { At = {x, z}, Radius, Weight? }, ... }  spots where finds settle
+--   Entrances = { {x, z}, ... }                            where a secret's entrance can stand
+--   Hazards   = { { Type = "Patrol", Path = ... }, ... }   where its biome's hazards go, by
+--               Type (see Hazards.luau for what each kind takes)
+--
 -- Which layout is active comes from the tile's biome (a Workspace attribute the server
 -- sets), so the server and every client agree on the ground. Layouts.setActive overrides
 -- that, for tools/tests.
 
 local Biomes = require(script.Parent.Biomes)
 local Config = require(script.Parent.Config)
+local Hazards = require(script.Parent.Hazards)
 
 local cfg = Config.Beach.Terrain
 
@@ -94,12 +101,20 @@ local function data()
 end
 
 -- Whether a module's value is one layout or a table of them indexed by zone.
-local function pick(value: any, zone: number): Layout?
+-- With `fallback`, a zone without its own takes the nearest above it (as the game does).
+local function pick(value: any, zone: number, fallback: boolean?): Layout?
 	if type(value) ~= "table" then
 		return nil
 	end
 	if value.Primitives then
 		return value
+	end
+	if fallback then
+		for index = zone, 1, -1 do
+			if value[index] then
+				return value[index]
+			end
+		end
 	end
 	return value[zone]
 end
@@ -122,12 +137,12 @@ end
 
 -- A biome's layout in a zone (nil: it has none and the base layout stays).
 function Layouts.forBiome(biomeId: string, zone: number): Layout?
-	return pick(data().biomes[biomeId], zone)
+	return pick(data().biomes[biomeId], zone, true)
 end
 
 -- A planned biome's draft layout in a zone.
 function Layouts.forPlanned(biomeId: string, zone: number): Layout?
-	return pick(data().planned[biomeId], zone)
+	return pick(data().planned[biomeId], zone, true)
 end
 
 -- Every layout, for tools/tests: { Source, Zone, Layout } per zone it can appear in.
@@ -368,6 +383,44 @@ function Layouts.isShaped(tile: number): boolean
 	return layout ~= nil and compile(layout).count > 0
 end
 
+-- What the tile's active layout places on its ground: loot spots and entrance spots in world
+-- X and Z (`z0` is the tile's start, from Beach.tileRange), and hazard placements as written.
+function Layouts.lootSpots(
+	tile: number,
+	z0: number
+): { { X: number, Z: number, Radius: number, Weight: number } }
+	local layout = Layouts.active(tile)
+	local spots = {}
+	for _, spot in (layout and (layout :: any).Loot) or {} do
+		table.insert(
+			spots,
+			{ X = spot.At[1], Z = z0 + spot.At[2], Radius = spot.Radius, Weight = spot.Weight or 1 }
+		)
+	end
+	return spots
+end
+
+function Layouts.entrances(tile: number, z0: number): { Vector2 }
+	local layout = Layouts.active(tile)
+	local spots = {}
+	for _, point in (layout and (layout :: any).Entrances) or {} do
+		table.insert(spots, Vector2.new(point[1], z0 + point[2]))
+	end
+	return spots
+end
+
+-- The layout's placements for one kind of hazard (tile coordinates), or an empty list.
+function Layouts.hazardPlacements(tile: number, hazardType: string): { { [string]: any } }
+	local layout = Layouts.active(tile)
+	local list = {}
+	for _, placement in (layout and (layout :: any).Hazards) or {} do
+		if placement.Type == hazardType then
+			table.insert(list, placement)
+		end
+	end
+	return list
+end
+
 -- Checking ------------------------------------------------------------------------------------
 
 local function isPoint(value: any): boolean
@@ -383,6 +436,58 @@ function Layouts.problems(layout: any): { string }
 	if type(layout) ~= "table" or type(layout.Name) ~= "string" or type(layout.Primitives) ~= "table" then
 		add("a layout needs a Name and a Primitives list")
 		return problems
+	end
+	for key in layout do
+		if
+			key ~= "Name"
+			and key ~= "Primitives"
+			and key ~= "Loot"
+			and key ~= "Entrances"
+			and key ~= "Hazards"
+		then
+			add(layout.Name .. ": unknown field " .. tostring(key))
+		end
+	end
+	for index, spot in layout.Loot or {} do
+		local where = layout.Name .. " loot spot " .. index
+		if
+			type(spot) ~= "table"
+			or not isPoint(spot.At)
+			or type(spot.Radius) ~= "number"
+			or spot.Radius <= 0
+		then
+			add(where .. ": needs At = {x, z} and a Radius")
+		elseif spot.Weight ~= nil and (type(spot.Weight) ~= "number" or spot.Weight <= 0) then
+			add(where .. ": Weight must be a positive number")
+		end
+	end
+	for index, point in layout.Entrances or {} do
+		if not isPoint(point) then
+			add(layout.Name .. " entrance " .. index .. ": must be {x, z}")
+		end
+	end
+	for index, placement in layout.Hazards or {} do
+		local where = layout.Name .. " hazard " .. index
+		local fields = type(placement) == "table" and Hazards.Placement[placement.Type]
+		if not fields then
+			add(where .. ": unknown hazard type " .. tostring(type(placement) == "table" and placement.Type))
+			continue
+		end
+		for key, value in placement do
+			if key == "Type" then
+				continue
+			elseif not fields[key] then
+				add(where .. " (" .. placement.Type .. "): unknown field " .. tostring(key))
+			elseif key == "At" and not isPoint(value) then
+				add(where .. ": At is {x, z}")
+			elseif key == "Path" and (type(value) ~= "table" or #value < 2 or not isPoint(value[1])) then
+				add(where .. ": Path needs at least two {x, z} points")
+			elseif key == "Lanes" and (type(value) ~= "table" or #value < 1) then
+				add(where .. ": Lanes is a list of X positions")
+			elseif (key == "Count" or key == "Radius") and (type(value) ~= "number" or value <= 0) then
+				add(where .. ": " .. key .. " must be a positive number")
+			end
+		end
 	end
 	for index, p in layout.Primitives do
 		local where = layout.Name .. " #" .. index

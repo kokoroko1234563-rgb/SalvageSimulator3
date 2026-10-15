@@ -44,7 +44,8 @@ do
 	local problems = Validate.run({
 		VesselBuilders = VesselService._builders,
 		Entrances = BiomeService._entranceBuilders,
-		Hazards = BiomeService._hazards,
+		Hazards = require(script.HazardService).Builders,
+		Scenery = BiomeService._decorBuilders,
 	})
 	for _, problem in problems do
 		warn("[Validate] " .. problem)
@@ -88,6 +89,7 @@ TradeService.init(notify)
 DrowningService.init()
 SecretService.init(notify)
 TraderService.init(notify) -- before biomes roll, so traders can appear in the first tide
+require(script.HazardService).init()
 BiomeService.init(SecretService.tryEnter, notify)
 FarSandbarService.init(map, SecretService.tryEnter)
 LexiconService.init(notify)

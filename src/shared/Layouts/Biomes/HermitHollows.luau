@@ -1,4 +1,4 @@
--- Hermit Hollows (planned, draft): a tight maze of rock-walled corridors, about 12 studs wide, with
+-- Hermit Hollows (draft; it rolls in zones 4 to 6): a tight maze of rock-walled corridors, about 12 studs wide, with
 -- dead ends and one way through. The maze sits between the cart ramps, so the ramps still go round
 -- the outside. Walls alternate their gap from end to end. A bank across the zone gives players on
 -- foot a shortcut that carts can't take. Heights follow the zone's limit. Rock only in zone 4.
