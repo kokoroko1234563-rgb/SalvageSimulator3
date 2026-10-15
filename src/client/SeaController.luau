@@ -159,16 +159,43 @@ local function gridY(ix: number, iz: number): number
 	return y
 end
 
-local function surfaceY(x: number, z: number): number
+-- The ground's ideal height (Beach.groundAt) on the same grid. The terrain is a faceted
+-- version of it; deciding what's under water from this keeps the shoreline a smooth curve.
+local idealCache: { [number]: number } = {}
+local function gridIdeal(ix: number, iz: number): number
+	local key = ix * 65536 + iz
+	local cached = idealCache[key]
+	if not cached then
+		cached = Beach.groundAt(ix * GRID, iz * GRID)
+		idealCache[key] = cached
+	end
+	return cached
+end
+
+local function bilinear(grid: (number, number) -> number, x: number, z: number): number
 	local fx, fz = x / GRID, z / GRID
 	local ix, iz = math.floor(fx), math.floor(fz)
 	local tx, tz = fx - ix, fz - iz
-	local a = gridY(ix, iz) + (gridY(ix, iz + 1) - gridY(ix, iz)) * tz
+	local a = grid(ix, iz) + (grid(ix, iz + 1) - grid(ix, iz)) * tz
 	if tx < 1e-6 then
 		return a
 	end
-	local b = gridY(ix + 1, iz) + (gridY(ix + 1, iz + 1) - gridY(ix + 1, iz)) * tz
+	local b = grid(ix + 1, iz) + (grid(ix + 1, iz + 1) - grid(ix + 1, iz)) * tz
 	return a + (b - a) * tx
+end
+
+local function surfaceY(x: number, z: number): number
+	return bilinear(gridY, x, z)
+end
+
+local function idealY(x: number, z: number): number
+	return bilinear(gridIdeal, x, z)
+end
+
+-- When a zone's biome changes, its ground is rebuilt: measure it again.
+local function forgetGround()
+	surfaceCache = {}
+	idealCache = {}
 end
 
 -- Lays a run of thin parts on the sand from z0 to z1 (z1 < z0: up the beach), each piece
@@ -209,7 +236,17 @@ end
 -- The continuous surfaces -------------------------------------------------------------------
 
 local SAMPLE = 12 -- studs along the shore between the columns where the water is worked out
-local SEA_STEP = 8 -- studs between the sea surface's columns over the beach
+local SEA_STEP = 4 -- studs between the sea surface's columns over the beach
+-- Near the shore the sea surface is a band of rows that drapes over the ground: from BAND_BACK
+-- studs up the beach of the waterline (the furthest a dip can flood, MaxDepth / Slope) to
+-- BAND_OUT studs out, every BAND_STEP studs. What's under water is decided from the ground's
+-- ideal shape, so the shoreline is a smooth curve even where the terrain is faceted; the water
+-- tucks under the sand where it's dry and lies just over any facet poking up where it's wet.
+local BAND_BACK = math.ceil(Config.Beach.Terrain.MaxDepth / Config.Beach.Slope) + 4
+local BAND_OUT = 16
+local BAND_STEP = 2
+local BAND_ROWS = math.floor((BAND_BACK + BAND_OUT) / BAND_STEP) + 1
+local SEA_REFRESH = 0.1 -- seconds between sea surface updates (the tide moves slowly)
 local SWASH_ROWS = 7 -- points across the run-up sheet and the wet sand
 local CREST_SLOTS = 2 -- crest ribbons (a rolling wave uses slot Index % CREST_SLOTS)
 
@@ -245,21 +282,27 @@ local function newSheet(
 		ids[i] = mesh:AddVertex(Vector3.zero)
 		points[i] = center
 	end
+	-- Both faces of every triangle, all lit as if facing up (the water and sand lie nearly
+	-- flat). Automatic normals would cancel out, since each point is shared by both faces.
+	local up = mesh:AddNormal(Vector3.yAxis)
+	local function triangle(a: number, b: number, c: number)
+		mesh:SetFaceNormals(mesh:AddTriangle(a, b, c), { up, up, up })
+	end
 	for c = 1, cols - 1 do
 		for r = 1, rows - 1 do
 			local v00 = ids[(c - 1) * rows + r]
 			local v01 = ids[(c - 1) * rows + r + 1]
 			local v10 = ids[c * rows + r]
 			local v11 = ids[c * rows + r + 1]
-			mesh:AddTriangle(v00, v10, v01)
-			mesh:AddTriangle(v10, v11, v01)
-			mesh:AddTriangle(v00, v01, v10)
-			mesh:AddTriangle(v10, v01, v11)
+			triangle(v00, v10, v01)
+			triangle(v10, v11, v01)
+			triangle(v00, v01, v10)
+			triangle(v10, v01, v11)
 		end
 	end
 	-- A flat, invisible triangle across the whole box, so the mesh's bounds (and so its scale
 	-- and centre) stay fixed however its points move.
-	mesh:AddTriangle(mesh:AddVertex(-half), mesh:AddVertex(half), mesh:AddVertex(Vector3.zero))
+	triangle(mesh:AddVertex(-half), mesh:AddVertex(half), mesh:AddVertex(Vector3.zero))
 	local part = AssetService:CreateMeshPartAsync(Content.fromObject(mesh))
 	part.Name = name
 	part.Anchored = true
@@ -357,7 +400,7 @@ local function buildMeshes(folder: Folder): Meshes
 			folder,
 			"Sea",
 			#seaXs,
-			2,
+			BAND_ROWS + 2,
 			Vector3.new(-half - SIDE - 1, low, zMin),
 			Vector3.new(half + SIDE + 1, 20, zMax),
 			{
@@ -463,14 +506,42 @@ local function blend(a: Column, b: Column): Column
 	return c
 end
 
-local function updateMeshes(m: Meshes, sea: Tide.Sea, wetSea: Tide.Sea)
-	-- The sea: flat out to sea at each column's water level.
+local seaUpdatedAt = -math.huge
+
+-- The sea surface: flat at each column's water level, draped over the ground near the shore.
+local function updateSea(m: Meshes, sea: Tide.Sea)
+	local rows = BAND_ROWS + 2
+	local half = Beach.HalfWidth
 	for c, x in m.seaXs do
-		local y = Beach.waterY(Tide.waterlineAt(sea, x))
-		setPoint(m.sea, c, 1, Vector3.new(x, y, zMin))
-		setPoint(m.sea, c, 2, Vector3.new(x, y, zMax))
+		local line = Tide.waterlineAt(sea, x)
+		local waterY = Beach.waterY(line)
+		-- Past the headlands (and under the cliffs) it's open sea: flat. The rows keep the
+		-- same Z as the beach's, so the surface joins up without stretching.
+		local open = math.abs(x) >= half - 1
+		local first = line - BAND_BACK
+		-- Far up the beach it's all dry: well under the sand.
+		setPoint(m.sea, c, 1, Vector3.new(x, if open then waterY else waterY - 50, zMin))
+		for k = 1, BAND_ROWS do
+			local z = math.max(first + (k - 1) * BAND_STEP, zMin + k * 0.01)
+			local y = waterY
+			if not open then
+				local ideal = idealY(x, z)
+				local wet = if z >= line then ideal <= waterY + 0.3 else ideal < waterY - 0.3
+				local ground = surfaceY(x, z)
+				y = if wet then math.max(waterY, ground + 0.06) else ground - 0.3
+			end
+			setPoint(m.sea, c, k + 1, Vector3.new(x, y, z))
+		end
+		setPoint(m.sea, c, rows, Vector3.new(x, waterY, zMax))
 	end
 	flush(m.sea)
+end
+
+local function updateMeshes(m: Meshes, sea: Tide.Sea, wetSea: Tide.Sea)
+	if os.clock() - seaUpdatedAt >= SEA_REFRESH then
+		seaUpdatedAt = os.clock()
+		updateSea(m, sea)
+	end
 
 	local sampled = table.create(#m.samples)
 	for i, x in m.samples do
@@ -673,6 +744,15 @@ function SeaController.init()
 
 	zMin = -beach.ShopDepth - 60
 	zMax = Beach.Depth + beach.SeaExtent + 200
+
+	Workspace.AttributeChanged:Connect(function(name)
+		if string.match(name, "^ZoneBiome") then
+			-- The zone's terrain is rebuilt (and replicates a moment later).
+			forgetGround()
+			seaUpdatedAt = -math.huge
+			task.delay(3, forgetGround)
+		end
+	end)
 
 	local ok, built = pcall(buildMeshes, folder)
 	if ok then
