@@ -116,6 +116,8 @@ All of this is computed from the shared clock, so the server and every client ag
 - **Unclaimed items:** after each wave, unclaimed items it reached may be shuffled a few studs: either way for ordinary waves, mostly out to sea for big ones (`DragChance`, `DragDistance`, in `SurfService`). Anything dragged deep enough is lost.
 - **Rogue waves:** clients know they're coming and show a warning banner about 8 seconds before. `waves rogue` sends one.
 
+**Wading:** water is sluggish. Walk speed and jump drop with depth (`Config.Beach.Wading`): 85% in the shallows, 70% knee-deep, 55% waist-deep and 40% once you're fully underwater, blended smoothly in between. Your own client applies it to the speed the server gives you (rewards, trader upgrades, the admin `speed` command).
+
 **What you see** (`SeaController`, client only):
 - The sea in 24-stud strips, each at its own level.
 - White crests rolling in.

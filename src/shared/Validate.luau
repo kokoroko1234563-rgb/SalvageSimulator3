@@ -155,6 +155,27 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		lastX = section.X or lastX
 	end
 
+	-- Wading
+	local wading = Config.Beach.Wading
+	check(
+		type(wading) == "table" and #wading >= 2 and wading[1].Depth == 0,
+		"Config.Beach.Wading needs points from depth 0"
+	)
+	for i, point in wading or {} do
+		check(
+			type(point.Speed) == "number"
+				and point.Speed > 0
+				and point.Speed <= 1
+				and type(point.Jump) == "number"
+				and point.Jump > 0
+				and point.Jump <= 1,
+			"Config.Beach.Wading: Speed and Jump must be between 0 and 1"
+		)
+		if i > 1 then
+			check(point.Depth > wading[i - 1].Depth, "Config.Beach.Wading must be in order of depth")
+		end
+	end
+
 	-- Waves and rock pools
 	check(#Config.Waves.ZoneScale >= #Config.Zones, "Config.Waves.ZoneScale needs an entry for every zone")
 	do
@@ -170,11 +191,19 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		local share = (w.DrawbackRange / w.Speed) / w.Period
 		pull = pull * share
 			+ (w.Undertow + (w.UndertowDeep - w.Undertow) * knee) * zone * w.Slack * (1 - share)
+		-- Walking speed at knee depth, after the water slows you (Config.Beach.Wading).
+		local wade = 16
+		for _, point in Config.Beach.Wading or {} do
+			if point.Depth <= Config.Beach.KneeDepth then
+				wade = 16 * point.Speed
+			end
+		end
 		check(
-			pull < 14,
+			pull < wade * 0.8,
 			string.format(
-				"the undertow at knee depth on the Far Sandbar (%.1f studs/s) is too close to walking speed (16)",
-				pull
+				"the undertow at knee depth on the Far Sandbar (%.1f studs/s) is too close to wading speed (%.1f)",
+				pull,
+				wade
 			)
 		)
 	end

@@ -528,6 +528,7 @@ command("speed", "speed <walkspeed> [player]", "Set walk speed (default 16)", fu
 		local humanoid = target.Character and target.Character:FindFirstChildOfClass("Humanoid")
 		if humanoid then
 			humanoid.WalkSpeed = math.clamp(speed, 0, 200)
+			humanoid:SetAttribute("BaseWalkSpeed", humanoid.WalkSpeed)
 			table.insert(lines, target.Name .. " walk speed " .. humanoid.WalkSpeed)
 		end
 	end) or lines

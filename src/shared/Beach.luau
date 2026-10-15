@@ -132,6 +132,25 @@ function Beach.isLost(position: Vector3, sea: Sea): boolean
 	return Beach.seaDepthAt(position, sea) >= beach.LostDepth
 end
 
+-- How much the water slows a character standing at a position: walk speed and jump
+-- multipliers from Config.Beach.Wading.
+function Beach.wading(position: Vector3, sea: Sea): (number, number)
+	local depth = Beach.depthAt(position, sea)
+	local points = beach.Wading
+	if depth <= points[1].Depth then
+		return points[1].Speed, points[1].Jump
+	end
+	for i = 2, #points do
+		local a, b = points[i - 1], points[i]
+		if depth < b.Depth then
+			local t = (depth - a.Depth) / (b.Depth - a.Depth)
+			return a.Speed + (b.Speed - a.Speed) * t, a.Jump + (b.Jump - a.Jump) * t
+		end
+	end
+	local last = points[#points]
+	return last.Speed, last.Jump
+end
+
 -- Z where the sea reaches a given depth, at a point along the shoreline.
 function Beach.zForDepth(depth: number, sea: Sea, x: number): number
 	return Tide.waterlineAt(sea, x) + depth / beach.Slope

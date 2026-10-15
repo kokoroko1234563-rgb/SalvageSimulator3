@@ -44,6 +44,16 @@ Config.Beach = {
 		{ X = 260, Z = 520, Radius = 8, Depth = 1.4 },
 	},
 
+	-- Wading: walk speed and jump at each water depth (studs over the ground), blended
+	-- smoothly in between. A character is about 5 studs tall, so past that you're underwater.
+	Wading = {
+		{ Depth = 0, Speed = 1, Jump = 1 },
+		{ Depth = 1.5, Speed = 0.85, Jump = 0.9 }, -- ankle to shin
+		{ Depth = 3, Speed = 0.7, Jump = 0.75 }, -- knee-deep
+		{ Depth = 4.5, Speed = 0.55, Jump = 0.6 }, -- waist-deep
+		{ Depth = 5.5, Speed = 0.4, Jump = 0.45 }, -- head under: fully underwater
+	},
+
 	-- Depth bands, by how deep the water is at a spot.
 	ShallowDepth = 1.5,
 	KneeDepth = 3,

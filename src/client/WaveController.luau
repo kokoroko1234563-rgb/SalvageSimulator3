@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Tide = require(Shared.Tide)
 local Stats = require(Shared.Stats)
@@ -57,6 +58,21 @@ function WaveController.init()
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if humanoid and root and humanoid.Health > 0 then
+			-- Water is sluggish: slower walking and lower jumps the deeper you are.
+			local speedScale, jumpScale = Beach.wading(root.Position, sea)
+			local base = humanoid:GetAttribute("BaseWalkSpeed") or Stats.walkSpeed(player)
+			humanoid.WalkSpeed = base * speedScale
+			local jumpBase = humanoid:GetAttribute("BaseJump")
+			if not jumpBase then
+				jumpBase = if humanoid.UseJumpPower then humanoid.JumpPower else humanoid.JumpHeight
+				humanoid:SetAttribute("BaseJump", jumpBase)
+			end
+			if humanoid.UseJumpPower then
+				humanoid.JumpPower = jumpBase * jumpScale
+			else
+				humanoid.JumpHeight = jumpBase * jumpScale
+			end
+
 			-- Characters are moved directly: the Humanoid controller would cancel a plain force.
 			local resistance = Stats.wavePush(player)
 			local push = Waves.getPush(root.Position, sea) * Config.Waves.CharacterFactor * resistance

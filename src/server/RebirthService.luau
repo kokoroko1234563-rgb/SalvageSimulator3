@@ -32,6 +32,8 @@ function RebirthService.applyEffects(player: Player)
 		return
 	end
 	humanoid.WalkSpeed = Stats.walkSpeed(player)
+	-- The client slows this down in the water (WaveController), from the base.
+	humanoid:SetAttribute("BaseWalkSpeed", humanoid.WalkSpeed)
 end
 
 -- Does the reset. `free` skips the cost (admin console).
