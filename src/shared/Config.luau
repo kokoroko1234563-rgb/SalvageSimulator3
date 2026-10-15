@@ -30,9 +30,9 @@ Config.Beach = {
 	-- Haze over the sea and sand: things further than FogEnd fade into it, so the whole map
 	-- can't be seen at once.
 	Fog = {
-		Start = 150, -- studs away where the haze starts
-		End = 400, -- studs away where it's fully opaque
-		Color = Color3.fromRGB(205, 220, 228),
+		Start = 170, -- studs away where the haze starts
+		End = 480, -- studs away where it's fully opaque
+		Color = Color3.fromRGB(214, 234, 246), -- the colour of the sky at the horizon
 	},
 
 	-- Rock pools: rings of rock that hold water after the sea leaves (a fixed level, Depth

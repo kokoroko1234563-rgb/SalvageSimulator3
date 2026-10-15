@@ -22,6 +22,7 @@ local Tide = require(Shared.Tide)
 local Waves = require(Shared.Waves)
 
 local CollisionGroups = require(script.Parent.CollisionGroups)
+local ItemModels = require(script.Parent.ItemModels)
 
 local cfg = Config.Items
 
@@ -220,6 +221,8 @@ local function createItem(def, zoneIndex: number, position: Vector3): BasePart
 	if def.SkyBeam then
 		CollectionService:AddTag(part, "SkyBeam")
 	end
+	-- The root stays the physics body; its visible model is welded on (see ItemModels).
+	ItemModels.build(part, def)
 	ItemService.setUnclaimed(part, false)
 	CollectionService:AddTag(part, ItemService.Tag)
 	part.Parent = folder

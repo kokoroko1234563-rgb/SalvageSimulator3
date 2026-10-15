@@ -210,6 +210,24 @@ Palette.Material = {
 	Grass = Enum.Material.Grass,
 }
 
+-- Accents for the beach item models (src/server/ItemModels.luau). Item body colours stay
+-- with the item data; these are the extra colours a model needs on top of that.
+Palette.ItemModel = {
+	White = rgb(255, 255, 255),
+	Label = rgb(248, 246, 238),
+	Paper = rgb(246, 236, 206),
+	Cork = rgb(196, 150, 95),
+	Wax = rgb(210, 50, 55),
+	Iron = rgb(90, 95, 105),
+	Hole = rgb(35, 30, 30), -- openings, interiors, the key's eye
+	Sunglasses = rgb(35, 40, 55),
+	SpyLens = rgb(90, 150, 210),
+	Flame = rgb(255, 200, 110),
+	LanternGlass = rgb(255, 230, 160),
+	Glow = rgb(255, 250, 225), -- the Beacon Pearl's halo
+	Glint = rgb(255, 210, 235), -- a pearl's shine
+}
+
 Palette.Font = {
 	Title = Enum.Font.FredokaOne,
 	Body = Enum.Font.GothamMedium,

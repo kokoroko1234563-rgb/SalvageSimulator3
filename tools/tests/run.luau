@@ -111,6 +111,37 @@ test("create every item", function()
 	end
 end)
 
+-- 4b. Every item has a model, and the model is only for looks: the root stays the body,
+-- and the visible parts never collide, can't be picked and weigh nothing.
+test("every item has a model", function()
+	local Items = h.require("Shared/Items")
+	local ItemModels = h.require("Server/ItemModels")
+	for _, def in Items.Catalog do
+		assert(ItemModels.has(def.Id), def.Id .. " has no model")
+	end
+end)
+
+test("item models are welded on and never block grabs", function()
+	local Items = h.require("Shared/Items")
+	local ItemService = h.require("Server/ItemService")
+	for _, def in Items.Catalog do
+		local part = ItemService.spawnAt(def, 1, roblox.Vector3.new(0, 5, 0))
+		assert(part.Transparency == 1, def.Id .. ": the body should be hidden")
+		local parts = 0
+		for _, child in part:GetChildren() do
+			if child:IsA("BasePart") then
+				parts += 1
+				assert(
+					not child.CanCollide and not child.CanQuery and not child.CanTouch,
+					def.Id .. ": " .. child.Name .. " blocks"
+				)
+				assert(child.Massless, def.Id .. ": " .. child.Name .. " has mass")
+			end
+		end
+		assert(parts > 0, def.Id .. " has no visible parts")
+	end
+end)
+
 -- 5. Every vessel builds.
 for id, build in VesselService and VesselService._builders or {} do
 	test("build vessel " .. id, function()
