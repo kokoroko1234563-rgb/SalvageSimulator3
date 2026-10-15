@@ -165,22 +165,43 @@ local function sway(x: number, now: number, rel: number): Vector3
 end
 
 local function pushAt(position: Vector3, sea: Sea, line: number, rel: number, scale: number): Vector3
-	for _, wave in Waves.wavesAt(position.X, sea, line) do
-		local strength = wave.Size * scale
-		if wave.Phase == "Rolling" then
-			local behind = rel - wave.Front
-			if behind >= 0 and behind <= cfg.BandWidth then
-				local depthFactor = 0.7 + math.clamp(rel, 0, 60) / 60 * 0.6
-				return SHORE * cfg.Push * (1 - behind / cfg.BandWidth) * depthFactor * strength
+	local list = Waves.wavesAt(position.X, sea, line)
+	if rel > 0 then
+		-- In the sea. Each passing wave rocks you in and out (the water circles under it) and
+		-- its front surges you toward the shore; ahead of it, the water rushes out to meet it.
+		local depthFactor = 0.7 + math.clamp(rel, 0, 60) / 60 * 0.6
+		local wavelength = cfg.Period * cfg.Speed
+		local push = Vector3.zero
+		local rocked = false
+		for _, wave in list do
+			if wave.Phase ~= "Rolling" then
+				continue
 			end
-			if rel > 0 and behind < 0 and -behind < cfg.DrawbackRange then
-				-- The water rushing out to meet the incoming wave: strongest right before it.
+			local strength = wave.Size * scale
+			local behind = rel - wave.Front -- > 0: the wave has passed this spot
+			if behind >= 0 and behind <= cfg.BandWidth then
+				push += SHORE * cfg.Push * (1 - behind / cfg.BandWidth) * depthFactor * strength
+			elseif behind < 0 and -behind < cfg.DrawbackRange then
 				local closeness = 1 + behind / cfg.DrawbackRange
 				local pull = undertow(rel, line)
 					* (cfg.Slack + cfg.Drawback * closeness * closeness * wave.Size * wave.Size)
-				return -SHORE * pull * scale
+				push -= SHORE * pull * scale
 			end
-		elseif rel >= wave.Front and rel <= 0 then
+			if not rocked then
+				-- Rocking follows the nearest wave still out at sea or just past.
+				rocked = true
+				push += SHORE * cfg.Rock * math.cos(2 * math.pi * behind / wavelength) * depthFactor * strength
+			end
+		end
+		if push == Vector3.zero then
+			push = -SHORE * undertow(rel, line) * cfg.Slack * scale
+		end
+		return push
+	end
+	-- On the sand: under a running-up sheet or a sliding-back one.
+	for _, wave in list do
+		if wave.Phase ~= "Rolling" and rel >= wave.Front then
+			local strength = wave.Size * scale
 			if wave.Phase == "RunUp" then
 				return SHORE * cfg.RunUpPush * (1 - wave.PhaseProgress) * strength
 			end
@@ -190,10 +211,6 @@ local function pushAt(position: Vector3, sea: Sea, line: number, rel: number, sc
 				* math.sin(math.pi * math.max(wave.PhaseProgress, 0.15))
 				* strength
 		end
-	end
-	if rel > 0 then
-		-- Slack water between waves: a gentle pull out.
-		return -SHORE * undertow(rel, line) * cfg.Slack * scale
 	end
 	return Vector3.zero
 end

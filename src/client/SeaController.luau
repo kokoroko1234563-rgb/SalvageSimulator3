@@ -182,15 +182,14 @@ local function update()
 			end
 		end
 		if edge < -0.3 then
-			place(strip.swash, onSand(strip.swash, strip.x, line + 1, line + edge, 0.07))
+			-- Only on the sand: once the water is back at the waterline, it's just the sea.
+			place(strip.swash, onSand(strip.swash, strip.x, line, line + edge, 0.07))
 			place(strip.edge, CFrame.new(strip.x, Beach.groundY(line + edge) + 0.09, line + edge) * TILT)
 			setTransparency(strip.swash, if sliding then 0.6 else 0.45)
 			setTransparency(strip.edge, if sliding then 0.55 else 0.2)
 		else
 			place(strip.swash, FAR)
-			-- A thin line of foam where the sea meets the sand between waves.
-			place(strip.edge, CFrame.new(strip.x, waterY + 0.05, line) * TILT)
-			setTransparency(strip.edge, 0.45)
+			place(strip.edge, FAR)
 		end
 
 		-- Wet sand: up to where the tide was a little while ago, or the last wave reached.

@@ -122,7 +122,7 @@ Config.Waves = {
 	Period = 6, -- seconds between waves
 	Speed = 26, -- studs/s the wave front travels toward shore
 	StartOffset = 90, -- where each wave starts, studs seaward of the waterline
-	BandWidth = 8, -- thickness of the pushing band behind the front: a short, sharp shove
+	BandWidth = 14, -- the surge behind a wave's front, pushing swimmers toward shore
 	Push = 14, -- studs/s shoreward push at the leading edge
 
 	-- The ordinary sea is impartial: it jostles you both ways and doesn't drag you out. As a
@@ -136,6 +136,7 @@ Config.Waves = {
 	Slack = 0, -- pull between waves, as a fraction of the undertow (0 = still water)
 	Drawback = 1.2, -- drawback strength just before a wave: undertow x this x size squared
 	DrawbackRange = 25, -- studs ahead of an incoming wave where the water rushes out to it
+	Rock = 3, -- studs/s in and out as each wave passes over you (the water circling under it)
 	Sway = 2.5, -- studs/s side-to-side drift in the water, varying along the beach and in time
 	Coupling = 4, -- how quickly you pick up (and lose) the water's speed; lower = more momentum
 
@@ -152,7 +153,7 @@ Config.Waves = {
 	-- over. Only big waves get there (and most waves on the Far Sandbar). The wave tumbles
 	-- them and drags them out to sea: they drop what they're holding and are carried seaward,
 	-- slowing over KnockdownTime. A rogue wave can carry you deep enough to drown.
-	KnockdownPush = 25, -- studs/s
+	KnockdownPush = 28, -- studs/s
 	KnockdownTime = 1.6,
 	ThrowFactor = 1.4, -- seaward carry speed, as a multiple of the push that knocked you over
 	ThrowLift = 14, -- studs/s upward on the throw
