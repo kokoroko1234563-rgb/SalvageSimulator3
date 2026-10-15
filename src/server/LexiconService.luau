@@ -45,12 +45,14 @@ local function claim(player: Player)
 	if not DataService.lexiconComplete(player) then
 		local profile = DataService.get(player)
 		local found = 0
-		for _ in (profile and profile.Lexicon) or {} do
-			found += 1
+		for _, item in Items.Lexicon do
+			if profile and profile.Lexicon[item.Id] then
+				found += 1
+			end
 		end
 		notify(
 			player,
-			string.format('"Come back when your lexicon is complete." (%d/%d found)', found, #Items.Catalog)
+			string.format('"Come back when your lexicon is complete." (%d/%d found)', found, #Items.Lexicon)
 		)
 		return
 	end

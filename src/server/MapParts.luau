@@ -77,4 +77,51 @@ function MapParts.sign(
 	return board
 end
 
+-- Scenery: a part that's purely for looks. It doesn't collide, query or touch anything.
+function MapParts.scenery(parent: Instance, props: { [string]: any }): Part
+	props.CanCollide = false
+	props.CanQuery = false
+	props.CanTouch = false
+	local part = MapParts.part(props)
+	part.Parent = parent
+	return part
+end
+
+-- A scenery ball, `diameter` across, centred on `center`.
+function MapParts.ball(
+	parent: Instance,
+	center: Vector3,
+	diameter: number,
+	color: Color3,
+	material: Enum.Material?
+)
+	return MapParts.scenery(parent, {
+		Name = "Ball",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(diameter, diameter, diameter),
+		CFrame = CFrame.new(center),
+		Color = color,
+		Material = material or Palette.Material.Smooth,
+	})
+end
+
+-- A scenery cylinder standing on `base`, `height` tall.
+function MapParts.column(
+	parent: Instance,
+	base: Vector3,
+	height: number,
+	diameter: number,
+	color: Color3,
+	material: Enum.Material?
+)
+	return MapParts.scenery(parent, {
+		Name = "Column",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(height, diameter, diameter),
+		CFrame = CFrame.new(base + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+		Color = color,
+		Material = material or Palette.Material.Wood,
+	})
+end
+
 return MapParts

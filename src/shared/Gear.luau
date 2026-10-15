@@ -152,6 +152,71 @@ Gear.Tools = {
 		Bubble = true,
 		MaxSpeed = 10,
 	},
+	-- Exotic grabbers from the rare biomes' lootboxes. Need attunement; never in the shop.
+	{
+		-- Whirlwind Dunes: a gust reels whatever it holds toward you, in or out of the water.
+		Id = "GustGloves",
+		Name = "Gust Gloves",
+		Rarity = "Exotic",
+		Price = 0,
+		Reach = 28,
+		Lift = Gear.WeightClass.Heavy,
+		Depth = Gear.Depth.Waist,
+		Grip = 520,
+		GripBreak = 12,
+		Note = "Exotic grabber: a gust reels items in fast, in or out of the water",
+		Available = false,
+		Exotic = true,
+		Magnet = true,
+		PullSpeed = 16,
+		PullAnywhere = true,
+	},
+	{
+		-- Hermit Hollows: short, but nothing pulls out of its grip.
+		Id = "CrabClaw",
+		Name = "Crab Claw",
+		Rarity = "Exotic",
+		Price = 0,
+		Reach = 14,
+		Lift = Gear.WeightClass.VeryHeavy,
+		Depth = Gear.Depth.Waist,
+		Grip = 900,
+		GripBreak = 25,
+		Note = "Exotic grabber: short reach, lifts anything, almost impossible to knock loose",
+		Available = false,
+		Exotic = true,
+	},
+	{
+		-- Black Sand Vents: the best all-round grabber.
+		Id = "ObsidianGrabber",
+		Name = "Obsidian Grabber",
+		Rarity = "Exotic",
+		Price = 0,
+		Reach = 30,
+		Lift = Gear.WeightClass.VeryHeavy,
+		Depth = Gear.Depth.Deep,
+		Grip = 700,
+		GripBreak = 14,
+		Note = "Exotic grabber: very long reach, lifts anything, reaches into deep water",
+		Available = false,
+		Exotic = true,
+	},
+	{
+		-- Stranded Iceberg: freezes the waves around you for a few seconds (never the tide).
+		Id = "FreezeWand",
+		Name = "Freeze Wand",
+		Rarity = "Exotic",
+		Price = 0,
+		Reach = 18,
+		Lift = Gear.WeightClass.Medium,
+		Depth = Gear.Depth.KneeDeep,
+		Grip = 400,
+		GripBreak = 8,
+		Note = "Exotic grabber: press F to freeze the waves around you for 5 seconds (25s cooldown)",
+		Available = false,
+		Exotic = true,
+		Freeze = { Duration = 5, Cooldown = 25, Radius = 30 },
+	},
 }
 
 Gear.Vessels = {
@@ -180,7 +245,9 @@ Gear.Vessels = {
 		Price = 6000,
 		Capacity = 10,
 		Note = "Fast on soft sand",
-		Available = false,
+		Available = true,
+		Speed = 1.3,
+		Stability = 1.2,
 	},
 	{
 		Id = "QuadBike",
@@ -189,7 +256,9 @@ Gear.Vessels = {
 		Price = 25000,
 		Capacity = 16,
 		Note = "Fast, bumps can spill items",
-		Available = false,
+		Available = true,
+		Speed = 1.5,
+		Stability = 0.5,
 	},
 	{
 		Id = "Dinghy",
@@ -197,8 +266,10 @@ Gear.Vessels = {
 		Name = "Inflatable Dinghy",
 		Price = 60000,
 		Capacity = 14,
-		Note = "Travels through shallow water",
-		Available = false,
+		Note = "Travels through deep water, lost if flipped",
+		Available = true,
+		Boat = true, -- survives deep water when towed; tipping over loses it
+		Stability = 1.4,
 	},
 	{
 		Id = "PickupTruck",
@@ -207,7 +278,9 @@ Gear.Vessels = {
 		Price = 150000,
 		Capacity = 24,
 		Note = "Fastest and most stable",
-		Available = false,
+		Available = true,
+		Speed = 1.8,
+		Stability = 3,
 	},
 	{
 		-- Magical vessel from a rebirth reward: never sold in the shop, kept through rebirths.
@@ -254,6 +327,72 @@ Gear.Vessels = {
 		Available = false,
 		Exotic = true,
 	},
+	-- Exotic vessels from the rare biomes' lootboxes.
+	{
+		-- Jellyfish Lagoon: a bouncy raft that follows you and swims.
+		Id = "JellyRaft",
+		Name = "Jelly Raft",
+		Rarity = "Exotic",
+		Price = 0,
+		Capacity = 10,
+		Note = "Exotic vessel: follows you and swims, so deep water doesn't take it. Holds 10",
+		Available = false,
+		Exotic = true,
+		Follows = true,
+		Swims = true,
+	},
+	{
+		-- Whirlwind Dunes: flies behind you, over sand and sea alike.
+		Id = "MagicCarpet",
+		Name = "Magic Carpet",
+		Rarity = "Exotic",
+		Price = 0,
+		Capacity = 10,
+		Note = "Exotic vessel: flies behind you over sand and sea, fast. Holds 10",
+		Available = false,
+		Exotic = true,
+		Follows = true,
+		Flies = true,
+		Speed = 1.5,
+	},
+	{
+		-- Hermit Hollows: a giant shell on wheels, very hard to tip.
+		Id = "ShellWagon",
+		Name = "Shell Wagon",
+		Rarity = "Exotic",
+		Price = 0,
+		Capacity = 14,
+		Note = "Exotic vessel: a giant shell on wheels, very hard to tip. Holds 14",
+		Available = false,
+		Exotic = true,
+		Stability = 3,
+	},
+	{
+		-- Sea-Glass Shore: a glass swan that swims behind you.
+		Id = "GlassSwan",
+		Name = "Glass Swan",
+		Rarity = "Exotic",
+		Price = 0,
+		Capacity = 12,
+		Note = "Exotic vessel: swims behind you, through deep water. Holds 12",
+		Available = false,
+		Exotic = true,
+		Follows = true,
+		Swims = true,
+	},
+	{
+		-- Stranded Iceberg: slides fast over sand and ice.
+		Id = "FrostSled",
+		Name = "Frost Sled",
+		Rarity = "Exotic",
+		Price = 0,
+		Capacity = 12,
+		Note = "Exotic vessel: slides very fast over sand. Holds 12",
+		Available = false,
+		Exotic = true,
+		Speed = 1.7,
+		Stability = 1.5,
+	},
 }
 
 -- Worn items. Exotic ones need attunement.
@@ -273,6 +412,65 @@ Gear.Accessories = {
 		Rarity = "Exotic",
 		WaveResist = 0.25,
 		Note = "Exotic accessory: waves push you 25% less",
+		Exotic = true,
+	},
+	-- Exotic accessories from the rare biomes' lootboxes.
+	{
+		-- Jellyfish Lagoon.
+		Id = "GlowPearl",
+		Name = "Glow Pearl",
+		Rarity = "Exotic",
+		Light = { Color = Color3.fromRGB(150, 240, 255), Range = 18, Brightness = 1.5 },
+		BreathBonus = 0.25,
+		Note = "Exotic accessory: glows around you, and your breath lasts 25% longer",
+		Exotic = true,
+	},
+	{
+		-- Fog Bank.
+		Id = "LanternOfClearSight",
+		Name = "Lantern of Clear Sight",
+		Rarity = "Exotic",
+		Light = { Color = Color3.fromRGB(255, 235, 170), Range = 16, Brightness = 1.2 },
+		ClearSight = 2.5,
+		Note = "Exotic accessory: you see 2.5x further through the haze",
+		Exotic = true,
+	},
+	{
+		-- Fog Bank.
+		Id = "Foghorn",
+		Name = "Foghorn",
+		Rarity = "Exotic",
+		WaveWarning = 10,
+		Note = "Exotic accessory: warns you of big and rogue waves 10 seconds earlier",
+		Exotic = true,
+	},
+	{
+		-- Spearstone Reef.
+		Id = "TidewalkerBoots",
+		Name = "Tidewalker Boots",
+		Rarity = "Exotic",
+		WaveResist = 0.3,
+		WadeBonus = 0.5,
+		Note = "Exotic accessory: waves push you 30% less, and water slows you half as much",
+		Exotic = true,
+	},
+	{
+		-- Sea-Glass Shore.
+		Id = "PrismLens",
+		Name = "Prism Lens",
+		Rarity = "Exotic",
+		RevealRare = 150,
+		Note = "Exotic accessory: rare items and unlock items within 150 studs shine through anything",
+		Exotic = true,
+	},
+	{
+		-- Black Sand Vents.
+		Id = "EmberLantern",
+		Name = "Ember Lantern",
+		Rarity = "Exotic",
+		Light = { Color = Color3.fromRGB(255, 140, 60), Range = 16, Brightness = 1.5 },
+		BreathBonus = 0.5,
+		Note = "Exotic accessory: keeps you warm underwater: breath lasts 50% longer",
 		Exotic = true,
 	},
 }

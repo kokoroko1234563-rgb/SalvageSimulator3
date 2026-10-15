@@ -84,7 +84,7 @@ local function grabItem(player: Player, item: BasePart, root: BasePart): (boolea
 					"New lexicon entry: %s! (%d/%d)",
 					if def then def.Name else itemId,
 					player:GetAttribute("LexiconCount") or 0,
-					#Items.Catalog
+					#Items.Lexicon
 				)
 			)
 		end

@@ -3,11 +3,15 @@
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 local Validate = require(Shared.Validate)
 local Tide = require(Shared.Tide)
 
 local AdminService = require(script.AdminService)
+local AccessoryService = require(script.AccessoryService)
+local Showroom = require(script.Showroom)
+local ShowroomExhibits = require(script.ShowroomExhibits)
 local AuctionService = require(script.AuctionService)
 local BeachBuilder = require(script.BeachBuilder)
 local BiomeService = require(script.BiomeService)
@@ -81,7 +85,16 @@ FarSandbarService.init(map, SecretService.tryEnter)
 LexiconService.init(notify)
 CosmeticService.init()
 ToolModels.init()
+AccessoryService.init()
 RebirthService.init(notify, ShopService.nearShop)
 AuctionService.init(notify)
 MonetizationService.init(notify)
 AdminService.init()
+
+-- The showroom (admins: tp showroom). Built last, off the startup path: some exhibits load
+-- avatars, which waits on Roblox.
+if Config.Showroom.Enabled then
+	task.spawn(function()
+		Showroom.build(Workspace, ShowroomExhibits())
+	end)
+end

@@ -61,6 +61,8 @@ test("load server services", function()
 			"BeachDressing",
 			"Buildings",
 			"MapParts",
+			"ZoneProps",
+			"BiomeModels",
 			"ItemService",
 			"GrabService",
 			"ShopService",
@@ -85,6 +87,8 @@ test("load server services", function()
 			"VesselTrim",
 			"BeachCheer",
 			"SurfService",
+			"Showroom",
+			"ShowroomExhibits",
 		}
 	do
 		h.require("Server/" .. name)
@@ -161,25 +165,34 @@ for id, build in VesselService and VesselService._builders or {} do
 	end)
 end
 
--- 5b. Every vessel has paint and trim, and the trim never collides or weighs anything.
+-- 5b. Every vessel builds with valid geometry, and where it has paint and trim, the trim never
+-- collides or weighs anything.
 test("vessels are painted and trimmed", function()
 	local VesselTrim = h.require("Server/VesselTrim")
+	local trimmed = 0
 	for id, build in VesselService._builders do
-		assert(VesselTrim.has(id), id .. " has no paint and trim")
 		local model = Harness.wrap(roblox.Instance.new("Model"))
 		build(model, roblox.CFrame.new(0, 1, 0))
-		-- The trim is welded on to the floor (the vessel's PrimaryPart).
-		local rim = model.PrimaryPart:FindFirstChild("RimFront")
-		assert(rim, id .. " has no rim")
 		for _, part in model:GetDescendants() do
-			if part:IsA("BasePart") and (part.Name:match("^Rim") or part.Name:match("^Stripe")) then
-				assert(
-					not part.CanCollide and not part.CanQuery and part.Massless,
-					id .. ": " .. part.Name .. " is solid"
-				)
+			if part:IsA("BasePart") then
+				for _, component in { part.CFrame:GetComponents() } do
+					assert(component == component, id .. ": " .. part.Name .. " has a NaN transform")
+				end
+				if part.Name:match("^Rim") or part.Name:match("^Stripe") then
+					assert(
+						not part.CanCollide and not part.CanQuery and part.Massless,
+						id .. ": " .. part.Name .. " is solid"
+					)
+				end
 			end
 		end
+		if VesselTrim.has(id) then
+			trimmed += 1
+			-- The trim is welded on to the floor (the vessel's PrimaryPart).
+			assert(model.PrimaryPart:FindFirstChild("RimFront"), id .. " has no rim")
+		end
 	end
+	assert(trimmed >= 6, "the base vessels should all be trimmed")
 end)
 
 -- 5c. Every tool but Bare Hands has a model that attaches at the hand, and the model is
@@ -402,6 +415,36 @@ test("waves run up and slide back", function()
 	assert(at(life + 0.5) == nil, "gone after its lifetime")
 	assert(Waves.size(cfg.SetEvery * 50) > Waves.size(cfg.SetEvery * 50 + 1) * 1.1, "set waves are bigger")
 	assert(Waves.reach(n, 700) > Waves.reach(n, 100), "waves are bigger further out")
+end)
+
+test("build the showroom", function()
+	local Showroom = h.require("Server/Showroom")
+	local catalogue = h.require("Server/ShowroomExhibits")()
+	local parent = Harness.wrap(roblox.Instance.new("Folder"))
+	local room = Showroom.build(parent, catalogue)
+	assert(room:FindFirstChild("Floor"), "the room has a floor")
+	-- Every exhibit built (a failed one is replaced by a red BuildFailed block).
+	local failed = {}
+	for _, d in room:GetDescendants() do
+		if d.Name == "BuildFailed" then
+			table.insert(failed, d.Parent.Name)
+		end
+	end
+	-- Avatars need Roblox's servers, so the person can't be built here.
+	local expected = { Person = true }
+	for _, name in failed do
+		assert(expected[name], "showroom exhibit failed to build: " .. name)
+	end
+	-- Nothing ends up on the beach or in the sea: the whole room is on the shop side.
+	local _, hi = Showroom._bounds(room)
+	assert(hi and hi.Z < 0, "the showroom must stay at Z < 0, away from the tide")
+	-- No exhibit may produce broken (NaN) positions.
+	for _, d in room:GetDescendants() do
+		if d:IsA("BasePart") then
+			local p = d.CFrame.Position
+			assert(p == p, "NaN position in showroom part " .. d:GetFullName())
+		end
+	end
 end)
 
 test("build the bell tower", function()

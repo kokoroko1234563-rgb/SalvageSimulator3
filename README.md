@@ -252,6 +252,60 @@ Press **I** (or the purple bag button) to open it.
 
 All tuning numbers are in `src/shared/Config.luau`, `Gear.luau` and `Items.luau`.
 
+## Items and gear from the doc
+
+Everything the design doc names now exists, with a model. See it all with `tp showroom`. Hand any of it out with `give <id>`.
+
+**Beach loot:**
+- Light: rope, old boots, coconuts, snorkels, starfish, fishing lures, glass floats, coral.
+- Medium: driftwood planks, tangled nets, buoys, big shells, frozen fish.
+- Very heavy (new class: Electric Winch, Crab Claw, Obsidian Grabber, Bubble Wand, or Strong Back): treasure chests and old statues.
+- Their biomes don't roll yet, so for now they wash up anywhere by rarity.
+- The traders' payment items (nets for Old Nell, big shells for Captain Pebble, frozen fish for Pip) are among them.
+
+**Unlock items for the other secrets:**
+- From the doc: the Carved Driftwood Idol, Pearl-Eyed Shell, Barnacled Lantern and Coral Comb.
+- One per rare biome. The doc doesn't name these, so the names are placeholders: Glowing Jelly Jar, Lighthouse Key, Wind Chime, Spiral Conch, Spearstone Shard, Prism Shard, Frozen Compass, Obsidian Egg.
+- They can't wash up until their biome is built (`Biomes.Planned` holds each biome's doc data: loot, unlock item, coin or lootbox, hazard, variant). They don't count toward the lexicon until then.
+
+**Shop vessels:** the Sand Cart (fast), Quad Bike + Trailer (faster, tips easily), Inflatable Dinghy (survives deep water when towed, sinks if it flips) and Pickup Truck (fastest, steadiest) are in the shop at the doc's prices.
+
+**Exotic gear** (lootbox rewards, attunement needed):
+
+| Item | From | Kind | What it does |
+|---|---|---|---|
+| Gust Gloves | Whirlwind Dunes | Grabber | Reels what it holds in fast, in or out of the water |
+| Crab Claw | Hermit Hollows | Grabber | Short reach, lifts anything, almost impossible to knock loose |
+| Obsidian Grabber | Black Sand Vents | Grabber | Very long reach, lifts anything, reaches deep water |
+| Freeze Wand | Stranded Iceberg | Grabber | **F** (or the button) freezes the waves within 30 studs for 5 s, 25 s cooldown. Never the tide |
+| Jelly Raft | Jellyfish Lagoon | Vessel | Follows you and swims, holds 10 |
+| Magic Carpet | Whirlwind Dunes | Vessel | Flies behind you over sand and sea, fast, holds 10 |
+| Shell Wagon | Hermit Hollows | Vessel | Towed, very hard to tip, holds 14 |
+| Glass Swan | Sea-Glass Shore | Vessel | Swims behind you, holds 12 |
+| Frost Sled | Stranded Iceberg | Vessel | Towed, very fast, holds 12 |
+| Glow Pearl | Jellyfish Lagoon | Accessory | Lights you up; breath +25% |
+| Lantern of Clear Sight | Fog Bank | Accessory | See 2.5x further through the haze; gives light |
+| Foghorn | Fog Bank | Accessory | Warns of big and rogue waves 10 s earlier |
+| Tidewalker Boots | Spearstone Reef | Accessory | Waves push you 30% less; water slows you half as much |
+| Prism Lens | Sea-Glass Shore | Accessory | Rare and unlock items within 150 studs shine through anything |
+| Ember Lantern | Black Sand Vents | Accessory | Breath +50%; gives warm light |
+
+The doc gives examples, not effects, for most of these, so the effects above are my proposals to tune. Light from accessories is server-side (`AccessoryService`), so everyone sees it. The rest is in `Stats` and `GearEffects`.
+
+## Showroom
+
+An open-air gallery off the map (`Config.Showroom`, X = 6000 on the shop side, so no tide or wave reaches it) that shows every model, material and colour in the game side by side. Each exhibit stands on its own tile or pedestal, with its name on a sign.
+
+- **Getting there:** `tp showroom` goes to the entrance. `showroom <section>` jumps to a section (`showroom biomes`, `showroom vessels`), and `showroom` on its own lists them.
+- **Sections:**
+  - Materials and colour swatches: every Palette group, each swatch labelled with its RGB value.
+  - Beach items with their models (items without a model yet are marked).
+  - Vessels, cosmetics, beach pieces (BeachDressing and ZoneProps), buildings and people.
+  - The secret doors, including the Sunken Bell Tower.
+  - All fourteen biomes.
+- **Adding something:** add an entry to `src/server/ShowroomExhibits.luau`: a name, an optional note and pedestal height, and a `Build(parent, at)` function that builds the thing around `at`. The showroom builds each exhibit at a staging point, measures it and lays the room out, so builders don't need to know their size or final position. Doors lose their prompts in the showroom.
+- **Failures:** an exhibit that fails to build shows as a red block, with a warning in the output. The tests check that every exhibit builds (except the person, which needs Roblox's avatar service) and that nothing ends up with a broken position.
+
 ## Admin console
 
 Press **F2** (or the gold **Admin** button, top right) to open it. Type `help` for every
@@ -269,7 +323,8 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `tide <out\|hold\|in> [percent]` | Jump the tide, e.g. `tide in 90` |
 | `tidespeed <scale>` | 1 = real 25 min cycle, 0.1 = 2.5 min |
 | `waves <multiplier\|rogue\|seed [n]>` | Wave strength (0 = calm), send a rogue wave, or set a new random sea seed |
-| `tp <shop\|zone\|sandbar\|player> [who]` | Teleport (`sandbar` = the bell tower door) |
+| `tp <shop\|zone\|sandbar\|showroom\|player> [who]` | Teleport (`sandbar` = the bell tower door) |
+| `showroom [section]` | Go to the showroom or one of its sections; lists the sections |
 | `heal`, `god`, `speed <n>` | Health/breath, toggle no-drowning, walk speed |
 | `resetdata <player>`, `kick <player> [reason]` | Wipe a save, kick |
 | `biomes` | Show each zone's biome and the biomes that exist |

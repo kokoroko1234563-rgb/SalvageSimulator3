@@ -50,6 +50,7 @@ local specs = {
 		Spots = true,
 		Parts = { Head = V.LimeLight, Flipper = V.LimeLight },
 	},
+	QuadBike = { Hull = V.Teal, Trim = V.Gold, Accent = V.White },
 	LeviathanRowboat = {
 		Hull = V.Royal,
 		Trim = V.Gold,

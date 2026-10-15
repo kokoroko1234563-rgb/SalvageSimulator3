@@ -37,11 +37,14 @@ function TideController.init()
 			-- Secret courses are built high above everything, far off the map.
 			local zone = if root.Position.Y > Config.Secrets.Origin.Y - 100
 				then -1
+				elseif root.Position.X > Config.Showroom.Origin.X - 1000 then -3
 				else Beach.zoneAt(root.Position.Z)
 			if zone ~= lastZone then
 				lastZone = zone
 				if zone == -1 then
 					HUD.setZone("A secret")
+				elseif zone == -3 then
+					HUD.setZone("The Showroom")
 				elseif zone == 0 then
 					HUD.setZone("The Shop")
 				elseif zone then

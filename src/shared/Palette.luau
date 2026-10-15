@@ -119,6 +119,80 @@ Palette.World = {
 	SandDark = rgb(238, 205, 132),
 }
 
+-- Props that give each zone its look (see ZoneProps).
+Palette.Zone = {
+	ChairWhite = rgb(248, 248, 244),
+	ChairCoral = rgb(255, 120, 90),
+	ChairSky = rgb(90, 180, 225),
+	TowelRed = rgb(230, 70, 90),
+	TowelBlue = rgb(70, 150, 230),
+	TowelYellow = rgb(250, 200, 60),
+	HutWall = rgb(238, 224, 192),
+	HutTealRoof = rgb(60, 150, 150),
+	HutThatch = rgb(190, 150, 80),
+	Pier = rgb(150, 110, 70),
+	Piling = rgb(95, 72, 50),
+	RockGrey = rgb(128, 122, 116),
+	RockDark = rgb(82, 80, 78),
+	Coral1 = rgb(255, 110, 130),
+	Coral2 = rgb(255, 165, 70),
+	Coral3 = rgb(190, 115, 235),
+	Pool = rgb(70, 205, 225),
+	Net = rgb(205, 200, 185),
+	Hull = rgb(60, 130, 200),
+	HullInside = rgb(250, 248, 240),
+	StoneLight = rgb(196, 186, 170),
+	StoneDark = rgb(150, 140, 128),
+	Bell = rgb(220, 170, 60),
+	Ridge = rgb(226, 204, 152),
+}
+
+-- Biome looks (see BiomeModels): each biome's own colours.
+Palette.Biome = {
+	SandcastleSand = rgb(230, 200, 140),
+	Moat = rgb(70, 170, 220),
+	Rope = rgb(200, 170, 110),
+	Bottle = rgb(110, 190, 130),
+	Boot = rgb(90, 60, 40),
+	Hollow = rgb(60, 40, 25),
+	Starfish = rgb(240, 130, 80),
+	BuoyRed = rgb(230, 60, 60),
+	BuoyWhite = rgb(250, 250, 250),
+	Seagrass = rgb(70, 140, 70),
+	Float = rgb(120, 220, 140),
+	Coconut = rgb(120, 85, 50),
+	Snorkel = rgb(245, 245, 245),
+	JellyBlue = rgb(140, 230, 255),
+	JellyPink = rgb(255, 150, 220),
+	Tentacle = rgb(200, 240, 255),
+	Lagoon = rgb(60, 210, 220),
+	Glow = rgb(120, 255, 240),
+	LighthouseWhite = rgb(245, 245, 240),
+	LighthouseRed = rgb(200, 50, 50),
+	LampGlass = rgb(255, 235, 150),
+	Fog = rgb(240, 245, 250),
+	Foghorn = rgb(180, 160, 60),
+	Hermit = rgb(190, 120, 90),
+	Claw = rgb(230, 110, 90),
+	Tunnel = rgb(200, 170, 120),
+	Spear = rgb(130, 120, 110),
+	SpearTip = rgb(170, 160, 150),
+	GlassTeal = rgb(120, 230, 220),
+	GlassPink = rgb(255, 160, 220),
+	GlassWhite = rgb(235, 250, 255),
+	GlassViolet = rgb(190, 160, 255),
+	IceWhite = rgb(235, 248, 255),
+	IceBlue = rgb(160, 215, 240),
+	IceDeep = rgb(90, 160, 210),
+	IceCave = rgb(60, 120, 170),
+	BlackSand = rgb(35, 32, 32),
+	VentGrey = rgb(70, 65, 65),
+	Lava = rgb(255, 120, 40),
+	Steam = rgb(245, 245, 245),
+	TubeDark = rgb(40, 30, 30),
+	WhirlSand = rgb(215, 190, 140),
+}
+
 Palette.Material = {
 	Sand = Enum.Material.Sand,
 	Wood = Enum.Material.Wood,
@@ -154,6 +228,17 @@ Palette.ItemModel = {
 	Sun = rgb(255, 214, 70), -- yellow accents
 	Aqua = rgb(60, 175, 240), -- blue accents
 	Glint = rgb(255, 210, 235), -- a pearl's shine
+	Gold = rgb(235, 190, 70), -- trims, locks, the compass case
+	Needle = rgb(215, 45, 45), -- the compass needle's north end
+	Barnacle = rgb(215, 210, 190),
+	Jelly = rgb(255, 140, 220), -- the glowing jellyfish in the jar
+	Magma = rgb(255, 120, 40), -- the obsidian egg's cracks
+	Rubber = rgb(40, 45, 50), -- snorkel mouthpiece and mask
+	MaskGlass = rgb(150, 210, 235),
+	Fish = rgb(120, 150, 170),
+	Float = rgb(240, 140, 50), -- the net's floats
+	Rock = rgb(110, 105, 100),
+	Moss = rgb(95, 140, 75),
 }
 
 -- Colours for the tool models (src/server/ToolModels.luau).
@@ -173,6 +258,11 @@ Palette.ToolModel = {
 	Pink = rgb(255, 140, 200),
 	Violet = rgb(175, 130, 255),
 	Film = rgb(235, 225, 255),
+	Sky = rgb(150, 215, 255),
+	Obsidian = rgb(52, 46, 74),
+	Lava = rgb(255, 112, 40),
+	Ice = rgb(170, 235, 255),
+	Frost = rgb(232, 250, 255),
 }
 
 -- Paint for the vessels (src/server/VesselTrim.luau).

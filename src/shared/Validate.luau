@@ -49,8 +49,8 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		check(type(item.Id) == "string" and Items.get(item.Id) == item, where .. ": duplicate or missing Id")
 		check(type(item.Name) == "string", where .. ": missing Name")
 		check(
-			item.Class == 1 or item.Class == 2 or item.Class == 3,
-			where .. ": Class must be Light, Medium or Heavy"
+			item.Class == 1 or item.Class == 2 or item.Class == 3 or item.Class == 4,
+			where .. ": Class must be Light, Medium, Heavy or Very heavy"
 		)
 		check(
 			Palette.Rarity[item.Rarity] ~= nil,
@@ -63,7 +63,9 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		check(type(item.Value) == "number", where .. ": missing Value")
 		if item.Unlock then
 			check(
-				Biomes.List[item.Unlock] ~= nil or Secrets.List[item.Unlock] ~= nil,
+				Biomes.List[item.Unlock] ~= nil
+					or Secrets.List[item.Unlock] ~= nil
+					or (item.Planned and Biomes.Planned[item.Unlock] ~= nil),
 				where .. ": unlocks unknown biome or secret " .. tostring(item.Unlock)
 			)
 			check(Catalog.get(item.Id) ~= nil, where .. ": unlock item missing from the inventory catalog")
@@ -270,6 +272,23 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 				where .. ": no hazard called " .. tostring(biome.Hazard)
 			)
 		end
+	end
+
+	-- Planned biomes: everything they name must exist.
+	for id, biome in Biomes.Planned do
+		local where = "Planned biome " .. id
+		local unlock = Items.get(biome.UnlockItem)
+		check(unlock ~= nil and unlock.Unlock == id, where .. ": unlock item must exist and point back at it")
+		for _, lootId in biome.Loot or {} do
+			check(Items.get(lootId) ~= nil, where .. ": loot " .. lootId .. " isn't an item")
+		end
+		for _, rewardId in biome.Rewards or {} do
+			check(
+				Catalog.get(rewardId) ~= nil,
+				where .. ": reward " .. rewardId .. " isn't an inventory item"
+			)
+		end
+		check(biome.Coin == nil or Palette.Coin[biome.Coin] ~= nil, where .. ": coin has no colour")
 	end
 
 	-- Secrets

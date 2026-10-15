@@ -249,6 +249,126 @@ builders.BubbleWand = function(handle)
 	end
 end
 
+builders.GustGloves = function(handle)
+	-- A leather gauntlet with fingers, and rings of wind spinning off the knuckles.
+	piece(handle, "Cuff", Block, Vector3.new(0.7, 0.6, 0.7), CFrame.new(0, 0, 0.1), T.PoleDark, Fabric)
+	piece(handle, "Palm", Block, Vector3.new(0.62, 0.5, 0.6), CFrame.new(0, 0, -0.55), T.Pole, Fabric)
+	for index = 0, 3 do
+		local x = -0.24 + index * 0.16
+		bar(handle, "Finger", point(x, 0, -0.85), point(x, 0.05, -1.45), 0.13, T.Pole, Fabric)
+		piece(
+			handle,
+			"Fingertip",
+			Ball,
+			Vector3.new(0.15, 0.15, 0.15),
+			CFrame.new(x, 0.05, -1.47),
+			T.Sky,
+			Smooth
+		)
+	end
+	for ring = 0, 2 do
+		local z = -1.7 - ring * 0.55
+		arc(handle, "Whirl", Vector2.new(0, 0.1), 0.45 + ring * 0.22, 0, 360, 0.07, T.Sky, Smooth, z)
+		piece(
+			handle,
+			"Puff",
+			Ball,
+			Vector3.new(0.2, 0.2, 0.2),
+			CFrame.new(0.45 + ring * 0.22, 0.1, z),
+			T.White,
+			Smooth
+		)
+	end
+end
+
+builders.CrabClaw = function(handle)
+	-- A big red pincer on a short handle, with a crab's eyes on stalks.
+	bar(handle, "Handle", point(0, 0, 0.8), point(0, 0, -0.7), 0.2, T.Orange, Smooth)
+	piece(handle, "Body", Block, Vector3.new(0.7, 0.55, 0.6), CFrame.new(0, 0, -0.75), T.Red, Smooth)
+	for _, side in { -1, 1 } do
+		bar(
+			handle,
+			"Stalk",
+			point(0.2 * side, 0.25, -0.7),
+			point(0.2 * side, 0.65, -0.7),
+			0.06,
+			T.Red,
+			Smooth
+		)
+		piece(
+			handle,
+			"Eye",
+			Ball,
+			Vector3.new(0.22, 0.22, 0.22),
+			CFrame.new(0.2 * side, 0.72, -0.7),
+			T.White,
+			Smooth
+		)
+		piece(
+			handle,
+			"Pupil",
+			Ball,
+			Vector3.new(0.1, 0.1, 0.1),
+			CFrame.new(0.2 * side, 0.74, -0.8),
+			T.PoleDark,
+			Smooth
+		)
+	end
+	local upper = { point(0, 0.12, -0.9), point(0, 0.62, -1.3), point(0, 0.55, -1.95), point(0, 0.12, -2.3) }
+	local lower =
+		{ point(0, -0.12, -0.9), point(0, -0.5, -1.25), point(0, -0.4, -1.75), point(0, -0.08, -2.1) }
+	for _, jaw in { upper, lower } do
+		for index = 1, #jaw - 1 do
+			bar(handle, "Jaw", jaw[index], jaw[index + 1], 0.3, T.Red, Smooth)
+		end
+		piece(handle, "Point", Ball, Vector3.new(0.26, 0.26, 0.26), CFrame.new(jaw[#jaw]), T.White, Smooth)
+	end
+end
+
+builders.ObsidianGrabber = function(handle)
+	-- Black volcanic glass on a dark shaft, with a glowing lava collar and three spikes.
+	pole(handle, -1.8, 0.2, T.Obsidian, Metal)
+	sleeve(handle, "Collar", -1.55, -1.85, 0.4, T.Lava, Neon)
+	for index = 0, 2 do
+		local angle = index * math.pi * 2 / 3 + math.pi / 2
+		local tip = point(math.cos(angle) * 0.6, math.sin(angle) * 0.6, -2.7)
+		bar(handle, "Spike", point(0, 0, -1.8), tip, 0.2, T.Obsidian, Metal)
+		piece(handle, "Ember", Ball, Vector3.new(0.2, 0.2, 0.2), CFrame.new(tip), T.Lava, Neon)
+	end
+	bar(handle, "Core", point(0, 0, -1.8), point(0, 0, -2.9), 0.24, T.Obsidian, Metal)
+	piece(handle, "Heart", Ball, Vector3.new(0.34, 0.34, 0.34), CFrame.new(0, 0, -3.0), T.Lava, Neon)
+end
+
+builders.FreezeWand = function(handle)
+	-- An icy wand topped with a glittering snowflake and a few icicles.
+	bar(handle, "Wand", point(0, 0, 0.7), point(0, 0, -1.8), 0.13, T.Ice, Glass)
+	sleeve(handle, "Grip", 0.6, 0.0, 0.22, T.Sky, Smooth)
+	local z = -2.1
+	for index = 0, 2 do
+		local angle = index * math.pi / 3
+		local dx, dy = math.cos(angle) * 0.55, math.sin(angle) * 0.55
+		bar(handle, "Ray", point(-dx, -dy, z), point(dx, dy, z), 0.1, T.Ice, Neon)
+		for _, side in { -1, 1 } do
+			local mid = point(dx * 0.62 * side, dy * 0.62 * side, z)
+			local across = point(-dy * 0.3, dx * 0.3, 0)
+			bar(handle, "Twig", mid - across, mid + across, 0.06, T.Frost, Neon)
+		end
+	end
+	piece(handle, "Heart", Ball, Vector3.new(0.3, 0.3, 0.3), CFrame.new(0, 0, z), T.Frost, Neon)
+	for _, x in { -0.3, 0, 0.3 } do
+		piece(
+			handle,
+			"Icicle",
+			Block,
+			Vector3.new(0.08, 0.34, 0.08),
+			CFrame.new(x, -0.72, z),
+			T.Ice,
+			Glass,
+			0.2
+		)
+	end
+end
+
 -- Whether a tool has a model. Bare Hands don't.
 function ToolModels.has(id: string): boolean
 	return builders[id] ~= nil
