@@ -15,6 +15,7 @@
 
 local CollectionService = game:GetService("CollectionService")
 
+local Beach = require(script.Parent.Beach)
 local Config = require(script.Parent.Config)
 
 local cfg = Config.Water
@@ -138,16 +139,28 @@ function WaterObstacles.topAt(x: number, z: number): number?
 	return best
 end
 
+-- The highest solid thing over (x, z): an obstacle, or the ground's own ridges.
+local function solidAt(x: number, z: number): number?
+	local top = WaterObstacles.topAt(x, z)
+	if Beach.isRough(z) then
+		local ground = Beach.groundAt(x, z)
+		if not top or ground > top then
+			top = ground
+		end
+	end
+	return top
+end
+
 -- How far up the beach a wave's run-up really gets at X. `front` is how far it would get on
 -- open sand (0 or negative: studs up the beach from the waterline `line`), and `reachY` the
 -- height its water climbs to. It stops just short of anything solid that rises above that.
 function WaterObstacles.limitFront(x: number, line: number, front: number, reachY: number): number
-	if front >= 0 or not WaterObstacles.near(x) then
+	if front >= 0 or not (WaterObstacles.near(x) or Beach.isRough(line) or Beach.isRough(line + front)) then
 		return front
 	end
 	local z = line
 	while z > line + front do
-		local top = WaterObstacles.topAt(x, z)
+		local top = solidAt(x, z)
 		if top and top > reachY then
 			return math.min(0, z + 1 - line)
 		end
@@ -159,16 +172,16 @@ end
 -- Whether (x, z) is sheltered from waves rolling in from the sea: something solid stands
 -- above the water surface (waterY) within ShelterRange seaward of it.
 function WaterObstacles.sheltered(x: number, z: number, waterY: number): boolean
-	if not WaterObstacles.near(x) then
+	if not (WaterObstacles.near(x) or Beach.isRough(z) or Beach.isRough(z + cfg.ShelterRange)) then
 		return false
 	end
-	local zz = z + cfg.Step
+	local zz = z + cfg.ShelterStep
 	while zz <= z + cfg.ShelterRange do
-		local top = WaterObstacles.topAt(x, zz)
+		local top = solidAt(x, zz)
 		if top and top > waterY + cfg.ShelterHeight then
 			return true
 		end
-		zz += cfg.Step
+		zz += cfg.ShelterStep
 	end
 	return false
 end

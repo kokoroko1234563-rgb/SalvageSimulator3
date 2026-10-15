@@ -381,13 +381,13 @@ local function groundBelow(position: Vector3): number
 	if map then
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Include
-		params.FilterDescendantsInstances = { map }
+		params.FilterDescendantsInstances = { map, Workspace.Terrain }
 		local hit = Workspace:Raycast(position + Vector3.new(0, 30, 0), Vector3.new(0, -100, 0), params)
 		if hit then
 			return hit.Position.Y
 		end
 	end
-	return Beach.groundY(position.Z)
+	return Beach.groundAt(position.X, position.Z)
 end
 
 -- Parking brake: while you aren't towing your vessel, hold it where you left it so it

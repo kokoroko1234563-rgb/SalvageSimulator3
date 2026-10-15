@@ -94,10 +94,10 @@ end
 function ItemService.dropToGround(item: BasePart)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
-	params.FilterDescendantsInstances = { mapFolder }
+	params.FilterDescendantsInstances = { mapFolder, Workspace.Terrain }
 	local origin = item.Position + Vector3.new(0, 10, 0)
 	local hit = Workspace:Raycast(origin, Vector3.new(0, -80, 0), params)
-	local groundY = if hit then hit.Position.Y else Beach.groundY(item.Position.Z)
+	local groundY = if hit then hit.Position.Y else Beach.groundAt(item.Position.X, item.Position.Z)
 	local _, yaw, _ = item.CFrame:ToOrientation()
 	item.CFrame = CFrame.new(item.Position.X, groundY + item.Size.Y / 2, item.Position.Z)
 		* CFrame.Angles(0, yaw, 0)
@@ -296,7 +296,7 @@ function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
 		def = choices[rng:NextInteger(1, #choices)]
 	end
 
-	local y = Beach.groundY(z) + def.Size.Y / 2
+	local y = Beach.groundAt(x, z) + def.Size.Y / 2
 	return createItem(def, zoneIndex, Vector3.new(x, y, z))
 end
 

@@ -16,6 +16,7 @@ local BeachCheer = require(script.Parent.BeachCheer)
 local BeachDressing = require(script.Parent.BeachDressing)
 local Buildings = require(script.Parent.Buildings)
 local MapParts = require(script.Parent.MapParts)
+local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local BiomeModels = require(script.Parent.BiomeModels)
 local Cosmetics = require(script.Parent.Cosmetics)
 local MapEdge = require(script.Parent.MapEdge)
@@ -40,66 +41,6 @@ local SELL_PAD_SIZE = Vector3.new(30, 0.2, 22)
 local BANK_PAD_SIZE = Vector3.new(32, 0.2, 16)
 local BUYER_X = 68
 
--- A block whose top face slopes down from (zStart, yStart) to (zEnd, yEnd).
-local function slopedBlock(
-	name: string,
-	x0: number,
-	x1: number,
-	zStart: number,
-	yStart: number,
-	zEnd: number,
-	yEnd: number,
-	color: Color3
-)
-	local run = zEnd - zStart
-	local drop = yStart - yEnd
-	local angle = math.atan2(drop, run)
-	local length = math.sqrt(run * run + drop * drop)
-	local thickness = 6
-	local topCenter = Vector3.new((x0 + x1) / 2, (yStart + yEnd) / 2, (zStart + zEnd) / 2)
-	local orientation = CFrame.Angles(angle, 0, 0)
-	local center = topCenter - orientation.UpVector * thickness / 2
-	return MapParts.part({
-		Name = name,
-		Size = Vector3.new(x1 - x0, thickness, length + 0.2),
-		CFrame = CFrame.new(center) * orientation,
-		Color = color,
-		Material = Palette.Material.Sand,
-	})
-end
-
--- The beach is cut into strips along Z. Each strip is a little darker the further out it is
--- (wetter), with some variation, so the sand reads as sand rather than one flat colour.
-local function buildBeach(map: Folder)
-	local rng = Random.new(11)
-	local stripLength = 30
-	local sandbar = beach.FarSandbar
-	local z = 0
-	while z < Beach.Depth do
-		local nextZ = math.min(z + stripLength, Beach.Depth)
-		if z >= sandbar.ChannelStart and z < sandbar.ChannelEnd then
-			-- The channel to the Far Sandbar is a curved dip (Beach.groundY): short pieces.
-			nextZ = math.min(z + 4, sandbar.ChannelEnd)
-		elseif z < sandbar.ChannelStart and nextZ > sandbar.ChannelStart then
-			nextZ = sandbar.ChannelStart
-		end
-		local wetness = (z / Beach.Depth) * 0.6 + rng:NextNumber(0, 0.25)
-		local color = SAND:Lerp(WET_SAND, wetness)
-		slopedBlock(
-			"Beach",
-			-Beach.HalfWidth,
-			Beach.HalfWidth,
-			z,
-			Beach.groundY(z),
-			nextZ,
-			Beach.groundY(nextZ),
-			color
-		).Parent =
-			map
-		z = nextZ
-	end
-end
-
 -- Flat patches of lighter and darker sand scattered over the beach, so it isn't one colour.
 local function buildSandPatches(map: Folder)
 	local folder = Instance.new("Folder")
@@ -118,7 +59,7 @@ local function buildSandPatches(map: Folder)
 			Name = "SandPatch",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(0.15, diameter, diameter),
-			CFrame = CFrame.new(x, Beach.groundY(z) + 0.05, z)
+			CFrame = CFrame.new(x, Beach.groundAt(x, z) + 0.05, z)
 				* CFrame.Angles(tilt, rng:NextNumber() * math.pi * 2, 0)
 				* CFrame.Angles(0, 0, math.pi / 2),
 			Color = color,
@@ -128,21 +69,6 @@ local function buildSandPatches(map: Folder)
 		}).Parent =
 			folder
 	end
-end
-
-local function buildSea(map: Folder)
-	local seaEnd = Beach.Depth + beach.SeaExtent
-	slopedBlock(
-		"Seabed",
-		-Beach.HalfWidth - 300,
-		Beach.HalfWidth + 300,
-		Beach.Depth,
-		Beach.groundY(Beach.Depth),
-		seaEnd,
-		Beach.groundY(seaEnd),
-		SAND
-	).Parent =
-		map
 end
 
 -- Zone markers: a tall post at each side of the beach where each zone starts, with its name
@@ -475,9 +401,9 @@ function BeachBuilder.build(): Folder
 
 	-- The beach: one long slope from the shoreline out under the sea. The tide uncovers more
 	-- or less of it.
-	buildBeach(map)
+	-- The beach, the channel, the sandbar and the seabed: smooth Terrain (TerrainBuilder).
+	TerrainBuilder.build()
 	buildSandPatches(map)
-	buildSea(map)
 
 	-- What keeps players in at the sides: an invisible barrier. The rocky coast you actually see
 	-- is MapEdge's scenery, which is built outside it.

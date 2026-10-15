@@ -22,7 +22,7 @@ local ball = MapParts.ball
 local column = MapParts.column
 
 local function ground(x: number, z: number): Vector3
-	return Vector3.new(x, Beach.groundY(z), z)
+	return Vector3.new(x, Beach.groundAt(x, z), z)
 end
 
 -- A deck chair: a seat, a backrest tipped back, and four legs.
@@ -237,7 +237,7 @@ end
 local function pilingRow(parent: Instance, x: number, z0: number, z1: number, top: number)
 	local z = z0
 	while z <= z1 do
-		local bottom = Beach.groundY(z) - 2
+		local bottom = Beach.groundAt(x, z) - 2
 		column(parent, Vector3.new(x, bottom, z), top - bottom, 0.9, Z.Piling)
 		z += 14
 	end
@@ -345,10 +345,7 @@ end
 
 -- Zone 3: Middle Banks. Sandbanks, driftwood piles, nets and beached boats.
 builders[3] = function(folder: Folder, rng: Random, zMin: number, zMax: number)
-	for _, z in { zMin + 20, zMin + 90, zMin + 150 } do
-		sandbank(folder, -340, -40, z, 5, 16)
-		sandbank(folder, 40, 340, z, 5, 16)
-	end
+	-- (Its sandbanks are now the terrain's own ridges: Config.Beach.Terrain.)
 	for _ = 1, 6 do
 		local x = rng:NextNumber(-300, 300)
 		local z = rng:NextNumber(zMin + 10, zMax - 10)
@@ -393,7 +390,6 @@ end
 -- Zone 5: The Far Sandbar. A sandbar spit with the ruined bell tower and its colonnade.
 builders[5] = function(folder: Folder, rng: Random, zMin: number, zMax: number)
 	local zMid = (zMin + zMax) / 2
-	sandbank(folder, -340, 340, zMid, 3, 60)
 	bellTower(folder, ground(0, zMid))
 	for i = 0, 7 do
 		local angle = i / 8 * math.pi * 2

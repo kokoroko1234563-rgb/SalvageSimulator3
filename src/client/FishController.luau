@@ -155,7 +155,7 @@ local function step(dt: number)
 			local z = school.Z + offset.Z + math.cos(now * 0.6 + phase) * 1.2
 			local y = state.WaterY - school.Depth + offset.Y + math.sin(now + phase) * 0.5
 			-- Stay off the seabed and under the surface.
-			y = math.clamp(y, Beach.groundY(z) + 1, state.WaterY - 1.2)
+			y = math.clamp(y, Beach.groundAt(x, z) + 1, state.WaterY - 1.2)
 			local position = Vector3.new(x, y, z)
 			local wag = math.sin(now * 9 + phase) * 0.12
 			model:PivotTo(CFrame.lookAt(position, position + direction) * CFrame.Angles(0, wag, 0))

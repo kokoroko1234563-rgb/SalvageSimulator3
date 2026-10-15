@@ -148,7 +148,7 @@ function BeachDressing.build(map: Instance, rng: Random)
 
 	local half = Beach.HalfWidth
 	local function groundAt(x: number, z: number): Vector3
-		return Vector3.new(x, Beach.groundY(z), z)
+		return Vector3.new(x, Beach.groundAt(x, z), z)
 	end
 
 	-- Palms beyond the shop buildings, on the dry sand at the sides of the cove.

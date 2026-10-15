@@ -86,6 +86,7 @@ test("load server services", function()
 			"SkyBeamService",
 			"CosmeticService",
 			"FarSandbarService",
+			"TerrainBuilder",
 			"MonetizationService",
 			"ModelParts",
 			"ItemModels",
@@ -429,6 +430,104 @@ test("water stops at solid things, passes under decks, and shelters behind rocks
 	WaterObstacles._clear()
 end)
 
+test("the beach has shape: smooth at the top, ridged further out, with gaps", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	for z = 5, 145, 10 do
+		assert(Beach.feature(0, z) == 0, "zone 1 stays smooth")
+	end
+	local z0, z1 = Beach.zoneRange(4)
+	local highest, lowest = 0, 0
+	local gapsFound = 0
+	for x = -300, 300, 10 do
+		local top = 0
+		for z = z0, z1, 2 do
+			local f = Beach.feature(x, z)
+			highest = math.max(highest, f)
+			lowest = math.min(lowest, f)
+			top = math.max(top, f)
+		end
+		if top < 1 then
+			gapsFound += 1
+		end
+	end
+	assert(highest > 4, "zone 4 has tall ridges, highest " .. highest)
+	assert(lowest < -1.5, "and troughs, lowest " .. lowest)
+	-- A column with no tall ridge in the whole zone is rare: gaps are per ridge. Check one ridge.
+	local spec = Config.Beach.Terrain.Zones[4]
+	local spacing = (z1 - z0) / spec.Ridges
+	local open = 0
+	for x = -300, 300, 5 do
+		local zc = z0 + spacing * 0.5
+		local peak = 0
+		for z = zc - 12, zc + 12, 2 do
+			peak = math.max(peak, Beach.feature(x, z))
+		end
+		if peak < 1 then
+			open += 1
+		end
+	end
+	assert(open > 0, "the first ridge of zone 4 has gaps to walk through")
+	assert(Beach.feature(Beach.HalfWidth, (z0 + z1) / 2) == 0, "the shape fades out at the sides")
+	local _ = gapsFound
+end)
+
+test("troughs flood before the waterline reaches them", function()
+	local Beach = h.require("Shared/Beach")
+	local Tide = h.require("Shared/Tide")
+	local z0, z1 = Beach.zoneRange(4)
+	-- Find the deepest trough in zone 4 along X = 0.
+	local troughZ, deepest = nil, 0
+	for z = z0, z1 do
+		local f = Beach.feature(0, z)
+		if f < deepest then
+			troughZ, deepest = z, f
+		end
+	end
+	assert(troughZ, "zone 4 has a trough at X = 0")
+	-- With the sea level just above the trough's floor, the waterline (where the plain slope
+	-- meets the sea) is still seaward of it, but the trough is already under water.
+	local floorY = Beach.groundAt(0, troughZ)
+	local seaY = floorY + 0.5
+	local waterline = -seaY / 0.06
+	assert(waterline > troughZ, "the waterline is still further out")
+	local ws = h.game.Workspace
+	-- Find a moment where the tide's waterline at X = 0 is about there.
+	local start = Tide.startFor("In", 0, 10000)
+	ws:SetAttribute(Tide.StartAttribute, start)
+	local found = false
+	for t = 10000, 10000 + 2000, 2 do
+		local sea = Tide.sea(t)
+		local line = Tide.waterlineAt(sea, 0)
+		if line < waterline and line > troughZ then
+			found = Beach.depthAt(roblox.Vector3.new(0, 0, troughZ), sea) > 0
+			break
+		end
+	end
+	ws:SetAttribute(Tide.StartAttribute, nil)
+	assert(found, "the trough floods while the waterline is still seaward of it")
+end)
+
+test("the terrain voxels follow the ground", function()
+	local TerrainBuilder = h.require("Server/TerrainBuilder")
+	local Beach = h.require("Shared/Beach")
+	local lo = roblox.Vector3.new(0, -40, 0)
+	local hi = roblox.Vector3.new(8, 12, 0)
+	local z0, z1 = 440, 448
+	local materials, occupancy = TerrainBuilder.slab(lo, hi, z0, z1)
+	-- Column (1, 1): x = 2, z = 442. Sum of occupancy * 4 + bottom = the ground height.
+	local filled = 0
+	for iy = 1, #occupancy[1] do
+		filled += occupancy[1][iy][1] * 4
+	end
+	local h = Beach.groundAt(2, 442)
+	assert(
+		math.abs((lo.Y + filled) - h) < 0.01,
+		"voxels reach the ground height " .. h .. ", got " .. (lo.Y + filled)
+	)
+	assert(materials[1][1][1] ~= roblox.Enum.Material.Air, "the bottom is solid")
+end)
+
 test("waves run up and slide back", function()
 	local Waves = h.require("Shared/Waves")
 	local Config = h.require("Shared/Config")
@@ -579,6 +678,7 @@ for _, name in
 		"DayController",
 		"MusicController",
 		"GearEffects",
+		"MistController",
 		"FishController",
 	}
 do

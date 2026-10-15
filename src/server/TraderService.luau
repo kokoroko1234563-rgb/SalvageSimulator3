@@ -188,7 +188,7 @@ function TraderService.spawn(trader, zone: number, parent: Instance): Model
 	local startZ = Beach.zoneRange(zone)
 	local z = startZ + 65
 	local x = rng:NextNumber(-Beach.HalfWidth + 30, Beach.HalfWidth - 30)
-	local groundY = Beach.groundY(z)
+	local groundY = Beach.groundAt(x, z)
 	local model = Instance.new("Model")
 	model.Name = "Trader_" .. trader.Id
 	local function part(name: string, size: Vector3, offset: Vector3, color: Color3)

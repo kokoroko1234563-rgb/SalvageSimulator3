@@ -127,7 +127,7 @@ local function onSand(part: Part, x: number, z0: number, z1: number, lift: numbe
 		part.Size = Vector3.new(part.Size.X, part.Size.Y, math.max(length, 0.2))
 	end
 	local z = (z0 + z1) / 2
-	return CFrame.new(x, Beach.groundY(z) + lift, z) * TILT
+	return CFrame.new(x, Beach.groundAt(x, z) + lift, z) * TILT
 end
 
 local function setTransparency(part: Part, value: number)
@@ -199,7 +199,10 @@ local function update()
 		if edge < -0.3 then
 			-- Only on the sand: once the water is back at the waterline, it's just the sea.
 			place(strip.swash, onSand(strip.swash, strip.x, line, line + edge, 0.07))
-			place(strip.edge, CFrame.new(strip.x, Beach.groundY(line + edge) + 0.09, line + edge) * TILT)
+			place(
+				strip.edge,
+				CFrame.new(strip.x, Beach.groundAt(strip.x, line + edge) + 0.09, line + edge) * TILT
+			)
 			setTransparency(strip.swash, if sliding then 0.6 else 0.45)
 			setTransparency(strip.edge, if sliding then 0.55 else 0.2)
 		else

@@ -127,7 +127,7 @@ function LexiconService.spawnTowerMan(zone: number)
 	local startZ, endZ = Beach.zoneRange(zone)
 	local z = rng:NextNumber(startZ + 40, endZ - 40)
 	local x = rng:NextNumber(-Beach.HalfWidth + 30, Beach.HalfWidth - 30)
-	LexiconService.buildTower(folder, Vector3.new(x, Beach.groundY(z), z))
+	LexiconService.buildTower(folder, Vector3.new(x, Beach.groundAt(x, z), z))
 	print(string.format("[Lexicon] the tower man appeared in zone %d", zone))
 end
 

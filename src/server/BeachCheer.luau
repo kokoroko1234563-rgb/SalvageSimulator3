@@ -25,7 +25,7 @@ local function scenery(props: { [string]: any }): Part
 end
 
 local function groundAt(x: number, z: number): Vector3
-	return Vector3.new(x, Beach.groundY(z), z)
+	return Vector3.new(x, Beach.groundAt(x, z), z)
 end
 
 -- A striped umbrella: a pole and twelve canopy panels, two colours taking turns, sloping

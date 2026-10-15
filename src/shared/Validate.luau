@@ -178,6 +178,28 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		end
 	end
 
+	-- Terrain shape and mist
+	local terrain = Config.Beach.Terrain
+	check(#terrain.Zones >= #Config.Zones, "Config.Beach.Terrain.Zones needs an entry for every zone")
+	for index, spec in terrain.Zones do
+		check(
+			type(spec.Ridges) == "number"
+				and spec.Ridges >= 0
+				and type(spec.Height) == "number"
+				and type(spec.Trough) == "number",
+			"Config.Beach.Terrain.Zones[" .. index .. "] needs Ridges, Height, Width and Trough"
+		)
+		check(
+			spec.Ridges == 0 or (spec.Width or 0) > 0,
+			"Config.Beach.Terrain.Zones[" .. index .. "]: ridges need a Width"
+		)
+	end
+	check(
+		terrain.Zones[sandbar.Zone] and terrain.Zones[sandbar.Zone].Ridges == 0,
+		"the Far Sandbar must stay flat (its door and the bell tower stand on it)"
+	)
+	check(#Config.Mist.Zones >= #Config.Zones, "Config.Mist.Zones needs a density for every zone")
+
 	-- Wading
 	local wading = Config.Beach.Wading
 	check(

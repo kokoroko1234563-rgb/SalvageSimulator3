@@ -381,7 +381,7 @@ command(
 			local spot = root.Position
 				+ forward * (6 + i * 0.5)
 				+ Vector3.new(rng:NextNumber(-4, 4), 0, rng:NextNumber(-4, 4))
-			local groundY = if spot.Z < 0 then 1 else Beach.groundY(spot.Z)
+			local groundY = if spot.Z < 0 then 1 else Beach.groundAt(spot.X, spot.Z)
 			ItemService.spawnAt(def, zone, Vector3.new(spot.X, groundY + def.Size.Y / 2, spot.Z))
 		end
 		return { string.format("Spawned %d item(s) with zone %d value", count, zone) }
@@ -479,12 +479,12 @@ command(
 			destination = Showroom.Entrance
 		elseif where == "sandbar" or where == "tower" then
 			local z = Config.Beach.FarSandbar.DoorZ - 6
-			destination = Vector3.new(0, Beach.groundY(z) + 4, z)
+			destination = Vector3.new(0, Beach.groundAt(0, z) + 4, z)
 		elseif tonumber(where) then
 			local zone = math.clamp(math.floor(tonumber(where) :: number), 1, Config.Beach.ActiveZones)
 			local startZ = Beach.zoneRange(zone)
 			local z = startZ + 10
-			destination = Vector3.new(0, Beach.groundY(z) + 4, z)
+			destination = Vector3.new(0, Beach.groundAt(0, z) + 4, z)
 		elseif where ~= "" then
 			local targets, err = findPlayers(caller, where)
 			local root = targets[1] and rootOf(targets[1])

@@ -30,7 +30,8 @@ local function drag(item: BasePart, size: number)
 	local dx = rng:NextNumber(-0.5, 0.5) * distance
 	local from = item.Position
 	local toZ = from.Z + dz
-	local target = item.CFrame + Vector3.new(dx, Beach.groundY(toZ) - Beach.groundY(from.Z), dz)
+	local target = item.CFrame
+		+ Vector3.new(dx, Beach.groundAt(from.X + dx, toZ) - Beach.groundAt(from.X, from.Z), dz)
 	local tween = TweenService:Create(
 		item,
 		TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),

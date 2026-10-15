@@ -100,6 +100,10 @@ local stubs = {
 			return true
 		end,
 	},
+	Terrain = {
+		WriteVoxels = function() end,
+		SetMaterialColor = function() end,
+	},
 	PhysicsService = {
 		RegisterCollisionGroup = function() end,
 		CollisionGroupSetCollidable = function() end,

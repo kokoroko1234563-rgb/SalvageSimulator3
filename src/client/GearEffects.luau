@@ -1,5 +1,5 @@
 -- Gear effects that only matter to the wearer, so they run on their own client:
---   * Lantern of Clear Sight (ClearSight): the haze is pushed further away.
+--   * (The Lantern of Clear Sight's longer sight is in MistController, which owns the haze.)
 --   * Prism Lens (RevealRare): rare and unlock items nearby shine through anything.
 --   * Freeze Wand (a tool with Freeze): press F, or the on-screen button, to freeze the waves
 --     around you for a few seconds, on a cooldown. It stops the waves pushing you, what you
@@ -8,7 +8,6 @@
 -- Foghorn's earlier warning from Gear directly.
 
 local CollectionService = game:GetService("CollectionService")
-local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -45,29 +44,6 @@ end
 -- Whether waves are frozen at a position right now (the Freeze Wand).
 function GearEffects.isFrozen(position: Vector3): boolean
 	return os.clock() < frozenUntil and (position - frozenAt).Magnitude <= frozenRadius
-end
-
--- Clear sight -----------------------------------------------------------------------------
-
-local baseFog: { start: number, finish: number, density: number? }? = nil
-
-local function applySight()
-	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
-	if not baseFog then
-		baseFog = {
-			start = Lighting.FogStart,
-			finish = Lighting.FogEnd,
-			density = if atmosphere then atmosphere.Density else nil,
-		}
-	end
-	local base = baseFog :: any
-	local worn = wornAccessory()
-	local factor = if worn and worn.ClearSight then worn.ClearSight else 1
-	Lighting.FogStart = base.start * factor
-	Lighting.FogEnd = base.finish * factor
-	if atmosphere and base.density then
-		atmosphere.Density = base.density / factor
-	end
 end
 
 -- Prism Lens ------------------------------------------------------------------------------
@@ -199,9 +175,6 @@ function GearEffects.init()
 			freeze()
 		end
 	end)
-
-	player:GetAttributeChangedSignal("Accessory"):Connect(applySight)
-	applySight()
 
 	local elapsed = 0
 	RunService.Heartbeat:Connect(function(dt)

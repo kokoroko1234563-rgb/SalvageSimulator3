@@ -47,7 +47,8 @@ local function bandSpot(zone: number, rng: Random, minZ: number?): Vector3
 	end
 	local half = Beach.HalfWidth - 30
 	local z = rng:NextNumber(low, math.max(high, low))
-	return Vector3.new(rng:NextNumber(-half, half), Beach.groundY(z), z)
+	local x = rng:NextNumber(-half, half)
+	return Vector3.new(x, Beach.groundAt(x, z), z)
 end
 
 -- A spot on the sea floor that's always under water, whatever the tide.
@@ -56,7 +57,8 @@ local function seaSpot(rng: Random, height: number): Vector3
 	local zMax = Beach.Depth + beach.SeaExtent - 12
 	local z = rng:NextNumber(math.max(minZ, Beach.Depth + 20), zMax)
 	local half = Beach.HalfWidth - 30
-	return Vector3.new(rng:NextNumber(-half, half), Beach.groundY(z), z)
+	local x = rng:NextNumber(-half, half)
+	return Vector3.new(x, Beach.groundAt(x, z), z)
 end
 
 -- A spot inside a biome's plot, away from the middle where its big structures stand.
@@ -131,7 +133,8 @@ function Cosmetics.build(map: Instance): { Models: number, Textures: number }
 			elseif kind.Range then
 				local z = rng:NextNumber(kind.Range[1], kind.Range[2])
 				local half = Beach.HalfWidth - 30
-				position = Vector3.new(rng:NextNumber(-half, half), Beach.groundY(z), z)
+				local x = rng:NextNumber(-half, half)
+				position = Vector3.new(x, Beach.groundAt(x, z), z)
 			else
 				position = bandSpot(ZONE_OF_THEME[kind.Theme], rng)
 			end

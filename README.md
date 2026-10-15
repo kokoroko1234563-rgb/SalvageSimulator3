@@ -141,6 +141,20 @@ All of this is computed from the shared clock, so the server and every client ag
 - **Admin:** `waves seed` picks a new seed, and `waves seed <n>` sets one, to replay a pattern.
 - **Validator:** it checks that a section's delay plus the shuffle stays shorter than the low-tide hold.
 
+**The beach's shape** (`Config.Beach.Terrain`, `TerrainBuilder`): the beach and seabed are smooth Terrain.
+- **Zone 1** stays a gentle even slope.
+- **Further out:** each zone has ridges across the beach with troughs between them: low dune ridges in zone 2, taller ones in zone 3, and big ridges and rock spines in zone 4.
+  - The ridges wander and have gaps to find your way through.
+  - From the top you can't see down into the lower zones, and the way back is slow.
+- **The sandbar** stays flat.
+- **Water:**
+  - Troughs below the sea level flood before the main waterline reaches them, so low ground behind you can fill as the tide comes in.
+  - Run-ups stop against ridges unless a wave climbs over them, and ridges standing out of the water shelter the sea behind them.
+- **Tuning:** per zone, set how many ridges, their height and width, how deep the troughs are, and above what height a ridge is rock.
+- **Placement:** everything placed on the beach uses `Beach.groundAt(x, z)`, the slope plus this shape. That includes items, props, cosmetics, biome decor and traders.
+
+**Sea mist** (`Config.Mist`, `MistController`): the haze thickens the further out you are. It's a light haze at the shop and thick on the sandbar, and it blends across zone edges. The Lantern of Clear Sight thins it.
+
 **Things the water reacts to** (`WaterObstacles`, `Config.Water`): tag a part `WaterObstacle` and give it a `Water` attribute (or call `WaterObstacles.mark(part, kind)` from code).
 - **`Solid`** (the default): the water can't pass through it.
   - **Run-up:** the run-up stops against it unless the wave climbs higher than its top, so a big wave overtops a low sandbank and a small one stops at it.
@@ -380,11 +394,11 @@ Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down 
    +--------------------------+   Z < 0: shop house, buyer, sell pad, bank house
    |  shop   sell   vessels   |
  ==+==========================+== Z = 0: top of the beach
-   |  zone 1  Shopside Shore  |   the sand slopes gently down toward +Z
+   |  zone 1  Shopside Shore  |   Z = 0-150, a gentle even slope toward +Z
    |..........................|   <- waterline at high tide (Z = 60)
-   |  zone 2  Sunny Stretch   |
-   |                          |
-   |  zone 3  Middle Banks    |
+   |  zone 2  Sunny Stretch   |   Z = 150-300, low dune ridges
+   |  zone 3  Middle Banks    |   Z = 300-450, taller ridges and troughs
+   |  zone 4  Outer Shore     |   Z = 450-600, big ridges and rock spines
    |~~~~~~ deep channel ~~~~~~|   Z = 600 to 640
    |  zone 5  Far Sandbar     |   bell tower door at Z = 680
    |..........................|   <- waterline at low tide (Z = 700)
@@ -394,7 +408,8 @@ Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down 
 ```
 
 The shoreline runs along X (720 studs wide, between two rocky headlands). The zones are
-200-stud bands running out to sea along +Z. The sand slopes down 0.06 studs per stud, so
+150-stud bands running out to sea along +Z. The sand slopes down 0.06 studs per stud, plus
+the ridges and troughs of the terrain, so
 the tide is simply the sea level rising and falling: as it drops, the waterline moves out
 and uncovers the richer zones. Items wash up in the surf around the current waterline, and
 their zone (value and rarity) depends on where they land. Water depth sets the bands:

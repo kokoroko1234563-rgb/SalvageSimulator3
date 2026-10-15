@@ -21,8 +21,8 @@ Config.Admins = {
 -- furthest out, only uncovered at low tide.
 Config.Beach = {
 	Width = 720, -- studs along the shoreline
-	ZoneLength = 200, -- studs each zone runs out to sea
-	ActiveZones = 3, -- test build only uses the first 3 zones
+	ZoneLength = 150, -- studs each zone runs out to sea
+	ActiveZones = 4, -- zones 1-4, then the Far Sandbar's channel
 	ShopDepth = 80, -- dry ground behind Z = 0 for the shop and boardwalk
 	Slope = 0.06, -- studs of drop per stud out to sea
 	SeaExtent = 300, -- seabed continues this far past the last zone
@@ -33,6 +33,25 @@ Config.Beach = {
 		Start = 300, -- studs away where the haze starts
 		End = 950, -- studs away where it's fully opaque
 		Color = Color3.fromRGB(196, 226, 250), -- the colour of the sky at the horizon
+	},
+
+	-- The shape of the ground (built as smooth Terrain, see TerrainBuilder). On top of the
+	-- even slope, each zone gets ridges across the beach with troughs between them: gentle near
+	-- the shop, rougher further out, so the lower zones are hidden from the top and slow to
+	-- cross. Ridges have gaps (where the noise is low) to find your way through; troughs below
+	-- the sea level flood before the waterline reaches them. Per zone (1-5):
+	--   Ridges = how many, Height/Width = studs, Trough = how deep the dips between them are,
+	--   Rock = ridges taller than this many studs are rock spines rather than sand.
+	Terrain = {
+		Voxel = 4, -- smooth Terrain resolution
+		EdgeFade = 30, -- the shape fades out over this many studs at the sides of the beach
+		Zones = {
+			{ Ridges = 0, Height = 0, Width = 0, Trough = 0 },
+			{ Ridges = 2, Height = 2.5, Width = 12, Trough = 1 },
+			{ Ridges = 3, Height = 4.5, Width = 14, Trough = 2 },
+			{ Ridges = 3, Height = 7, Width = 16, Trough = 3, Rock = 5 },
+			{ Ridges = 0, Height = 0, Width = 0, Trough = 0 }, -- the sandbar stays walkable
+		},
 	},
 
 	-- Rock pools: rings of rock that hold water after the sea leaves (a fixed level, Depth
@@ -173,7 +192,7 @@ Config.Waves = {
 	RogueChance = 0.03, -- and this fraction of waves are rogue waves...
 	RogueSize = 3, -- ...this much bigger. The admin console can send one (wave rogue).
 	-- Waves get bigger further out: by zone (where the water reaches), 1 = normal.
-	ZoneScale = { 1, 1, 1.15, 1.3, 1.7 },
+	ZoneScale = { 1, 1.15, 1.35, 1.65, 2 },
 
 	-- Unclaimed items near the waterline get moved by the swash: after each wave, items it
 	-- reached may be dragged a little (mostly seaward, sometimes up the beach).
@@ -198,11 +217,22 @@ Config.Waves = {
 	MinPushFraction = 0.3, -- future stat stacking can never reduce waves below this
 }
 
+-- Sea mist: the haze thickens the further out you are, so the lower zones feel closed in and
+-- you can't see far ahead (or back). Atmosphere density by zone (shop, then zones 1-5); it
+-- blends smoothly across zone edges. The Lantern of Clear Sight divides it.
+Config.Mist = {
+	Shop = 0.2,
+	Zones = { 0.24, 0.32, 0.42, 0.55, 0.68 },
+	Blend = 40, -- studs over which one zone's mist blends into the next
+	Response = 0.8, -- how quickly the mist follows you (per second)
+}
+
 -- How the water treats objects on the beach (WaterObstacles).
 Config.Water = {
 	Bucket = 16, -- studs along X per lookup bucket
 	Step = 1, -- studs between samples when the run-up looks for something in its way
 	ShelterRange = 40, -- solid things up to this far out to sea shelter what's behind them
+	ShelterStep = 3, -- studs between samples when looking for shelter
 	ShelterHeight = 0.3, -- they shelter only where they stand at least this far out of the water
 	ShelterFactor = 0.15, -- waves push this much behind shelter
 }

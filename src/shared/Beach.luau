@@ -54,6 +54,59 @@ function Beach.groundY(z: number): number
 	return -z * beach.Slope
 end
 
+-- The ground's shape on top of the even slope (ridges and troughs, Config.Beach.Terrain):
+-- studs up (positive) or down (negative) at a point. 0 near the shop, in the channel and on the
+-- sandbar, at the very sides of the beach, and around rock pools.
+local shape = beach.Terrain
+local function bump(t: number): number
+	if t <= -1 or t >= 1 then
+		return 0
+	end
+	local u = 1 - t * t
+	return u * u
+end
+
+function Beach.feature(x: number, z: number): number
+	local zone = Beach.zoneAt(z)
+	local spec = zone and zone > 0 and shape.Zones[zone]
+	if not spec or spec.Ridges == 0 then
+		return 0
+	end
+	local z0, z1 = Beach.zoneRange(zone)
+	local spacing = (z1 - z0) / spec.Ridges
+	local height = 0
+	for i = 1, spec.Ridges do
+		local salt = zone * 10 + i
+		-- The ridge's line wanders, and it has gaps where the noise is low.
+		local center = z0 + spacing * (i - 0.5) + 10 * math.noise(x / 90, salt * 1.7, 0.5)
+		local gap = math.clamp((math.noise(x / 70, salt * 2.3, 1.5) + 0.15) * 4, 0, 1)
+		height += spec.Height * gap * bump((z - center) / (spec.Width / 2))
+		-- A trough on the landward side of each ridge.
+		local trough = center - spacing / 2
+		height -= spec.Trough * bump((z - trough) / (spacing * 0.35))
+	end
+	-- Fade out at the sides of the beach (the cliffs stand there) and around rock pools.
+	local edge = math.clamp((Beach.HalfWidth - math.abs(x)) / shape.EdgeFade, 0, 1)
+	height *= edge
+	for _, pool in Beach.Pools or {} do
+		local d = math.sqrt((x - pool.X) ^ 2 + (z - pool.Z) ^ 2)
+		height *= math.clamp((d - pool.Radius) / 8, 0, 1)
+	end
+	return height
+end
+
+-- The real ground height at a point: the slope plus its shape.
+function Beach.groundAt(x: number, z: number): number
+	return Beach.groundY(z) + Beach.feature(x, z)
+end
+
+-- Whether the ground has any shape near this Z (a quick check before scanning it).
+function Beach.isRough(z: number): boolean
+	local zone = Beach.zoneAt(z)
+	local spec = zone and zone > 0 and shape.Zones[zone]
+	return spec ~= nil and spec ~= false and spec.Ridges > 0
+end
+
 -- Height of the sea surface for a waterline position.
 function Beach.waterY(waterline: number): number
 	return -waterline * beach.Slope
@@ -100,12 +153,12 @@ end
 
 -- How deep the water is over the ground at a position (0 or less on dry sand).
 function Beach.depthAt(position: Vector3, sea: Sea): number
-	return Beach.surfaceY(position, sea) - Beach.groundY(position.Z)
+	return Beach.surfaceY(position, sea) - Beach.groundAt(position.X, position.Z)
 end
 
 -- How deep the sea alone is (rock pools never drown anyone or swallow anything).
 function Beach.seaDepthAt(position: Vector3, sea: Sea): number
-	return Beach.waterYAt(sea, position.X) - Beach.groundY(position.Z)
+	return Beach.waterYAt(sea, position.X) - Beach.groundAt(position.X, position.Z)
 end
 
 function Beach.depthBand(position: Vector3, sea: Sea): number

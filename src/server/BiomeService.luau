@@ -46,7 +46,7 @@ function decorBuilders.Sandcastle(zoneFolder: Folder, biome, startZ: number, end
 		local x = rng:NextNumber(-Beach.HalfWidth + 15, Beach.HalfWidth - 15)
 		local z = rng:NextNumber(startZ + 10, endZ - 10)
 		local size = rng:NextNumber(2, 4)
-		local groundY = Beach.groundY(z)
+		local groundY = Beach.groundAt(x, z)
 		makePart({
 			Name = "Sandcastle",
 			Size = Vector3.new(size, size, size),
@@ -78,7 +78,7 @@ function decorBuilders.Wreck(zoneFolder: Folder, biome, startZ: number, endZ: nu
 		makePart({
 			Name = "Plank",
 			Size = Vector3.new(length, 0.5, 1.2),
-			CFrame = CFrame.new(x, Beach.groundY(z) + 0.2, z)
+			CFrame = CFrame.new(x, Beach.groundAt(x, z) + 0.2, z)
 				* CFrame.Angles(math.rad(rng:NextNumber(-12, 12)), rng:NextNumber() * math.pi, 0),
 			Color = biome.Decor,
 			Material = Palette.Material.WoodPlanks,
@@ -155,7 +155,7 @@ local function buildEntrance(zoneFolder: Folder, biome, zone: number)
 	local startZ = Beach.zoneRange(zone)
 	local x = biome.EntranceSpots[rng:NextInteger(1, #biome.EntranceSpots)]
 	local z = startZ + 30
-	local groundY = Beach.groundY(z)
+	local groundY = Beach.groundAt(x, z)
 	local model = Instance.new("Model")
 	model.Name = "SecretEntrance"
 	local door = entranceBuilders[biome.Entrance](model, biome, x, z, groundY)
@@ -190,11 +190,10 @@ local function rollBarrel(zoneFolder: Folder, zone: number)
 		Name = "RollingBarrel",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(3, 2.6, 2.6), -- axis along X so it rolls toward the sea
-		CFrame = CFrame.new(
-			rng:NextNumber(-Beach.HalfWidth + 20, Beach.HalfWidth - 20),
-			Beach.groundY(fromZ) + 1.5,
-			fromZ
-		),
+		CFrame = (function()
+			local x = rng:NextNumber(-Beach.HalfWidth + 20, Beach.HalfWidth - 20)
+			return CFrame.new(x, Beach.groundAt(x, fromZ) + 1.5, fromZ)
+		end)(),
 		Color = Color3.fromRGB(120, 80, 45),
 		Material = Palette.Material.Wood,
 		Anchored = false,
