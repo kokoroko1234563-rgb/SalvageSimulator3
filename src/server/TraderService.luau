@@ -208,7 +208,8 @@ function TraderService.spawn(trader, zone: number, parent: Instance): Model
 	-- The trader is a real Roblox character, standing behind the stall.
 	local avatar = Buildings.person(model, "Trader", CFrame.new(x, groundY, z), Palette.World.TraderCoat)
 	model.PrimaryPart = avatar.PrimaryPart :: BasePart
-	MapParts.sign(model, trader.Name, CFrame.new(x, groundY + 3.6, z - 4.5), 6, 1.6)
+	-- The name board stands on the stall's counter (2.4 high, centred 3 studs in front).
+	MapParts.sign(model, trader.Name, CFrame.new(x, groundY + 2.4 + 0.8, z - 3), 6, 1.6)
 
 	local encounterId = HttpService:GenerateGUID(false)
 	model:SetAttribute("EncounterId", encounterId)

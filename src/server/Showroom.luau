@@ -118,23 +118,15 @@ local function buildSection(room: Folder, section: Section, frontZ: number): num
 
 	-- The section's title, across the aisle at its start.
 	local titleZ = frontZ - 4
+	-- One sign on a post (no boards floating on their own): the name, and the description under it.
 	MapParts.sign(
 		folder,
-		section.Name,
+		if section.Description then section.Name .. "\n" .. section.Description else section.Name,
 		CFrame.new(cfg.Origin.X, 9, titleZ),
 		math.min(cfg.RowWidth * 0.5, 60),
-		5,
+		if section.Description then 7 else 5,
 		0
 	)
-	if section.Description then
-		MapParts.sign(
-			folder,
-			section.Description,
-			CFrame.new(cfg.Origin.X, 4.5, titleZ),
-			math.min(cfg.RowWidth * 0.6, 80),
-			2
-		)
-	end
 	Showroom.Sections[section.Name:lower()] = Vector3.new(cfg.Origin.X, 4, frontZ + 4)
 
 	-- Rows of exhibits, filling toward -Z.

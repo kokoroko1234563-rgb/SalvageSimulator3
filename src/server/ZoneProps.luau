@@ -105,11 +105,19 @@ local function hut(parent: Instance, base: Vector3, yaw: number, wall: Color3, r
 end
 
 -- A long low sandbank running along X at a given Z.
+-- It's a long cylinder lying along X, sunk into the sand so only a low rounded cap shows:
+-- `width` across the cap, at most SANDBANK_MAX_HEIGHT tall. It's scenery you wade through, so
+-- it stays low (a tall flat-topped box here looked like a wall you could walk through).
+local SANDBANK_MAX_HEIGHT = 1.2
 local function sandbank(parent: Instance, x0: number, x1: number, z: number, height: number, width: number)
+	local h = math.min(height, SANDBANK_MAX_HEIGHT)
+	local half = width / 2
+	local radius = (half * half + h * h) / (2 * h) -- the circle through the cap's edges and top
 	add(parent, {
 		Name = "Sandbank",
-		Size = Vector3.new(x1 - x0, height, width),
-		CFrame = CFrame.new((x0 + x1) / 2, Beach.groundY(z) + height / 2, z),
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(x1 - x0, radius * 2, radius * 2),
+		CFrame = CFrame.new((x0 + x1) / 2, Beach.groundY(z) + h - radius, z),
 		Color = Z.Ridge,
 		Material = Palette.Material.Sand,
 	})
