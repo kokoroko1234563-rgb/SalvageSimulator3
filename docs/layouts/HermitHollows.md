@@ -1,6 +1,6 @@
 # Hermit Hollows (planned, draft)
 
-Draft, not in use. A maze of rock walls 12 studs wide, five walls with alternating gaps and two dead ends. The cart ramps run outside it. Its foot shortcuts are weak (0 to 1 of 5), so the maze is hard to cross on foot from the top.
+Draft, not in use. A maze of rock walls about 12 studs wide, with alternating gaps and dead ends, between the cart ramps. The bank across the zone is the foot shortcut, and the ramps still go round the outside.
 
 ## Maps
 
@@ -106,4 +106,4 @@ Shortcut starts counts how many of five start points on the top edge reach the s
 
 ## What a player sees from the top
 
-Not measured for sightlines yet; it is a draft.
+The bank across each zone is the main shape from the top: zone 1 stays open, and zones 2 to 4 hide most of the lower half. The maze, pools and channels show as strips and gaps where the bank breaks.

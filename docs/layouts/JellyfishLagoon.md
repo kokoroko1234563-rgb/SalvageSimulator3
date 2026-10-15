@@ -1,6 +1,6 @@
 # Jellyfish Lagoon (planned, draft)
 
-Draft, not in use. One big lagoon hollow ringed by a bank with causeway gaps. Its shortcuts are weak in every zone (0 of 5), so the causeways need widening before it is used.
+Draft, not in use. One big lagoon hollow, ringed by a bank with causeway gaps, behind a bank across the zone.
 
 ## Maps
 
@@ -97,7 +97,7 @@ Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 261
 Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 411
 <!-- /floods -->
 <!-- floods Biomes/Planned/JellyfishLagoon@4 -->
-Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 561
+Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 539
 <!-- /floods -->
 
 ## Shortcuts
@@ -106,4 +106,4 @@ Shortcut starts counts how many of five start points on the top edge reach the s
 
 ## What a player sees from the top
 
-Not measured for sightlines yet; it is a draft.
+The bank across each zone is the main shape from the top: zone 1 stays open, and zones 2 to 4 hide most of the lower half. The maze, pools and channels show as strips and gaps where the bank breaks.

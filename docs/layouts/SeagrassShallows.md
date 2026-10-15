@@ -1,6 +1,6 @@
 # Seagrass Shallows (planned, draft)
 
-Draft, not in use. Low flats cut by two channels and two hollows that flood early as the tide turns.
+Draft, not in use. Low flats cut by two channels and two hollows that flood early as the tide turns, behind a bank across the zone.
 
 ## Maps
 
@@ -106,10 +106,10 @@ Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 379
 Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 373
 <!-- /floods -->
 <!-- floods Biomes/Planned/SeagrassShallows@4 -->
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 559
 Channel at x -60, z 104: the sea reaches it when the waterline is below Z 559
 Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 529
 Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 523
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 479
 <!-- /floods -->
 
 ## Shortcuts
@@ -118,4 +118,4 @@ Shortcut starts counts how many of five start points on the top edge reach the s
 
 ## What a player sees from the top
 
-Not measured for sightlines yet; it is a draft.
+The bank across each zone is the main shape from the top: zone 1 stays open, and zones 2 to 4 hide most of the lower half. The maze, pools and channels show as strips and gaps where the bank breaks.

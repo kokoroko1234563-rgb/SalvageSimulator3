@@ -1,6 +1,6 @@
 # Coral Garden (planned, draft)
 
-Draft, not in use. Pairs of reef spines leave arches to walk through. Zone 1 and 2 versions are short so they don't hide the view.
+Draft, not in use. Pairs of reef spines leave arches to walk through, behind a bank across the zone.
 
 ## Maps
 
@@ -92,12 +92,12 @@ Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 107
 Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 107
 <!-- /floods -->
 <!-- floods Biomes/Planned/CoralGarden@2 -->
-Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 257
-Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 257
+Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 233
+Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 210
 <!-- /floods -->
 <!-- floods Biomes/Planned/CoralGarden@3 -->
-Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 407
-Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 407
+Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 383
+Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 360
 <!-- /floods -->
 <!-- floods Biomes/Planned/CoralGarden@4 -->
 Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 557
@@ -110,4 +110,4 @@ Shortcut starts counts how many of five start points on the top edge reach the s
 
 ## What a player sees from the top
 
-Not measured for sightlines yet; it is a draft.
+The bank across each zone is the main shape from the top: zone 1 stays open, and zones 2 to 4 hide most of the lower half. The maze, pools and channels show as strips and gaps where the bank breaks.

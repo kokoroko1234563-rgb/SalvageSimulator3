@@ -1602,5 +1602,71 @@ test("the rock pools keep their ground, so nothing is cut or raised through them
 	assert(#problems == 0, table.concat(problems, "; "))
 end)
 
+test("each planned draft reaches the sea, has shortcuts, and keeps the sightline rule", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Biomes = h.require("Shared/Biomes")
+	local Layouts = h.require("Shared/Layouts")
+	local cfg = Config.Beach.Terrain
+	local grid = layoutGrid()
+	local problems = {}
+	for zone = 1, Config.Beach.ActiveZones do
+		for id in Biomes.Planned do
+			if Layouts.forPlanned(id, zone) then
+				-- This zone takes the draft; every other zone keeps its base layout.
+				Layouts.setActive(zone, id)
+				local option = { name = id, heights = {} }
+				for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
+					if grid.zoneOfRow[iz] == zone then
+						for ix = -LAYOUT_COLS, LAYOUT_COLS do
+							option.heights[layoutKey(ix, iz)] =
+								Beach.groundAt(ix * LAYOUT_GRID, iz * LAYOUT_GRID)
+						end
+					end
+				end
+				local hidden = layoutHidden(zone)
+				Layouts.setActive(zone, nil)
+				local label = id .. " (zone " .. zone .. ")"
+				local byZone = { options = {}, zoneOfRow = grid.zoneOfRow, shop = grid.shop }
+				local choice = {}
+				for other = 1, Config.Beach.ActiveZones do
+					byZone.options[other] = if other == zone then { option } else { grid.options[other][1] }
+					choice[other] = 1
+				end
+				if not layoutReaches(layoutFlood(byZone, choice, cfg.CartSlope), 0, 592) then
+					table.insert(problems, label .. ": a cart can't reach the sea")
+				end
+				if not layoutReaches(layoutFlood(byZone, choice, cfg.FootSlope), 0, 592) then
+					table.insert(problems, label .. ": a player on foot can't reach the sea")
+				end
+				local count = 0
+				for _, x in { -300, -150, 0, 150, 300 } do
+					local startIx = math.floor(x / LAYOUT_GRID)
+					local cart = layoutRoute(byZone, zone, option, startIx, cfg.CartSlope)
+					local foot = layoutRoute(byZone, zone, option, startIx, cfg.FootSlope)
+					if foot and (cart == nil or foot < cart) then
+						count += 1
+					end
+				end
+				if count < 2 then
+					table.insert(problems, label .. ": only " .. count .. " shortcut starts of 5")
+				end
+				if zone == 1 and hidden > 0.2 then
+					table.insert(
+						problems,
+						label .. ": hides " .. math.floor(hidden * 100) .. "% from the top"
+					)
+				elseif zone > 1 and hidden < 0.6 then
+					table.insert(
+						problems,
+						label .. ": hides only " .. math.floor(hidden * 100) .. "% from the top"
+					)
+				end
+			end
+		end
+	end
+	assert(#problems == 0, table.concat(problems, "; "))
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)

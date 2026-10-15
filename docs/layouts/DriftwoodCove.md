@@ -1,6 +1,6 @@
 # Driftwood Cove (planned, draft)
 
-Draft, not in use. A log jam: ridges piled across the zone, each with a gap, and a dip behind them. Its zone 4 version gives players on foot no shortcut (0 of 5 starts), so it needs gaps before it is used.
+Draft, not in use. A log jam: stretches of logs piled behind a bank across the zone, with a gap between each stretch and a dip where the logs catch the water.
 
 ## Maps
 
@@ -88,16 +88,16 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
 
 <!-- floods Biomes/Planned/DriftwoodCove@1 -->
-Hollow at x -80, z 90: the sea reaches it when the waterline is below Z 99
+Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 129
 <!-- /floods -->
 <!-- floods Biomes/Planned/DriftwoodCove@2 -->
-Hollow at x -80, z 90: the sea reaches it when the waterline is below Z 249
+Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 279
 <!-- /floods -->
 <!-- floods Biomes/Planned/DriftwoodCove@3 -->
-Hollow at x -80, z 90: the sea reaches it when the waterline is below Z 399
+Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 429
 <!-- /floods -->
 <!-- floods Biomes/Planned/DriftwoodCove@4 -->
-Hollow at x -80, z 90: the sea reaches it when the waterline is below Z 549
+Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 579
 <!-- /floods -->
 
 ## Shortcuts
@@ -106,4 +106,4 @@ Shortcut starts counts how many of five start points on the top edge reach the s
 
 ## What a player sees from the top
 
-Not measured for sightlines yet; it is a draft.
+The bank across each zone is the main shape from the top: zone 1 stays open, and zones 2 to 4 hide most of the lower half. The maze, pools and channels show as strips and gaps where the bank breaks.
