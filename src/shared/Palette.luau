@@ -192,6 +192,43 @@ Palette.Biome = {
 	WhirlSand = rgb(215, 190, 140),
 }
 
+-- Colours for the small cosmetic props and the fish (see CosmeticModels and Fish). Variants of
+-- a prop name their colours from here.
+Palette.Cosmetic = {
+	Red = rgb(235, 70, 70),
+	Orange = rgb(255, 150, 60),
+	Yellow = rgb(250, 210, 70),
+	Green = rgb(90, 190, 100),
+	Teal = rgb(60, 185, 185),
+	Blue = rgb(70, 140, 230),
+	Purple = rgb(160, 110, 220),
+	Pink = rgb(255, 140, 190),
+	White = rgb(248, 248, 244),
+	Cream = rgb(245, 235, 210),
+	Brown = rgb(120, 85, 55),
+	Grey = rgb(150, 150, 155),
+	DarkGrey = rgb(80, 80, 88),
+	Gold = rgb(235, 190, 70),
+	Silver = rgb(205, 210, 215),
+	Navy = rgb(40, 60, 110),
+	Lime = rgb(170, 225, 90),
+	Coral = rgb(255, 120, 110),
+	Aqua = rgb(120, 225, 230),
+	Mint = rgb(170, 235, 200),
+	Rust = rgb(170, 90, 60),
+	Ink = rgb(35, 35, 45),
+	Terracotta = rgb(200, 110, 75),
+	Olive = rgb(120, 140, 70),
+	Peach = rgb(255, 200, 160),
+	Bone = rgb(232, 224, 205),
+	Moss = rgb(80, 130, 70),
+	Verdigris = rgb(90, 160, 140),
+	Lavender = rgb(200, 180, 240),
+	Magenta = rgb(220, 70, 160),
+	Sand = rgb(236, 215, 160),
+	Stone = rgb(170, 165, 155),
+}
+
 Palette.Material = {
 	Sand = Enum.Material.Sand,
 	Wood = Enum.Material.Wood,

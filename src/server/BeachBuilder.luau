@@ -16,6 +16,8 @@ local BeachDressing = require(script.Parent.BeachDressing)
 local Buildings = require(script.Parent.Buildings)
 local MapParts = require(script.Parent.MapParts)
 local BiomeModels = require(script.Parent.BiomeModels)
+local Cosmetics = require(script.Parent.Cosmetics)
+local MapEdge = require(script.Parent.MapEdge)
 local ZoneProps = require(script.Parent.ZoneProps)
 
 local beach = Config.Beach
@@ -24,7 +26,6 @@ local BeachBuilder = {}
 
 local SAND = Palette.World.Sand
 local WET_SAND = Palette.World.WetSand
-local ROCK = Palette.World.Rock
 
 -- Where the shop buildings stand, on the dry sand behind the shoreline.
 local HOUSE_Z = -50
@@ -232,14 +233,7 @@ local function buildShop(map: Folder)
 		CFrame.new(BUYER_X, 0, SELL_PAD.Z) * CFrame.Angles(0, -math.pi / 2, 0),
 		Palette.World.Buyer
 	)
-	MapParts.sign(
-		shop,
-		"BUYER",
-		CFrame.new(BUYER_X - 4, 5, SELL_PAD.Z - 10),
-		12,
-		2.4,
-		0
-	)
+	MapParts.sign(shop, "BUYER", CFrame.new(BUYER_X - 4, 5, SELL_PAD.Z - 10), 12, 2.4, 0)
 	local buyerPrompt = Instance.new("ProximityPrompt")
 	buyerPrompt.Name = "BuyerPrompt"
 	buyerPrompt.ActionText = "Sell"
@@ -386,15 +380,16 @@ function BeachBuilder.build(): Folder
 	buildSandPatches(map)
 	buildSea(map)
 
-	-- Rocky headlands on both sides, pushed out and kept low so the cove reads as open.
+	-- What keeps players in at the sides: an invisible barrier. The rocky coast you actually see
+	-- is MapEdge's scenery, which is built outside it.
 	for side = -1, 1, 2 do
 		local length = seaEnd + beach.ShopDepth + 40
 		MapParts.part({
-			Name = "Headland",
+			Name = "EdgeBarrier",
 			Size = Vector3.new(80, 70, length),
 			CFrame = CFrame.new(side * (half + 60), -25, -beach.ShopDepth - 40 + length / 2),
-			Color = ROCK,
-			Material = Palette.Material.Rock,
+			Transparency = 1,
+			CanQuery = false,
 		}).Parent =
 			map
 	end
@@ -404,6 +399,8 @@ function BeachBuilder.build(): Folder
 	BeachDressing.build(map, Random.new(7))
 	ZoneProps.build(map)
 	BiomeModels.showcase(map)
+	MapEdge.build(map)
+	Cosmetics.build(map)
 
 	map.Parent = Workspace
 	return map

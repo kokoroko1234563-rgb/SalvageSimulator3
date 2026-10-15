@@ -42,6 +42,7 @@ for _, name in
 		"Waves",
 		"Remotes",
 		"Validate",
+		"Fish",
 	}
 do
 	test("load Shared/" .. name, function()
@@ -62,6 +63,10 @@ test("load server services", function()
 			"MapParts",
 			"ZoneProps",
 			"BiomeModels",
+			"CosmeticModels",
+			"Textures",
+			"Cosmetics",
+			"MapEdge",
 			"ItemService",
 			"GrabService",
 			"ShopService",
@@ -160,6 +165,7 @@ for _, name in
 		"TraderUI",
 		"AuctionUI",
 		"SkyBeamController",
+		"FishController",
 	}
 do
 	test("load Client/" .. name, function()
@@ -381,6 +387,124 @@ test("auction: a rebirth cancels and refunds the bid first", function()
 	AuctionService._resolve(AuctionService._lotIndex())
 	AuctionService._collect(c :: any)
 	assert(pc.Coins == 60000 and next(pc.Items) == nil, "a cancelled bid can't win or be refunded twice")
+end)
+
+-- 10. The cosmetic models, textures and fish. Everything cosmetic must be small, and must never
+-- collide or be queried, so none of it can become part of the active map.
+local CosmeticModels = h.require("Server/CosmeticModels")
+local Textures = h.require("Server/Textures")
+local Cosmetics = h.require("Server/Cosmetics")
+local BiomeModels = h.require("Server/BiomeModels")
+local Fish = h.require("Shared/Fish")
+
+local function fakeRandom()
+	return {
+		NextNumber = function(_, min, max)
+			min, max = min or 0, max or 1
+			return min + math.random() * (max - min)
+		end,
+		NextInteger = function(_, min, max)
+			return math.random(min, max)
+		end,
+	}
+end
+
+-- Checks that everything under `folder` is cosmetic. Returns how many parts there are and how far
+-- up the highest one reaches.
+local function checkCosmetic(folder, label: string): (number, number)
+	local parts, highest = 0, 0
+	for _, part in folder:GetDescendants() do
+		if part:IsA("BasePart") then
+			parts += 1
+			assert(not part.CanCollide, label .. ": " .. part.Name .. " collides")
+			assert(not part.CanQuery, label .. ": " .. part.Name .. " is queryable")
+			highest = math.max(
+				highest,
+				part.CFrame.Position.Y + math.max(part.Size.X, part.Size.Y, part.Size.Z) / 2
+			)
+		end
+	end
+	assert(parts > 0, label .. " built no parts")
+	return parts, highest
+end
+
+test("the cosmetic catalog has about two hundred models", function()
+	assert(#CosmeticModels.List >= 200, "only " .. #CosmeticModels.List .. " cosmetic models")
+	local seen = {}
+	for _, entry in CosmeticModels.List do
+		assert(not seen[entry.Id], "duplicate cosmetic id " .. entry.Id)
+		seen[entry.Id] = true
+		assert(entry.Height <= CosmeticModels.MAX_HEIGHT, entry.Id .. " is taller than a cosmetic may be")
+	end
+end)
+
+test("every cosmetic model builds and is cosmetic", function()
+	local failures = {}
+	for _, entry in CosmeticModels.List do
+		local folder = Harness.wrap(roblox.Instance.new("Folder"))
+		local ok, err = pcall(function()
+			entry.Build(folder, roblox.CFrame.new(0, 0, 0), fakeRandom())
+			local _, highest = checkCosmetic(folder, entry.Id)
+			assert(highest <= CosmeticModels.MAX_HEIGHT + 0.5, entry.Id .. " reaches " .. highest)
+		end)
+		if not ok then
+			table.insert(failures, entry.Id .. ": " .. tostring(err))
+		end
+	end
+	assert(#failures == 0, table.concat(failures, "\n      "))
+end)
+
+test("every cosmetic model belongs to a real theme", function()
+	local themes = {}
+	for _, theme in CosmeticModels.ZoneThemes do
+		themes[theme] = true
+	end
+	for name in BiomeModels.Plots do
+		themes[name] = true
+	end
+	for _, entry in CosmeticModels.List do
+		assert(themes[entry.Theme], entry.Id .. " has no such theme: " .. entry.Theme)
+	end
+end)
+
+test("every texture builds and is cosmetic", function()
+	assert(#Textures.List >= 20, "only " .. #Textures.List .. " textures")
+	local failures = {}
+	for _, kind in Textures.List do
+		local folder = Harness.wrap(roblox.Instance.new("Folder"))
+		local ok, err = pcall(function()
+			kind.Build(folder, roblox.Vector3.new(0, 0, 100), fakeRandom())
+			checkCosmetic(folder, kind.Id)
+		end)
+		if not ok then
+			table.insert(failures, kind.Id .. ": " .. tostring(err))
+		end
+	end
+	assert(#failures == 0, table.concat(failures, "\n      "))
+end)
+
+for _, species in Fish.Species do
+	test("build fish " .. species.Id, function()
+		local model = Fish.build(species)
+		assert(model.PrimaryPart ~= nil, "fish needs a PrimaryPart")
+		checkCosmetic(model, species.Id)
+	end)
+end
+
+test("cosmetics are placed across the map", function()
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	local placed = Cosmetics.build(folder)
+	assert(placed.Models >= 500, "only " .. placed.Models .. " models placed")
+	assert(placed.Textures >= 250, "only " .. placed.Textures .. " textures placed")
+	local parts = checkCosmetic(folder, "placed cosmetics")
+	print(
+		string.format(
+			"[Cosmetics] %d models and %d textures placed, %d parts",
+			placed.Models,
+			placed.Textures,
+			parts
+		)
+	)
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failures))

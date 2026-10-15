@@ -28,7 +28,14 @@ local ball = MapParts.ball
 local column = MapParts.column
 
 -- A block with its own orientation, for the bits that aren't column-shaped.
-local function block(parent: Instance, cf: CFrame, size: Vector3, color: Color3, material: Enum.Material?, transparency: number?)
+local function block(
+	parent: Instance,
+	cf: CFrame,
+	size: Vector3,
+	color: Color3,
+	material: Enum.Material?,
+	transparency: number?
+)
 	return add(parent, {
 		Name = "Block",
 		Size = size,
@@ -40,7 +47,15 @@ local function block(parent: Instance, cf: CFrame, size: Vector3, color: Color3,
 end
 
 -- A flat horizontal disc: a lake, a patch, a vent's rim.
-local function disc(parent: Instance, center: Vector3, diameter: number, thickness: number, color: Color3, material: Enum.Material?, transparency: number?)
+local function disc(
+	parent: Instance,
+	center: Vector3,
+	diameter: number,
+	thickness: number,
+	color: Color3,
+	material: Enum.Material?,
+	transparency: number?
+)
 	return add(parent, {
 		Name = "Disc",
 		Shape = Enum.PartType.Cylinder,
@@ -53,7 +68,16 @@ local function disc(parent: Instance, center: Vector3, diameter: number, thickne
 end
 
 -- A tower that tapers from `d0` at the bottom to `d1` at the top, in `levels` steps.
-local function taper(parent: Instance, base: Vector3, levels: number, d0: number, d1: number, height: number, color: Color3, material: Enum.Material?)
+local function taper(
+	parent: Instance,
+	base: Vector3,
+	levels: number,
+	d0: number,
+	d1: number,
+	height: number,
+	color: Color3,
+	material: Enum.Material?
+)
 	local each = height / levels
 	for i = 0, levels - 1 do
 		local t = i / math.max(levels - 1, 1)
@@ -88,7 +112,12 @@ local function sandcastleFlats(p: Instance, c: Vector3, rng: Random)
 			local top = c + Vector3.new(x, 30.8, z)
 			column(p, c + Vector3.new(x, 0.8, z), 30, 8, B.SandcastleSand, M.Sand)
 			post(p, top, 6, W.Post)
-			block(p, CFrame.new(top + Vector3.new(1.5, 4, 0)), Vector3.new(3, 2, 0.2), Color3.fromHSV(rng:NextNumber(), 0.7, 1))
+			block(
+				p,
+				CFrame.new(top + Vector3.new(1.5, 4, 0)),
+				Vector3.new(3, 2, 0.2),
+				Color3.fromHSV(rng:NextNumber(), 0.7, 1)
+			)
 		end
 	end
 	block(p, CFrame.new(c + Vector3.new(0, 6, -12.2)), Vector3.new(6, 11, 0.6), B.Hollow, M.Wood)
@@ -97,7 +126,13 @@ local function sandcastleFlats(p: Instance, c: Vector3, rng: Random)
 		local x = rng:NextNumber(-34, 34)
 		local z = rng:NextNumber(-34, 34)
 		if math.abs(x) > 16 or math.abs(z) > 16 then
-			block(p, CFrame.new(c + Vector3.new(x, s / 2 + 0.6, z)), Vector3.new(s, s, s), B.SandcastleSand, M.Sand)
+			block(
+				p,
+				CFrame.new(c + Vector3.new(x, s / 2 + 0.6, z)),
+				Vector3.new(s, s, s),
+				B.SandcastleSand,
+				M.Sand
+			)
 		end
 	end
 end
@@ -134,7 +169,8 @@ local function driftwoodCove(p: Instance, c: Vector3, rng: Random)
 			Name = "Bottle",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(2.4, 0.9, 0.9),
-			CFrame = CFrame.new(c + Vector3.new(x, 0.8, z)) * CFrame.Angles(0, rng:NextNumber() * math.pi * 2, 0),
+			CFrame = CFrame.new(c + Vector3.new(x, 0.8, z))
+				* CFrame.Angles(0, rng:NextNumber() * math.pi * 2, 0),
 			Color = B.Bottle,
 			Material = M.Glass,
 			Transparency = 0.2,
@@ -143,7 +179,13 @@ local function driftwoodCove(p: Instance, c: Vector3, rng: Random)
 	for _ = 1, 10 do
 		local x = rng:NextNumber(-36, 36)
 		local z = rng:NextNumber(-36, 36)
-		block(p, CFrame.new(c + Vector3.new(x, 0.5, z)) * CFrame.Angles(0, rng:NextNumber() * math.pi, 0), Vector3.new(8, 0.8, 1.2), W.Driftwood, M.Wood)
+		block(
+			p,
+			CFrame.new(c + Vector3.new(x, 0.5, z)) * CFrame.Angles(0, rng:NextNumber() * math.pi, 0),
+			Vector3.new(8, 0.8, 1.2),
+			W.Driftwood,
+			M.Wood
+		)
 	end
 	block(p, CFrame.new(c + Vector3.new(-30, 1.5, 30)), Vector3.new(3, 3, 5), B.Boot, M.Fabric)
 	block(p, CFrame.new(c + Vector3.new(-25, 1.5, 33)), Vector3.new(3, 3, 5), B.Boot, M.Fabric)
@@ -156,7 +198,9 @@ local function tidepoolRocks(p: Instance, c: Vector3, rng: Random)
 		local d = rng:NextNumber(8, 14)
 		ball(p, c + Vector3.new(math.cos(a) * 32, d * 0.3, -math.sin(a) * 26 - 6), d, Z.RockGrey, M.Rock)
 	end
-	for _, pos in { Vector3.new(-14, 0, 6), Vector3.new(14, 0, 4), Vector3.new(-6, 0, 22), Vector3.new(18, 0, 24) } do
+	for _, pos in
+		{ Vector3.new(-14, 0, 6), Vector3.new(14, 0, 4), Vector3.new(-6, 0, 22), Vector3.new(18, 0, 24) }
+	do
 		disc(p, c + pos + Vector3.new(0, 0.4, 0), 6, 0.3, B.Lagoon, M.Glass, 0.25)
 		for k = 0, 7 do
 			local a = k / 8 * math.pi * 2
@@ -170,7 +214,8 @@ local function tidepoolRocks(p: Instance, c: Vector3, rng: Random)
 		add(p, {
 			Name = "Starfish",
 			Size = Vector3.new(1.2, 0.4, 4),
-			CFrame = CFrame.new(c + Vector3.new(30 + math.cos(a) * 2.4, 0.5, 30 + math.sin(a) * 2.4)) * CFrame.Angles(0, a, 0),
+			CFrame = CFrame.new(c + Vector3.new(30 + math.cos(a) * 2.4, 0.5, 30 + math.sin(a) * 2.4))
+				* CFrame.Angles(0, a, 0),
 			Color = B.Starfish,
 			Material = M.Smooth,
 		})
@@ -179,7 +224,13 @@ end
 
 -- A jetty that has collapsed into the shallows, a line of buoys, seagrass and glass floats.
 local function seagrassShallows(p: Instance, c: Vector3, rng: Random)
-	block(p, CFrame.new(c + Vector3.new(0, 6, 0)) * CFrame.Angles(0, math.rad(35), math.rad(-14)), Vector3.new(60, 1.2, 8), Z.Pier, M.WoodPlanks)
+	block(
+		p,
+		CFrame.new(c + Vector3.new(0, 6, 0)) * CFrame.Angles(0, math.rad(35), math.rad(-14)),
+		Vector3.new(60, 1.2, 8),
+		Z.Pier,
+		M.WoodPlanks
+	)
 	for k = -2, 2 do
 		column(p, c + Vector3.new(k * 12, 0.6, 0), rng:NextNumber(6, 9), 1.8, W.DarkWood, M.Wood)
 	end
@@ -192,7 +243,14 @@ local function seagrassShallows(p: Instance, c: Vector3, rng: Random)
 		local x = rng:NextNumber(-40, 40)
 		local z = rng:NextNumber(-40, 40)
 		local h = rng:NextNumber(3, 6)
-		block(p, CFrame.new(c + Vector3.new(x, h / 2, z)) * CFrame.Angles(rng:NextNumber(-0.2, 0.2), 0, rng:NextNumber(-0.2, 0.2)), Vector3.new(0.4, h, 0.4), B.Seagrass, M.Grass)
+		block(
+			p,
+			CFrame.new(c + Vector3.new(x, h / 2, z))
+				* CFrame.Angles(rng:NextNumber(-0.2, 0.2), 0, rng:NextNumber(-0.2, 0.2)),
+			Vector3.new(0.4, h, 0.4),
+			B.Seagrass,
+			M.Grass
+		)
 	end
 	for _ = 1, 6 do
 		ball(p, c + Vector3.new(rng:NextNumber(-36, 36), 1, rng:NextNumber(-36, 36)), 2, B.Float, M.Glass)
@@ -214,7 +272,10 @@ local function coralGarden(p: Instance, c: Vector3, rng: Random)
 				Name = "Branch",
 				Shape = Enum.PartType.Cylinder,
 				Size = Vector3.new(7, 1.4, 1.4),
-				CFrame = CFrame.new(tip) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(0, 0, math.rad(60)) * CFrame.new(3, 0, 0),
+				CFrame = CFrame.new(tip)
+					* CFrame.Angles(0, yaw, 0)
+					* CFrame.Angles(0, 0, math.rad(60))
+					* CFrame.new(3, 0, 0),
 				Color = color,
 				Material = M.Smooth,
 			})
@@ -230,7 +291,14 @@ local function coralGarden(p: Instance, c: Vector3, rng: Random)
 		ball(p, c + Vector3.new(rng:NextNumber(22, 34), 0.7, rng:NextNumber(22, 34)), 1.4, B.Coconut, M.Wood)
 	end
 	for _ = 1, 3 do
-		column(p, c + Vector3.new(rng:NextNumber(-38, -24), 0, rng:NextNumber(20, 36)), 4, 0.6, B.Snorkel, M.Smooth)
+		column(
+			p,
+			c + Vector3.new(rng:NextNumber(-38, -24), 0, rng:NextNumber(20, 36)),
+			4,
+			0.6,
+			B.Snorkel,
+			M.Smooth
+		)
 	end
 end
 
@@ -239,11 +307,24 @@ end
 -- A hull lying on its side, planks, a broken mast, a hatch, a ship's bell and barrels that
 -- roll down the sand (hazard).
 local function shipwreckShallows(p: Instance, c: Vector3, rng: Random)
-	block(p, CFrame.new(c + Vector3.new(0, 7, 0)) * CFrame.Angles(0, 0, math.rad(18)), Vector3.new(60, 14, 18), W.DarkWood, M.WoodPlanks)
+	block(
+		p,
+		CFrame.new(c + Vector3.new(0, 7, 0)) * CFrame.Angles(0, 0, math.rad(18)),
+		Vector3.new(60, 14, 18),
+		W.DarkWood,
+		M.WoodPlanks
+	)
 	for _ = 1, 10 do
 		local x = rng:NextNumber(-38, 38)
 		local z = rng:NextNumber(-38, 38)
-		block(p, CFrame.new(c + Vector3.new(x, 0.6, z)) * CFrame.Angles(0, rng:NextNumber() * math.pi, rng:NextNumber(-0.3, 0.3)), Vector3.new(10, 0.8, 1.4), W.DarkWood, M.WoodPlanks)
+		block(
+			p,
+			CFrame.new(c + Vector3.new(x, 0.6, z))
+				* CFrame.Angles(0, rng:NextNumber() * math.pi, rng:NextNumber(-0.3, 0.3)),
+			Vector3.new(10, 0.8, 1.4),
+			W.DarkWood,
+			M.WoodPlanks
+		)
 	end
 	add(p, {
 		Name = "Mast",
@@ -266,7 +347,8 @@ local function shipwreckShallows(p: Instance, c: Vector3, rng: Random)
 			Name = "Barrel",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(5, 4, 4),
-			CFrame = CFrame.new(c + Vector3.new(x, 2, z)) * CFrame.Angles(0, rng:NextNumber() * math.pi * 2, 0),
+			CFrame = CFrame.new(c + Vector3.new(x, 2, z))
+				* CFrame.Angles(0, rng:NextNumber() * math.pi * 2, 0),
 			Color = W.Barrel,
 			Material = M.Wood,
 		})
@@ -278,7 +360,13 @@ local function jellyfishLagoon(p: Instance, c: Vector3, rng: Random)
 	disc(p, c + Vector3.new(0, 0.2, 0), 70, 0.3, B.Lagoon, M.Glass, 0.2)
 	for i = 0, 11 do
 		local a = i / 12 * math.pi * 2
-		block(p, CFrame.new(c + Vector3.new(math.cos(a) * 38, 3, math.sin(a) * 38)), Vector3.new(8, 6, 8), Z.RockGrey, M.Rock)
+		block(
+			p,
+			CFrame.new(c + Vector3.new(math.cos(a) * 38, 3, math.sin(a) * 38)),
+			Vector3.new(8, 6, 8),
+			Z.RockGrey,
+			M.Rock
+		)
 	end
 	local jellies = Instance.new("Model")
 	jellies.Name = "Hazard_Jellyfish"
@@ -292,7 +380,8 @@ local function jellyfishLagoon(p: Instance, c: Vector3, rng: Random)
 		for _ = 1, 4 do
 			local tx = x + rng:NextNumber(-3, 3)
 			local tz = z + rng:NextNumber(-3, 3)
-			column(jellies, c + Vector3.new(tx, height - 8, tz), 8, 0.4, B.Tentacle, M.Neon).Transparency = 0.3
+			column(jellies, c + Vector3.new(tx, height - 8, tz), 8, 0.4, B.Tentacle, M.Neon).Transparency =
+				0.3
 		end
 	end
 	for _, x in { -36, -26 } do
@@ -328,7 +417,14 @@ local function fogBank(p: Instance, c: Vector3, rng: Random)
 		local cx = rng:NextNumber(-28, 28)
 		local cz = rng:NextNumber(-20, 28)
 		for _ = 1, 6 do
-			ball(fog, c + Vector3.new(cx + rng:NextNumber(-8, 8), rng:NextNumber(6, 18), cz + rng:NextNumber(-8, 8)), rng:NextNumber(14, 22), B.Fog, M.Smooth).Transparency = 0.5
+			ball(
+				fog,
+				c + Vector3.new(cx + rng:NextNumber(-8, 8), rng:NextNumber(6, 18), cz + rng:NextNumber(-8, 8)),
+				rng:NextNumber(14, 22),
+				B.Fog,
+				M.Smooth
+			).Transparency =
+				0.5
 		end
 	end
 end
@@ -358,7 +454,14 @@ local function hermitHollows(p: Instance, c: Vector3, rng: Random)
 	taper(crab, c + Vector3.new(-8, 2, 0), 4, 22, 8, 22, B.ShellTan, M.Smooth)
 	for _, side in { -1, 1 } do
 		for k = 0, 2 do
-			block(crab, CFrame.new(body + Vector3.new(side * 7, -4 + k * 2, -2 + k * 3)) * CFrame.Angles(0, 0, side * math.rad(35)), Vector3.new(1, 1, 10), B.Hermit, M.Smooth)
+			block(
+				crab,
+				CFrame.new(body + Vector3.new(side * 7, -4 + k * 2, -2 + k * 3))
+					* CFrame.Angles(0, 0, side * math.rad(35)),
+				Vector3.new(1, 1, 10),
+				B.Hermit,
+				M.Smooth
+			)
 		end
 	end
 	for _, side in { -1, 1 } do
@@ -378,7 +481,9 @@ end
 
 -- Spears of stone standing out of the reef, a field of spikes (hazard) and a timing gap.
 local function spearstoneReef(p: Instance, c: Vector3, rng: Random)
-	for _, pos in { Vector3.new(-28, 0, -26), Vector3.new(26, 0, -30), Vector3.new(-30, 0, 4), Vector3.new(30, 0, 8) } do
+	for _, pos in
+		{ Vector3.new(-28, 0, -26), Vector3.new(26, 0, -30), Vector3.new(-30, 0, 4), Vector3.new(30, 0, 8) }
+	do
 		taper(p, c + pos, 6, 10, 1.5, rng:NextNumber(36, 44), B.Spear, M.Rock)
 		ball(p, c + pos + Vector3.new(0, 44, 0), 1.2, B.SpearTip, M.Metal)
 	end
@@ -400,7 +505,15 @@ local function seaGlassShore(p: Instance, c: Vector3, rng: Random)
 	local glass = { B.GlassTeal, B.GlassPink, B.GlassWhite, B.GlassViolet }
 	for i = 0, 5 do
 		local a = i / 6 * math.pi * 2
-		local pillar = block(p, CFrame.new(c + Vector3.new(math.cos(a) * 22, 14, math.sin(a) * 22)) * CFrame.Angles(0, 0, rng:NextNumber(-0.05, 0.05)), Vector3.new(2.4, 28, 2.4), glass[(i % #glass) + 1], M.Glass, 0.25)
+		local pillar = block(
+			p,
+			CFrame.new(c + Vector3.new(math.cos(a) * 22, 14, math.sin(a) * 22))
+				* CFrame.Angles(0, 0, rng:NextNumber(-0.05, 0.05)),
+			Vector3.new(2.4, 28, 2.4),
+			glass[(i % #glass) + 1],
+			M.Glass,
+			0.25
+		)
 		pillar.Name = "Prism"
 	end
 	local shards = Instance.new("Model")
@@ -410,10 +523,30 @@ local function seaGlassShore(p: Instance, c: Vector3, rng: Random)
 		local x = rng:NextNumber(-38, 38)
 		local z = rng:NextNumber(-38, 38)
 		local h = rng:NextNumber(5, 12)
-		block(shards, CFrame.new(c + Vector3.new(x, h / 2, z)) * CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber() * math.pi, rng:NextNumber(-0.3, 0.3)), Vector3.new(1.2, h, 1.2), glass[rng:NextInteger(1, #glass)], M.Glass, 0.15)
+		block(
+			shards,
+			CFrame.new(c + Vector3.new(x, h / 2, z))
+				* CFrame.Angles(
+					rng:NextNumber(-0.3, 0.3),
+					rng:NextNumber() * math.pi,
+					rng:NextNumber(-0.3, 0.3)
+				),
+			Vector3.new(1.2, h, 1.2),
+			glass[rng:NextInteger(1, #glass)],
+			M.Glass,
+			0.15
+		)
 	end
 	for _ = 1, 6 do
-		disc(p, c + Vector3.new(rng:NextNumber(-34, 34), 0.3, rng:NextNumber(-34, 34)), rng:NextNumber(6, 10), 0.3, glass[rng:NextInteger(1, #glass)], M.Glass, 0.4)
+		disc(
+			p,
+			c + Vector3.new(rng:NextNumber(-34, 34), 0.3, rng:NextNumber(-34, 34)),
+			rng:NextNumber(6, 10),
+			0.3,
+			glass[rng:NextInteger(1, #glass)],
+			M.Glass,
+			0.4
+		)
 	end
 	for _, x in { -30, -18 } do
 		block(p, CFrame.new(c + Vector3.new(x, 10, -34)), Vector3.new(3, 20, 3), B.GlassWhite, M.Glass, 0.2)
@@ -426,14 +559,29 @@ local function strandedIceberg(p: Instance, c: Vector3, rng: Random)
 	local layers = { { 34, 6, 30 }, { 28, 8, 24 }, { 22, 9, 18 }, { 14, 9, 12 }, { 8, 7, 7 } }
 	local y = 0
 	for i, dims in layers do
-		block(p, CFrame.new(c + Vector3.new(rng:NextNumber(-2, 2), y + dims[2] / 2, rng:NextNumber(-2, 2))) * CFrame.Angles(0, i * 0.5, 0), Vector3.new(dims[1], dims[2], dims[3]), if i % 2 == 0 then B.IceWhite else B.IceBlue, M.Smooth, 0.05)
+		block(
+			p,
+			CFrame.new(c + Vector3.new(rng:NextNumber(-2, 2), y + dims[2] / 2, rng:NextNumber(-2, 2)))
+				* CFrame.Angles(0, i * 0.5, 0),
+			Vector3.new(dims[1], dims[2], dims[3]),
+			if i % 2 == 0 then B.IceWhite else B.IceBlue,
+			M.Smooth,
+			0.05
+		)
 		y += dims[2]
 	end
 	block(p, CFrame.new(c + Vector3.new(0, 5, -15)), Vector3.new(12, 10, 4), B.IceCave, M.Smooth)
 	local slope = Instance.new("Model")
 	slope.Name = "Hazard_Ice"
 	slope.Parent = p
-	block(slope, CFrame.new(c + Vector3.new(28, 8, 8)) * CFrame.Angles(0, 0, math.rad(12)), Vector3.new(40, 1, 30), B.IceDeep, M.Glass, 0.1)
+	block(
+		slope,
+		CFrame.new(c + Vector3.new(28, 8, 8)) * CFrame.Angles(0, 0, math.rad(12)),
+		Vector3.new(40, 1, 30),
+		B.IceDeep,
+		M.Glass,
+		0.1
+	)
 	for _ = 1, 8 do
 		ball(p, c + Vector3.new(rng:NextNumber(-38, 38), 2, rng:NextNumber(-38, 38)), 4, B.IceWhite, M.Smooth)
 	end
@@ -441,7 +589,13 @@ end
 
 -- Black sand, three steaming vents (hazard) and a lava tube arch.
 local function blackSandVents(p: Instance, c: Vector3, rng: Random)
-	block(p, CFrame.new(c + Vector3.new(0, 0.3, 0)), Vector3.new(SIZE - 10, 0.4, SIZE - 10), B.BlackSand, M.Sand)
+	block(
+		p,
+		CFrame.new(c + Vector3.new(0, 0.3, 0)),
+		Vector3.new(SIZE - 10, 0.4, SIZE - 10),
+		B.BlackSand,
+		M.Sand
+	)
 	local vents = Instance.new("Model")
 	vents.Name = "Hazard_Vent"
 	vents.Parent = p
@@ -449,7 +603,14 @@ local function blackSandVents(p: Instance, c: Vector3, rng: Random)
 		column(vents, c + pos, 34, 8, B.VentGrey, M.Rock)
 		disc(vents, c + pos + Vector3.new(0, 34.3, 0), 7, 0.6, B.Lava, M.Neon)
 		for _ = 1, 3 do
-			ball(vents, c + pos + Vector3.new(rng:NextNumber(-4, 4), 40 + rng:NextNumber(0, 8), rng:NextNumber(-4, 4)), 10, B.Steam, M.Smooth).Transparency = 0.5
+			ball(
+				vents,
+				c + pos + Vector3.new(rng:NextNumber(-4, 4), 40 + rng:NextNumber(0, 8), rng:NextNumber(-4, 4)),
+				10,
+				B.Steam,
+				M.Smooth
+			).Transparency =
+				0.5
 		end
 	end
 	for _, x in { -28, -16 } do
@@ -481,6 +642,10 @@ local BIOMES = {
 local ROW_Z = { -200, -320 }
 local COLUMN_X = { -300, -200, -100, 0, 100, 200, 300 }
 
+-- The centre of each biome's plot, by biome name, filled in by showcase. The cosmetic props
+-- use it to dress each biome.
+BiomeModels.Plots = {} :: { [string]: Vector3 }
+
 function BiomeModels.showcase(map: Instance)
 	local folder = Instance.new("Folder")
 	folder.Name = "BiomeShowcase"
@@ -500,6 +665,7 @@ function BiomeModels.showcase(map: Instance)
 		local index = i - 1
 		local c = Vector3.new(COLUMN_X[index % #COLUMN_X + 1], 0, ROW_Z[math.floor(index / #COLUMN_X) + 1])
 		local p = plot(folder, c, name, ground)
+		BiomeModels.Plots[name] = c
 		build(p, c, Random.new(300 + i))
 	end
 end

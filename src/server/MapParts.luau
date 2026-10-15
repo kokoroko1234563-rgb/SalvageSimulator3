@@ -88,7 +88,13 @@ function MapParts.scenery(parent: Instance, props: { [string]: any }): Part
 end
 
 -- A scenery ball, `diameter` across, centred on `center`.
-function MapParts.ball(parent: Instance, center: Vector3, diameter: number, color: Color3, material: Enum.Material?)
+function MapParts.ball(
+	parent: Instance,
+	center: Vector3,
+	diameter: number,
+	color: Color3,
+	material: Enum.Material?
+)
 	return MapParts.scenery(parent, {
 		Name = "Ball",
 		Shape = Enum.PartType.Ball,
