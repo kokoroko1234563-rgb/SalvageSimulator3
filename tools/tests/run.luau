@@ -1520,7 +1520,7 @@ test("zone 1 is readable from the top, and zones 2 to 4 hide their lower half", 
 	assert(#problems == 0, table.concat(problems, "; "))
 end)
 
-test("layouts stay within their zone's height, and only zone 4 is rock", function()
+test("layouts stay within their zone's height, and rock and walls start at zone 4", function()
 	local Config = h.require("Shared/Config")
 	local Layouts = h.require("Shared/Layouts")
 	local cfg = Config.Beach.Terrain
@@ -1528,9 +1528,23 @@ test("layouts stay within their zone's height, and only zone 4 is rock", functio
 	local problems = {}
 	for _, entry in Layouts.all(true) do
 		local high, low, rock = 0, 0, false
+		-- Walls have their own limit (WallMaxHeight, checked with every layout) and belong to
+		-- the rock zones; the zone's roughness is the rest of its ground.
+		local banks = { Name = entry.Layout.Name, Primitives = {} }
+		local walls = false
+		for _, p in entry.Layout.Primitives do
+			if p.Kind == "Wall" then
+				walls = true
+			else
+				table.insert(banks.Primitives, p)
+			end
+		end
+		if walls and entry.Zone < 4 then
+			table.insert(problems, entry.Source .. " has walls before zone 4")
+		end
 		for x = -350, 350, 2 do
 			for z = 0, 150, 2 do
-				local f, r = Layouts.evaluate(entry.Layout, x, z)
+				local f, r = Layouts.evaluate(banks, x, z)
 				high = math.max(high, f)
 				low = math.min(low, f)
 				rock = rock or r
@@ -1546,8 +1560,8 @@ test("layouts stay within their zone's height, and only zone 4 is rock", functio
 		if -low > cfg.MaxDepth then
 			table.insert(problems, entry.Source .. " cuts " .. -low .. " deep")
 		end
-		if rock and entry.Zone ~= 4 then
-			table.insert(problems, entry.Source .. " has rock outside zone 4")
+		if rock and entry.Zone < 4 then
+			table.insert(problems, entry.Source .. " has rock before zone 4")
 		end
 	end
 	assert(#problems == 0, table.concat(problems, "; "))
@@ -1755,6 +1769,37 @@ test("the water meshes fit Roblox's limits", function()
 	end
 	-- Keep the water light: the editable mesh memory budget is small.
 	assert(total <= 14000, "the water has " .. total .. " triangles")
+end)
+
+test("walls are flat-topped rock too steep to climb", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local cfg = Config.Beach.Terrain
+	local tile = 3
+	local z0 = Beach.tileRange(tile)
+	local wall = { Kind = "Wall", Path = { { -100, 75 }, { 100, 75 } }, Height = 20, Width = 12 }
+	Layouts.setActive(tile, { Name = "wall", Primitives = { wall } })
+	local height, rock = Beach.shapeAt(0, z0 + 75)
+	assert(math.abs(height - 20) < 0.01 and rock, "full height, rock, at its middle")
+	assert(math.abs(Beach.feature(0, z0 + 75 + 4) - 20) < 0.01, "and across its flat top")
+	-- Its side: steeper than anyone can walk up, and taller than a jump.
+	local steepest = 0
+	for z = z0 + 75, z0 + 75 + 8, 0.5 do
+		steepest = math.max(steepest, Beach.feature(0, z) - Beach.feature(0, z + 0.5))
+	end
+	assert(steepest / 0.5 > cfg.FootSlope * 3, "its side is a cliff, steepest " .. steepest / 0.5)
+	assert(Beach.feature(0, z0 + 75 + 7) == 0, "and it ends at Width / 2")
+	Layouts.setActive(tile, nil)
+	local tooTall = {
+		Name = "x",
+		Primitives = { { Kind = "Wall", Path = { { 0, 0 }, { 1, 1 } }, Height = 99, Width = 10 } },
+	}
+	local tooThin = {
+		Name = "x",
+		Primitives = { { Kind = "Wall", Path = { { 0, 0 }, { 1, 1 } }, Height = 10, Width = 2 } },
+	}
+	assert(#Layouts.problems(tooTall) == 1 and #Layouts.problems(tooThin) == 1, "walls have limits")
 end)
 
 test("hazards are data: kinds, settings and problems", function()

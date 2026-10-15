@@ -99,13 +99,24 @@ local function build(zone: number)
 	-- Walls spaced 24 apart leave corridors 12 wide. Each leaves its gap at one end, alternately.
 	for i, z in { 60, 84, 108 } do
 		local ends = if i % 2 == 1 then { -120, 70 } else { -70, 120 }
-		table.insert(walls, {
-			Kind = "Ridge",
-			Path = { { ends[1], z }, { (ends[1] + ends[2]) / 2, z }, { ends[2], z } },
-			Height = top * 0.8,
-			Width = 12,
-			Rock = rock,
-		})
+		-- Where it rolls (zone 4 and below), the walls are real rock walls you can't climb.
+		table.insert(
+			walls,
+			if rock
+				then {
+					Kind = "Wall",
+					Path = { { ends[1], z }, { (ends[1] + ends[2]) / 2, z }, { ends[2], z } },
+					Height = 14,
+					Width = 10,
+				}
+				else {
+					Kind = "Ridge",
+					Path = { { ends[1], z }, { (ends[1] + ends[2]) / 2, z }, { ends[2], z } },
+					Height = top * 0.8,
+					Width = 12,
+					Rock = rock,
+				}
+		)
 	end
 	return {
 		Name = "Hermit Hollows (zone " .. zone .. ", draft)",

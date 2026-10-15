@@ -12,6 +12,8 @@
 -- local to the tile (0 at its landward edge, 150 at its seaward edge); heights are studs
 -- above (or below) the base slope. Primitive kinds:
 --   Ridge   { Path = {{x, z}, ...}, Height, Width, Rock? }  a bank along a path
+--   Wall    { Path = {{x, z}, ...}, Height, Width }         a rock wall: flat top, sides too
+--                                                           steep to climb (a maze, a cave)
 --   Mound   { At = {x, z}, Radius, Height, Rock? }          a hump or boulder
 --   Channel { Path = {{x, z}, ...}, Depth, Width }          a cut along a path
 --   Hollow  { At = {x, z}, Radius, Depth }                  a round dip (a pool)
@@ -55,6 +57,7 @@ export type Layout = { Name: string, Primitives: { Primitive } }
 
 Layouts.Kinds = {
 	Ridge = { Path = true, Height = true, Width = true, Rock = false },
+	Wall = { Path = true, Height = true, Width = true },
 	Mound = { At = true, Radius = true, Height = true, Rock = false },
 	Channel = { Path = true, Depth = true, Width = true },
 	Hollow = { At = true, Radius = true, Depth = true },
@@ -260,7 +263,14 @@ local function compile(layout: Layout): Compiled
 			entry.half = p.Radius or 0
 		end
 		local list
-		if p.Kind == "Ridge" or p.Kind == "Mound" then
+		if p.Kind == "Wall" then
+			-- Rock with a flat top and sides too steep to climb.
+			entry.amount = p.Height or 0
+			entry.rock = true
+			entry.wall = true
+			reach = entry.half
+			list = c.raised
+		elseif p.Kind == "Ridge" or p.Kind == "Mound" then
 			entry.amount = p.Height or 0
 			reach = entry.half
 			list = c.raised
@@ -320,6 +330,10 @@ local function distance(segments: { { number } }, x: number, z: number): number
 end
 
 -- A smooth bank: 1 at the centre, 0 at the edge. Rock has a flatter top and steeper faces.
+-- A wall's sides go from its foot to its full height over this many studs (the terrain's own
+-- cells soften that a little), far steeper than anyone can climb.
+local WALL_EDGE = 1.5
+
 local function profile(t: number, rock: boolean): number
 	if t >= 1 then
 		return 0
@@ -346,7 +360,10 @@ function Layouts.evaluate(layout: Layout, x: number, z: number): (number, boolea
 	end
 	local up, rock = 0, false
 	for _, p in cell.raised do
-		local v = p.amount * profile(distance(p.segments, x, z) / p.half, p.rock)
+		local d = distance(p.segments, x, z)
+		local v = if p.wall
+			then p.amount * math.clamp((p.half - d) / WALL_EDGE, 0, 1)
+			else p.amount * profile(d / p.half, p.rock)
 		if v > up then
 			up, rock = v, p.rock
 		end
@@ -529,7 +546,14 @@ function Layouts.problems(layout: any): { string }
 				add(where .. " (" .. p.Kind .. "): needs " .. key)
 			end
 		end
-		if type(p.Height) == "number" and p.Height > cfg.MaxHeight then
+		if p.Kind == "Wall" then
+			if type(p.Height) == "number" and p.Height > cfg.WallMaxHeight then
+				add(where .. ": Height is over Config.Beach.Terrain.WallMaxHeight")
+			end
+			if type(p.Width) == "number" and p.Width < cfg.WallMinWidth then
+				add(where .. ": a Wall must be at least Config.Beach.Terrain.WallMinWidth wide")
+			end
+		elseif type(p.Height) == "number" and p.Height > cfg.MaxHeight then
 			add(where .. ": Height is over Config.Beach.Terrain.MaxHeight")
 		end
 		if type(p.Depth) == "number" and p.Depth > cfg.MaxDepth then

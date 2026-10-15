@@ -19,6 +19,7 @@ local player = Players.LocalPlayer
 local WaveController = {}
 
 local cfg = Config.Waves
+local MAX_SLOPE = math.deg(math.atan(Config.Beach.Terrain.FootSlope))
 
 -- The water's speed the character has picked up: it builds up and fades instead of
 -- snapping to the water's speed, so being in the surf has momentum.
@@ -80,6 +81,11 @@ function WaveController.init()
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		if humanoid and root and humanoid.Health > 0 then
+			-- Nobody walks up a slope steeper than FootSlope (rock walls, cliffs): the layouts'
+			-- routes and shortcuts are worked out with the same limit.
+			if math.abs(humanoid.MaxSlopeAngle - MAX_SLOPE) > 0.01 then
+				humanoid.MaxSlopeAngle = MAX_SLOPE
+			end
 			-- Water is sluggish: slower walking and lower jumps the deeper you are.
 			local speedScale, jumpScale = Beach.wading(root.Position, sea)
 			local wade = Stats.wadeBonus(player) -- Tidewalker Boots

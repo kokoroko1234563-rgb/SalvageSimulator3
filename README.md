@@ -160,7 +160,9 @@ All of this is computed from the shared clock, so the server and every client ag
 
 **The beach's shape** (`src/shared/Layouts`, `TerrainBuilder`): the beach and seabed are smooth Terrain: the even slope plus a hand-built layout for each zone.
 - **Layouts:** each zone has a base layout (`Layouts/Zones/ZoneN`). A biome can bring its own (`Layouts/Biomes/<BiomeId>`), which replaces the base layout while it's rolled there; the zone's terrain is rebuilt and `GroundShift` moves props, items and players to stay on the new ground.
-  - A layout is a list of shapes: Ridge, Mound, Channel, Hollow, Ramp and Flat (see `Layouts/init.luau`). Rock shapes are built from rock.
+  - A layout is a list of shapes: Ridge, Mound, Wall, Channel, Hollow, Ramp and Flat (see `Layouts/init.luau`). Rock shapes are built from rock.
+  - **Walls** are rock with a flat top and sides too steep to climb, up to 24 studs tall: well over a jump, and you can't see over them. They're how a maze or a cave passage is made (zone 4 and out).
+- **Climbing:** nobody can walk up a slope steeper than `Config.Beach.Terrain.FootSlope` (about 42°), the same limit the layout tests use for routes on foot, so steep banks, walls and cliffs have to be gone around.
   - The current base layouts are placeholders; the hand-built ones follow `docs/layout-prompt.md`.
 - **Carts:** a towed vessel can't go up ground steeper than `Config.Beach.Terrain.CartSlope`. Every zone has Ramps that cross its edges at x = -200 and x = 180, so a cart can always get down to the sea.
 - **The shop and the sandbar** stay flat.

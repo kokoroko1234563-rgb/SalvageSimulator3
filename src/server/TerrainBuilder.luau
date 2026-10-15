@@ -28,7 +28,7 @@ function TerrainBuilder.bounds(): (Vector3, Vector3)
 	local half = Beach.HalfWidth + 40
 	local zEnd = Beach.Depth + beach.SeaExtent
 	local low = Beach.groundY(zEnd) - beach.FarSandbar.ChannelDepth - 12
-	local high = 4 + shape.MaxHeight
+	local high = 4 + math.max(shape.MaxHeight, shape.WallMaxHeight)
 	local function snap(v: number, up: boolean): number
 		return (if up then math.ceil(v / VOXEL) else math.floor(v / VOXEL)) * VOXEL
 	end
@@ -86,7 +86,8 @@ function TerrainBuilder.heightRange(z0: number, z1: number): (number, number)
 		end
 		z = math.min(z + VOXEL, z1)
 	end
-	return snap(low - shape.MaxDepth - CRUST, false), snap(high + shape.MaxHeight + 4, true)
+	return snap(low - shape.MaxDepth - CRUST, false),
+		snap(high + math.max(shape.MaxHeight, shape.WallMaxHeight) + 4, true)
 end
 
 -- Writes the terrain between two Z positions (snapped out to whole voxels).
