@@ -1802,6 +1802,36 @@ test("walls are flat-topped rock too steep to climb", function()
 	assert(#Layouts.problems(tooTall) == 1 and #Layouts.problems(tooThin) == 1, "walls have limits")
 end)
 
+test("walls get an invisible barrier inside them, open where a ramp cuts through", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local WallBarriers = h.require("Server/WallBarriers")
+	local tile = 14
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "walled",
+		Primitives = {
+			{ Kind = "Wall", Path = { { -150, 75 }, { 150, 75 } }, Height = 18, Width = 14 },
+			{ Kind = "Ramp", Path = { { 0, 0 }, { 0, 150 } }, Width = 16 },
+		},
+	})
+	local slabs = WallBarriers.slabsFor(tile)
+	assert(#slabs == 2, "one slab each side of the ramp, got " .. #slabs)
+	for _, slab in slabs do
+		local position = slab.cframe.Position
+		assert(math.abs(position.Z - (z0 + 75)) < 0.01, "down the wall's middle")
+		assert(math.abs(position.X) > 8, "not across the ramp")
+		local top = position.Y + slab.size.Y / 2
+		assert(top > Beach.groundY(z0 + 75) + 18 + 7, "higher than a jump off the wall's top")
+		assert(slab.size.X < 14, "inside the wall")
+	end
+	WallBarriers.build(tile)
+	assert(#h.game.Workspace.WallBarriers["Tile" .. tile]:GetChildren() == 2, "built as parts")
+	Layouts.setActive(tile, nil)
+	WallBarriers.build(tile)
+	assert(#h.game.Workspace.WallBarriers["Tile" .. tile]:GetChildren() == 0, "and gone with the wall")
+end)
+
 test("hazards are data: kinds, settings and problems", function()
 	local Hazards = h.require("Shared/Hazards")
 	local settings = Hazards.settings({ Type = "Patrol", Count = 7 })

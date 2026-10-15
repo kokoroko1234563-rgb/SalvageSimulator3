@@ -15,6 +15,8 @@ local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Palette = require(Shared.Palette)
 
+local WallBarriers = require(script.Parent.WallBarriers)
+
 local TerrainBuilder = {}
 
 local beach = Config.Beach
@@ -115,9 +117,11 @@ end
 function TerrainBuilder.buildTile(tile: number)
 	local z0, z1 = Beach.tileRange(tile)
 	TerrainBuilder.buildRange(z0, z1)
+	WallBarriers.build(tile)
 end
 
 function TerrainBuilder.build()
+	WallBarriers.buildAll()
 	local terrain = Workspace:FindFirstChildOfClass("Terrain")
 	if not terrain then
 		return
