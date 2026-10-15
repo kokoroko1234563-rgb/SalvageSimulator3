@@ -106,16 +106,14 @@ All of this is computed from the shared clock, so the server and every client ag
 
 **Waves:** each wave rolls in to the local waterline, runs up the exposed sand as a thin sheet, slows to a stop and slides back.
 - **Sizes:** each wave's size varies a little. Every 6th wave is a big one, about 3% are rogue waves, and waves get bigger further out (`ZoneScale`, 1.7x on the Far Sandbar). Size scales how far a wave runs up and how hard it pushes. `waves <n>` still scales all of it.
-- **Undertow, in pulses:** the sea pulls seaward, harder the deeper it is (`Undertow` 5 studs/s at the waterline, `UndertowDeep` 10 at waist depth). The pull comes in a rhythm, not as a steady current:
-  - As each wave approaches, the water rushes out to meet it (`Drawback`, strongest right before the wave and bigger for bigger waves).
-  - The wave's front gives a short shove toward shore.
-  - Then the water goes slack (`Slack`, 35%) until the next wave.
-  - On top of that, a gentle side-to-side sway (`Sway`) varies along the beach.
-  - You pick up the water's speed gradually and keep it for a moment (`Coupling`), so the surf has momentum instead of carrying you along like a conveyor belt.
-  - The undertow grows only half as much as the waves in the outer zones, and the validator checks you can always wade back across the sandbar channel.
-- **Danger:** the run-up pushes players, held items, vessels and dropped loot up the beach, and the backwash (24 studs/s) drags them back toward the sea. Following the water out, or staying out on the sandbar, is risky, especially when a big one comes.
-- **Knockdowns:** a push of 30 studs/s or more, after Sea Legs or other wave resistance, knocks you over. Only big and rogue waves get there near the shore, but most waves do on the Far Sandbar. The water throws you, you drop what you're holding, and it carries you for 1.6 seconds before you get up (`KnockdownPush`, `KnockdownTime`, `ThrowFactor`).
-- **Unclaimed items:** after each wave, unclaimed items it reached may be dragged a few studs, mostly seaward (`DragChance`, `DragDistance`, in `SurfService`). Anything dragged deep enough is lost.
+- **The ordinary sea is impartial:** it jostles you back and forth but doesn't pull you out.
+  - As each wave approaches, the water rushes out to meet it (the drawback). Then the wave's front shoves you back in. For a normal wave the two roughly cancel.
+  - Between waves the water is still (`Slack` 0), apart from a side-to-side sway (`Sway`).
+  - You pick up the water's speed gradually and keep it for a moment (`Coupling`), so it has momentum.
+- **Big waves are the danger:** the drawback grows with the wave's size *squared* (`Drawback`). Normal waves barely tug, set waves (every 6th) pull hard, and rogue waves pull very hard.
+- **Run-up and backwash:** on the sand, the run-up pushes players, held items, vessels and dropped loot up the beach (`RunUpPush` 12), then the backwash pulls them back (`BackwashPull` 16), both scaled by the wave's size.
+- **Knockdowns:** a push of 25 studs/s or more, after Sea Legs or other wave resistance, knocks you over. Normal waves stay under that near the shore. Set waves get there in knee-deep water, rogue waves almost anywhere, and most waves do on the Far Sandbar. The wave tumbles you and carries you out to sea for 1.6 seconds, and you drop what you're holding. A set wave carries you about 30 studs. A rogue wave can carry you about 60 studs, into water deep enough to drown, so being close to the water is a risk you take for better loot.
+- **Unclaimed items:** after each wave, unclaimed items it reached may be shuffled a few studs: either way for ordinary waves, mostly out to sea for big ones (`DragChance`, `DragDistance`, in `SurfService`). Anything dragged deep enough is lost.
 - **Rogue waves:** clients know they're coming and show a warning banner about 8 seconds before. `waves rogue` sends one.
 
 **What you see** (`SeaController`, client only):

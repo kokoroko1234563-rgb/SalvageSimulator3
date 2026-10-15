@@ -113,19 +113,19 @@ Config.Waves = {
 	Speed = 26, -- studs/s the wave front travels toward shore
 	StartOffset = 90, -- where each wave starts, studs seaward of the waterline
 	BandWidth = 8, -- thickness of the pushing band behind the front: a short, sharp shove
-	Push = 18, -- studs/s shoreward push at the leading edge
+	Push = 14, -- studs/s shoreward push at the leading edge
 
-	-- Undertow: the sea always pulls out, between and under the waves, harder the deeper it
-	-- is. Over a whole wave it outweighs the shove toward shore, so standing still in the
-	-- water drags you out.
-	Undertow = 5, -- studs/s seaward at the waterline...
-	UndertowDeep = 10, -- ...rising to this at waist depth and beyond
-	UndertowZoneScale = 0.5, -- the undertow grows half as much as the waves further out
-	-- The pull comes in pulses, not as a steady current: as each wave approaches, the water
-	-- rushes out to meet it (the drawback), then the wave's front shoves, then it goes slack.
-	Slack = 0.35, -- the undertow between waves, as a fraction
-	Drawback = 2, -- extra pull (times the undertow, times the wave's size) just before a wave
-	DrawbackRange = 35, -- studs ahead of an incoming wave where the water rushes out to it
+	-- The ordinary sea is impartial: it jostles you both ways and doesn't drag you out. As a
+	-- wave approaches, the water rushes out to meet it (the drawback), then the wave's front
+	-- shoves you back in; for a normal wave the two roughly cancel. The drawback grows with
+	-- the wave's size squared, so big waves pull hard and rogue waves pull very hard: they are
+	-- the danger, not the water itself.
+	Undertow = 4, -- studs/s scale of the drawback at the waterline...
+	UndertowDeep = 6, -- ...rising to this at waist depth and beyond
+	UndertowZoneScale = 0.5, -- grows half as much as the waves further out
+	Slack = 0, -- pull between waves, as a fraction of the undertow (0 = still water)
+	Drawback = 1.2, -- drawback strength just before a wave: undertow x this x size squared
+	DrawbackRange = 25, -- studs ahead of an incoming wave where the water rushes out to it
 	Sway = 2.5, -- studs/s side-to-side drift in the water, varying along the beach and in time
 	Coupling = 4, -- how quickly you pick up (and lose) the water's speed; lower = more momentum
 
@@ -134,16 +134,17 @@ Config.Waves = {
 	-- beach; while sliding back it drags them toward the sea.
 	RunUp = 10, -- studs an average wave runs up the sand
 	RunUpVariation = 0.35, -- each wave is up to this much bigger or smaller (deterministic)
-	RunUpPush = 14, -- studs/s up the beach under the running-up sheet
-	BackwashPull = 24, -- studs/s toward the sea under the sliding-back sheet
+	RunUpPush = 12, -- studs/s up the beach under the running-up sheet
+	BackwashPull = 16, -- studs/s toward the sea under the sliding-back sheet
 	BackwashRatio = 1.1, -- sliding back takes this many times as long as running up
 
 	-- Knockdowns: a push this strong (after the player's wave resistance) knocks the player
-	-- over. They're thrown with the water, drop what they're holding, and lie helpless for
-	-- KnockdownTime while the water keeps carrying them.
-	KnockdownPush = 30, -- studs/s: big waves anywhere, most waves on the Far Sandbar
+	-- over. Only big waves get there (and most waves on the Far Sandbar). The wave tumbles
+	-- them and drags them out to sea: they drop what they're holding and are carried seaward,
+	-- slowing over KnockdownTime. A rogue wave can carry you deep enough to drown.
+	KnockdownPush = 25, -- studs/s
 	KnockdownTime = 1.6,
-	ThrowFactor = 1.4, -- launch speed, as a multiple of the push
+	ThrowFactor = 1.4, -- seaward carry speed, as a multiple of the push that knocked you over
 	ThrowLift = 14, -- studs/s upward on the throw
 	KnockdownCooldown = 2.5, -- seconds after getting up before the next knockdown
 	SetEvery = 6, -- every Nth wave is a big one...

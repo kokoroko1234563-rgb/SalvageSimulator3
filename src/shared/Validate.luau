@@ -165,7 +165,7 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		-- The strongest moment: the drawback just before a big (set) wave.
 		local pull = (w.Undertow + (w.UndertowDeep - w.Undertow) * knee)
 			* zone
-			* (w.Slack + w.Drawback * w.SetSize)
+			* (w.Slack + w.Drawback * w.SetSize * w.SetSize)
 		-- Averaged over a wave it must stay well under walking speed.
 		local share = (w.DrawbackRange / w.Speed) / w.Period
 		pull = pull * share

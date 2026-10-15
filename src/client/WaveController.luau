@@ -24,6 +24,7 @@ local carried = Vector3.zero
 -- Knockdown state for this client's character.
 local knockedUntil = 0
 local readyAt = 0
+local thrown = Vector3.zero -- the seaward carry when knocked over
 
 -- Knocks the character over and throws it along with the water. The humanoid stops fighting
 -- (PlatformStand), so the water carries it until it gets back up.
@@ -33,8 +34,9 @@ local function knockDown(character: Model, humanoid: Humanoid, root: BasePart, p
 	readyAt = knockedUntil + cfg.KnockdownCooldown
 	character:SetAttribute("KnockedDown", true) -- local only; GrabController drops what you hold
 	humanoid.PlatformStand = true
-	root.AssemblyLinearVelocity = Vector3.new(push.X, 0, push.Z) * cfg.ThrowFactor
-		+ Vector3.new(0, cfg.ThrowLift, 0)
+	-- Whichever way the wave hit, it tumbles you and the water takes you out to sea.
+	thrown = Vector3.new(push.X * 0.3, 0, push.Magnitude) * cfg.ThrowFactor
+	root.AssemblyLinearVelocity = thrown + Vector3.new(0, cfg.ThrowLift, 0)
 	root.AssemblyAngularVelocity = Vector3.new(math.random() * 6 - 3, 0, math.random() * 6 - 3)
 	task.delay(cfg.KnockdownTime, function()
 		if humanoid.Parent then
@@ -60,11 +62,11 @@ function WaveController.init()
 			local push = Waves.getPush(root.Position, sea) * Config.Waves.CharacterFactor * resistance
 			local now = os.clock()
 			if now < knockedUntil then
-				-- Lying in the water: it carries you (velocity, since nothing fights it now).
+				-- Tumbling: the water carries you out, slowing as the wave spends itself.
+				local left = (knockedUntil - now) / cfg.KnockdownTime
 				local velocity = root.AssemblyLinearVelocity
-				local target = Vector3.new(push.X, velocity.Y, push.Z)
-				root.AssemblyLinearVelocity = velocity:Lerp(target, math.min(1, dt * 3))
-				carried = Vector3.new(push.X, 0, push.Z)
+				root.AssemblyLinearVelocity = Vector3.new(thrown.X * left, velocity.Y, thrown.Z * left)
+				carried = thrown * left
 			elseif push.Magnitude >= cfg.KnockdownPush and now >= readyAt then
 				knockDown(character :: Model, humanoid, root, push)
 			else

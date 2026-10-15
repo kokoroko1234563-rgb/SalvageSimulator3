@@ -24,8 +24,9 @@ local dragging: { [BasePart]: Tween } = {}
 
 local function drag(item: BasePart, size: number)
 	local distance = cfg.DragDistance * size * rng:NextNumber(0.4, 1)
-	-- Mostly out to sea (the backwash), sometimes up the beach (the run-up).
-	local dz = if rng:NextNumber() < 0.7 then distance else -distance * 0.5
+	-- Ordinary waves shuffle things either way; big ones mostly drag them out to sea.
+	local seaward = if size >= cfg.SetSize then 0.85 else 0.5
+	local dz = if rng:NextNumber() < seaward then distance else -distance
 	local dx = rng:NextNumber(-0.5, 0.5) * distance
 	local from = item.Position
 	local toZ = from.Z + dz

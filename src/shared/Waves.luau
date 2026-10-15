@@ -177,7 +177,7 @@ local function pushAt(position: Vector3, sea: Sea, line: number, rel: number, sc
 				-- The water rushing out to meet the incoming wave: strongest right before it.
 				local closeness = 1 + behind / cfg.DrawbackRange
 				local pull = undertow(rel, line)
-					* (cfg.Slack + cfg.Drawback * closeness * closeness * wave.Size)
+					* (cfg.Slack + cfg.Drawback * closeness * closeness * wave.Size * wave.Size)
 				return -SHORE * pull * scale
 			end
 		elseif rel >= wave.Front and rel <= 0 then
