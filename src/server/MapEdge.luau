@@ -52,8 +52,10 @@ local function headland(folder: Folder, side: number, rng: Random)
 
 		-- Two terraces: a lower one at the front and a higher one behind it.
 		for layer = 1, 2 do
-			local width = if layer == 1 then 22 else 34
-			local inner = half + 14 + (if layer == 1 then 0 else 22)
+			-- Each section overlaps the next by a few studs. Nudge its position and width so no
+			-- two sections' faces are ever in the same plane, or they flicker where they overlap.
+			local width = (if layer == 1 then 22 else 34) + rng:NextNumber(0, 2)
+			local inner = half + 14 + (if layer == 1 then 0 else 22) + rng:NextNumber(-1.5, 1.5)
 			local heightTop = if layer == 1 then top - rng:NextNumber(0, 7) else top + rng:NextNumber(3, 12)
 			local height = heightTop - floorY
 			local x = side * (inner + width / 2)
