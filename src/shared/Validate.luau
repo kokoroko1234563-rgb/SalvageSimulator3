@@ -158,6 +158,25 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		lastX = section.X or lastX
 	end
 
+	-- Day and music
+	check(
+		Config.Day.DayShare > 0 and Config.Day.DayShare < 1 and Config.Day.Length > 0,
+		"Config.Day: DayShare must be between 0 and 1, and Length positive"
+	)
+	local PLACES = { Shop = true, Shore = true, Outer = true, Sandbar = true, Secret = true, Showroom = true }
+	local TIMES = { Day = true, Twilight = true, Night = true }
+	for _, track in Config.Music.Tracks do
+		local where = "Music track " .. tostring(track.Title)
+		check(type(track.SoundId) == "number", where .. ": SoundId must be a number (0 = not uploaded yet)")
+		check(type(track.Places) == "table" and #track.Places > 0, where .. ": needs Places")
+		for _, place in track.Places or {} do
+			check(PLACES[place] == true, where .. ": unknown place " .. tostring(place))
+		end
+		for _, time in track.Times or {} do
+			check(TIMES[time] == true, where .. ": unknown time " .. tostring(time))
+		end
+	end
+
 	-- Wading
 	local wading = Config.Beach.Wading
 	check(

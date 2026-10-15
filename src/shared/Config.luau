@@ -238,6 +238,60 @@ Config.Showroom = {
 	WallHeight = 4,
 }
 
+-- The day: a 24-hour clock that runs on the shared server clock, separate from the tide.
+-- Daytime (6:00 to 18:00) takes DayShare of each cycle, so nights pass quicker.
+Config.Day = {
+	Length = 1200, -- seconds for a whole day (20 minutes)
+	DayShare = 0.7, -- the share of it that's daylight
+	StartHour = 9, -- the hour a new server starts at
+	NightAmbient = Color3.fromRGB(70, 85, 130), -- outdoor light at night: dim and blue, still playable
+	NightBrightness = 0.8,
+	DuskColor = Color3.fromRGB(255, 160, 110), -- haze colour around sunrise and sunset
+}
+
+-- Music: Kevin MacLeod (incompetech.com), licensed CC BY 4.0. Roblox only plays audio
+-- uploaded to Roblox: download each track from incompetech.com, upload it in the Creator
+-- Hub (Creations > Audio), and paste its id as SoundId. Tracks still at 0 are skipped.
+-- The title and the credit show whenever a track starts.
+-- Places: Shop, Shore (zones 1-2), Outer (zones 3-4), Sandbar (zone 5), Secret, Showroom.
+-- Times: Day, Twilight (dawn and dusk), Night. A track with no Times plays at any time.
+Config.Music = {
+	Volume = 0.35,
+	FadeTime = 3, -- seconds to cross-fade between tracks
+	Gap = { 4, 12 }, -- seconds of quiet between tracks
+	Credit = "Kevin MacLeod (incompetech.com) · CC BY 4.0",
+	Tracks = {
+		{ Title = "Local Forecast", SoundId = 0, Places = { "Shop" }, Times = { "Day", "Twilight" } },
+		{ Title = "Lobby Time", SoundId = 0, Places = { "Shop", "Showroom" }, Times = { "Day" } },
+		{ Title = "Wallpaper", SoundId = 0, Places = { "Shop", "Showroom" } },
+		{ Title = "Carefree", SoundId = 0, Places = { "Shore" }, Times = { "Day" } },
+		{ Title = "Island Meet and Greet", SoundId = 0, Places = { "Shore", "Shop" }, Times = { "Day" } },
+		{ Title = "Easy Lemon", SoundId = 0, Places = { "Shore" }, Times = { "Day", "Twilight" } },
+		{ Title = "Fluffing a Duck", SoundId = 0, Places = { "Shore" }, Times = { "Day" } },
+		{ Title = "Monkeys Spinning Monkeys", SoundId = 0, Places = { "Shore", "Outer" }, Times = { "Day" } },
+		{ Title = "Investigations", SoundId = 0, Places = { "Outer" }, Times = { "Day", "Twilight" } },
+		{ Title = "Sneaky Snitch", SoundId = 0, Places = { "Outer" }, Times = { "Day" } },
+		{ Title = "Floating Cities", SoundId = 0, Places = { "Sandbar" } },
+		{
+			Title = "Lightless Dawn",
+			SoundId = 0,
+			Places = { "Sandbar", "Outer" },
+			Times = { "Twilight", "Night" },
+		},
+		{ Title = "Dreamy Flashback", SoundId = 0, Places = { "Shore", "Outer" }, Times = { "Twilight" } },
+		{ Title = "Bathed in the Light", SoundId = 0, Places = { "Shore", "Shop" }, Times = { "Twilight" } },
+		{ Title = "Night on the Docks", SoundId = 0, Places = { "Shop", "Shore" }, Times = { "Night" } },
+		{
+			Title = "Peaceful Desolation",
+			SoundId = 0,
+			Places = { "Shore", "Outer", "Sandbar" },
+			Times = { "Night" },
+		},
+		{ Title = "Comfortable Mystery", SoundId = 0, Places = { "Secret" } },
+		{ Title = "Deep Haze", SoundId = 0, Places = { "Secret" } },
+	},
+}
+
 Config.Lexicon = {
 	TowerManChance = 0.001, -- per zone, per tide cycle
 }

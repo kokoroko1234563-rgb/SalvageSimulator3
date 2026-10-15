@@ -7,6 +7,7 @@ local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 local Validate = require(Shared.Validate)
 local Tide = require(Shared.Tide)
+local DayCycle = require(Shared.DayCycle)
 
 local AdminService = require(script.AdminService)
 local AccessoryService = require(script.AccessoryService)
@@ -61,6 +62,11 @@ end
 Workspace:SetAttribute(Tide.StartAttribute, Workspace:GetServerTimeNow())
 -- Each server's sea gets its own pattern of waterline and waves.
 Workspace:SetAttribute(Tide.SeedAttribute, Random.new():NextInteger(1, 999999))
+-- The day/night clock starts at Config.Day.StartHour on a new server.
+Workspace:SetAttribute(
+	DayCycle.StartAttribute,
+	DayCycle.startFor(Config.Day.StartHour, Workspace:GetServerTimeNow())
+)
 
 local map = BeachBuilder.build()
 

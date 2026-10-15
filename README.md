@@ -259,6 +259,27 @@ Everything the design doc names now exists, with a model. See it all with `tp sh
 
 The doc gives examples, not effects, for most of these, so the effects above are my proposals to tune. Light from accessories is server-side (`AccessoryService`), so everyone sees it. The rest is in `Stats` and `GearEffects`.
 
+## Day, night and music
+
+**Day/night cycle** (`Config.Day`, `DayCycle`, `DayController`): a 24-hour clock that runs on the shared server clock, separate from the tide.
+- A day lasts 20 minutes, and daylight takes 70% of it, so nights pass quicker. A new server starts at 9:00.
+- At night the light dims and turns blue but stays playable. Sunrise and sunset warm the haze.
+- `time` shows the clock, and `time 19.5` jumps to dusk.
+
+**Music** (`Config.Music`, `MusicController`): Kevin MacLeod tracks, chosen by where you are and the time of day.
+- Each track lists its places (Shop, Shore, Outer, Sandbar, Secret, Showroom) and times (Day, Twilight, Night).
+- When you move somewhere a track doesn't fit, or the day turns, it cross-fades to one that does.
+- When a track ends, another follows after a short quiet gap.
+- Each new track shows its title and the credit ("Kevin MacLeod (incompetech.com) · CC BY 4.0"). The license requires that credit, so keep it.
+- **M**, or the inventory toggle, mutes it, and the setting is saved.
+
+**Setting the music up:** Roblox can only play audio that's been uploaded to Roblox.
+1. Download each track in `Config.Music.Tracks` from incompetech.com.
+2. Upload it in the Creator Hub (Creations, then Audio), under the same owner as the game.
+3. Paste its id as the track's `SoundId`.
+
+Tracks still at 0 are skipped, so the music starts as soon as the first one is in. Check the titles on incompetech.com: I picked them from memory to fit each place and mood, and you may prefer others.
+
 ## Showroom
 
 An open-air gallery off the map (`Config.Showroom`, X = 6000 on the shop side, so no tide or wave reaches it) that shows every model, material and colour in the game side by side. Each exhibit stands on its own tile or pedestal, with its name on a sign.
@@ -291,6 +312,7 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `tidespeed <scale>` | 1 = real 25 min cycle, 0.1 = 2.5 min |
 | `waves <multiplier\|rogue\|seed [n]>` | Wave strength (0 = calm), send a rogue wave, or set a new random sea seed |
 | `tp <shop\|zone\|sandbar\|showroom\|player> [who]` | Teleport (`sandbar` = the bell tower door) |
+| `time [hour]` | Show or set the time of day, e.g. `time 19.5` |
 | `showroom [section]` | Go to the showroom or one of its sections; lists the sections |
 | `heal`, `god`, `speed <n>` | Health/breath, toggle no-drowning, walk speed |
 | `resetdata <player>`, `kick <player> [reason]` | Wipe a save, kick |

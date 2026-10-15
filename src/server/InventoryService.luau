@@ -208,7 +208,10 @@ local function onAction(player: Player, action: any, arg: any, value: any): (boo
 		DataService.changed(player)
 		return true
 	elseif action == "setting" then
-		if (arg == "HideShopGear" or arg == "ShowResetText") and type(value) == "boolean" then
+		if
+			(arg == "HideShopGear" or arg == "ShowResetText" or arg == "MuteMusic")
+			and type(value) == "boolean"
+		then
 			profile.Settings[arg] = value
 			DataService.changed(player)
 			return true

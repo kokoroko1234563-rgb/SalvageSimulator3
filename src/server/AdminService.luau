@@ -17,6 +17,7 @@ local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
+local DayCycle = require(Shared.DayCycle)
 local Waves = require(Shared.Waves)
 
 local AuctionService = require(script.Parent.AuctionService)
@@ -532,6 +533,26 @@ command("showroom", "showroom [section]", "Go to the showroom, or one of its sec
 	end
 	character:PivotTo(CFrame.new(spot))
 	return { "Teleported to the showroom" }
+end)
+
+command("time", "time [hour]", "Show the time of day, or set it, e.g. time 19.5 for dusk", function(_, args)
+	local hour = tonumber(args[1])
+	if hour then
+		Workspace:SetAttribute(
+			DayCycle.StartAttribute,
+			DayCycle.startFor(hour % 24, Workspace:GetServerTimeNow())
+		)
+	end
+	local now = DayCycle.hour()
+	return {
+		string.format(
+			"It's %02d:%02d (%s), a day lasts %ds",
+			math.floor(now),
+			math.floor((now % 1) * 60),
+			DayCycle.period(now),
+			Config.Day.Length
+		),
+	}
 end)
 
 command("heal", "heal [player]", "Full health and breath", function(caller, args)

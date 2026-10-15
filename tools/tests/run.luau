@@ -353,6 +353,40 @@ test("build the showroom", function()
 	end
 end)
 
+test("day cycle", function()
+	local DayCycle = h.require("Shared/DayCycle")
+	for _, hour in { 0, 5.5, 6, 12, 17.9, 18, 23 } do
+		local back = DayCycle.hourFor(DayCycle.fractionFor(hour))
+		assert(math.abs(back - hour) < 1e-6, "hour round trip " .. hour .. " -> " .. back)
+	end
+	assert(
+		DayCycle.period(12) == "Day" and DayCycle.period(6) == "Twilight" and DayCycle.period(2) == "Night"
+	)
+	assert(DayCycle.nightness(12) == 0 and DayCycle.nightness(1) == 1, "night ramps")
+	local start = DayCycle.startFor(19.5, 1000)
+	h.game.Workspace:SetAttribute(DayCycle.StartAttribute, start)
+	local hour = DayCycle.hour(1000)
+	h.game.Workspace:SetAttribute(DayCycle.StartAttribute, nil)
+	assert(math.abs(hour - 19.5) < 1e-6, "setting the time works")
+end)
+
+test("music picks tracks by place and time", function()
+	local Music = h.require("Client/MusicController")
+	local Config = h.require("Shared/Config")
+	assert(Music.place(roblox.Vector3.new(0, 5, -40)) == "Shop", "the shop")
+	assert(Music.place(roblox.Vector3.new(0, 0, 100)) == "Shore", "zone 1 is the shore")
+	assert(Music.place(roblox.Vector3.new(0, -40, 700)) == "Sandbar", "the sandbar")
+	assert(#Music.candidates("Shore", "Day") == 0, "tracks without a SoundId never play")
+	local track = Config.Music.Tracks[4] -- Carefree: Shore, Day
+	local old = track.SoundId
+	track.SoundId = 123
+	local list = Music.candidates("Shore", "Day")
+	local night = Music.candidates("Shore", "Night")
+	track.SoundId = old
+	assert(#list == 1 and list[1].Title == track.Title, "an uploaded track fits its place and time")
+	assert(#night == 0, "and not other times")
+end)
+
 test("build the bell tower", function()
 	local map = Harness.wrap(roblox.Instance.new("Folder"))
 	local door = h.require("Server/FarSandbarService").build(map)
@@ -393,6 +427,9 @@ for _, name in
 		"SkyBeamController",
 		"HotbarUI",
 		"SeaController",
+		"DayController",
+		"MusicController",
+		"GearEffects",
 	}
 do
 	test("load Client/" .. name, function()

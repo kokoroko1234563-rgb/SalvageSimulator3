@@ -58,7 +58,7 @@ export type Profile = {
 	Lexicon: { [string]: number }, -- item id -> when first found (os.time); never reset
 	Upgrades: { [string]: number }, -- trader upgrade id -> level
 	Pockets: { PocketEntry }, -- Deep Pockets contents
-	Settings: { HideShopGear: boolean, ShowResetText: boolean },
+	Settings: { HideShopGear: boolean, ShowResetText: boolean, MuteMusic: boolean },
 	Receipts: { string }, -- recent Robux purchase ids, already granted (MonetizationService)
 	Hotbar: { string }, -- tool id per hotbar slot, "" = empty (see Hotbar.luau)
 }
@@ -81,7 +81,7 @@ local function defaultProfile(): Profile
 		Lexicon = {},
 		Upgrades = {},
 		Pockets = {},
-		Settings = { HideShopGear = false, ShowResetText = false },
+		Settings = { HideShopGear = false, ShowResetText = false, MuteMusic = false },
 		Receipts = {},
 		Hotbar = Hotbar.empty(),
 	}
@@ -232,6 +232,7 @@ local function reconcile(data: any): Profile
 	end
 	if type(data.Settings) == "table" then
 		profile.Settings.HideShopGear = data.Settings.HideShopGear == true
+		profile.Settings.MuteMusic = data.Settings.MuteMusic == true
 		profile.Settings.ShowResetText = data.Settings.ShowResetText == true
 	end
 	if type(data.Hotbar) == "table" then

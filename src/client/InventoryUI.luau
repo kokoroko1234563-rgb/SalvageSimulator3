@@ -535,6 +535,7 @@ local function refreshFilters()
 	end
 	toggle("Hide shop gear", "HideShopGear", 1)
 	toggle("Reset text", "ShowResetText", 2)
+	toggle("Mute music (M)", "MuteMusic", 3)
 end
 
 local function refreshPockets()
