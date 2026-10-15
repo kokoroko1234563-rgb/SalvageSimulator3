@@ -266,19 +266,15 @@ The doc gives examples, not effects, for most of these, so the effects above are
 - At night the light dims and turns blue but stays playable. Sunrise and sunset warm the haze.
 - `time` shows the clock, and `time 19.5` jumps to dusk.
 
-**Music** (`Config.Music`, `MusicController`): Kevin MacLeod tracks, chosen by where you are and the time of day.
+**Music** (`Config.Music`, `MusicController`): 20 tracks from Roblox's licensed library (APM Music), chosen by where you are and the time of day.
+- These tracks are free to use in any experience, so nothing needs uploading.
 - Each track lists its places (Shop, Shore, Outer, Sandbar, Secret, Showroom) and times (Day, Twilight, Night).
 - When you move somewhere a track doesn't fit, or the day turns, it cross-fades to one that does.
 - When a track ends, another follows after a short quiet gap.
-- Each new track shows its title and the credit ("Kevin MacLeod (incompetech.com) · CC BY 4.0"). The license requires that credit, so keep it.
+- Each new track shows its title and artist.
 - **M**, or the inventory toggle, mutes it, and the setting is saved.
-
-**Setting the music up:** Roblox can only play audio that's been uploaded to Roblox.
-1. Download each track in `Config.Music.Tracks` from incompetech.com.
-2. Upload it in the Creator Hub (Creations, then Audio), under the same owner as the game.
-3. Paste its id as the track's `SoundId`.
-
-Tracks still at 0 are skipped, so the music starts as soon as the first one is in. Check the titles on incompetech.com: I picked them from memory to fit each place and mood, and you may prefer others.
+- **Adding tracks:** find them in the Creator Store's audio section and add each with its asset id, artist, places and times.
+- Kevin MacLeod's music was tried first, but Roblox's moderation rejects it on upload.
 
 ## Showroom
 

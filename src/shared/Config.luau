@@ -249,46 +249,149 @@ Config.Day = {
 	DuskColor = Color3.fromRGB(255, 160, 110), -- haze colour around sunrise and sunset
 }
 
--- Music: Kevin MacLeod (incompetech.com), licensed CC BY 4.0. Roblox only plays audio
--- uploaded to Roblox: download each track from incompetech.com, upload it in the Creator
--- Hub (Creations > Audio), and paste its id as SoundId. Tracks still at 0 are skipped.
--- The title and the credit show whenever a track starts.
+-- Music, chosen by place and time of day. These are Roblox's licensed library tracks (APM
+-- Music), free to use in any experience, so nothing needs uploading. Find more in the Creator
+-- Store's audio section (or with tools that search it) and add them here with their asset id.
+-- (Kevin MacLeod's music was tried first: Roblox's moderation rejects it on upload.)
 -- Places: Shop, Shore (zones 1-2), Outer (zones 3-4), Sandbar (zone 5), Secret, Showroom.
 -- Times: Day, Twilight (dawn and dusk), Night. A track with no Times plays at any time.
+-- A track with SoundId 0 is skipped. Each new track shows its title and artist.
 Config.Music = {
 	Volume = 0.35,
 	FadeTime = 3, -- seconds to cross-fade between tracks
 	Gap = { 4, 12 }, -- seconds of quiet between tracks
-	Credit = "Kevin MacLeod (incompetech.com) · CC BY 4.0",
 	Tracks = {
-		{ Title = "Local Forecast", SoundId = 0, Places = { "Shop" }, Times = { "Day", "Twilight" } },
-		{ Title = "Lobby Time", SoundId = 0, Places = { "Shop", "Showroom" }, Times = { "Day" } },
-		{ Title = "Wallpaper", SoundId = 0, Places = { "Shop", "Showroom" } },
-		{ Title = "Carefree", SoundId = 0, Places = { "Shore" }, Times = { "Day" } },
-		{ Title = "Island Meet and Greet", SoundId = 0, Places = { "Shore", "Shop" }, Times = { "Day" } },
-		{ Title = "Easy Lemon", SoundId = 0, Places = { "Shore" }, Times = { "Day", "Twilight" } },
-		{ Title = "Fluffing a Duck", SoundId = 0, Places = { "Shore" }, Times = { "Day" } },
-		{ Title = "Monkeys Spinning Monkeys", SoundId = 0, Places = { "Shore", "Outer" }, Times = { "Day" } },
-		{ Title = "Investigations", SoundId = 0, Places = { "Outer" }, Times = { "Day", "Twilight" } },
-		{ Title = "Sneaky Snitch", SoundId = 0, Places = { "Outer" }, Times = { "Day" } },
-		{ Title = "Floating Cities", SoundId = 0, Places = { "Sandbar" } },
 		{
-			Title = "Lightless Dawn",
-			SoundId = 0,
+			Title = "Prima Bossa Nova",
+			Artist = "Anthony Mawer",
+			SoundId = 1837070127,
+			Places = { "Shop" },
+			Times = { "Day", "Twilight" },
+		},
+		{
+			Title = "Bossa Nova Party",
+			Artist = "Intersound",
+			SoundId = 1845764031,
+			Places = { "Shop", "Showroom" },
+			Times = { "Day" },
+		},
+		{
+			Title = "A Dream of Bossa Nova",
+			Artist = "Intersound",
+			SoundId = 9043921564,
+			Places = { "Shop", "Showroom" },
+		},
+		{
+			Title = "Seaside Parade",
+			Artist = "Themes - Vinyl Series",
+			SoundId = 1848368912,
+			Places = { "Showroom", "Shop" },
+			Times = { "Day" },
+		},
+		{
+			Title = "Hawaiian Calypso",
+			Artist = "Jo Wetter",
+			SoundId = 1837052375,
+			Places = { "Shore" },
+			Times = { "Day" },
+		},
+		{
+			Title = "Tropical Breeze",
+			Artist = "Charles Michael Brotman",
+			SoundId = 9047134387,
+			Places = { "Shore", "Shop" },
+			Times = { "Day", "Twilight" },
+		},
+		{
+			Title = "Maui Beach",
+			Artist = "Selected Sound New Vinyl Series",
+			SoundId = 9043828544,
+			Places = { "Shore" },
+			Times = { "Day" },
+		},
+		{
+			Title = "Beach Party",
+			Artist = "Endgame",
+			SoundId = 1837779005,
+			Places = { "Shore" },
+			Times = { "Day" },
+		},
+		{
+			Title = "Jamaica Boy",
+			Artist = "Bruce Campbell",
+			SoundId = 1836356833,
+			Places = { "Shore", "Outer" },
+			Times = { "Day" },
+		},
+		{
+			Title = "Carnival in Trinidad",
+			Artist = "Lars-Luis Linek",
+			SoundId = 1844398749,
+			Places = { "Shore", "Outer" },
+			Times = { "Day" },
+		},
+		{
+			Title = "Beach Island",
+			Artist = "Aymeric Ribot",
+			SoundId = 9047876685,
+			Places = { "Outer" },
+			Times = { "Day", "Twilight" },
+		},
+		{
+			Title = "Pirate King",
+			Artist = "2nd Foundation Music",
+			SoundId = 1835322563,
+			Places = { "Outer", "Sandbar" },
+			Times = { "Day", "Twilight" },
+		},
+		{
+			Title = "Atlantis Mystery",
+			Artist = "Sonoton Vanguard",
+			SoundId = 1847183157,
+			Places = { "Sandbar" },
+		},
+		{
+			Title = "Dangerous Deep Sea",
+			Artist = "Walt Rockman",
+			SoundId = 1846079117,
 			Places = { "Sandbar", "Outer" },
 			Times = { "Twilight", "Night" },
 		},
-		{ Title = "Dreamy Flashback", SoundId = 0, Places = { "Shore", "Outer" }, Times = { "Twilight" } },
-		{ Title = "Bathed in the Light", SoundId = 0, Places = { "Shore", "Shop" }, Times = { "Twilight" } },
-		{ Title = "Night on the Docks", SoundId = 0, Places = { "Shop", "Shore" }, Times = { "Night" } },
 		{
-			Title = "Peaceful Desolation",
-			SoundId = 0,
+			Title = "Kona Sunset",
+			Artist = "Charles Michael Brotman",
+			SoundId = 9047138975,
+			Places = { "Shore", "Outer" },
+			Times = { "Twilight" },
+		},
+		{
+			Title = "Sunset Chill",
+			Artist = "Queens Road",
+			SoundId = 9046862941,
+			Places = { "Shore", "Shop" },
+			Times = { "Twilight" },
+		},
+		{
+			Title = "Night in Jamaica",
+			Artist = "Lars-Luis Linek",
+			SoundId = 1844398912,
+			Places = { "Shop", "Shore" },
+			Times = { "Night" },
+		},
+		{
+			Title = "Calypso Ballad",
+			Artist = "David Ohana",
+			SoundId = 9047782221,
 			Places = { "Shore", "Outer", "Sandbar" },
 			Times = { "Night" },
 		},
-		{ Title = "Comfortable Mystery", SoundId = 0, Places = { "Secret" } },
-		{ Title = "Deep Haze", SoundId = 0, Places = { "Secret" } },
+		{ Title = "Deep Sea", Artist = "Sonoton Vinyl", SoundId = 9043080550, Places = { "Secret" } },
+		{
+			Title = "Mysterious Ocean",
+			Artist = "Philippe Bestion",
+			SoundId = 1839254432,
+			Places = { "Secret" },
+		},
 	},
 }
 

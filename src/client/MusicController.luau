@@ -23,7 +23,7 @@ local cfg = Config.Music
 
 local MusicController = {}
 
-type Track = { Title: string, SoundId: number, Places: { string }, Times: { string }? }
+type Track = { Title: string, Artist: string?, SoundId: number, Places: { string }, Times: { string }? }
 
 local muted = false
 local current: { track: Track, sound: Sound }? = nil
@@ -31,6 +31,7 @@ local lastTitle: string? = nil
 local quietUntil = 0
 local toast: Frame
 local toastTitle: TextLabel
+local toastCredit: TextLabel
 
 -- Where the player is, as a music place.
 function MusicController.place(position: Vector3): string
@@ -76,8 +77,9 @@ local function fade(sound: Sound, volume: number, destroyAfter: boolean)
 	tween:Play()
 end
 
-local function showToast(title: string)
+local function showToast(title: string, artist: string?)
 	toastTitle.Text = "♪  " .. title
+	toastCredit.Text = artist or ""
 	toast.Visible = true
 	toast.BackgroundTransparency = 1
 	TweenService:Create(toast, TweenInfo.new(0.6), { BackgroundTransparency = 0.25 }):Play()
@@ -106,7 +108,7 @@ local function play(track: Track)
 	fade(sound, cfg.Volume, false)
 	current = { track = track, sound = sound }
 	lastTitle = track.Title
-	showToast(track.Title)
+	showToast(track.Title, track.Artist)
 	sound.Ended:Connect(function()
 		if current and current.sound == sound then
 			current = nil
@@ -208,8 +210,8 @@ function MusicController.init()
 	credit.TextSize = 12
 	credit.TextColor3 = Palette.UI.Muted
 	credit.TextXAlignment = Enum.TextXAlignment.Left
-	credit.Text = cfg.Credit
 	credit.Parent = toast
+	toastCredit = credit
 
 	-- The mute setting lives on the profile and arrives with the inventory.
 	Remotes.get("InventorySync").OnClientEvent:Connect(function(snapshot)

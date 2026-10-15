@@ -376,15 +376,28 @@ test("music picks tracks by place and time", function()
 	assert(Music.place(roblox.Vector3.new(0, 5, -40)) == "Shop", "the shop")
 	assert(Music.place(roblox.Vector3.new(0, 0, 100)) == "Shore", "zone 1 is the shore")
 	assert(Music.place(roblox.Vector3.new(0, -40, 700)) == "Sandbar", "the sandbar")
-	assert(#Music.candidates("Shore", "Day") == 0, "tracks without a SoundId never play")
-	local track = Config.Music.Tracks[4] -- Carefree: Shore, Day
-	local old = track.SoundId
-	track.SoundId = 123
-	local list = Music.candidates("Shore", "Day")
-	local night = Music.candidates("Shore", "Night")
-	track.SoundId = old
-	assert(#list == 1 and list[1].Title == track.Title, "an uploaded track fits its place and time")
-	assert(#night == 0, "and not other times")
+	-- Every place has something for every time of day.
+	for _, place in { "Shop", "Shore", "Outer", "Sandbar", "Secret", "Showroom" } do
+		for _, time in { "Day", "Twilight", "Night" } do
+			if place ~= "Showroom" or time == "Day" then
+				assert(#Music.candidates(place, time) > 0, "no music for " .. place .. " at " .. time)
+			end
+		end
+	end
+	for _, track in Music.candidates("Shore", "Night") do
+		assert(track.Times == nil or table.find(track.Times, "Night"), "a day track played at night")
+	end
+	-- Tracks without a SoundId never play.
+	local saved = {}
+	for i, track in Config.Music.Tracks do
+		saved[i] = track.SoundId
+		track.SoundId = 0
+	end
+	local none = Music.candidates("Shore", "Day")
+	for i, track in Config.Music.Tracks do
+		track.SoundId = saved[i]
+	end
+	assert(#none == 0, "tracks without a SoundId never play")
 end)
 
 test("build the bell tower", function()

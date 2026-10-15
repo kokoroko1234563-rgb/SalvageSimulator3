@@ -168,6 +168,7 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 	for _, track in Config.Music.Tracks do
 		local where = "Music track " .. tostring(track.Title)
 		check(type(track.SoundId) == "number", where .. ": SoundId must be a number (0 = not uploaded yet)")
+		check(type(track.Artist) == "string", where .. ": needs an Artist (it's shown when the track starts)")
 		check(type(track.Places) == "table" and #track.Places > 0, where .. ": needs Places")
 		for _, place in track.Places or {} do
 			check(PLACES[place] == true, where .. ": unknown place " .. tostring(place))
