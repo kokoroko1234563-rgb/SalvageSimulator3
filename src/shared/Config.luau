@@ -110,6 +110,14 @@ Config.Tide = {
 	-- in seconds (scaled by TimeScale like the phases): that part of the sea follows the tide
 	-- this much later. Positive = drains later and floods later; negative = earlier. Between
 	-- points the delay blends smoothly, so the waterline curves.
+	-- On top of the sections, a random pattern (from the server's sea seed) shifts which
+	-- parts drain first, and slowly changes over time, so the highest and lowest stretches of
+	-- the waterline move about as the tide goes out. Each server has its own seed.
+	Shuffle = {
+		Amplitude = 25, -- up to this many seconds earlier or later (scaled by TimeScale)
+		Wavelength = 260, -- studs along the shoreline between high and low stretches (roughly)
+		Change = 120, -- seconds for the pattern to change into a different one
+	},
 	Sections = {
 		{ X = -360, Lag = -30 }, -- the west end drains first
 		{ X = -120, Lag = 0 },
@@ -145,6 +153,8 @@ Config.Waves = {
 	-- beach; while sliding back it drags them toward the sea.
 	RunUp = 10, -- studs an average wave runs up the sand
 	RunUpVariation = 0.35, -- each wave is up to this much bigger or smaller (deterministic)
+	AlongVariation = 0.35, -- and up to this much bigger or smaller at different spots along the beach
+	AlongWavelength = 140, -- studs between the bigger and smaller stretches of a wave
 	RunUpPush = 12, -- studs/s up the beach under the running-up sheet
 	BackwashPull = 16, -- studs/s toward the sea under the sliding-back sheet
 	BackwashRatio = 1.1, -- sliding back takes this many times as long as running up
@@ -172,7 +182,7 @@ Config.Waves = {
 	DragShallows = 6, -- items this far into the water (past the waterline) count as reached
 
 	WetSeconds = 40, -- sand the tide uncovered this recently still looks wet
-	WobbleAmplitude = 5, -- the front is not a perfect line along the beach
+	WobbleAmplitude = 8, -- the front is not a perfect line along the beach (a different shape each wave)
 	WobbleFrequency = 1 / 45,
 	CharacterFactor = 1, -- multiplier on push for characters (displacement)
 	ItemFactor = 2.5, -- multiplier on push for physical items (acceleration)

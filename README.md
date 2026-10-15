@@ -102,6 +102,12 @@ All of this is computed from the shared clock, so the server and every client ag
 
 **Which part goes down when:** `Sections` are points along the shoreline, each with a delay in seconds. That part of the sea follows the tide this much later: positive drains later and floods later, negative goes first. Between points the delay blends smoothly, so the waterline curves along the beach instead of being a straight line. By default the west end drains first and the east end holds water longest. Each delay must stay shorter than the low-tide hold, which the validator checks.
 
+**Random patterns (the sea seed):** each server picks a random sea seed at startup, so no two servers' seas behave the same.
+- **Waterline:** a smooth random pattern on top of the sections makes some stretches drain up to 25 seconds earlier or later (`Config.Tide.Shuffle`). The pattern slowly turns into a different one over a couple of minutes, so where the waterline is furthest out and furthest in moves about as the tide goes down.
+- **Waves:** each wave has its own front shape (`WobbleAmplitude`) and is up to 35% bigger or smaller at different spots along the beach (`AlongVariation`). The seed also decides which waves are rogue waves.
+- **Admin:** `waves seed` picks a new seed, and `waves seed <n>` sets one, to replay a pattern.
+- **Validator:** it checks that a section's delay plus the shuffle stays shorter than the low-tide hold.
+
 **Rock pools** (`Config.Beach.Pools`): rings of rock that hold still water at a fixed level after the sea leaves. Floating items float in them. They never count as deep water.
 
 **Waves:** each wave rolls in to the local waterline, runs up the exposed sand as a thin sheet, slows to a stop and slides back.
@@ -229,7 +235,7 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `clearitems [all]` | Remove unclaimed items (or all items) |
 | `tide <out\|hold\|in> [percent]` | Jump the tide, e.g. `tide in 90` |
 | `tidespeed <scale>` | 1 = real 25 min cycle, 0.1 = 2.5 min |
-| `waves <multiplier\|rogue>` | Wave strength (0 = calm), or send a rogue wave |
+| `waves <multiplier\|rogue\|seed [n]>` | Wave strength (0 = calm), send a rogue wave, or set a new random sea seed |
 | `tp <shop\|zone\|sandbar\|player> [who]` | Teleport (`sandbar` = the bell tower door) |
 | `heal`, `god`, `speed <n>` | Health/breath, toggle no-drowning, walk speed |
 | `resetdata <player>`, `kick <player> [reason]` | Wipe a save, kick |

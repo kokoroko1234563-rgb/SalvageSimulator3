@@ -55,6 +55,8 @@ end
 
 -- Every machine derives the tide from this one shared timestamp.
 Workspace:SetAttribute(Tide.StartAttribute, Workspace:GetServerTimeNow())
+-- Each server's sea gets its own pattern of waterline and waves.
+Workspace:SetAttribute(Tide.SeedAttribute, Random.new():NextInteger(1, 999999))
 
 local map = BeachBuilder.build()
 

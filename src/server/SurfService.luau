@@ -57,7 +57,7 @@ function SurfService.afterWave(n: number)
 		end
 		local position = item.Position
 		local line = Tide.waterlineAt(sea, position.X)
-		local reach = Waves.reach(n, line)
+		local reach = Waves.reach(n, line, position.X)
 		local rel = position.Z - line
 		if rel >= -reach and rel <= cfg.DragShallows then
 			local size = reach / cfg.RunUp

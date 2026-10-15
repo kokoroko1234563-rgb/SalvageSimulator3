@@ -154,8 +154,34 @@ function Tide.waterline(now: number?): number
 	return rawState(now).Waterline
 end
 
--- Sections: the delay (seconds, already time-scaled) for a point along the shoreline.
-function Tide.lagAt(x: number): number
+Tide.SeedAttribute = "SeaSeed" -- set once by the server at startup (random), or the admin console
+
+-- The server's sea seed: makes the waterline pattern and the waves different per server.
+function Tide.seed(): number
+	return Workspace:GetAttribute(Tide.SeedAttribute) or 0
+end
+
+-- Smooth noise in -1..1 for a seed (a different slice of Perlin noise per seed).
+function Tide.noise(a: number, b: number, salt: number): number
+	local slice = (Tide.seed() * 0.6180339 + salt * 0.37) % 1000 + 0.5
+	return math.clamp(math.noise(a, b, slice) * 2, -1, 1)
+end
+
+-- The delay (seconds, already time-scaled) for a point along the shoreline: the fixed
+-- sections plus the seeded pattern, which changes slowly over time.
+function Tide.lagAt(x: number, now: number?): number
+	local scale = Workspace:GetAttribute(Tide.ScaleAttribute) or cfg.TimeScale
+	local shuffle = cfg.Shuffle
+	local extra = 0
+	if shuffle and shuffle.Amplitude > 0 then
+		local t = (now or Tide.now()) / shuffle.Change
+		extra = Tide.noise(x / shuffle.Wavelength, t, 1) * shuffle.Amplitude * scale
+	end
+	return Tide.sectionLag(x) + extra
+end
+
+-- Just the fixed sections' delay (time-scaled).
+function Tide.sectionLag(x: number): number
 	local sections = cfg.Sections
 	if not sections or #sections == 0 then
 		return 0
@@ -185,7 +211,7 @@ end
 
 -- The waterline (Z) at a point along the shoreline.
 function Tide.waterlineAt(sea: Sea, x: number): number
-	return waterlineFor(sea.Now - Tide.lagAt(x))
+	return waterlineFor(sea.Now - Tide.lagAt(x, sea.Now))
 end
 
 return Tide

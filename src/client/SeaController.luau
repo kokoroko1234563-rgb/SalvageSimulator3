@@ -193,7 +193,7 @@ local function update()
 		end
 
 		-- Wet sand: up to where the tide was a little while ago, or the last wave reached.
-		local lastReach = Waves.reach(Waves.indexAt(sea.Now) - 1, line)
+		local lastReach = Waves.reach(Waves.indexAt(sea.Now) - 1, line, strip.x)
 		local wetTo = math.min(Tide.waterlineAt(wetSea, strip.x), line - lastReach, line + edge)
 		if wetTo < line - 0.5 then
 			place(strip.wet, onSand(strip.wet, strip.x, line, wetTo, 0.04))

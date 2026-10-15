@@ -27,9 +27,11 @@ Waves.RogueAttribute = "RogueWave" -- set by the admin console: this wave index 
 
 local SHORE = Vector3.new(0, 0, -1)
 
--- Deterministic 0-1 hash of a wave index, the same on server and every client.
+-- Deterministic 0-1 hash of a wave index (and the server's sea seed), the same on the server
+-- and every client. Reduced first so the multiplication stays exact.
 local function hash(n: number, salt: number): number
-	return ((n * salt) % 4294967296) / 4294967296
+	local m = (n + Tide.seed() * 7919) % 1000003
+	return ((m * salt) % 4294967296) / 4294967296
 end
 
 function Waves.indexAt(now: number): number
@@ -58,8 +60,14 @@ local function zoneScale(z: number): number
 	return if zone and zone > 0 then cfg.ZoneScale[zone] or 1 else 1
 end
 
+-- Each wave's front has its own shape along the beach.
 local function wobble(x: number, n: number): number
-	return cfg.WobbleAmplitude * math.sin(x * cfg.WobbleFrequency + n * 1.7)
+	return cfg.WobbleAmplitude * Tide.noise(x * cfg.WobbleFrequency, n * 0.43, 2)
+end
+
+-- Each wave is bigger at some spots along the beach and smaller at others.
+function Waves.sizeAt(n: number, x: number): number
+	return Waves.size(n) * (1 + cfg.AlongVariation * Tide.noise(x / cfg.AlongWavelength, n * 0.61, 3))
 end
 
 export type WaveAt = {
@@ -78,7 +86,7 @@ function Waves.wave(n: number, x: number, sea: Sea, waterline: number?): WaveAt?
 		return nil
 	end
 	local line = waterline or Tide.waterlineAt(sea, x)
-	local size = Waves.size(n) * zoneScale(line)
+	local size = Waves.sizeAt(n, x) * zoneScale(line)
 	local start = cfg.StartOffset + wobble(x, n)
 	local arrive = start / cfg.Speed
 	if s < arrive then
@@ -136,13 +144,14 @@ function Waves.wavesAt(x: number, sea: Sea, waterline: number?): { WaveAt }
 end
 
 -- How far up the beach wave n runs where the waterline is `waterline`.
-function Waves.reach(n: number, waterline: number): number
-	return cfg.RunUp * Waves.size(n) * zoneScale(waterline)
+function Waves.reach(n: number, waterline: number, x: number?): number
+	local size = if x then Waves.sizeAt(n, x) else Waves.size(n)
+	return cfg.RunUp * size * zoneScale(waterline)
 end
 
 -- How long wave n lasts from its start until it has slid back (the longest anywhere).
 function Waves.lifetime(n: number): number
-	local size = Waves.size(n) * (cfg.ZoneScale[#cfg.ZoneScale] or 1)
+	local size = Waves.size(n) * (1 + cfg.AlongVariation) * (cfg.ZoneScale[#cfg.ZoneScale] or 1)
 	local upTime = 2 * cfg.RunUp * size / cfg.Speed
 	return (cfg.StartOffset + cfg.WobbleAmplitude) / cfg.Speed + upTime * (1 + cfg.BackwashRatio)
 end

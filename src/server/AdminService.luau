@@ -440,9 +440,15 @@ end)
 
 command(
 	"waves",
-	"waves <multiplier|rogue>",
-	"Wave strength (1 = normal, 0 = calm), or send a rogue wave",
+	"waves <multiplier|rogue|seed [n]>",
+	"Wave strength (1 = normal, 0 = calm), send a rogue wave, or change the sea's random seed",
 	function(_, args)
+		if (args[1] or ""):lower() == "seed" then
+			-- A new pattern for the waterline and the waves (random unless a number is given).
+			local seed = tonumber(args[2]) or Random.new():NextInteger(1, 999999)
+			Workspace:SetAttribute(Tide.SeedAttribute, math.floor(seed))
+			return { "Sea seed " .. math.floor(seed) }
+		end
 		if (args[1] or ""):lower() == "rogue" then
 			-- The wave after the one already rolling in (clients get a few seconds' warning).
 			local index = Waves.indexAt(Tide.now()) + 1
@@ -451,7 +457,7 @@ command(
 		end
 		local scale = tonumber(args[1])
 		if not scale or scale < 0 then
-			return { "Usage: waves <multiplier|rogue>" }
+			return { "Usage: waves <multiplier|rogue|seed [n]>" }
 		end
 		Workspace:SetAttribute(Waves.ScaleAttribute, scale)
 		return { string.format("Wave strength x%.2f", scale) }

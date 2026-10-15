@@ -148,9 +148,10 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 			"Config.Tide.Sections entries need X and Lag numbers"
 		)
 		check((section.X or 0) > lastX, "Config.Tide.Sections must be in order of X")
+		local shuffle = Config.Tide.Shuffle and Config.Tide.Shuffle.Amplitude or 0
 		check(
-			math.abs(section.Lag or 0) < Config.Tide.HoldTime,
-			"a tide section's Lag must be shorter than the low-tide hold, or that part never reaches low tide with the rest"
+			math.abs(section.Lag or 0) + shuffle < Config.Tide.HoldTime,
+			"a tide section's Lag plus the Shuffle amplitude must be shorter than the low-tide hold, or that part never reaches low tide with the rest"
 		)
 		lastX = section.X or lastX
 	end

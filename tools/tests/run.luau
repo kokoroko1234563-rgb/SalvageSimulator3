@@ -236,14 +236,34 @@ test("water slows you down", function()
 	assert(knee < 1 and under < knee, "slower the deeper you are, slowest underwater")
 end)
 
+test("the sea seed changes the patterns", function()
+	local Tide = h.require("Shared/Tide")
+	local Waves = h.require("Shared/Waves")
+	local ws = h.game.Workspace
+	local function shape()
+		local out = {}
+		for x = -300, 300, 100 do
+			table.insert(out, Tide.lagAt(x, 5000))
+		end
+		return table.concat(out, ","), Waves.sizeAt(77, 120)
+	end
+	ws:SetAttribute(Tide.SeedAttribute, 1)
+	local a, sizeA = shape()
+	ws:SetAttribute(Tide.SeedAttribute, 2)
+	local b, sizeB = shape()
+	ws:SetAttribute(Tide.SeedAttribute, nil)
+	assert(a ~= b, "different seeds give different waterline patterns")
+	assert(sizeA ~= sizeB, "different seeds give different waves")
+	-- The pattern changes over time too.
+	assert(Tide.lagAt(0, 0) ~= Tide.lagAt(0, 600), "the waterline pattern changes as time goes on")
+end)
+
 test("waves run up and slide back", function()
 	local Waves = h.require("Shared/Waves")
 	local Config = h.require("Shared/Config")
 	local Tide = h.require("Shared/Tide")
 	local cfg = Config.Waves
 	local n = 1001 -- not a set wave
-	local arrive = (cfg.StartOffset + cfg.WobbleAmplitude * math.sin(0 * cfg.WobbleFrequency + n * 1.7))
-		/ cfg.Speed
 	-- Hold the tide still (low tide) so the waterline doesn't move during the wave.
 	h.game.Workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("Hold", 0.5, n * cfg.Period))
 	local line = Tide.waterlineAt(Tide.sea(n * cfg.Period), 0)
@@ -251,6 +271,11 @@ test("waves run up and slide back", function()
 		return Waves.wave(n, 0, Tide.sea(n * cfg.Period + t), line)
 	end
 	assert(at(0).Phase == "Rolling" and at(0).Front > 0, "starts out at sea")
+	-- When it reaches the waterline (its front's shape along the beach is random).
+	local arrive = 0
+	while at(arrive) and at(arrive).Phase == "Rolling" do
+		arrive += 0.05
+	end
 	local up = at(arrive + 0.3)
 	assert(up and up.Phase == "RunUp" and up.Front < 0, "runs up the sand after reaching the waterline")
 	local push =
