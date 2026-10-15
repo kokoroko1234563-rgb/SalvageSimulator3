@@ -81,6 +81,11 @@ test("load server services", function()
 			"CosmeticService",
 			"FarSandbarService",
 			"MonetizationService",
+			"ModelParts",
+			"ItemModels",
+			"ToolModels",
+			"VesselTrim",
+			"BeachCheer",
 			"SurfService",
 			"Showroom",
 			"ShowroomExhibits",
@@ -138,6 +143,10 @@ test("item models are welded on and never block grabs", function()
 					def.Id .. ": " .. child.Name .. " blocks"
 				)
 				assert(child.Massless, def.Id .. ": " .. child.Name .. " has mass")
+				-- A NaN here (from a lookAt along its up vector) would make the part vanish.
+				for _, component in { child.CFrame:GetComponents() } do
+					assert(component == component, def.Id .. ": " .. child.Name .. " has a NaN transform")
+				end
 			end
 		end
 		assert(parts > 0, def.Id .. " has no visible parts")
@@ -155,6 +164,91 @@ for id, build in VesselService and VesselService._builders or {} do
 		assert(model:FindFirstChild("Cargo"), "vessel needs a Cargo part")
 	end)
 end
+
+-- 5b. Every vessel builds with valid geometry, and where it has paint and trim, the trim never
+-- collides or weighs anything.
+test("vessels are painted and trimmed", function()
+	local VesselTrim = h.require("Server/VesselTrim")
+	local trimmed = 0
+	for id, build in VesselService._builders do
+		local model = Harness.wrap(roblox.Instance.new("Model"))
+		build(model, roblox.CFrame.new(0, 1, 0))
+		for _, part in model:GetDescendants() do
+			if part:IsA("BasePart") then
+				for _, component in { part.CFrame:GetComponents() } do
+					assert(component == component, id .. ": " .. part.Name .. " has a NaN transform")
+				end
+				if part.Name:match("^Rim") or part.Name:match("^Stripe") then
+					assert(
+						not part.CanCollide and not part.CanQuery and part.Massless,
+						id .. ": " .. part.Name .. " is solid"
+					)
+				end
+			end
+		end
+		if VesselTrim.has(id) then
+			trimmed += 1
+			-- The trim is welded on to the floor (the vessel's PrimaryPart).
+			assert(model.PrimaryPart:FindFirstChild("RimFront"), id .. " has no rim")
+		end
+	end
+	assert(trimmed >= 6, "the base vessels should all be trimmed")
+end)
+
+-- 5c. Every tool but Bare Hands has a model that attaches at the hand, and the model is
+-- only for looks: no collision, no mass, nothing a pointer can pick, no broken transforms.
+test("tools have models that attach at the hand", function()
+	local Gear = h.require("Shared/Gear")
+	local ToolModels = h.require("Server/ToolModels")
+	for _, tool in Gear.Tools do
+		if tool.Id == "BareHands" then
+			assert(
+				not ToolModels.has(tool.Id) and ToolModels.build(tool.Id) == nil,
+				"bare hands hold nothing"
+			)
+		else
+			assert(ToolModels.has(tool.Id), tool.Id .. " has no model")
+			local accessory = ToolModels.build(tool.Id)
+			local handle = accessory and accessory:FindFirstChild("Handle")
+			assert(
+				handle and handle:FindFirstChild("RightGripAttachment"),
+				tool.Id .. " has nowhere to attach"
+			)
+			local parts = 0
+			for _, part in accessory:GetDescendants() do
+				if part:IsA("BasePart") then
+					parts += 1
+					assert(
+						not part.CanCollide and not part.CanQuery and not part.CanTouch and part.Massless,
+						tool.Id .. ": " .. part.Name .. " is not just for looks"
+					)
+					for _, component in { part.CFrame:GetComponents() } do
+						assert(component == component, tool.Id .. ": " .. part.Name .. " has a NaN transform")
+					end
+				end
+			end
+			assert(parts > 2, tool.Id .. " has hardly any parts")
+		end
+	end
+end)
+
+-- 5d. The beach's cheerful scenery never gets in the way of towing, grabbing or the waves.
+test("beach cheer is scenery only", function()
+	local map = h.require("Server/BeachBuilder").build()
+	local cheer = map:FindFirstChild("Cheer")
+	assert(cheer and #cheer:GetChildren() > 100, "no beach cheer was built")
+	for _, part in cheer:GetDescendants() do
+		if part:IsA("BasePart") then
+			assert(
+				not part.CanCollide and not part.CanQuery and not part.CanTouch,
+				part.Name .. " gets in the way"
+			)
+			for _, component in { part.CFrame:GetComponents() } do
+				assert(component == component, part.Name .. " has a NaN transform")
+			end
+		end
+	end
+end)
 
 -- 6. Every biome's decor, entrance and hazard build.
 local Biomes = h.require("Shared/Biomes")

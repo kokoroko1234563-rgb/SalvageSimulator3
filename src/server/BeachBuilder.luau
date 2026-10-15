@@ -12,6 +12,7 @@ local Palette = require(Shared.Palette)
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 
+local BeachCheer = require(script.Parent.BeachCheer)
 local BeachDressing = require(script.Parent.BeachDressing)
 local Buildings = require(script.Parent.Buildings)
 local MapParts = require(script.Parent.MapParts)
@@ -411,7 +412,7 @@ local function setLighting()
 	correction.Saturation = 0.35
 	correction.Contrast = 0.05
 	correction.Brightness = 0.04
-	correction.TintColor = Color3.fromRGB(255, 244, 226)
+	correction.TintColor = Color3.fromRGB(255, 249, 238)
 
 	-- Sparkle on the water and warm sun rays through the haze.
 	local bloom = ensure("BloomEffect") :: BloomEffect
@@ -494,6 +495,7 @@ function BeachBuilder.build(): Folder
 	buildPools(map)
 	buildShop(map)
 	BeachDressing.build(map, Random.new(7))
+	BeachCheer.build(map, Random.new(41))
 	ZoneProps.build(map)
 	BiomeModels.showcase(map)
 

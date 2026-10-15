@@ -1,0 +1,183 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>html,body{margin:0;background:#cfe6f5;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from "three"
+
+// A rough stand-in for how Roblox shades each material. It is for judging shape, colour and
+// proportion, not for matching the engine pixel for pixel.
+const MATERIALS = {
+  SmoothPlastic: { r: 0.42, m: 0 }, Plastic: { r: 0.6, m: 0 }, Wood: { r: 0.8, m: 0 },
+  WoodPlanks: { r: 0.78, m: 0 }, Metal: { r: 0.32, m: 0.85 }, CorrodedMetal: { r: 0.85, m: 0.45 },
+  Foil: { r: 0.22, m: 0.95 }, Fabric: { r: 1, m: 0 }, Sand: { r: 1, m: 0 }, Slate: { r: 0.9, m: 0 },
+  Ground: { r: 1, m: 0 }, Glass: { r: 0.05, m: 0 }, Neon: { r: 0.3, m: 0 }, Grass: { r: 1, m: 0 },
+}
+
+const params = new URLSearchParams(location.search)
+const model = params.get("model")
+const view = params.get("view") || "iso"
+const W = +params.get("w") || 480, H = +params.get("h") || 400
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
+renderer.setSize(W, H)
+renderer.shadowMap.enabled = true
+renderer.shadowMap.type = THREE.PCFSoftShadowMap
+renderer.toneMapping = THREE.ACESFilmicToneMapping
+renderer.toneMappingExposure = 0.85
+renderer.outputColorSpace = THREE.SRGBColorSpace
+document.body.appendChild(renderer.domElement)
+
+const data = await (await fetch(`./out/${model}.json`)).json()
+const lighting = await (await fetch("./out/lighting.json")).json()
+
+// The game's ColorCorrectionEffect, as a filter on the finished picture, plus its tint.
+renderer.domElement.style.filter =
+  `saturate(${1 + lighting.Saturation}) contrast(${1 + lighting.Contrast}) brightness(${1 + lighting.CorrectionBrightness})`
+const tint = document.createElement("div")
+tint.style.cssText = `position:fixed;inset:0;pointer-events:none;mix-blend-mode:multiply;background:rgb(${lighting.TintColor.join(",")})`
+document.body.appendChild(tint)
+
+// The sun's height and side, from the time of day: it rises in the east and sets in the west.
+const hours = lighting.ClockTime
+const altitude = Math.PI / 2 - Math.abs(((hours - 6) / 12) * Math.PI - Math.PI / 2)
+const sunDirection = new THREE.Vector3(hours < 12 ? 0.9 : -0.9, 0, 0.3).multiplyScalar(Math.cos(altitude))
+sunDirection.y = Math.sin(altitude)
+sunDirection.normalize()
+const isBeach = data.group === "beach"
+const c3 = (c) => new THREE.Color().setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace)
+
+const scene = new THREE.Scene()
+const horizon = c3(lighting.FogColor)
+scene.background = horizon
+if (isBeach) scene.fog = new THREE.Fog(horizon, lighting.FogStart, lighting.FogEnd)
+
+// Metals and glass look black without something to reflect, so give them the sky and sand.
+{
+  const geometry = new THREE.SphereGeometry(50, 48, 24)
+  const colors = []
+  const top = new THREE.Color(0x6db8f2), mid = new THREE.Color(0xe8f4ff), low = new THREE.Color(0xe2cf9c)
+  const position = geometry.attributes.position
+  for (let i = 0; i < position.count; i++) {
+    const t = position.getY(i) / 50
+    const c = t > 0 ? mid.clone().lerp(top, Math.pow(t, 0.6)) : mid.clone().lerp(low, Math.min(1, -t * 4))
+    colors.push(c.r, c.g, c.b)
+  }
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
+  const dome = new THREE.Scene()
+  dome.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })))
+  const sun = new THREE.Mesh(new THREE.SphereGeometry(5, 16, 8), new THREE.MeshBasicMaterial({ color: 0xfff2d0 }))
+  sun.position.set(-20, 30, 25)
+  dome.add(sun)
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(dome, 0.02).texture
+}
+
+const group = new THREE.Group()
+scene.add(group)
+
+for (const p of data.parts) {
+  let geometry
+  const [sx, sy, sz] = p.size
+  if (p.shape === "Ball") geometry = new THREE.SphereGeometry(sx / 2, 28, 18)
+  else if (p.shape === "Cylinder") {
+    geometry = new THREE.CylinderGeometry(Math.min(sy, sz) / 2, Math.min(sy, sz) / 2, sx, 32)
+    geometry.rotateZ(Math.PI / 2)
+  } else if (p.class === "WedgePart") {
+    // Right-angled prism: the slope rises toward +Z, as Roblox draws it.
+    const s = new THREE.Shape()
+    s.moveTo(-sz / 2, -sy / 2); s.lineTo(sz / 2, -sy / 2); s.lineTo(sz / 2, sy / 2); s.closePath()
+    geometry = new THREE.ExtrudeGeometry(s, { depth: sx, bevelEnabled: false })
+    geometry.translate(0, 0, -sx / 2); geometry.rotateY(-Math.PI / 2)
+  } else geometry = new THREE.BoxGeometry(sx, sy, sz)
+
+  const info = MATERIALS[p.material] || { r: 0.6, m: 0 }
+  const opacity = 1 - p.transparency
+  const glass = p.material === "Glass"
+  const material = new THREE.MeshStandardMaterial({
+    color: c3(p.color), roughness: info.r, metalness: info.m,
+    transparent: opacity < 1 || glass, opacity: glass ? Math.min(opacity, 0.55) : opacity,
+    emissive: p.material === "Neon" ? c3(p.color) : 0x000000,
+    emissiveIntensity: p.material === "Neon" ? 0.9 : 0,
+  })
+  if (p.transparency >= 0.999) continue
+  const mesh = new THREE.Mesh(geometry, material)
+  const m = p.cf
+  mesh.applyMatrix4(new THREE.Matrix4().set(
+    m[3], m[4], m[5], m[0], m[6], m[7], m[8], m[1], m[9], m[10], m[11], m[2], 0, 0, 0, 1))
+  mesh.castShadow = !(isBeach && Math.max(sx, sz) > 60)
+  mesh.receiveShadow = true
+  group.add(mesh)
+}
+
+// Light: a warm sun, the sky as fill, and sand-coloured bounce from below.
+const sky = c3(lighting.OutdoorAmbient)
+scene.add(new THREE.HemisphereLight(c3([200, 225, 250]), c3([236, 215, 160]), isBeach ? 1.5 : 1.15))
+const sun = new THREE.DirectionalLight(c3([255, 240, 215]), isBeach ? 2.4 : 2.0)
+sun.castShadow = true
+sun.shadow.mapSize.set(2048, 2048)
+sun.shadow.bias = -0.0005
+scene.add(sun, sun.target)
+
+const box = new THREE.Box3().setFromObject(group)
+const center = box.getCenter(new THREE.Vector3())
+const size = box.getSize(new THREE.Vector3())
+const camera = new THREE.PerspectiveCamera(isBeach ? 62 : 32, W / H, 0.1, 4000)
+
+if (isBeach) {
+  // Standing on the boardwalk looking down the shore, out to sea.
+  const sea = new THREE.Mesh(
+    new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: c3(data.sea || [40, 185, 205]), roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.82 }))
+  sea.position.y = -4.5
+  scene.add(sea)
+  const views = {
+    high: [[0, 70, -90], [0, -4, 120]],
+    shop: [[-120, 9, -10], [-200, 8, -50]],
+    huts: [[-175, 6, 12], [-135, 4, -18]],
+    umbrellas: [[135, 7, 2], [205, 5, 30]],
+    street: [[0, 9, 8], [60, 2, 120]],
+  }
+  const [eye, look] = views[view] || views.street
+  camera.position.set(...eye); camera.lookAt(...look)
+  sun.position.copy(sunDirection).multiplyScalar(500); sun.target.position.set(0, 0, 100)
+  sun.shadow.camera.left = -420; sun.shadow.camera.right = 420
+  sun.shadow.camera.top = 420; sun.shadow.camera.bottom = -420; sun.shadow.camera.far = 1400
+} else {
+  const radius = size.length() * 0.5
+  const dir = view === "side" ? new THREE.Vector3(0, 0.25, 1) : new THREE.Vector3(0.95, 0.65, 1.25)
+  camera.position.copy(center).add(dir.normalize().multiplyScalar(radius / Math.sin((32 * Math.PI) / 360) * 1.05))
+  camera.lookAt(center)
+  sun.position.copy(center).add(new THREE.Vector3(-3, 6, 4).multiplyScalar(radius))
+  sun.target.position.copy(center)
+  const r = radius * 2.2
+  Object.assign(sun.shadow.camera, { left: -r, right: r, top: r, bottom: -r, near: 0.1, far: radius * 14 })
+  // A patch of sand under the model, so it sits somewhere.
+  const ground = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius * 3.2, radius * 3.2, 0.1, 64),
+    new THREE.MeshStandardMaterial({ color: c3([244, 212, 140]), roughness: 1, envMapIntensity: 0.25 }))
+  ground.position.set(center.x, box.min.y - 0.05, center.z)
+  ground.receiveShadow = true
+  scene.add(ground)
+}
+sun.shadow.camera.updateProjectionMatrix()
+
+// Roblox's default sky is a blue gradient that fades to the haze at the horizon.
+{
+  const geometry = new THREE.SphereGeometry(1800, 32, 16)
+  const zenith = c3([70, 150, 238])
+  const colors = []
+  const position = geometry.attributes.position
+  for (let i = 0; i < position.count; i++) {
+    const t = Math.max(0, position.getY(i) / 1800)
+    const c = horizon.clone().lerp(zenith, Math.min(1, Math.pow(t, 0.55) * 1.15))
+    colors.push(c.r, c.g, c.b)
+  }
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
+  const sky = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }))
+  sky.position.copy(camera.position)
+  sky.renderOrder = -1
+  scene.add(sky)
+}
+renderer.render(scene, camera)
+window.__ready = true
+</script>

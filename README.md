@@ -36,6 +36,39 @@ Two more safeguards live in the game itself:
 - **Palette:** `src/shared/Palette.luau` holds every shared colour, material and font by name. Code uses `Palette.UI.Accent` or `Palette.Material.Wood`, never inline values, so one look changes in one place.
 - **Data validator:** `src/shared/Validate.luau` checks that the data fits together when the server starts. For example: every secret has a coin *or* a loot table, every loot item exists, every rarity has a colour, and every ownable vessel has a builder. Problems print to Output as `[Validate]` warnings.
 
+## The look: models, paint and scenery
+
+Everything you see is built from parts in code (no uploaded meshes or textures), so the surface
+detail comes from Roblox's own materials (`WoodPlanks`, `Metal`, `Foil`, `Glass`, `Neon`, `Fabric`).
+Each piece is a welded model on top of the thing it decorates: its parts weigh nothing and never
+collide or get picked, so physics, grabbing and cargo behave exactly as before. The shared
+helpers are in `src/server/ModelParts.luau`; colours are in `Palette.luau` (`ItemModel`,
+`ToolModel`, `VesselTrim`, `Cheer`).
+
+| What | Where |
+| --- | --- |
+| Beach items (19). The catalog part stays the invisible physics body | `src/server/ItemModels.luau` |
+| Tools in the hand (all but Bare Hands), attached at `RightGripAttachment` | `src/server/ToolModels.luau` |
+| Vessel paint and trim (stripes, rim, bumpers, pennants) | `src/server/VesselTrim.luau` |
+| Beach scenery: striped umbrellas, towels, huts, bunting, surfboards, flowers | `src/server/BeachCheer.luau` |
+| Late-afternoon light, a clear sky with clouds, bright haze | `BeachBuilder.setLighting`, `Config.Beach.Fog` |
+
+![Items](docs/previews/items.png)
+![Tools](docs/previews/tools.png)
+![Vessels](docs/previews/vessels.png)
+![Beach](docs/previews/beach.png)
+
+**Previewing without Studio.** `tools/preview/dump.luau` runs the real builders in Lune and writes every
+part (shape, size, transform, colour, material) to JSON, and `tools/preview/render.cjs` draws that with
+three.js in a headless browser. It is for judging shape, colour and proportion; it approximates Roblox's
+materials and lighting, so check the real thing in Studio.
+
+```sh
+lune run tools/preview/dump.luau /tmp/out
+(cd tools/preview && npm install)
+node tools/preview/render.cjs /tmp/out /tmp/png            # needs `playwright` and a Chromium
+```
+
 ## What's in Milestone 1
 
 | Doc item | Where |

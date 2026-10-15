@@ -71,13 +71,13 @@ Palette.Reset = {
 }
 
 Palette.World = {
-	Sand = rgb(236, 215, 160),
-	WetSand = rgb(196, 170, 120),
-	Rock = rgb(120, 115, 105),
-	Sea = rgb(40, 185, 205),
+	Sand = rgb(250, 222, 150),
+	WetSand = rgb(222, 184, 114),
+	Rock = rgb(178, 150, 122), -- warm sandstone
+	Sea = rgb(24, 196, 214),
 	Flood = rgb(40, 120, 170),
 	Foam = rgb(255, 255, 255),
-	Boardwalk = rgb(160, 115, 75),
+	Boardwalk = rgb(190, 135, 85),
 	Post = rgb(240, 240, 240),
 	Shopkeeper = rgb(255, 170, 90),
 	SellPad = rgb(255, 210, 60),
@@ -94,12 +94,12 @@ Palette.World = {
 	TraderCoat = rgb(80, 120, 160),
 
 	-- Buildings and people on the shore.
-	Stucco = rgb(242, 230, 205),
+	Stucco = rgb(255, 240, 212),
 	SignText = rgb(70, 40, 20),
-	RoofTile = rgb(170, 85, 60),
+	RoofTile = rgb(230, 105, 75),
 	Awning = rgb(225, 75, 65),
 	AwningCream = rgb(248, 242, 225),
-	Window = rgb(150, 205, 225),
+	Window = rgb(160, 222, 245),
 	Counter = rgb(140, 95, 55),
 	Pants = rgb(55, 60, 85),
 	Buyer = rgb(90, 160, 110),
@@ -108,7 +108,7 @@ Palette.World = {
 	-- Beach dressing.
 	Driftwood = rgb(150, 130, 105),
 	Palm = rgb(120, 90, 55),
-	Frond = rgb(70, 145, 70),
+	Frond = rgb(60, 175, 80),
 	Lifeguard = rgb(230, 60, 50),
 	UmbrellaRed = rgb(230, 90, 80),
 	UmbrellaTeal = rgb(60, 170, 190),
@@ -116,7 +116,7 @@ Palette.World = {
 	ShellPink = rgb(245, 205, 200),
 	ShellCream = rgb(250, 240, 220),
 	ShellTan = rgb(215, 180, 140),
-	SandDark = rgb(222, 200, 150),
+	SandDark = rgb(238, 205, 132),
 }
 
 -- Props that give each zone its look (see ZoneProps).
@@ -220,11 +220,13 @@ Palette.ItemModel = {
 	Wax = rgb(210, 50, 55),
 	Iron = rgb(90, 95, 105),
 	Hole = rgb(35, 30, 30), -- openings, interiors, the key's eye
-	Sunglasses = rgb(35, 40, 55),
+	Sunglasses = rgb(40, 50, 95),
 	SpyLens = rgb(90, 150, 210),
 	Flame = rgb(255, 200, 110),
 	LanternGlass = rgb(255, 230, 160),
-	Glow = rgb(255, 250, 225), -- the Beacon Pearl's halo
+	Glow = rgb(255, 232, 160), -- the Beacon Pearl's halo
+	Sun = rgb(255, 214, 70), -- yellow accents
+	Aqua = rgb(60, 175, 240), -- blue accents
 	Glint = rgb(255, 210, 235), -- a pearl's shine
 	Gold = rgb(235, 190, 70), -- trims, locks, the compass case
 	Needle = rgb(215, 45, 45), -- the compass needle's north end
@@ -237,6 +239,65 @@ Palette.ItemModel = {
 	Float = rgb(240, 140, 50), -- the net's floats
 	Rock = rgb(110, 105, 100),
 	Moss = rgb(95, 140, 75),
+}
+
+-- Colours for the tool models (src/server/ToolModels.luau).
+Palette.ToolModel = {
+	Pole = rgb(238, 214, 170),
+	PoleDark = rgb(176, 122, 72),
+	Brass = rgb(240, 190, 70),
+	Steel = rgb(196, 210, 228),
+	Red = rgb(235, 75, 70),
+	Yellow = rgb(255, 205, 60),
+	Orange = rgb(255, 150, 50),
+	Blue = rgb(60, 150, 240),
+	White = rgb(250, 250, 250),
+	Rope = rgb(225, 195, 140),
+	Teal = rgb(40, 225, 200),
+	Green = rgb(90, 255, 150),
+	Pink = rgb(255, 140, 200),
+	Violet = rgb(175, 130, 255),
+	Film = rgb(235, 225, 255),
+	Sky = rgb(150, 215, 255),
+	Obsidian = rgb(52, 46, 74),
+	Lava = rgb(255, 112, 40),
+	Ice = rgb(170, 235, 255),
+	Frost = rgb(232, 250, 255),
+}
+
+-- Paint for the vessels (src/server/VesselTrim.luau).
+Palette.VesselTrim = {
+	Sunny = rgb(255, 200, 60),
+	Coral = rgb(240, 90, 85),
+	Pearl = rgb(255, 190, 225),
+	Teal = rgb(45, 175, 195),
+	Lime = rgb(110, 205, 90),
+	LimeDark = rgb(60, 160, 70),
+	LimeLight = rgb(165, 225, 105),
+	Royal = rgb(60, 115, 225),
+	Gold = rgb(255, 214, 70),
+	White = rgb(255, 255, 255),
+	Aqua = rgb(90, 235, 205),
+	Oak = rgb(214, 152, 92),
+	Red = rgb(235, 75, 70),
+}
+
+-- Cheerful colours for the beach scenery (src/server/BeachCheer.luau).
+Palette.Cheer = {
+	Mint = rgb(170, 235, 205),
+	Peach = rgb(255, 200, 170),
+	Butter = rgb(255, 235, 150),
+	Sky = rgb(150, 205, 255),
+	Coral = rgb(255, 125, 110),
+	Lilac = rgb(200, 170, 255),
+	Aqua = rgb(70, 215, 220),
+	Sun = rgb(255, 205, 70),
+	Pink = rgb(255, 150, 195),
+	Lime = rgb(140, 215, 90),
+	Leaf = rgb(80, 170, 70),
+	White = rgb(255, 255, 255),
+	Door = rgb(120, 80, 60),
+	Pole = rgb(245, 245, 245),
 }
 
 Palette.Font = {
