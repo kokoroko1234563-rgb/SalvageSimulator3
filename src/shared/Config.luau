@@ -35,23 +35,20 @@ Config.Beach = {
 		Color = Color3.fromRGB(196, 226, 250), -- the colour of the sky at the horizon
 	},
 
-	-- The shape of the ground (built as smooth Terrain, see TerrainBuilder). On top of the
-	-- even slope, each zone gets ridges across the beach with troughs between them: gentle near
-	-- the shop, rougher further out, so the lower zones are hidden from the top and slow to
-	-- cross. Ridges have gaps (where the noise is low) to find your way through; troughs below
-	-- the sea level flood before the waterline reaches them. Per zone (1-5):
-	--   Ridges = how many, Height/Width = studs, Trough = how deep the dips between them are,
-	--   Rock = ridges taller than this many studs are rock spines rather than sand.
+	-- The shape of the ground (built as smooth Terrain, see TerrainBuilder): the even slope,
+	-- plus each zone's hand-built layout (src/shared/Layouts), which changes with its biome.
 	Terrain = {
 		Voxel = 4, -- smooth Terrain resolution
 		EdgeFade = 30, -- the shape fades out over this many studs at the sides of the beach
-		Zones = {
-			{ Ridges = 0, Height = 0, Width = 0, Trough = 0 },
-			{ Ridges = 2, Height = 2.5, Width = 12, Trough = 0.6 },
-			{ Ridges = 3, Height = 4.5, Width = 14, Trough = 1.2 },
-			{ Ridges = 3, Height = 7, Width = 16, Trough = 2, Rock = 5 },
-			{ Ridges = 0, Height = 0, Width = 0, Trough = 0 }, -- the sandbar stays walkable
-		},
+		-- The shape of zones 1-4 comes from hand-built layouts (src/shared/Layouts).
+		ZoneFade = 6, -- it fades out over this many studs at each zone's landward and seaward edge
+		Blend = 8, -- Ramps and Flats blend into the ground around them over this many studs
+		RockMin = 1.5, -- rock shapes lower than this are built from sand
+		CartSlope = 0.35, -- the steepest climb a vessel can take (rise over run)
+		FootSlope = 0.9, -- the steepest climb a player can walk up
+		MaxHeight = 12, -- the tallest a layout shape can be
+		MaxDepth = 4, -- the deepest a layout cut can be
+		EyeHeight = 5, -- standing eye height above the ground (for sightlines)
 	},
 
 	-- Rock pools: rings of rock that hold water after the sea leaves (a fixed level, Depth

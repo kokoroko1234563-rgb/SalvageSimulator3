@@ -38,6 +38,7 @@ for _, name in
 		"Rebirth",
 		"Hotbar",
 		"WaterObstacles",
+		"Layouts",
 		"Traders",
 		"Tide",
 		"Beach",
@@ -398,7 +399,11 @@ test("water stops at solid things, passes under decks, and shelters behind rocks
 	local WaterObstacles = h.require("Shared/WaterObstacles")
 	local Waves = h.require("Shared/Waves")
 	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
 	WaterObstacles._clear()
+	-- On open sand: no layout shapes in the way.
+	Layouts.setActive(2, false)
+	Layouts.setActive(3, false)
 	local function part(shape, size, cf, kind)
 		local p = Harness.wrap(roblox.Instance.new("Part"))
 		p.Shape = roblox.Enum.PartType[shape]
@@ -428,48 +433,125 @@ test("water stops at solid things, passes under decks, and shelters behind rocks
 	assert(WaterObstacles.sheltered(-100, sea - 10, Beach.waterY(line)), "behind the boulder is sheltered")
 	assert(not WaterObstacles.sheltered(-100, sea + 10, Beach.waterY(line)), "seaward of it is not")
 	WaterObstacles._clear()
+	Layouts.setActive(2, nil)
+	Layouts.setActive(3, nil)
 end)
 
-test("the beach has shape: smooth at the top, ridged further out, with gaps", function()
+test("every layout is well formed", function()
+	local Layouts = h.require("Shared/Layouts")
+	local all = Layouts.all(true)
+	assert(#all > 0, "there are layouts")
+	for _, entry in all do
+		local problems = Layouts.problems(entry.Layout)
+		assert(#problems == 0, entry.Source .. ": " .. table.concat(problems, "; "))
+	end
+	for zone = 1, h.require("Shared/Config").Beach.ActiveZones do
+		assert(Layouts.base(zone), "zone " .. zone .. " has a base layout")
+	end
+	assert(
+		#Layouts.problems({ Name = "x", Primitives = { { Kind = "Ridge", Path = { { 0, 0 } } } } }) > 0,
+		"it catches a missing field"
+	)
+	assert(#Layouts.problems({ Name = "x", Primitives = { { Kind = "Blob" } } }) > 0, "and an unknown kind")
+end)
+
+test("layout primitives shape the ground", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local Config = h.require("Shared/Config")
+	local z0 = Beach.zoneRange(2)
+	local layout = {
+		Name = "test",
+		Primitives = {
+			{ Kind = "Ridge", Path = { { -100, 40 }, { 100, 40 } }, Height = 6, Width = 16 },
+			{ Kind = "Mound", At = { 200, 100 }, Radius = 10, Height = 8, Rock = true },
+			{ Kind = "Channel", Path = { { -100, 100 }, { 100, 100 } }, Depth = 2, Width = 10 },
+			{ Kind = "Ramp", Path = { { 0, 0 }, { 0, 150 } }, Width = 16 },
+			{ Kind = "Flat", At = { -60, 100 }, Radius = 10 },
+		},
+	}
+	Layouts.setActive(2, layout)
+	local function near(a, b)
+		return math.abs(a - b) < 0.01
+	end
+	assert(near(Beach.feature(-50, z0 + 40), 6), "a ridge's crest is its Height")
+	assert(Beach.feature(-50, z0 + 47) < 1 and Beach.feature(-50, z0 + 49) == 0, "and it ends at Width / 2")
+	assert(near(Beach.feature(50, z0 + 100), -2), "a channel cuts Depth down")
+	local height, rock = Beach.shapeAt(200, z0 + 100)
+	assert(near(height, 8) and rock, "a rock mound is rock")
+	assert(
+		Beach.feature(0, z0 + 40) == 0 and Beach.feature(0, z0 + 100) == 0,
+		"a ramp clears the ridge and channel"
+	)
+	assert(Beach.feature(-60, z0 + 100) == 0, "so does a flat")
+	local blend = Config.Beach.Terrain.Blend
+	assert(near(Beach.feature(-30, z0 + 100), -2), "beyond the flat's blend the channel is untouched")
+	assert(Beach.feature(-60 + 10 + blend / 2, z0 + 100) > -2, "inside the blend it eases in")
+	assert(near(Beach.groundAt(-50, z0 + 40), Beach.groundY(z0 + 40) + 6), "groundAt adds the shape")
+	-- Zones join without a seam, and the shape stays inside the beach.
+	Layouts.setActive(2, {
+		Name = "edge",
+		Primitives = { { Kind = "Ridge", Path = { { -360, 0 }, { 360, 0 } }, Height = 5, Width = 40 } },
+	})
+	assert(Beach.feature(0, z0) == 0, "the shape fades out at the zone's edge")
+	assert(Beach.feature(Beach.HalfWidth, z0 + 2) == 0, "and at the sides")
+	assert(Beach.isRough(z0 + 10), "a shaped zone is rough")
+	Layouts.setActive(2, false)
+	assert(Beach.feature(-50, z0 + 40) == 0 and not Beach.isRough(z0 + 10), "false makes it flat")
+	Layouts.setActive(2, nil)
+	assert(Beach.feature(0, -10) == 0, "the shop stays flat")
+	assert(Beach.feature(0, 700) == 0, "and so does the Far Sandbar")
+end)
+
+-- A flood fill over a 4-stud grid: can you get from the shop to the bottom of zone 4 without
+-- climbing a step steeper than `slope`?
+local function reachesSea(Beach, slope: number): boolean
+	local STEP = 4
+	local _, bottom = Beach.zoneRange(4)
+	local seen = {}
+	local queue = {}
+	local function key(ix, iz)
+		return ix * 10000 + iz
+	end
+	for ix = -84, 84 do
+		local k = key(ix, -1)
+		seen[k] = true
+		table.insert(queue, { ix, -1 })
+	end
+	local head = 1
+	while head <= #queue do
+		local cell = queue[head]
+		head += 1
+		local ix, iz = cell[1], cell[2]
+		local y = Beach.groundAt(ix * STEP, iz * STEP)
+		for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local nx, nz = ix + d[1], iz + d[2]
+			if math.abs(nx) <= 84 and nz >= -1 and not seen[key(nx, nz)] then
+				local ny = Beach.groundAt(nx * STEP, nz * STEP)
+				if math.abs(ny - y) <= slope * STEP then
+					if nz * STEP >= bottom - 5 then
+						return true
+					end
+					seen[key(nx, nz)] = true
+					table.insert(queue, { nx, nz })
+				end
+			end
+		end
+	end
+	return false
+end
+
+test("a cart can get from the shop to the sea on the base layouts", function()
 	local Beach = h.require("Shared/Beach")
 	local Config = h.require("Shared/Config")
-	for z = 5, 145, 10 do
-		assert(Beach.feature(0, z) == 0, "zone 1 stays smooth")
+	local Layouts = h.require("Shared/Layouts")
+	for zone = 1, Config.Beach.ActiveZones do
+		Layouts.setActive(zone, "Base")
 	end
-	local z0, z1 = Beach.zoneRange(4)
-	local highest, lowest = 0, 0
-	local gapsFound = 0
-	for x = -300, 300, 10 do
-		local top = 0
-		for z = z0, z1, 2 do
-			local f = Beach.feature(x, z)
-			highest = math.max(highest, f)
-			lowest = math.min(lowest, f)
-			top = math.max(top, f)
-		end
-		if top < 1 then
-			gapsFound += 1
-		end
+	assert(reachesSea(Beach, Config.Beach.Terrain.CartSlope), "a cart gets through")
+	for zone = 1, Config.Beach.ActiveZones do
+		Layouts.setActive(zone, nil)
 	end
-	assert(highest > 4, "zone 4 has tall ridges, highest " .. highest)
-	assert(lowest < -1.5, "and troughs, lowest " .. lowest)
-	-- A column with no tall ridge in the whole zone is rare: gaps are per ridge. Check one ridge.
-	local spec = Config.Beach.Terrain.Zones[4]
-	local spacing = (z1 - z0) / spec.Ridges
-	local open = 0
-	for x = -300, 300, 5 do
-		local zc = z0 + spacing * 0.5
-		local peak = 0
-		for z = zc - 12, zc + 12, 2 do
-			peak = math.max(peak, Beach.feature(x, z))
-		end
-		if peak < 1 then
-			open += 1
-		end
-	end
-	assert(open > 0, "the first ridge of zone 4 has gaps to walk through")
-	assert(Beach.feature(Beach.HalfWidth, (z0 + z1) / 2) == 0, "the shape fades out at the sides")
-	local _ = gapsFound
 end)
 
 test("troughs flood before the waterline reaches them", function()

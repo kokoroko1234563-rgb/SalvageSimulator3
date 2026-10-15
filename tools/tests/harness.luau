@@ -249,17 +249,26 @@ function Harness.new(root: string)
 	local modulePaths = {} -- ModuleScript full name -> file path
 	local cache = {}
 
-	local function mount(parent, name, className, folder)
+	local mount
+	function mount(parent, name, className, folder)
 		local container = roblox.Instance.new(className)
 		container.Name = name
 		container.Parent = parent
 		for _, file in fs.readDir(folder) do
+			local path = folder .. "/" .. file
 			local stem = string.match(file, "^(.-)%.luau$")
 			if stem and not string.match(stem, "^init") then
 				local module = roblox.Instance.new("ModuleScript")
 				module.Name = stem
 				module.Parent = container
-				modulePaths[module:GetFullName()] = folder .. "/" .. file
+				modulePaths[module:GetFullName()] = path
+			elseif fs.isDir(path) then
+				-- A folder with an init.luau is a module with children (as Rojo builds it).
+				local hasInit = fs.isFile(path .. "/init.luau")
+				local child = mount(container, file, if hasInit then "ModuleScript" else "Folder", path)
+				if hasInit then
+					modulePaths[child:GetFullName()] = path .. "/init.luau"
+				end
 			end
 		end
 		return container

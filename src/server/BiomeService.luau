@@ -1,5 +1,6 @@
 -- Rolls a biome for every zone at the start of each tide cycle, and builds what goes with it:
--- decor so players can tell (rare biomes are never announced, but you can see them), the
+-- the biome's ground (its layout, see src/shared/Layouts: the zone's terrain is rebuilt and
+-- props are moved to stay on it), decor so players can tell (rare biomes are never announced, but you can see them), the
 -- secret's entrance, and the biome's beach hazard.
 -- Admins can set or reroll biomes from the console (see AdminService).
 
@@ -12,10 +13,13 @@ local Beach = require(Shared.Beach)
 local Biomes = require(Shared.Biomes)
 local Config = require(Shared.Config)
 local Items = require(Shared.Items)
+local Layouts = require(Shared.Layouts)
 local Tide = require(Shared.Tide)
 
 local CollisionGroups = require(script.Parent.CollisionGroups)
 local GrabService = require(script.Parent.GrabService)
+local GroundShift = require(script.Parent.GroundShift)
+local TerrainBuilder = require(script.Parent.TerrainBuilder)
 
 local BiomeService = {}
 
@@ -248,7 +252,14 @@ end
 -- Sets (or clears, with nil) a zone's biome and rebuilds its decor and entrance.
 function BiomeService.set(zone: number, biomeId: string?)
 	local biome = biomeId and Biomes.List[biomeId]
+	local wasLayout = Layouts.active(zone)
+	local settle = GroundShift.capture(zone)
 	Workspace:SetAttribute(Biomes.attributeFor(zone), if biome then biome.Id else nil)
+	if Layouts.active(zone) ~= wasLayout then
+		-- The biome brings its own ground: rebuild the zone's terrain and keep things on it.
+		TerrainBuilder.buildZone(zone)
+		settle()
+	end
 	local old = folder:FindFirstChild("Zone" .. zone)
 	if old then
 		old:Destroy()

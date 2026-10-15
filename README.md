@@ -141,16 +141,15 @@ All of this is computed from the shared clock, so the server and every client ag
 - **Admin:** `waves seed` picks a new seed, and `waves seed <n>` sets one, to replay a pattern.
 - **Validator:** it checks that a section's delay plus the shuffle stays shorter than the low-tide hold.
 
-**The beach's shape** (`Config.Beach.Terrain`, `TerrainBuilder`): the beach and seabed are smooth Terrain.
-- **Zone 1** stays a gentle even slope.
-- **Further out:** each zone has ridges across the beach with troughs between them: low dune ridges in zone 2, taller ones in zone 3, and big ridges and rock spines in zone 4.
-  - The ridges wander and have gaps to find your way through.
-  - From the top you can't see down into the lower zones, and the way back is slow.
-- **The sandbar** stays flat.
+**The beach's shape** (`src/shared/Layouts`, `TerrainBuilder`): the beach and seabed are smooth Terrain: the even slope plus a hand-built layout for each zone.
+- **Layouts:** each zone has a base layout (`Layouts/Zones/ZoneN`). A biome can bring its own (`Layouts/Biomes/<BiomeId>`), which replaces the base layout while it's rolled there; the zone's terrain is rebuilt and `GroundShift` moves props, items and players to stay on the new ground.
+  - A layout is a list of shapes: Ridge, Mound, Channel, Hollow, Ramp and Flat (see `Layouts/init.luau`). Rock shapes are built from rock.
+  - The current base layouts are placeholders; the hand-built ones follow `docs/layout-prompt.md`.
+- **Carts:** a towed vessel can't go up ground steeper than `Config.Beach.Terrain.CartSlope`. Every zone has Ramps that cross its edges at x = -160 and x = 180, so a cart can always get down to the sea.
+- **The shop and the sandbar** stay flat.
 - **Water:**
-  - Troughs below the sea level flood before the main waterline reaches them, so low ground behind you can fill as the tide comes in.
+  - Dips below the sea level flood before the main waterline reaches them, so low ground behind you can fill as the tide comes in.
   - Run-ups stop against ridges unless a wave climbs over them, and ridges standing out of the water shelter the sea behind them.
-- **Tuning:** per zone, set how many ridges, their height and width, how deep the troughs are, and above what height a ridge is rock.
 - **Placement:** everything placed on the beach uses `Beach.groundAt(x, z)`, the slope plus this shape. That includes items, props, cosmetics, biome decor and traders.
 
 **Sea mist** (`Config.Mist`, `MistController`): the haze thickens the further out you are. It's a light haze at the shop and thick on the sandbar, and it blends across zone edges. The Lantern of Clear Sight thins it.

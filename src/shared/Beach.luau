@@ -5,6 +5,7 @@
 
 local Config = require(script.Parent.Config)
 local Gear = require(script.Parent.Gear)
+local Layouts = require(script.Parent.Layouts)
 local Tide = require(script.Parent.Tide)
 
 type Sea = Tide.Sea
@@ -54,47 +55,34 @@ function Beach.groundY(z: number): number
 	return -z * beach.Slope
 end
 
--- The ground's shape on top of the even slope (ridges and troughs, Config.Beach.Terrain):
--- studs up (positive) or down (negative) at a point. 0 near the shop, in the channel and on the
--- sandbar, at the very sides of the beach, and around rock pools.
+-- The ground's shape on top of the even slope, from the zone's layout (src/shared/Layouts):
+-- its height above the slope at (x, z), and whether it's rock. It fades out at the edges of
+-- each zone (so zones join without a seam), at the sides of the beach (the cliffs stand
+-- there) and around rock pools.
 local shape = beach.Terrain
-local function bump(t: number): number
-	if t <= -1 or t >= 1 then
-		return 0
+
+function Beach.shapeAt(x: number, z: number): (number, boolean)
+	local zone = Beach.zoneAt(z)
+	if not zone or zone < 1 or zone > beach.ActiveZones then
+		return 0, false
 	end
-	local u = 1 - t * t
-	return u * u
+	local z0, z1 = Beach.zoneRange(zone)
+	local height, rock = Layouts.shapeAt(zone, x, z - z0)
+	if height == 0 then
+		return 0, false
+	end
+	local fade = math.clamp((Beach.HalfWidth - math.abs(x)) / shape.EdgeFade, 0, 1)
+		* math.clamp(math.min(z - z0, z1 - z) / shape.ZoneFade, 0, 1)
+	for _, pool in Beach.Pools or {} do
+		local d = math.sqrt((x - pool.X) ^ 2 + (z - pool.Z) ^ 2)
+		fade *= math.clamp((d - pool.Radius) / 8, 0, 1)
+	end
+	fade = fade * fade * (3 - 2 * fade)
+	return height * fade, rock and height * fade > shape.RockMin
 end
 
 function Beach.feature(x: number, z: number): number
-	local zone = Beach.zoneAt(z)
-	local spec = zone and zone > 0 and shape.Zones[zone]
-	if not spec or spec.Ridges == 0 then
-		return 0
-	end
-	local z0, z1 = Beach.zoneRange(zone)
-	local spacing = (z1 - z0) / spec.Ridges
-	local height = 0
-	for i = 1, spec.Ridges do
-		local salt = zone * 10 + i
-		-- The ridge's line wanders, and it has gaps where the noise is low.
-		local center = z0 + spacing * (i - 0.5) + 10 * math.noise(x / 90, salt * 1.7, 0.5)
-		local gap = math.clamp((math.noise(x / 70, salt * 2.3, 1.5) + 0.15) * 4, 0, 1)
-		height += spec.Height * gap * bump((z - center) / (spec.Width / 2))
-		-- Dips on the landward side of each ridge. They come and go along the beach, so the low
-		-- ground holds separate pools and puddles, not one long canal.
-		local trough = center - spacing / 2 + 6 * math.noise(x / 60, salt * 2.9, 3.5)
-		local pools = math.clamp((math.noise(x / 45, salt * 3.1, 2.5) + 0.05) * 3, 0, 1)
-		height -= spec.Trough * pools * bump((z - trough) / (spacing * 0.3))
-	end
-	-- Fade out at the sides of the beach (the cliffs stand there) and around rock pools.
-	local edge = math.clamp((Beach.HalfWidth - math.abs(x)) / shape.EdgeFade, 0, 1)
-	height *= edge
-	for _, pool in Beach.Pools or {} do
-		local d = math.sqrt((x - pool.X) ^ 2 + (z - pool.Z) ^ 2)
-		height *= math.clamp((d - pool.Radius) / 8, 0, 1)
-	end
-	return height
+	return (Beach.shapeAt(x, z))
 end
 
 -- The real ground height at a point: the slope plus its shape.
@@ -105,8 +93,7 @@ end
 -- Whether the ground has any shape near this Z (a quick check before scanning it).
 function Beach.isRough(z: number): boolean
 	local zone = Beach.zoneAt(z)
-	local spec = zone and zone > 0 and shape.Zones[zone]
-	return spec ~= nil and spec ~= false and spec.Ridges > 0
+	return zone ~= nil and zone >= 1 and zone <= beach.ActiveZones and Layouts.isShaped(zone)
 end
 
 -- Height of the sea surface for a waterline position.

@@ -1,8 +1,9 @@
 -- Builds the beach and the seabed as smooth Terrain from Beach.groundAt: the even slope plus
--- the ridges and troughs of Config.Beach.Terrain, the channel to the Far Sandbar, the sandbar
--- and the sea floor beyond. Terrain collides and blocks the view, so the lower zones are hidden
--- from the top and slow to cross. The tallest ridges in the rough zones are rock spines.
--- Props sit on it by placing themselves with Beach.groundAt.
+-- each zone's layout (src/shared/Layouts), the channel to the Far Sandbar, the sandbar and the
+-- sea floor beyond. Terrain collides and blocks the view, so the lower zones are hidden from
+-- the top and slow to cross. Rock shapes are built from rock. When a zone's biome changes,
+-- TerrainBuilder.buildZone rebuilds just that zone. Props sit on it by placing themselves
+-- with Beach.groundAt.
 
 local Workspace = game:GetService("Workspace")
 
@@ -23,22 +24,12 @@ function TerrainBuilder.bounds(): (Vector3, Vector3)
 	local half = Beach.HalfWidth + 40
 	local zEnd = Beach.Depth + beach.SeaExtent
 	local low = Beach.groundY(zEnd) - beach.FarSandbar.ChannelDepth - 12
-	local high = 12
+	local high = 4 + shape.MaxHeight
 	local function snap(v: number, up: boolean): number
 		return (if up then math.ceil(v / VOXEL) else math.floor(v / VOXEL)) * VOXEL
 	end
 	return Vector3.new(snap(-half, false), snap(low, false), 0),
 		Vector3.new(snap(half, true), snap(high, true), snap(zEnd, true))
-end
-
--- Material for the ground at (x, z): rock where a ridge stands taller than its zone's Rock.
-local function materialAt(x: number, z: number): Enum.Material
-	local zone = Beach.zoneAt(z)
-	local spec = zone and zone > 0 and shape.Zones[zone]
-	if spec and spec.Rock and Beach.feature(x, z) > spec.Rock then
-		return Palette.Material.Rock
-	end
-	return Palette.Material.Sand
 end
 
 -- The voxels for one slab (Z from z0 to z1): materials and occupancy, [x][y][z].
@@ -56,8 +47,9 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 		end
 		for iz = 1, nz do
 			local z = z0 + (iz - 0.5) * VOXEL
-			local h = Beach.groundAt(x, z)
-			local material = materialAt(x, z)
+			local height, rock = Beach.shapeAt(x, z)
+			local h = Beach.groundY(z) + height
+			local material = if rock then Palette.Material.Rock else Palette.Material.Sand
 			for iy = 1, ny do
 				local bottom = lo.Y + (iy - 1) * VOXEL
 				local fill = math.clamp((h - bottom) / VOXEL, 0, 1)
@@ -72,22 +64,43 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 	return materials, occupancy
 end
 
-function TerrainBuilder.build()
+local function snap(v: number, up: boolean): number
+	return (if up then math.ceil(v / VOXEL) else math.floor(v / VOXEL)) * VOXEL
+end
+
+-- Writes the terrain between two Z positions (snapped out to whole voxels).
+function TerrainBuilder.buildRange(fromZ: number, toZ: number)
 	local terrain = Workspace:FindFirstChildOfClass("Terrain")
 	if not terrain then
 		return -- tools/tests: no Terrain to write to
 	end
-	terrain:SetMaterialColor(Palette.Material.Sand, Palette.World.Sand)
-	terrain:SetMaterialColor(Palette.Material.Rock, Palette.World.Rock)
 	local lo, hi = TerrainBuilder.bounds()
-	local z0 = lo.Z
-	while z0 < hi.Z do
-		local z1 = math.min(z0 + SLAB * VOXEL, hi.Z)
+	local z0 = math.max(lo.Z, snap(fromZ, false))
+	local stop = math.min(hi.Z, snap(toZ, true))
+	while z0 < stop do
+		local z1 = math.min(z0 + SLAB * VOXEL, stop)
 		local materials, occupancy = TerrainBuilder.slab(lo, hi, z0, z1)
 		local region = Region3.new(Vector3.new(lo.X, lo.Y, z0), Vector3.new(hi.X, hi.Y, z1))
 		terrain:WriteVoxels(region, VOXEL, materials, occupancy)
 		z0 = z1
 	end
+end
+
+-- Rebuilds one zone's terrain (after its layout changed).
+function TerrainBuilder.buildZone(zone: number)
+	local z0, z1 = Beach.zoneRange(zone)
+	TerrainBuilder.buildRange(z0, z1)
+end
+
+function TerrainBuilder.build()
+	local terrain = Workspace:FindFirstChildOfClass("Terrain")
+	if not terrain then
+		return
+	end
+	terrain:SetMaterialColor(Palette.Material.Sand, Palette.World.Sand)
+	terrain:SetMaterialColor(Palette.Material.Rock, Palette.World.Rock)
+	local lo, hi = TerrainBuilder.bounds()
+	TerrainBuilder.buildRange(lo.Z, hi.Z)
 end
 
 return TerrainBuilder

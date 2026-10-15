@@ -515,6 +515,33 @@ local function enterLifted()
 	HUD.setHoldButtons(true, current.kind == "item" and myVessel() ~= nil, canPocket())
 end
 
+-- Vessels can't be towed up ground steeper than Config.Beach.Terrain.CartSlope: the furthest
+-- point from `from` toward `to` a vessel gets before the climb is too steep. (Downhill is
+-- always allowed, so a vessel never gets stuck.) Ramps in each zone's layout are the way through for carts.
+local CART_STEP = 2
+local function cartReach(from: Vector3, to: Vector3): Vector3
+	local flat = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+	local length = flat.Magnitude
+	if length < CART_STEP then
+		return to
+	end
+	local dir = flat / length
+	local limit = Config.Beach.Terrain.CartSlope * CART_STEP
+	local x, z = from.X, from.Z
+	local y = Beach.groundAt(x, z)
+	local travelled = 0
+	while travelled + CART_STEP <= length do
+		local nx, nz = x + dir.X * CART_STEP, z + dir.Z * CART_STEP
+		local ny = Beach.groundAt(nx, nz)
+		if ny - y > limit then
+			return Vector3.new(x, to.Y, z)
+		end
+		x, z, y = nx, nz, ny
+		travelled += CART_STEP
+	end
+	return to
+end
+
 local function targetPosition(current: Held, root: BasePart): Vector3
 	local reach = if current.kind == "item" then currentTool().Reach else grabCfg.VesselHandleReach
 	local look = root.CFrame.LookVector
@@ -524,7 +551,7 @@ local function targetPosition(current: Held, root: BasePart): Vector3
 
 	if current.mode == "lifted" then
 		if current.kind == "vessel" then
-			local spot = root.Position + flatLook * 3.5
+			local spot = cartReach(current.part.Position, root.Position + flatLook * 3.5)
 			return Vector3.new(spot.X, groundBelow(spot) + handleHeight, spot.Z)
 		end
 		local size = current.part.Size.Magnitude / 2
@@ -540,6 +567,9 @@ local function targetPosition(current: Held, root: BasePart): Vector3
 	end
 	-- The pointer ray usually ends at the ground, which would press things into the sand
 	-- and pin them with friction. Keep items lifted clear of it, and handles at towing height.
+	if current.kind == "vessel" then
+		target = cartReach(current.part.Position, target)
+	end
 	local ground = groundBelow(target)
 	if current.kind == "vessel" then
 		return Vector3.new(target.X, ground + handleHeight, target.Z)

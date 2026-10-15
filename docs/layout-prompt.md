@@ -1,10 +1,8 @@
 # Prompt: hand-build the descent layouts
 
-> **For the user:** this is the prompt for the cheaper model. Read it and tell me what to
-> change. It assumes that **I build the layout format and the terrain plumbing first**
-> (section 3), so the other model only writes layout data, tests and notes. It never touches
-> the wave, tide or terrain code that every client depends on. Send it once that plumbing is
-> pushed (I'll tell you when).
+> **For the user:** this is the prompt for the cheaper model. The layout engine (section 3)
+> is now on `claude/exciting-ride-aqbwyx`, so the other model only writes layout data, tests
+> and notes. It never touches the wave, tide or terrain code that every client depends on.
 
 ---
 
@@ -16,17 +14,20 @@ prove they're playable, and a short design note for each.
 
 ## 1. Repository and git rules
 
-- Repo: `kokoroko1234563-rgb/SalvageSimulator3`. Work on the branch
-  `claude/exciting-ride-aqbwyx`: fetch it, check it out, and pull before you start. Don't
-  start from any other branch, and don't create a new one.
-- Commit in small steps with clear messages, and push with
-  `git push -u origin claude/exciting-ride-aqbwyx`.
+- Repo: `kokoroko1234563-rgb/SalvageSimulator3`. The engine lives on
+  `claude/exciting-ride-aqbwyx`. Before you start, fetch it and merge
+  `origin/claude/exciting-ride-aqbwyx` into the branch your session was given. Work and push
+  only on your own branch; the layouts get merged into `claude/exciting-ride-aqbwyx` after
+  they've been reviewed. Never push to `claude/exciting-ride-aqbwyx` yourself.
+- Commit in small steps with clear messages, and push to your own branch.
 - Never write AI model names or model IDs anywhere in the repo, including comments, docs and
   commit messages.
 - Before every push, `bash tools/check.sh` must pass. It runs StyLua, the API check, the Lune
   tests and the Rojo build. Run `stylua src tools` if formatting fails. Don't disable or skip
   any test.
 - Don't open a pull request.
+- If something blocks you (the engine is missing, a test can't pass, an instruction
+  contradicts another), stop and report it rather than working around it.
 - Only edit the files listed in section 6. If something outside them looks wrong or missing,
   write it down in your final report instead of changing it.
 
@@ -68,7 +69,7 @@ like an open slope you can read at a glance:
    every zone needs **guaranteed ramps** for them. Players on foot get **shortcuts**:
    steeper climbs that carts can't use.
 
-## 3. The layout format (already implemented; read the code)
+## 3. The layout format (implemented; read the code)
 
 Read these files before you write anything:
 
@@ -77,10 +78,16 @@ Read these files before you write anything:
   `zoneRange(i)`.
 - `src/shared/Layouts/init.luau`: the layout engine. It evaluates the primitives below.
 - `src/shared/Layouts/Zones/Zone1.luau` … `Zone4.luau`: the base layout of each zone, used
-  when the zone has no biome.
-- `src/shared/Layouts/Biomes/<BiomeId>.luau`: a biome's layout. Each rolls in place of the
-  zone's base layout.
-- `src/server/TerrainBuilder.luau`: rebuilds a zone's terrain when its biome changes.
+  when the zone has no biome. **These are simple placeholders now. Replace them.**
+- `src/shared/Layouts/Biomes/<BiomeId>.luau`: a biome's layout (the file name is the biome's
+  Id, e.g. `ShipwreckShallows.luau`). It replaces the zone's base layout when that biome
+  rolls there. A biome with no file keeps the base layout. None exist yet.
+- `src/server/TerrainBuilder.luau` and `src/server/GroundShift.luau`: they rebuild a zone's
+  terrain when its biome changes and move props, items and players to stay on the new ground.
+- `src/client/GrabController.luau` (`cartReach`): a towed vessel can't go up a step steeper
+  than `CartSlope`.
+- `tools/tests/run.luau`: the layout tests already there, including `reachesSea`, a flood
+  fill you can reuse for the cart and foot tests.
 - `src/shared/Biomes.luau`: `Biomes.List` (the biomes that roll now) and `Biomes.Planned`
   (biomes designed but not yet built).
 - `src/shared/Config.luau`: `Config.Beach` (including `Terrain`), `Config.Waves` and
@@ -111,7 +118,7 @@ return {
 		-- A guaranteed cart route. Along its path, the ground is evened out so the climb
 		-- never exceeds Config.Beach.Terrain.CartSlope, and it overrides everything else
 		-- within Width.
-		{ Kind = "Ramp", Path = { { -200, 0 }, { -180, 75 }, { -210, 150 } }, Width = 16 },
+		{ Kind = "Ramp", Path = { { -160, 0 }, { -180, 75 }, { -160, 150 } }, Width = 16 },
 		-- Clears the shape back to the bare slope (for entrance spots, the pier and so on).
 		{ Kind = "Flat", At = { 40, 75 }, Radius = 12 },
 	},
@@ -122,16 +129,28 @@ return {
 
 - Raised shapes take the **max** of the overlapping heights. Cuts take the **min**.
 - `Ramp` and `Flat` are applied last and blend smoothly into the ground around them.
-- The engine fades every shape to zero over the first and last 6 studs of the zone, and
-  near the side cliffs, so zones join with no seam.
+- The engine fades every shape to zero over the first and last `ZoneFade` (6) studs of the
+  zone, over the last `EdgeFade` (30) studs before the side cliffs, and around the rock
+  pools, so zones join with no seam.
 - Terrain voxels are 4 studs, so nothing narrower than **8 studs** will show up.
 
 **Tunables** (in `Config.Beach.Terrain`; read their values, don't change them):
 
-- `CartSlope`: the steepest climb a vessel can take.
-- `FootSlope`: the steepest a player can walk up.
-- `MaxHeight` / `MaxDepth`: the limits on shape height.
-- `EyeHeight`: the standing eye height used by the sightline test.
+- `CartSlope` (0.35): the steepest climb a vessel can take, as rise over run.
+- `FootSlope` (0.9): the steepest a player can walk up.
+- `MaxHeight` (12) / `MaxDepth` (4): the limits on shape height and cut depth.
+- `EyeHeight` (5): the standing eye height used by the sightline test.
+- `Blend` (8): how far Ramps and Flats blend into the ground around them.
+- `RockMin` (1.5): rock shapes lower than this are built from sand.
+
+**Engine functions you'll use in tests:**
+
+- `Layouts.setActive(zone, x)` forces a zone's layout. `x` is a layout table, a biome Id,
+  `"Base"`, `false` for flat ground, or `nil` to go back to following the zone's biome.
+  Always reset to `nil` at the end of a test.
+- `Layouts.all(includePlanned)` lists every layout with its source and zone.
+- `Layouts.problems(layout)` returns what's wrong with a layout.
+- `Layouts.evaluate(layout, x, localZ)` gives the raw shape, before the fades.
 
 ## 4. Design rules for every layout
 
@@ -142,14 +161,15 @@ return {
      there at z = 0). That way a cart can always get from the shop to zone 4's seaward edge,
      whatever biomes rolled.
    - To make that work, **every layout (base and biome) must have ramps that cross z = 0 and
-     z = 150 at the same anchor X positions:** x = -200 and x = 180. Between the edges, a
-     ramp may wander freely.
+     z = 150 at the same anchor X positions:** x = -160 and x = 180. Between the edges, a
+     ramp may wander freely. (x = -160 keeps clear of the rock pool at x = -210 on the
+     zone 1/2 boundary.)
 2. **Foot shortcuts.** Give each zone at least two places where a player on foot can cut
    through faster than the ramps, up a slope steeper than `CartSlope` but no steeper than
    `FootSlope`. They should feel like a risk-for-time trade: a narrow gap between two rock
    spines, or a ford across a channel that floods.
 3. **Sightlines.** From the top edge of each zone at eye height, at least **60%** of the
-   ground in the zone's lower half should be hidden by ridges. Zone 1 is the exception:
+   ground in the zone's lower half (local z from 75 to 150) should be hidden by ridges. Zone 1 is the exception:
    aim for 0–20%, since it's the readable tutorial zone.
 4. **Flooding.** In zones 3 and 4, the Channels and Hollows should flood in stages as the
    tide comes in. Set their depths so that **some fords cut off before others**. Read
@@ -162,8 +182,8 @@ return {
 7. **Don't touch:**
    - the rock pools at `Config.Beach.Pools`: the engine already flattens around them, but
      don't put ridges through them;
-   - the pier corridor: read where `ZoneProps.luau` builds the pier, and keep a `Flat` path
-     under it;
+   - the pier corridor: the pier runs along x = 40 from world z 170 to 360 (zone 2 and the
+     top of zone 3). Keep a Ramp at least 14 wide under it, as the placeholders do;
    - the side cliffs.
 8. **Scale with depth.** Each zone gets more rugged than the one above:
    - Zone 1: up to about 2.5 studs high, no rock.
@@ -178,7 +198,7 @@ return {
 
 1. **Base layouts** for zones 1–4 (`Layouts/Zones/Zone1.luau` … `Zone4.luau`), following
    the character table in section 2.
-2. **Biome layouts** for each biome in `Biomes.List`:
+2. **Biome layouts** for each biome in `Biomes.List`. Right now that's only these two:
    - **Sandcastle Flats:** wide, open, almost-flat sand with a few castle mounds. It is the
      relief zone, easy to cross, but still keep one or two ridges that block sightlines.
    - **Shipwreck Shallows:** a scour channel cut around where the wreck lies, with debris
@@ -203,7 +223,7 @@ return {
    `Layouts.setActive` or whatever the engine exposes; read it):
    - Every layout loads and has only known primitive kinds and fields.
    - **Cart test:** for every layout, walk each Ramp's path in 2-stud steps. The slope
-     between steps must never exceed `CartSlope`, and the anchors must sit at x = -200 and
+     between steps must never exceed `CartSlope`, and the anchors must sit at x = -160 and
      x = 180 at z = 0 and z = 150. Then check that from the shop (z = -5) a cart can get to
      z = 595 under every combination of base and biome layouts across zones 1–4. To do
      that, run a flood-fill on a 4-stud grid where a step between neighbours is allowed

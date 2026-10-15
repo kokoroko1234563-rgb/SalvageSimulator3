@@ -34,6 +34,7 @@ type Obstacle = {
 }
 
 local byPart: { [BasePart]: Obstacle } = {}
+local watched: { [BasePart]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 local buckets: { [number]: { Obstacle } } = {}
 
 local function bucketOf(x: number): number
@@ -57,6 +58,20 @@ end
 
 function WaterObstacles.add(part: BasePart)
 	WaterObstacles.remove(part)
+	if not watched[part] then
+		-- Re-register it when it moves (props shift when a zone's ground changes shape).
+		watched[part] = true
+		local ok, signal = pcall(function()
+			return part:GetPropertyChangedSignal("CFrame")
+		end)
+		if ok and signal then
+			signal:Connect(function()
+				if byPart[part] then
+					WaterObstacles.add(part)
+				end
+			end)
+		end
+	end
 	if (part:GetAttribute("Water") or "Solid") ~= "Solid" then
 		return -- "Under": the water passes beneath it
 	end

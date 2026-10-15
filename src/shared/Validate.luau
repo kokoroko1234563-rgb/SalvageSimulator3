@@ -8,6 +8,7 @@ local Catalog = require(script.Parent.Catalog)
 local Config = require(script.Parent.Config)
 local Gear = require(script.Parent.Gear)
 local Items = require(script.Parent.Items)
+local Layouts = require(script.Parent.Layouts)
 local Palette = require(script.Parent.Palette)
 local Rebirth = require(script.Parent.Rebirth)
 local Secrets = require(script.Parent.Secrets)
@@ -180,24 +181,31 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 
 	-- Terrain shape and mist
 	local terrain = Config.Beach.Terrain
-	check(#terrain.Zones >= #Config.Zones, "Config.Beach.Terrain.Zones needs an entry for every zone")
-	for index, spec in terrain.Zones do
+	for _, key in
+		{
+			"Voxel",
+			"EdgeFade",
+			"ZoneFade",
+			"Blend",
+			"RockMin",
+			"CartSlope",
+			"FootSlope",
+			"MaxHeight",
+			"MaxDepth",
+			"EyeHeight",
+		}
+	do
 		check(
-			type(spec.Ridges) == "number"
-				and spec.Ridges >= 0
-				and type(spec.Height) == "number"
-				and type(spec.Trough) == "number",
-			"Config.Beach.Terrain.Zones[" .. index .. "] needs Ridges, Height, Width and Trough"
-		)
-		check(
-			spec.Ridges == 0 or (spec.Width or 0) > 0,
-			"Config.Beach.Terrain.Zones[" .. index .. "]: ridges need a Width"
+			type(terrain[key]) == "number" and terrain[key] > 0,
+			"Config.Beach.Terrain." .. key .. " must be a positive number"
 		)
 	end
-	check(
-		terrain.Zones[sandbar.Zone] and terrain.Zones[sandbar.Zone].Ridges == 0,
-		"the Far Sandbar must stay flat (its door and the bell tower stand on it)"
-	)
+	check(terrain.CartSlope < terrain.FootSlope, "carts can't climb steeper than players walk")
+	for _, entry in Layouts.all(true) do
+		for _, problem in Layouts.problems(entry.Layout) do
+			check(false, "Layouts/" .. entry.Source .. ": " .. problem)
+		end
+	end
 	check(#Config.Mist.Zones >= #Config.Zones, "Config.Mist.Zones needs a density for every zone")
 
 	-- Wading
