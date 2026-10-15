@@ -1,21 +1,38 @@
--- Zone 2, Dunes (base layout). A placeholder until the hand-built layout replaces it: two
--- broken lines of dunes with hollows behind them, and a clear corridor under the pier (x = 40).
+-- Zone 2, Dunes (base layout): a dune line that hides most of the zone's lower half from the top,
+-- broken only where the ramps and the pier let the eye through. Heights stay at 5 studs or less.
 return {
 	Name = "Dunes (base)",
 	Primitives = {
+		-- The main dune: tall enough that the eye (5 studs up) can't see past it.
 		{
 			Kind = "Ridge",
-			Path = { { -340, 45 }, { -250, 55 }, { -120, 48 }, { -20, 52 } },
+			Path = {
+				{ -360, 46 },
+				{ -240, 40 },
+				{ -120, 48 },
+				{ 0, 42 },
+				{ 120, 48 },
+				{ 240, 40 },
+				{ 360, 46 },
+			},
 			Height = 4.5,
 			Width = 16,
 		},
-		{ Kind = "Ridge", Path = { { 90, 50 }, { 200, 42 }, { 340, 50 } }, Height = 4.5, Width = 16 },
-		{ Kind = "Ridge", Path = { { -300, 105 }, { -180, 112 }, { -60, 104 } }, Height = 5, Width = 16 },
-		{ Kind = "Ridge", Path = { { 0, 115 }, { 140, 108 }, { 300, 116 } }, Height = 5, Width = 16 },
-		{ Kind = "Hollow", At = { -220, 80 }, Radius = 12, Depth = 1.2 },
-		{ Kind = "Hollow", At = { 240, 82 }, Radius = 12, Depth = 1.2 },
-		{ Kind = "Ramp", Path = { { 40, 0 }, { 40, 150 } }, Width = 14 },
-		{ Kind = "Ramp", Path = { { -160, 0 }, { -170, 75 }, { -160, 150 } }, Width = 16 },
-		{ Kind = "Ramp", Path = { { 180, 0 }, { 170, 75 }, { 180, 150 } }, Width = 16 },
+		-- A second dune further out, between the pool and the sea.
+		{ Kind = "Ridge", Path = { { 80, 100 }, { 200, 98 }, { 330, 102 } }, Height = 3.5, Width = 14 },
+		{ Kind = "Ridge", Path = { { -320, 100 }, { -200, 104 }, { -60, 98 } }, Height = 3, Width = 14 },
+		{ Kind = "Hollow", At = { -60, 80 }, Radius = 10, Depth = 2 },
+		{ Kind = "Hollow", At = { 260, 82 }, Radius = 9, Depth = 2 },
+		{ Kind = "Ramp", Path = { { -200, 0 }, { -250, 40 }, { -225, 90 }, { -200, 150 } }, Width = 16 },
+		{ Kind = "Ramp", Path = { { 180, 0 }, { 215, 60 }, { 205, 110 }, { 180, 150 } }, Width = 16 },
+		-- The pier at x = 40 runs out through this zone: keep a clear path under it.
+		{ Kind = "Flat", At = { 40, 22 }, Radius = 9 },
+		{ Kind = "Flat", At = { 40, 40 }, Radius = 9 },
+		{ Kind = "Flat", At = { 40, 58 }, Radius = 9 },
+		{ Kind = "Flat", At = { 40, 76 }, Radius = 9 },
+		{ Kind = "Flat", At = { 40, 94 }, Radius = 9 },
+		{ Kind = "Flat", At = { 40, 112 }, Radius = 9 },
+		{ Kind = "Flat", At = { 40, 130 }, Radius = 9 },
+		{ Kind = "Flat", At = { 40, 148 }, Radius = 9 },
 	},
 }

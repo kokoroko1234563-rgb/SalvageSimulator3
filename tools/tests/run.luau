@@ -1133,5 +1133,474 @@ test("cosmetics are placed across the map", function()
 	)
 end)
 
+-- The descent layouts (docs/layouts). Carts and players on foot walk a 4-stud grid over zones 1-4:
+-- a step is allowed only where the climb is at most the slope they can take.
+local LAYOUT_GRID = 4
+local LAYOUT_COLS = 84 -- grid columns either side of X = 0 (336 studs)
+local LAYOUT_ROWS = { -1, 148 } -- z = -4 (the shop side) to z = 592 (the seaward end of zone 4)
+local layoutGridCache = nil
+
+local function layoutKey(ix: number, iz: number): number
+	return ix * 1000 + iz
+end
+
+-- The ground on the grid, for every layout each zone can take. Computed once: a zone's ground
+-- only depends on that zone's layout, so every combination of zones can then be walked cheaply.
+local function layoutGrid()
+	if layoutGridCache then
+		return layoutGridCache
+	end
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local Biomes = h.require("Shared/Biomes")
+	local grid = { zoneOfRow = {}, options = {}, shop = {} }
+	for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
+		grid.zoneOfRow[iz] = Beach.zoneAt(iz * LAYOUT_GRID) or 0
+	end
+	for ix = -LAYOUT_COLS, LAYOUT_COLS do
+		grid.shop[layoutKey(ix, -1)] = Beach.groundAt(ix * LAYOUT_GRID, -LAYOUT_GRID)
+	end
+	for zone = 1, Config.Beach.ActiveZones do
+		local names = { "Base" }
+		for id in Biomes.List do
+			if Layouts.forBiome(id, zone) then
+				table.insert(names, id)
+			end
+		end
+		grid.options[zone] = {}
+		for _, name in names do
+			Layouts.setActive(zone, name)
+			local heights = {}
+			for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
+				if grid.zoneOfRow[iz] == zone then
+					for ix = -LAYOUT_COLS, LAYOUT_COLS do
+						heights[layoutKey(ix, iz)] = Beach.groundAt(ix * LAYOUT_GRID, iz * LAYOUT_GRID)
+					end
+				end
+			end
+			table.insert(grid.options[zone], { name = name, heights = heights })
+			Layouts.setActive(zone, nil)
+		end
+	end
+	layoutGridCache = grid
+	return grid
+end
+
+-- Calls fn(choice) once for every combination: choice[zone] is an index into that zone's options.
+local function eachLayoutChoice(grid, fn)
+	local Config = h.require("Shared/Config")
+	local choice = {}
+	local function walk(zone)
+		if zone > Config.Beach.ActiveZones then
+			fn(choice)
+			return
+		end
+		for index in grid.options[zone] do
+			choice[zone] = index
+			walk(zone + 1)
+		end
+	end
+	walk(1)
+	return choice
+end
+
+-- Every cell a route can reach from the shop, stepping only where the climb is at most `slope`.
+local function layoutFlood(grid, choice, slope: number)
+	local function height(ix: number, iz: number): number
+		if iz < 0 then
+			return grid.shop[layoutKey(ix, -1)]
+		end
+		local zone = grid.zoneOfRow[iz]
+		return grid.options[zone][choice[zone]].heights[layoutKey(ix, iz)]
+	end
+	local seen = {}
+	local queue, head = {}, 1
+	for ix = -LAYOUT_COLS, LAYOUT_COLS do
+		seen[layoutKey(ix, -1)] = true
+		table.insert(queue, { ix, -1 })
+	end
+	while head <= #queue do
+		local ix, iz = queue[head][1], queue[head][2]
+		head += 1
+		local y = height(ix, iz)
+		for _, step in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local nx, nz = ix + step[1], iz + step[2]
+			if
+				math.abs(nx) <= LAYOUT_COLS
+				and nz >= -1
+				and nz <= LAYOUT_ROWS[2]
+				and not seen[layoutKey(nx, nz)]
+				and math.abs(height(nx, nz) - y) <= slope * LAYOUT_GRID
+			then
+				seen[layoutKey(nx, nz)] = true
+				table.insert(queue, { nx, nz })
+			end
+		end
+	end
+	return seen
+end
+
+-- Whether a flood reaches a point (x, z) of the beach, within one grid cell.
+local function layoutReaches(seen, x: number, z: number): boolean
+	local ix, iz = math.floor(x / LAYOUT_GRID + 0.5), math.floor(z / LAYOUT_GRID + 0.5)
+	for dx = -1, 1 do
+		for dz = -1, 1 do
+			if seen[layoutKey(ix + dx, iz + dz)] then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- How far a route is (in cells) from one start point on the top of a zone to its bottom, or nil.
+local function layoutRoute(grid, zone: number, option, startIx: number, slope: number): number?
+	local rows = {}
+	for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
+		if grid.zoneOfRow[iz] == zone then
+			table.insert(rows, iz)
+		end
+	end
+	local top, bottom = rows[1], rows[#rows]
+	local dist = { [layoutKey(startIx, top)] = 0 }
+	local queue, head = { { startIx, top } }, 1
+	while head <= #queue do
+		local ix, iz = queue[head][1], queue[head][2]
+		head += 1
+		if iz == bottom then
+			return dist[layoutKey(ix, iz)]
+		end
+		local y = option.heights[layoutKey(ix, iz)]
+		for _, step in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local nx, nz = ix + step[1], iz + step[2]
+			local k = layoutKey(nx, nz)
+			if math.abs(nx) <= LAYOUT_COLS and nz >= top and nz <= bottom and dist[k] == nil then
+				local ny = option.heights[k]
+				if ny and math.abs(ny - y) <= slope * LAYOUT_GRID then
+					dist[k] = dist[layoutKey(ix, iz)] + 1
+					table.insert(queue, { nx, nz })
+				end
+			end
+		end
+	end
+	return nil
+end
+
+-- Share of a zone's lower half that a player at its top edge can't see at eye height. A target
+-- counts as hidden only when none of the nine viewpoints along the top edge can see it.
+local function layoutHidden(zone: number): number
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local z0, z1 = Beach.zoneRange(zone)
+	local eye = Config.Beach.Terrain.EyeHeight
+	local eyes = {}
+	for _, x in { -320, -240, -160, -80, 0, 80, 160, 240, 320 } do
+		local z = z0 + 1
+		table.insert(eyes, { x = x, z = z, y = Beach.groundAt(x, z) + eye })
+	end
+	local total, hidden = 0, 0
+	for z = z0 + (z1 - z0) / 2, z1 - 2, 6 do
+		for x = -340, 340, 8 do
+			local ty = Beach.groundAt(x, z)
+			total += 1
+			local seen = false
+			for _, e in eyes do
+				local blocked = false
+				local dz = z - e.z
+				for s = 0.04, 0.96, 2 / math.max(dz, 1) do
+					if Beach.groundAt(e.x + (x - e.x) * s, e.z + dz * s) > e.y + (ty - e.y) * s + 0.2 then
+						blocked = true
+						break
+					end
+				end
+				if not blocked then
+					seen = true
+					break
+				end
+			end
+			if not seen then
+				hidden += 1
+			end
+		end
+	end
+	return hidden / math.max(total, 1)
+end
+
+test("every layout keeps a ramp on each side, anchored where the zones join", function()
+	local Layouts = h.require("Shared/Layouts")
+	local function anchored(p, x)
+		local first, last = p.Path[1], p.Path[#p.Path]
+		return first[1] == x and first[2] == 0 and last[1] == x and last[2] == 150
+	end
+	for _, entry in Layouts.all(true) do
+		local left, right = false, false
+		for _, p in entry.Layout.Primitives do
+			if p.Kind == "Ramp" then
+				assert(p.Width >= 14, entry.Source .. ": a ramp is at least 14 studs wide")
+				left = left or anchored(p, -200)
+				right = right or anchored(p, 180)
+			end
+		end
+		assert(
+			left and right,
+			entry.Source .. " (zone " .. entry.Zone .. "): needs ramps from x = -200 and x = 180"
+		)
+	end
+end)
+
+test("ramps stay within the cart slope and are clear of the ground's shape", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local z0 = nil
+	for _, entry in Layouts.all(true) do
+		Layouts.setActive(entry.Zone, entry.Layout)
+		z0 = Beach.zoneRange(entry.Zone)
+		for _, p in entry.Layout.Primitives do
+			if p.Kind == "Ramp" then
+				for i = 1, #p.Path - 1 do
+					local a, b = p.Path[i], p.Path[i + 1]
+					local len = math.sqrt((b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2)
+					local last = nil
+					for s = 0, len, 2 do
+						local t = s / len
+						local x = a[1] + (b[1] - a[1]) * t
+						local z = z0 + a[2] + (b[2] - a[2]) * t
+						assert(
+							Beach.feature(x, z) == 0,
+							entry.Source .. ": a ramp's centre is clear of shapes"
+						)
+						local y = Beach.groundAt(x, z)
+						if last then
+							assert(
+								math.abs(y - last) / 2 <= Config.Beach.Terrain.CartSlope,
+								entry.Source .. ": a ramp is cart-passable"
+							)
+						end
+						last = y
+					end
+				end
+			end
+		end
+		Layouts.setActive(entry.Zone, nil)
+	end
+end)
+
+test("a cart and a player on foot reach the sea whatever the biomes", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local grid = layoutGrid()
+	local carts, feet = 0, 0
+	local combos = 0
+	eachLayoutChoice(grid, function(choice)
+		combos += 1
+		local cart = layoutFlood(grid, choice, Config.Beach.Terrain.CartSlope)
+		if layoutReaches(cart, 0, 592) then
+			carts += 1
+		end
+		local foot = layoutFlood(grid, choice, Config.Beach.Terrain.FootSlope)
+		if layoutReaches(foot, 0, 592) then
+			feet += 1
+		end
+	end)
+	assert(combos > 0, "there are combinations to test")
+	assert(carts == combos, carts .. " of " .. combos .. " combinations let a cart reach the sea")
+	assert(feet == combos, feet .. " of " .. combos .. " combinations let a player on foot reach the sea")
+end)
+
+test("a player on foot can reach every biome's entrance spot in every zone it rolls in", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Biomes = h.require("Shared/Biomes")
+	local grid = layoutGrid()
+	local checked, failures = 0, {}
+	eachLayoutChoice(grid, function(choice)
+		local seen = nil
+		for zone = 1, Config.Beach.ActiveZones do
+			local option = grid.options[zone][choice[zone]]
+			local biome = Biomes.List[option.name]
+			if biome then
+				seen = seen or layoutFlood(grid, choice, Config.Beach.Terrain.FootSlope)
+				local zStart = Beach.zoneRange(zone)
+				for _, x in biome.EntranceSpots do
+					checked += 1
+					if not layoutReaches(seen, x, zStart + 30) then
+						table.insert(failures, option.name .. " in zone " .. zone .. " at x " .. x)
+					end
+				end
+			end
+		end
+	end)
+	assert(checked > 0, "there are entrance spots to check")
+	assert(#failures == 0, "unreachable on foot: " .. table.concat(failures, "; "))
+end)
+
+test("every zone has at least two shortcuts a player on foot can take faster than a cart", function()
+	local Config = h.require("Shared/Config")
+	local grid = layoutGrid()
+	local starts = { -300, -150, 0, 150, 300 }
+	local weak = {}
+	for zone = 1, Config.Beach.ActiveZones do
+		for _, option in grid.options[zone] do
+			local count = 0
+			for _, x in starts do
+				local startIx = math.floor(x / LAYOUT_GRID)
+				local cart = layoutRoute(grid, zone, option, startIx, Config.Beach.Terrain.CartSlope)
+				local foot = layoutRoute(grid, zone, option, startIx, Config.Beach.Terrain.FootSlope)
+				if foot and (cart == nil or foot < cart) then
+					count += 1
+				end
+			end
+			if count < 2 then
+				table.insert(weak, option.name .. " (zone " .. zone .. ") has " .. count)
+			end
+		end
+	end
+	assert(#weak == 0, "too few shortcuts: " .. table.concat(weak, "; "))
+end)
+
+test("zone 1 is readable from the top, and zones 2 to 4 hide their lower half", function()
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local grid = layoutGrid()
+	local problems = {}
+	for zone = 1, Config.Beach.ActiveZones do
+		for _, option in grid.options[zone] do
+			Layouts.setActive(zone, option.name)
+			local hidden = layoutHidden(zone)
+			Layouts.setActive(zone, nil)
+			if zone == 1 and hidden > 0.2 then
+				table.insert(problems, option.name .. " (zone 1) hides " .. math.floor(hidden * 100) .. "%")
+			elseif zone > 1 and hidden < 0.6 then
+				table.insert(
+					problems,
+					option.name .. " (zone " .. zone .. ") hides only " .. math.floor(hidden * 100) .. "%"
+				)
+			end
+		end
+	end
+	assert(#problems == 0, table.concat(problems, "; "))
+end)
+
+test("layouts stay within their zone's height, and only zone 4 is rock", function()
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local cfg = Config.Beach.Terrain
+	local limit = { 2.5, 5, 7, 10 } -- from the design: how rough each zone may get
+	local problems = {}
+	for _, entry in Layouts.all(true) do
+		local high, low, rock = 0, 0, false
+		for x = -350, 350, 2 do
+			for z = 0, 150, 2 do
+				local f, r = Layouts.evaluate(entry.Layout, x, z)
+				high = math.max(high, f)
+				low = math.min(low, f)
+				rock = rock or r
+			end
+		end
+		local max = limit[entry.Zone] or cfg.MaxHeight
+		if high > max + 0.01 then
+			table.insert(
+				problems,
+				entry.Source .. " (zone " .. entry.Zone .. ") rises " .. high .. ", over " .. max
+			)
+		end
+		if -low > cfg.MaxDepth then
+			table.insert(problems, entry.Source .. " cuts " .. -low .. " deep")
+		end
+		if rock and entry.Zone ~= 4 then
+			table.insert(problems, entry.Source .. " has rock outside zone 4")
+		end
+	end
+	assert(#problems == 0, table.concat(problems, "; "))
+end)
+
+test("the pier's path and every entrance spot are clear of shapes", function()
+	local Beach = h.require("Shared/Beach")
+	local Biomes = h.require("Shared/Biomes")
+	local Layouts = h.require("Shared/Layouts")
+	local grid = layoutGrid()
+	local problems = {}
+	for zone = 1, 4 do
+		for _, option in grid.options[zone] do
+			Layouts.setActive(zone, option.name)
+			local zStart, zEnd = Beach.zoneRange(zone)
+			if zone == 2 or zone == 3 then
+				local from, to = 20, 150 -- the pier runs through zone 2 (local z 20 to 150) ...
+				if zone == 3 then
+					from, to = 0, 60 -- ... and on into zone 3 (local z 0 to 60)
+				end
+				for z = zStart + from, zStart + to, 2 do
+					if Beach.feature(40, z) ~= 0 then
+						table.insert(problems, option.name .. ": the pier is blocked at z " .. z)
+						break
+					end
+				end
+			end
+			local biome = Biomes.List[option.name]
+			if biome then
+				for _, x in biome.EntranceSpots do
+					if Beach.feature(x, zStart + 30) ~= 0 then
+						table.insert(problems, option.name .. ": entrance at x " .. x .. " is not flat")
+					end
+				end
+			end
+			Layouts.setActive(zone, nil)
+		end
+	end
+	assert(#problems == 0, table.concat(problems, "; "))
+end)
+
+test("the rock pools keep their ground, so nothing is cut or raised through them", function()
+	local Config = h.require("Shared/Config")
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local problems = {}
+	-- The distance from a pool's centre (in the zone's own Z) to a primitive's path, or to its centre.
+	local function distanceTo(pool, p): number
+		local points = p.Path or { p.At }
+		if #points == 1 then
+			return math.sqrt((points[1][1] - pool.X) ^ 2 + (points[1][2] - pool.Z) ^ 2)
+		end
+		local best = math.huge
+		for i = 1, #points - 1 do
+			local a, b = points[i], points[i + 1]
+			local dx, dz = b[1] - a[1], b[2] - a[2]
+			local len2 = dx * dx + dz * dz
+			local t = if len2 > 0
+				then math.clamp(((pool.X - a[1]) * dx + (pool.Z - a[2]) * dz) / len2, 0, 1)
+				else 0
+			best = math.min(best, math.sqrt((a[1] + dx * t - pool.X) ^ 2 + (a[2] + dz * t - pool.Z) ^ 2))
+		end
+		return best
+	end
+	for _, entry in Layouts.all(true) do
+		local zStart, zEnd = Beach.zoneRange(entry.Zone)
+		for _, pool in Config.Beach.Pools do
+			if pool.Z >= zStart and pool.Z < zEnd then
+				local local_pool = { X = pool.X, Z = pool.Z - zStart, Radius = pool.Radius }
+				for _, p in entry.Layout.Primitives do
+					if p.Kind == "Ridge" or p.Kind == "Mound" or p.Kind == "Channel" then
+						local d = distanceTo(local_pool, p)
+						if d < pool.Radius + 6 then
+							table.insert(
+								problems,
+								entry.Source
+									.. ": a "
+									.. p.Kind
+									.. " comes within "
+									.. math.floor(d)
+									.. " studs of a pool"
+							)
+						end
+					end
+				end
+			end
+		end
+	end
+	assert(#problems == 0, table.concat(problems, "; "))
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)
