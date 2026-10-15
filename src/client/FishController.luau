@@ -73,7 +73,8 @@ local schools: { School } = {}
 -- Where a school may swim: not across the headlands, and only where the water is deep enough.
 local function bounds(waterline: number): (number, number, number)
 	local xMax = Beach.HalfWidth - 20
-	local zMin = Beach.zForDepth(MIN_DEPTH + 1, waterline)
+	-- Where the sea is MIN_DEPTH + 1 deep (the beach slopes evenly, so it's this far out).
+	local zMin = waterline + (MIN_DEPTH + 1) / Config.Beach.Slope
 	local zMax = Beach.Depth + Config.Beach.SeaExtent - 30
 	return xMax, zMin, zMax
 end
