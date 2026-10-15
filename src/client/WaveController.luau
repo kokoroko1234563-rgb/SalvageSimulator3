@@ -17,6 +17,10 @@ local WaveController = {}
 
 local cfg = Config.Waves
 
+-- The water's speed the character has picked up: it builds up and fades instead of
+-- snapping to the water's speed, so being in the surf has momentum.
+local carried = Vector3.zero
+
 -- Knockdown state for this client's character.
 local knockedUntil = 0
 local readyAt = 0
@@ -60,10 +64,14 @@ function WaveController.init()
 				local velocity = root.AssemblyLinearVelocity
 				local target = Vector3.new(push.X, velocity.Y, push.Z)
 				root.AssemblyLinearVelocity = velocity:Lerp(target, math.min(1, dt * 3))
+				carried = Vector3.new(push.X, 0, push.Z)
 			elseif push.Magnitude >= cfg.KnockdownPush and now >= readyAt then
 				knockDown(character :: Model, humanoid, root, push)
-			elseif push.Magnitude > 0 then
-				root.CFrame += Vector3.new(push.X, 0, push.Z) * dt
+			else
+				carried = carried:Lerp(Vector3.new(push.X, 0, push.Z), 1 - math.exp(-cfg.Coupling * dt))
+				if carried.Magnitude > 0.05 then
+					root.CFrame += carried * dt
+				end
 			end
 		end
 

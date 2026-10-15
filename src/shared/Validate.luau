@@ -162,7 +162,14 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		local w = Config.Waves
 		local knee = Config.Beach.KneeDepth / Config.Beach.WaistDepth
 		local zone = 1 + ((w.ZoneScale[sandbar.Zone] or 1) - 1) * w.UndertowZoneScale
-		local pull = (w.Undertow + (w.UndertowDeep - w.Undertow) * knee) * zone
+		-- The strongest moment: the drawback just before a big (set) wave.
+		local pull = (w.Undertow + (w.UndertowDeep - w.Undertow) * knee)
+			* zone
+			* (w.Slack + w.Drawback * w.SetSize)
+		-- Averaged over a wave it must stay well under walking speed.
+		local share = (w.DrawbackRange / w.Speed) / w.Period
+		pull = pull * share
+			+ (w.Undertow + (w.UndertowDeep - w.Undertow) * knee) * zone * w.Slack * (1 - share)
 		check(
 			pull < 14,
 			string.format(

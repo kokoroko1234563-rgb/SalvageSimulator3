@@ -150,10 +150,21 @@ end
 -- Returns the push velocity (studs/s) the sea applies at a position: shoreward in the band
 -- behind a rolling wave and under a running-up sheet, seaward under a sliding-back sheet
 -- and in the water between waves, zero on sand no wave reaches.
-function Waves.getPush(position: Vector3, sea: Sea): Vector3
-	local line = Tide.waterlineAt(sea, position.X)
-	local rel = position.Z - line
-	local scale = workspace:GetAttribute(Waves.ScaleAttribute) or 1
+-- The undertow at a spot in the water (rel > 0), before the pulses.
+local function undertow(rel: number, line: number): number
+	local depth = math.clamp(rel * Config.Beach.Slope / Config.Beach.WaistDepth, 0, 1)
+	local pull = cfg.Undertow + (cfg.UndertowDeep - cfg.Undertow) * depth
+	-- Grows less than the waves further out, so you can always wade back across the channel.
+	return pull * (1 + (zoneScale(line) - 1) * cfg.UndertowZoneScale)
+end
+
+-- Side-to-side drift in the water, different along the beach and changing over time.
+local function sway(x: number, now: number, rel: number): Vector3
+	local amount = cfg.Sway * math.clamp(rel / 20, 0, 1)
+	return Vector3.new(amount * math.sin(now * 0.45 + x * 0.031) * math.cos(now * 0.17 - x * 0.013), 0, 0)
+end
+
+local function pushAt(position: Vector3, sea: Sea, line: number, rel: number, scale: number): Vector3
 	for _, wave in Waves.wavesAt(position.X, sea, line) do
 		local strength = wave.Size * scale
 		if wave.Phase == "Rolling" then
@@ -161,6 +172,13 @@ function Waves.getPush(position: Vector3, sea: Sea): Vector3
 			if behind >= 0 and behind <= cfg.BandWidth then
 				local depthFactor = 0.7 + math.clamp(rel, 0, 60) / 60 * 0.6
 				return SHORE * cfg.Push * (1 - behind / cfg.BandWidth) * depthFactor * strength
+			end
+			if rel > 0 and behind < 0 and -behind < cfg.DrawbackRange then
+				-- The water rushing out to meet the incoming wave: strongest right before it.
+				local closeness = 1 + behind / cfg.DrawbackRange
+				local pull = undertow(rel, line)
+					* (cfg.Slack + cfg.Drawback * closeness * closeness * wave.Size)
+				return -SHORE * pull * scale
 			end
 		elseif rel >= wave.Front and rel <= 0 then
 			if wave.Phase == "RunUp" then
@@ -174,14 +192,21 @@ function Waves.getPush(position: Vector3, sea: Sea): Vector3
 		end
 	end
 	if rel > 0 then
-		-- Undertow: the sea pulls out between and under the waves, harder where it's deeper.
-		local depth = math.clamp(rel * Config.Beach.Slope / Config.Beach.WaistDepth, 0, 1)
-		local pull = cfg.Undertow + (cfg.UndertowDeep - cfg.Undertow) * depth
-		-- Grows less than the waves further out, so you can always wade back across the channel.
-		local zone = 1 + (zoneScale(line) - 1) * cfg.UndertowZoneScale
-		return -SHORE * pull * zone * scale
+		-- Slack water between waves: a gentle pull out.
+		return -SHORE * undertow(rel, line) * cfg.Slack * scale
 	end
 	return Vector3.zero
+end
+
+function Waves.getPush(position: Vector3, sea: Sea): Vector3
+	local line = Tide.waterlineAt(sea, position.X)
+	local rel = position.Z - line
+	local scale = workspace:GetAttribute(Waves.ScaleAttribute) or 1
+	local push = pushAt(position, sea, line, rel, scale)
+	if rel > 0 then
+		push += sway(position.X, sea.Now, rel) * scale
+	end
+	return push
 end
 
 -- How far up the beach the water reaches at X right now (distance from the waterline, 0 or

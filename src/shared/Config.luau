@@ -112,7 +112,7 @@ Config.Waves = {
 	Period = 6, -- seconds between waves
 	Speed = 26, -- studs/s the wave front travels toward shore
 	StartOffset = 90, -- where each wave starts, studs seaward of the waterline
-	BandWidth = 6, -- thickness of the pushing band behind the front: a short, sharp shove
+	BandWidth = 8, -- thickness of the pushing band behind the front: a short, sharp shove
 	Push = 18, -- studs/s shoreward push at the leading edge
 
 	-- Undertow: the sea always pulls out, between and under the waves, harder the deeper it
@@ -121,6 +121,13 @@ Config.Waves = {
 	Undertow = 5, -- studs/s seaward at the waterline...
 	UndertowDeep = 10, -- ...rising to this at waist depth and beyond
 	UndertowZoneScale = 0.5, -- the undertow grows half as much as the waves further out
+	-- The pull comes in pulses, not as a steady current: as each wave approaches, the water
+	-- rushes out to meet it (the drawback), then the wave's front shoves, then it goes slack.
+	Slack = 0.35, -- the undertow between waves, as a fraction
+	Drawback = 2, -- extra pull (times the undertow, times the wave's size) just before a wave
+	DrawbackRange = 35, -- studs ahead of an incoming wave where the water rushes out to it
+	Sway = 2.5, -- studs/s side-to-side drift in the water, varying along the beach and in time
+	Coupling = 4, -- how quickly you pick up (and lose) the water's speed; lower = more momentum
 
 	-- Run-up: after reaching the waterline each wave keeps running up the exposed sand as a
 	-- thin sheet, slowing down, then slides back. While running up it pushes things up the
