@@ -16,6 +16,7 @@ local Tide = require(Shared.Tide)
 
 local CollisionGroups = require(script.Parent.CollisionGroups)
 local ItemService = require(script.Parent.ItemService)
+local VesselTrim = require(script.Parent.VesselTrim)
 
 local VesselService = {}
 
@@ -643,6 +644,15 @@ local function tick()
 end
 
 -- For the data validator and tools/tests.
+-- The builders above make each vessel's bare shape; VesselTrim paints and trims it.
+for kind, build in builders do
+	builders[kind] = function(model: Model, at: CFrame)
+		local handle = build(model, at)
+		VesselTrim.apply(model, kind)
+		return handle
+	end
+end
+
 VesselService._builders = builders
 
 function VesselService.init(notifyFn: (Player, string) -> ())

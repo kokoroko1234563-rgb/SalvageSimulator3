@@ -5,3 +5,5 @@
 sourcemap.json
 tools/.cache/
 roblox.yml
+tools/preview/node_modules/
+tools/preview/out/

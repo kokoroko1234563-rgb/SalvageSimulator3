@@ -26,102 +26,18 @@ local Smooth = Palette.Material.Smooth
 
 local M = Palette.ItemModel
 
--- Turns a cylinder (which lies along X) to stand along Y or Z.
-local ALONG_Y = CFrame.Angles(0, 0, math.pi / 2)
-local ALONG_Z = CFrame.Angles(0, math.pi / 2, 0)
+local ModelParts = require(script.Parent.ModelParts)
+
+local ALONG_Y = ModelParts.ALONG_Y
+local ALONG_Z = ModelParts.ALONG_Z
+local shade = ModelParts.shade
+local piece = ModelParts.piece
+local bar = ModelParts.bar
+local arc = ModelParts.arc
+local along = ModelParts.along
 
 local ItemModels = {}
 local builders = {}
-
--- A darker (negative) or lighter (positive) version of a colour.
-local function shade(color: Color3, amount: number): Color3
-	if amount >= 0 then
-		return color:Lerp(M.White, amount)
-	end
-	return color:Lerp(Color3.new(0, 0, 0), -amount)
-end
-
--- Adds one visible part to the item. `at` is in the root's own frame.
-local function piece(
-	root: BasePart,
-	name: string,
-	shape: Enum.PartType,
-	size: Vector3,
-	at: CFrame,
-	color: Color3,
-	material: Enum.Material?,
-	transparency: number?
-): BasePart
-	local p = Instance.new("Part")
-	p.Name = name
-	p.Shape = shape
-	p.Size = size
-	p.CFrame = root.CFrame * at
-	p.Color = color
-	p.Material = material or Smooth
-	p.Transparency = transparency or 0
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	p.Massless = true
-	p.CanCollide = false
-	p.CanQuery = false
-	p.CanTouch = false
-	p.Parent = root
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = root
-	weld.Part1 = p
-	weld.Parent = root
-	return p
-end
-
--- A square bar from one point to another, in the root's frame.
-local function bar(
-	root: BasePart,
-	name: string,
-	from: Vector3,
-	to: Vector3,
-	thickness: number,
-	color: Color3,
-	material: Enum.Material?
-)
-	piece(
-		root,
-		name,
-		Block,
-		Vector3.new(thickness, thickness, (to - from).Magnitude),
-		CFrame.lookAt((from + to) / 2, to),
-		color,
-		material
-	)
-end
-
--- A curved metal handle in the root's XY plane, as a chain of bars.
-local function arc(
-	root: BasePart,
-	name: string,
-	centre: Vector2,
-	radius: number,
-	fromDegrees: number,
-	toDegrees: number,
-	thickness: number,
-	color: Color3
-)
-	local steps = 6
-	local previous = nil
-	for step = 0, steps do
-		local angle = math.rad(fromDegrees + (toDegrees - fromDegrees) * step / steps)
-		local point = Vector3.new(centre.X + radius * math.cos(angle), centre.Y + radius * math.sin(angle), 0)
-		if previous then
-			bar(root, name, previous, point, thickness, color, Metal)
-		end
-		previous = point
-	end
-end
-
--- A part spanning from..to along the root's X axis, centred on the root.
-local function along(from: number, to: number): CFrame
-	return CFrame.new((from + to) / 2, 0, 0)
-end
 
 -- A bottle lying along X. `half` is half its length, `width` its diameter.
 local function bottle(
@@ -141,7 +57,7 @@ local function bottle(
 		along(bodyStart, bodyEnd),
 		color,
 		Glass,
-		0.35
+		0.25
 	)
 	piece(
 		root,
@@ -151,7 +67,7 @@ local function bottle(
 		along(bodyEnd, shoulderEnd),
 		color,
 		Glass,
-		0.35
+		0.25
 	)
 	piece(
 		root,
@@ -161,7 +77,7 @@ local function bottle(
 		along(shoulderEnd, neckEnd),
 		color,
 		Glass,
-		0.35
+		0.25
 	)
 	piece(
 		root,
@@ -210,19 +126,23 @@ end
 
 builders.Seashell = function(root, def)
 	local color = def.Color
-	-- A fan-shaped shell lying flat, with ribs radiating from the hinge.
-	piece(root, "Shell", Cylinder, Vector3.new(0.18, 1.1, 1.1), CFrame.new(0, -0.12, 0) * ALONG_Y, color)
-	for index, degrees in { -50, -25, 0, 25, 50 } do
+	-- A scallop lying flat: a fan of ribs spreading from the hinge, two shades alternating,
+	-- taller in the middle.
+	for index = 0, 6 do
+		local degrees = -60 + index * 20
+		local height = 0.16 - math.abs(degrees) / 60 * 0.06
 		piece(
 			root,
 			"Rib" .. index,
 			Block,
-			Vector3.new(0.1, 0.1, 0.5),
-			CFrame.new(0, -0.02, 0) * CFrame.Angles(0, math.rad(degrees), 0) * CFrame.new(0, 0, -0.3),
-			shade(color, -0.15)
+			Vector3.new(0.22, height, 0.7),
+			CFrame.new(0, -0.25 + height / 2, 0.45)
+				* CFrame.Angles(0, math.rad(degrees), 0)
+				* CFrame.new(0, 0, -0.34),
+			if index % 2 == 0 then color else shade(color, 0.45)
 		)
 	end
-	piece(root, "Hinge", Ball, Vector3.new(0.25, 0.25, 0.25), CFrame.new(0, -0.1, 0.5), shade(color, -0.15))
+	piece(root, "Hinge", Ball, Vector3.new(0.26, 0.26, 0.26), CFrame.new(0, -0.14, 0.48), shade(color, -0.2))
 end
 
 builders.GlassBottle = function(root, def)
@@ -242,8 +162,9 @@ end
 
 builders.MessageBottle = function(root, def)
 	local width = def.Size.Y
-	bottle(root, def.Color, def.Size.X / 2, width, function(from, to)
-		-- The rolled message, and the red ribbon tied round the bottle.
+	local half = def.Size.X / 2
+	bottle(root, def.Color, half, width, function(from, to)
+		-- The rolled message inside, and a red ribbon tied round the neck.
 		piece(
 			root,
 			"Message",
@@ -252,13 +173,12 @@ builders.MessageBottle = function(root, def)
 			along(from, to),
 			M.Paper
 		)
-		local ringX = from + (to - from) * 0.4
 		piece(
 			root,
 			"Ribbon",
 			Cylinder,
-			Vector3.new(0.12, width * 1.06, width * 1.06),
-			CFrame.new(ringX, 0, 0),
+			Vector3.new(0.1, width * 0.52, width * 0.52),
+			CFrame.new(half * 0.74, 0, 0),
 			M.Wax,
 			Smooth
 		)
@@ -268,8 +188,8 @@ end
 builders.FlipFlop = function(root, def)
 	local color = def.Color
 	piece(root, "Sole", Block, Vector3.new(0.8, 0.2, 1.7), CFrame.new(0, -0.025, 0), color)
-	-- A thong that splits from the toe post to the heel.
-	local strap = shade(color, -0.2)
+	-- A pale thong that splits from the toe post to the heel.
+	local strap = shade(color, 0.55)
 	local post = Vector3.new(0, 0.09, -0.1)
 	bar(root, "StrapLeft", post, Vector3.new(-0.28, 0.09, 0.55), 0.1, strap)
 	bar(root, "StrapRight", post, Vector3.new(0.28, 0.09, 0.55), 0.1, strap)
@@ -335,6 +255,10 @@ builders.BeachBall = function(root, def)
 	piece(root, "SeamX", Cylinder, band, CFrame.new(), M.White)
 	piece(root, "SeamY", Cylinder, band, ALONG_Y, M.White)
 	piece(root, "SeamZ", Cylinder, band, ALONG_Z, M.White)
+	-- A yellow cap on one pole and a blue one on the other.
+	local cap = Vector3.new(0.14, size * 0.34, size * 0.34)
+	piece(root, "CapTop", Cylinder, cap, CFrame.new(0, size / 2 - 0.05, 0) * ALONG_Y, M.Sun)
+	piece(root, "CapBottom", Cylinder, cap, CFrame.new(0, -(size / 2 - 0.05), 0) * ALONG_Y, M.Aqua)
 end
 
 builders.GoldenSpade = function(root, def)
@@ -358,33 +282,45 @@ end
 
 builders.BeaconPearl = function(root, def)
 	piece(root, "Core", Ball, def.Size, CFrame.new(), def.Color, Neon)
-	-- A soft halo round the glowing core.
-	piece(root, "Halo", Ball, def.Size * 1.35, CFrame.new(), M.Glow, Glass, 0.75)
+	-- A soft halo round the glowing core, and a ring of sparks circling it.
+	piece(root, "Halo", Ball, def.Size * 1.4, CFrame.new(), M.Glow, Glass, 0.6)
+	for step = 0, 7 do
+		local angle = step * math.pi / 4
+		piece(
+			root,
+			"Spark",
+			Ball,
+			Vector3.new(0.13, 0.13, 0.13),
+			CFrame.new(math.cos(angle) * 0.78, 0.05, math.sin(angle) * 0.78),
+			M.Sun,
+			Neon
+		)
+	end
 end
 
 builders.Bucket = function(root, def)
 	local color = def.Color
 	local width = def.Size.Y
 	piece(root, "Body", Cylinder, Vector3.new(1.35, width * 0.94, width * 0.94), along(-0.8, 0.55), color)
+	-- A blue band round the middle, and a white plastic rim and handle.
 	piece(
 		root,
-		"Rim",
+		"Band",
 		Cylinder,
-		Vector3.new(0.1, width, width),
-		CFrame.new(0.6, 0, 0),
-		shade(color, 0.15),
-		Metal
+		Vector3.new(0.32, width * 0.96, width * 0.96),
+		CFrame.new(-0.2, 0, 0),
+		M.Aqua
 	)
-	-- The open top, dark inside.
+	piece(root, "Rim", Cylinder, Vector3.new(0.1, width, width), CFrame.new(0.6, 0, 0), M.White)
 	piece(
 		root,
 		"Mouth",
 		Cylinder,
 		Vector3.new(0.03, width * 0.8, width * 0.8),
 		CFrame.new(0.66, 0, 0),
-		M.Hole
+		shade(color, -0.45)
 	)
-	arc(root, "Handle", Vector2.new(-0.1, 0), 0.9, 25, 155, 0.08, M.Iron)
+	arc(root, "Handle", Vector2.new(-0.1, 0), 0.9, 25, 155, 0.09, M.White, Smooth)
 end
 
 builders.SmallCrate = function(root, def)
@@ -423,8 +359,15 @@ builders.Lantern = function(root, def)
 	end
 	piece(root, "Roof", Block, Vector3.new(1.08, 0.12, 1.08), CFrame.new(0, 0.66, 0), color, Metal)
 	piece(root, "Cap", Block, Vector3.new(0.6, 0.22, 0.6), CFrame.new(0, 0.83, 0), color, Metal)
-	piece(root, "Flame", Ball, Vector3.new(0.36, 0.36, 0.36), CFrame.new(0, -0.15, 0), M.Flame, Neon)
+	local flame =
+		piece(root, "Flame", Ball, Vector3.new(0.4, 0.4, 0.4), CFrame.new(0, -0.15, 0), M.Flame, Neon)
 	arc(root, "Handle", Vector2.new(0, 0.6), 0.5, 15, 165, 0.07, color)
+	-- A warm glow, so it's a lantern you can find at dusk.
+	local light = Instance.new("PointLight")
+	light.Color = M.Flame
+	light.Range = 10
+	light.Brightness = 1.3
+	light.Parent = flame
 end
 
 builders.Spyglass = function(root, def)
@@ -504,7 +447,7 @@ builders.ShipBell = function(root, def)
 	)
 	piece(root, "Body", Cylinder, Vector3.new(1.2, 1.8, 1.8), CFrame.new(-0.2, 0, 0), color, Metal)
 	piece(root, "Lip", Cylinder, Vector3.new(0.3, 2.2, 2.2), CFrame.new(0.65, 0, 0), color, Metal)
-	piece(root, "Mouth", Cylinder, Vector3.new(0.04, 1.7, 1.7), CFrame.new(0.79, 0, 0), M.Hole)
+	piece(root, "Mouth", Cylinder, Vector3.new(0.04, 1.7, 1.7), CFrame.new(0.79, 0, 0), shade(color, -0.6))
 end
 
 builders.Barrel = function(root, def)
@@ -550,14 +493,20 @@ builders.Anchor = function(root, def)
 	bar(root, "Shank", Vector3.new(0, -1.2, 0), Vector3.new(0, 1.4, 0), 0.36, color, Rust)
 	bar(root, "Stock", Vector3.new(-1.0, 1.25, 0), Vector3.new(1.0, 1.25, 0), 0.36, color, Rust)
 	piece(root, "Eye", Ball, Vector3.new(0.34, 0.34, 0.34), CFrame.new(0, 1.5, 0), color, Rust)
+	-- Two curved arms, each ending in a flat blade.
 	for _, side in { -1, 1 } do
-		bar(root, "Fluke", Vector3.new(0, -1.15, 0), Vector3.new(side * 0.75, -1.25, 0), 0.34, color, Rust)
-		bar(
+		local previous = Vector3.new(0, -1.25, 0)
+		for _, point in { Vector3.new(0.5, -1.4, 0), Vector3.new(0.95, -1.15, 0), Vector3.new(1.15, -0.7, 0) } do
+			local target = Vector3.new(point.X * side, point.Y, 0)
+			bar(root, "Arm", previous, target, 0.34, color, Rust)
+			previous = target
+		end
+		piece(
 			root,
-			"Point",
-			Vector3.new(side * 0.75, -1.25, 0),
-			Vector3.new(side * 1.1, -0.85, 0),
-			0.34,
+			"Blade",
+			Block,
+			Vector3.new(0.5, 0.5, 0.3),
+			CFrame.new(1.1 * side, -0.62, 0) * CFrame.Angles(0, 0, math.rad(-25 * side)),
 			color,
 			Rust
 		)
@@ -569,7 +518,14 @@ builders.ShipWheel = function(root, def)
 	local width = def.Size.Y
 	-- A disc standing on its edge: wooden rim, dark hole, spokes on the front face.
 	piece(root, "Rim", Cylinder, Vector3.new(0.4, width, width), CFrame.new(), color, Wood)
-	piece(root, "Hole", Cylinder, Vector3.new(0.46, width * 0.76, width * 0.76), CFrame.new(), M.Hole)
+	piece(
+		root,
+		"Hole",
+		Cylinder,
+		Vector3.new(0.46, width * 0.76, width * 0.76),
+		CFrame.new(),
+		shade(color, -0.6)
+	)
 	local face = 0.27
 	piece(
 		root,

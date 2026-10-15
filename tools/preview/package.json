@@ -1,0 +1,8 @@
+{
+  "name": "salvage-preview",
+  "private": true,
+  "description": "Draws the game's models in a browser so they can be looked at without Studio",
+  "dependencies": {
+    "three": "0.160.0"
+  }
+}

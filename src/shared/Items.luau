@@ -32,7 +32,7 @@ Items.Catalog = {
 		Value = 4,
 		Size = Vector3.new(1, 0.5, 1.2),
 		Shape = "Ball",
-		Color = Color3.fromRGB(250, 220, 200),
+		Color = Color3.fromRGB(255, 165, 190),
 	},
 	{
 		Id = "GlassBottle",
@@ -42,7 +42,7 @@ Items.Catalog = {
 		Value = 6,
 		Size = Vector3.new(1.6, 0.6, 0.6),
 		Shape = "Cylinder",
-		Color = Color3.fromRGB(110, 190, 140),
+		Color = Color3.fromRGB(70, 215, 150),
 		Material = Palette.Material.Glass,
 	},
 	{
@@ -53,7 +53,7 @@ Items.Catalog = {
 		Value = 5,
 		Size = Vector3.new(0.8, 0.25, 1.8),
 		Shape = "Block",
-		Color = Color3.fromRGB(255, 120, 160),
+		Color = Color3.fromRGB(255, 105, 170),
 	},
 	{
 		Id = "Sunglasses",
@@ -63,7 +63,7 @@ Items.Catalog = {
 		Value = 14,
 		Size = Vector3.new(1.4, 0.4, 0.5),
 		Shape = "Block",
-		Color = Color3.fromRGB(30, 30, 40),
+		Color = Color3.fromRGB(250, 248, 240),
 	},
 	{
 		Id = "MessageBottle",
@@ -73,7 +73,7 @@ Items.Catalog = {
 		Value = 40,
 		Size = Vector3.new(1.8, 0.7, 0.7),
 		Shape = "Cylinder",
-		Color = Color3.fromRGB(160, 220, 255),
+		Color = Color3.fromRGB(100, 195, 255),
 		Material = Palette.Material.Glass,
 	},
 	{
@@ -84,7 +84,7 @@ Items.Catalog = {
 		Value = 120,
 		Size = Vector3.new(0.7, 0.7, 0.7),
 		Shape = "Ball",
-		Color = Color3.fromRGB(250, 250, 255),
+		Color = Color3.fromRGB(252, 240, 250),
 		Material = Palette.Material.Smooth,
 	},
 	{
@@ -95,7 +95,7 @@ Items.Catalog = {
 		Value = 7,
 		Size = Vector3.new(1.6, 1.6, 1.6),
 		Shape = "Ball",
-		Color = Color3.fromRGB(255, 90, 90),
+		Color = Color3.fromRGB(255, 80, 90),
 	},
 	-- Unlock items: never rolled as normal loot, never sold, banked at the bank house.
 	{
@@ -107,7 +107,7 @@ Items.Catalog = {
 		Value = 0,
 		Size = Vector3.new(0.6, 0.4, 2.6),
 		Shape = "Block",
-		Color = Color3.fromRGB(255, 200, 50),
+		Color = Color3.fromRGB(255, 205, 55),
 		Material = Palette.Material.Foil,
 	},
 	{
@@ -119,7 +119,7 @@ Items.Catalog = {
 		Value = 0,
 		Size = Vector3.new(0.5, 0.3, 1.8),
 		Shape = "Block",
-		Color = Color3.fromRGB(80, 200, 190),
+		Color = Color3.fromRGB(60, 215, 200),
 		Material = Palette.Material.Metal,
 	},
 	{
@@ -134,7 +134,7 @@ Items.Catalog = {
 		Value = 0,
 		Size = Vector3.new(1, 1, 1),
 		Shape = "Ball",
-		Color = Color3.fromRGB(255, 245, 200),
+		Color = Color3.fromRGB(255, 232, 140),
 		Material = Palette.Material.Neon,
 	},
 	-- Medium
@@ -146,7 +146,7 @@ Items.Catalog = {
 		Value = 15,
 		Size = Vector3.new(1.6, 1.8, 1.6),
 		Shape = "Cylinder",
-		Color = Color3.fromRGB(255, 200, 60),
+		Color = Color3.fromRGB(255, 190, 50),
 	},
 	{
 		Id = "SmallCrate",
@@ -156,7 +156,7 @@ Items.Catalog = {
 		Value = 35,
 		Size = Vector3.new(2, 2, 2),
 		Shape = "Block",
-		Color = Color3.fromRGB(170, 120, 70),
+		Color = Color3.fromRGB(214, 150, 86),
 		Material = Palette.Material.WoodPlanks,
 	},
 	{
@@ -167,7 +167,7 @@ Items.Catalog = {
 		Value = 80,
 		Size = Vector3.new(1.2, 2, 1.2),
 		Shape = "Block",
-		Color = Color3.fromRGB(200, 150, 60),
+		Color = Color3.fromRGB(255, 176, 60),
 		Material = Palette.Material.Metal,
 	},
 	{
@@ -178,7 +178,7 @@ Items.Catalog = {
 		Value = 200,
 		Size = Vector3.new(2.6, 0.7, 0.7),
 		Shape = "Cylinder",
-		Color = Color3.fromRGB(190, 160, 80),
+		Color = Color3.fromRGB(225, 185, 80),
 		Material = Palette.Material.Metal,
 	},
 	-- Heavy
@@ -190,7 +190,7 @@ Items.Catalog = {
 		Value = 110,
 		Size = Vector3.new(2, 2.2, 2),
 		Shape = "Cylinder",
-		Color = Color3.fromRGB(190, 150, 60),
+		Color = Color3.fromRGB(240, 190, 70),
 		Material = Palette.Material.Metal,
 	},
 	{
@@ -201,7 +201,7 @@ Items.Catalog = {
 		Value = 55,
 		Size = Vector3.new(3, 2.4, 2.4),
 		Shape = "Cylinder",
-		Color = Color3.fromRGB(130, 85, 50),
+		Color = Color3.fromRGB(190, 120, 62),
 		Material = Palette.Material.Wood,
 	},
 	{
@@ -212,7 +212,7 @@ Items.Catalog = {
 		Value = 90,
 		Size = Vector3.new(3.2, 3.2, 3.2),
 		Shape = "Block",
-		Color = Color3.fromRGB(150, 100, 55),
+		Color = Color3.fromRGB(200, 132, 72),
 		Material = Palette.Material.WoodPlanks,
 	},
 	{
@@ -223,7 +223,7 @@ Items.Catalog = {
 		Value = 220,
 		Size = Vector3.new(2.4, 3, 0.8),
 		Shape = "Block",
-		Color = Color3.fromRGB(80, 85, 95),
+		Color = Color3.fromRGB(120, 150, 185),
 		Material = Palette.Material.Rust,
 	},
 	{
@@ -234,7 +234,7 @@ Items.Catalog = {
 		Value = 450,
 		Size = Vector3.new(0.6, 3.4, 3.4),
 		Shape = "Cylinder",
-		Color = Color3.fromRGB(120, 75, 40),
+		Color = Color3.fromRGB(176, 112, 60),
 		Material = Palette.Material.Wood,
 	},
 }
