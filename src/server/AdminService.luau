@@ -438,14 +438,31 @@ command("tidespeed", "tidespeed <scale>", "Tide time scale: 1 = real 25 min, 0.1
 	return { string.format("Tide time scale %.2f, full cycle %.0fs", scale, Tide.cycleLength()) }
 end)
 
-command("waves", "waves <multiplier>", "Wave strength: 1 = normal, 0 = calm", function(_, args)
-	local scale = tonumber(args[1])
-	if not scale or scale < 0 then
-		return { "Usage: waves <multiplier>" }
+command(
+	"waves",
+	"waves <multiplier|rogue|seed [n]>",
+	"Wave strength (1 = normal, 0 = calm), send a rogue wave, or change the sea's random seed",
+	function(_, args)
+		if (args[1] or ""):lower() == "seed" then
+			-- A new pattern for the waterline and the waves (random unless a number is given).
+			local seed = tonumber(args[2]) or Random.new():NextInteger(1, 999999)
+			Workspace:SetAttribute(Tide.SeedAttribute, math.floor(seed))
+			return { "Sea seed " .. math.floor(seed) }
+		end
+		if (args[1] or ""):lower() == "rogue" then
+			-- The wave after the one already rolling in (clients get a few seconds' warning).
+			local index = Waves.indexAt(Tide.now()) + 1
+			Workspace:SetAttribute(Waves.RogueAttribute, index)
+			return { string.format("Wave %d will be a rogue wave", index) }
+		end
+		local scale = tonumber(args[1])
+		if not scale or scale < 0 then
+			return { "Usage: waves <multiplier|rogue|seed [n]>" }
+		end
+		Workspace:SetAttribute(Waves.ScaleAttribute, scale)
+		return { string.format("Wave strength x%.2f", scale) }
 	end
-	Workspace:SetAttribute(Waves.ScaleAttribute, scale)
-	return { string.format("Wave strength x%.2f", scale) }
-end)
+)
 
 command(
 	"tp",
@@ -517,6 +534,7 @@ command("speed", "speed <walkspeed> [player]", "Set walk speed (default 16)", fu
 		local humanoid = target.Character and target.Character:FindFirstChildOfClass("Humanoid")
 		if humanoid then
 			humanoid.WalkSpeed = math.clamp(speed, 0, 200)
+			humanoid:SetAttribute("BaseWalkSpeed", humanoid.WalkSpeed)
 			table.insert(lines, target.Name .. " walk speed " .. humanoid.WalkSpeed)
 		end
 	end) or lines

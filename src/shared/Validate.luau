@@ -124,6 +124,109 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		Config.Tide.LowWaterline > sandbar.ChannelEnd and Config.Tide.LowWaterline < sandbar.End,
 		"low tide must reach past the channel but not past the sandbar"
 	)
+	-- Tide shape and sections
+	for _, name in { "OutShape", "InShape" } do
+		local shape = Config.Tide[name]
+		check(type(shape) == "table" and #shape >= 2, "Config.Tide." .. name .. " needs at least 2 values")
+		if type(shape) == "table" and #shape >= 2 then
+			check(
+				shape[1] == 0 and shape[#shape] == 1,
+				"Config.Tide." .. name .. " must start at 0 and end at 1"
+			)
+			for _, value in shape do
+				check(
+					type(value) == "number" and value >= 0 and value <= 1,
+					"Config.Tide." .. name .. " values must be between 0 and 1"
+				)
+			end
+		end
+	end
+	local lastX = -math.huge
+	for _, section in Config.Tide.Sections or {} do
+		check(
+			type(section.X) == "number" and type(section.Lag) == "number",
+			"Config.Tide.Sections entries need X and Lag numbers"
+		)
+		check((section.X or 0) > lastX, "Config.Tide.Sections must be in order of X")
+		local shuffle = Config.Tide.Shuffle and Config.Tide.Shuffle.Amplitude or 0
+		check(
+			math.abs(section.Lag or 0) + shuffle < Config.Tide.HoldTime,
+			"a tide section's Lag plus the Shuffle amplitude must be shorter than the low-tide hold, or that part never reaches low tide with the rest"
+		)
+		lastX = section.X or lastX
+	end
+
+	-- Wading
+	local wading = Config.Beach.Wading
+	check(
+		type(wading) == "table" and #wading >= 2 and wading[1].Depth == 0,
+		"Config.Beach.Wading needs points from depth 0"
+	)
+	for i, point in wading or {} do
+		check(
+			type(point.Speed) == "number"
+				and point.Speed > 0
+				and point.Speed <= 1
+				and type(point.Jump) == "number"
+				and point.Jump > 0
+				and point.Jump <= 1,
+			"Config.Beach.Wading: Speed and Jump must be between 0 and 1"
+		)
+		if i > 1 then
+			check(point.Depth > wading[i - 1].Depth, "Config.Beach.Wading must be in order of depth")
+		end
+	end
+
+	-- Waves and rock pools
+	check(#Config.Waves.ZoneScale >= #Config.Zones, "Config.Waves.ZoneScale needs an entry for every zone")
+	do
+		-- Wading back across the Far Sandbar's channel at knee depth must stay possible.
+		local w = Config.Waves
+		local knee = Config.Beach.KneeDepth / Config.Beach.WaistDepth
+		local zone = 1 + ((w.ZoneScale[sandbar.Zone] or 1) - 1) * w.UndertowZoneScale
+		-- The strongest moment: the drawback just before a big (set) wave.
+		local pull = (w.Undertow + (w.UndertowDeep - w.Undertow) * knee)
+			* zone
+			* (w.Slack + w.Drawback * w.SetSize * w.SetSize)
+		-- Averaged over a wave it must stay well under walking speed.
+		local share = (w.DrawbackRange / w.Speed) / w.Period
+		pull = pull * share
+			+ (w.Undertow + (w.UndertowDeep - w.Undertow) * knee) * zone * w.Slack * (1 - share)
+		-- Walking speed at knee depth, after the water slows you (Config.Beach.Wading).
+		local wade = 16
+		for _, point in Config.Beach.Wading or {} do
+			if point.Depth <= Config.Beach.KneeDepth then
+				wade = 16 * point.Speed
+			end
+		end
+		check(
+			pull < wade * 0.8,
+			string.format(
+				"the undertow at knee depth on the Far Sandbar (%.1f studs/s) is too close to wading speed (%.1f)",
+				pull,
+				wade
+			)
+		)
+	end
+	for index, pool in Config.Beach.Pools or {} do
+		local where = "Rock pool " .. index
+		check(
+			type(pool.Radius) == "number"
+				and pool.Radius > 2
+				and type(pool.Depth) == "number"
+				and pool.Depth > 0,
+			where .. ": needs a Radius (over 2) and a Depth"
+		)
+		check(
+			math.abs(pool.X) + pool.Radius < Config.Beach.Width / 2 and pool.Z - pool.Radius > 0,
+			where .. ": must be on the beach"
+		)
+		check(
+			pool.Z + pool.Radius < sandbar.ChannelStart,
+			where .. ": must be in front of the Far Sandbar's channel"
+		)
+	end
+
 	for index, zone in Config.Zones do
 		for rarity in zone.Rarity do
 			check(

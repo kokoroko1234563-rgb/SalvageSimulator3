@@ -19,10 +19,26 @@ local beach = Config.Beach
 Tide.HighWaterline = cfg.HighWaterline
 Tide.LowWaterline = cfg.LowWaterline
 
-local function smoothstep(t: number): number
-	t = math.clamp(t, 0, 1)
-	return t * t * (3 - 2 * t)
+-- How far out the tide is (0-1) at `p` (0-1) through a phase, from a list of evenly spaced
+-- values joined by a smooth (Catmull-Rom) curve.
+local function shaped(points: { number }, p: number): number
+	local n = #points - 1
+	if n < 1 then
+		return math.clamp(p, 0, 1)
+	end
+	p = math.clamp(p, 0, 1)
+	local segment = math.min(math.floor(p * n), n - 1)
+	local t = p * n - segment
+	local p1 = points[segment + 1]
+	local p2 = points[segment + 2]
+	local p0 = points[segment] or p1
+	local p3 = points[segment + 3] or p2
+	local t2, t3 = t * t, t * t * t
+	local value = 0.5
+		* (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - p0 - 3 * p2 + p3) * t3)
+	return math.clamp(value, 0, 1)
 end
+Tide._shaped = shaped
 
 function Tide.durations()
 	local scale = Workspace:GetAttribute(Tide.ScaleAttribute) or cfg.TimeScale
@@ -67,7 +83,8 @@ local function rawState(now: number?): State
 			Phase = "Out",
 			PhaseProgress = p,
 			PhaseRemaining = outTime - t,
-			Waterline = Tide.HighWaterline + (Tide.LowWaterline - Tide.HighWaterline) * smoothstep(p),
+			Waterline = Tide.HighWaterline
+				+ (Tide.LowWaterline - Tide.HighWaterline) * shaped(cfg.OutShape, p),
 			Cycle = cycle,
 			WaterY = 0,
 		}
@@ -88,7 +105,7 @@ local function rawState(now: number?): State
 			Phase = "In",
 			PhaseProgress = p,
 			PhaseRemaining = inTime - i,
-			Waterline = Tide.LowWaterline - (Tide.LowWaterline - Tide.HighWaterline) * smoothstep(p),
+			Waterline = Tide.LowWaterline - (Tide.LowWaterline - Tide.HighWaterline) * shaped(cfg.InShape, p),
 			Cycle = cycle,
 			WaterY = 0,
 		}
@@ -116,8 +133,85 @@ function Tide.getState(now: number?): State
 	return state
 end
 
+-- Just the waterline for a moment (no table; called a lot).
+local function waterlineFor(now: number): number
+	local outTime, holdTime, inTime = Tide.durations()
+	local length = outTime + holdTime + inTime
+	local elapsed = now - Tide.cycleStart()
+	local t = elapsed - math.floor(elapsed / length) * length
+	local range = Tide.LowWaterline - Tide.HighWaterline
+	if t < outTime then
+		return Tide.HighWaterline + range * shaped(cfg.OutShape, t / outTime)
+	elseif t < outTime + holdTime then
+		return Tide.LowWaterline
+	end
+	return Tide.LowWaterline - range * shaped(cfg.InShape, (t - outTime - holdTime) / inTime)
+end
+
+-- The waterline at X = 0's reference point of the tide (no section delay). Most code wants
+-- the waterline where something actually is: use Tide.sea() and Tide.waterlineAt().
 function Tide.waterline(now: number?): number
 	return rawState(now).Waterline
+end
+
+Tide.SeedAttribute = "SeaSeed" -- set once by the server at startup (random), or the admin console
+
+-- The server's sea seed: makes the waterline pattern and the waves different per server.
+function Tide.seed(): number
+	return Workspace:GetAttribute(Tide.SeedAttribute) or 0
+end
+
+-- Smooth noise in -1..1 for a seed (a different slice of Perlin noise per seed).
+function Tide.noise(a: number, b: number, salt: number): number
+	local slice = (Tide.seed() * 0.6180339 + salt * 0.37) % 1000 + 0.5
+	return math.clamp(math.noise(a, b, slice) * 2, -1, 1)
+end
+
+-- The delay (seconds, already time-scaled) for a point along the shoreline: the fixed
+-- sections plus the seeded pattern, which changes slowly over time.
+function Tide.lagAt(x: number, now: number?): number
+	local scale = Workspace:GetAttribute(Tide.ScaleAttribute) or cfg.TimeScale
+	local shuffle = cfg.Shuffle
+	local extra = 0
+	if shuffle and shuffle.Amplitude > 0 then
+		local t = (now or Tide.now()) / shuffle.Change
+		extra = Tide.noise(x / shuffle.Wavelength, t, 1) * shuffle.Amplitude * scale
+	end
+	return Tide.sectionLag(x) + extra
+end
+
+-- Just the fixed sections' delay (time-scaled).
+function Tide.sectionLag(x: number): number
+	local sections = cfg.Sections
+	if not sections or #sections == 0 then
+		return 0
+	end
+	local scale = Workspace:GetAttribute(Tide.ScaleAttribute) or cfg.TimeScale
+	if x <= sections[1].X then
+		return sections[1].Lag * scale
+	end
+	for i = 2, #sections do
+		local a, b = sections[i - 1], sections[i]
+		if x <= b.X then
+			local t = (x - a.X) / (b.X - a.X)
+			t = t * t * (3 - 2 * t) -- blend smoothly between points
+			return (a.Lag + (b.Lag - a.Lag) * t) * scale
+		end
+	end
+	return sections[#sections].Lag * scale
+end
+
+-- A moment of the sea. Pass it to Beach and Waves functions; they work out the waterline at
+-- each position from it, since different parts of the beach drain at different times.
+export type Sea = { Now: number }
+
+function Tide.sea(now: number?): Sea
+	return { Now = now or Tide.now() }
+end
+
+-- The waterline (Z) at a point along the shoreline.
+function Tide.waterlineAt(sea: Sea, x: number): number
+	return waterlineFor(sea.Now - Tide.lagAt(x, sea.Now))
 end
 
 return Tide

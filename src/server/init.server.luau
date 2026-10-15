@@ -22,6 +22,7 @@ local ItemService = require(script.ItemService)
 local PocketService = require(script.PocketService)
 local RebirthService = require(script.RebirthService)
 local SecretService = require(script.SecretService)
+local SurfService = require(script.SurfService)
 local FarSandbarService = require(script.FarSandbarService)
 local MonetizationService = require(script.MonetizationService)
 local ShopService = require(script.ShopService)
@@ -54,6 +55,8 @@ end
 
 -- Every machine derives the tide from this one shared timestamp.
 Workspace:SetAttribute(Tide.StartAttribute, Workspace:GetServerTimeNow())
+-- Each server's sea gets its own pattern of waterline and waves.
+Workspace:SetAttribute(Tide.SeedAttribute, Random.new():NextInteger(1, 999999))
 
 local map = BeachBuilder.build()
 
@@ -61,6 +64,7 @@ local map = BeachBuilder.build()
 CollisionGroups.init()
 DataService.init()
 ItemService.init(map)
+SurfService.init()
 SkyBeamService.init()
 VesselService.init(notify)
 GrabService.init(notify)

@@ -15,7 +15,7 @@ local TICK = 0.2
 local DrowningService = {}
 
 local function tick()
-	local waterline = Tide.waterline()
+	local sea = Tide.sea()
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -26,7 +26,7 @@ local function tick()
 		end
 
 		local breath = player:GetAttribute("Breath") or 1
-		if Beach.isDeep(root.Position, waterline) and not player:GetAttribute("AdminGod") then
+		if Beach.isDeep(root.Position, sea) and not player:GetAttribute("AdminGod") then
 			local lungs = Stats.breath(player)
 			breath = math.max(0, breath - TICK / (cfg.BreathTime * lungs))
 			if breath <= 0 then

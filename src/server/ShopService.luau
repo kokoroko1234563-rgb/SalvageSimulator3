@@ -1,8 +1,6 @@
 -- The main shopkeeper (buying gear, respawning vessels), the buyer (selling what's on the sell
 -- pad, and your pockets) and the banker (unlock items on the bank floor go into the inventory).
 
-local Players = game:GetService("Players")
-
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)

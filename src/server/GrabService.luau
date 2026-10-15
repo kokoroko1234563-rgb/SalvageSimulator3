@@ -65,9 +65,7 @@ local function grabItem(player: Player, item: BasePart, root: BasePart): (boolea
 	if (item:GetAttribute("Class") or 1) > Stats.lift(player, tool) then
 		return false, "Too heavy for your " .. tool.Name
 	end
-	if
-		state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(item.Position, Tide.waterline()))
-	then
+	if state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(item.Position, Tide.sea())) then
 		return false, "Too deep for your " .. tool.Name
 	end
 

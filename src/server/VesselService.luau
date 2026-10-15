@@ -518,7 +518,7 @@ function VesselService.spotNear(player: Player): (CFrame?, string?)
 	local hit = Workspace:Raycast(spot + Vector3.new(0, 30, 0), Vector3.new(0, -120, 0), params)
 	local groundY = if hit then hit.Position.Y else Beach.groundY(spot.Z)
 	local ground = Vector3.new(spot.X, groundY, spot.Z)
-	if Beach.isDeep(ground, Tide.waterline()) then
+	if Beach.isDeep(ground, Tide.sea()) then
 		return nil, "The water is too deep for a vessel here"
 	end
 	return CFrame.lookAt(ground, ground + forward)
@@ -601,7 +601,7 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 end
 
 local function tick()
-	local waterline = Tide.waterline()
+	local sea = Tide.sea()
 	for player, vessel in vesselOf do
 		local base = vessel.PrimaryPart
 		if not base or not vessel.Parent then
@@ -609,7 +609,7 @@ local function tick()
 			continue
 		end
 		local swims = vessel:GetAttribute("Swims") == true
-		if swims and Beach.isDeep(base.Position, waterline) then
+		if swims and Beach.isDeep(base.Position, sea) then
 			-- Swimming vessels survive deep water, but the waves can wash cargo off.
 			if math.random() < Config.Grab.SwimWashChance then
 				local contents = VesselService.contents(vessel)
@@ -620,7 +620,7 @@ local function tick()
 			end
 		end
 		if
-			(not swims and Beach.isDeep(base.Position, waterline))
+			(not swims and Beach.isDeep(base.Position, sea))
 			or base.Position.Y < Beach.groundY(base.Position.Z) - 30
 		then
 			destroyVessel(

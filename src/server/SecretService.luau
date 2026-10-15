@@ -58,7 +58,7 @@ local function floodDuration(door: Vector3): number
 	local now = Tide.now()
 	local t = 0
 	while t < cfg.MaxFlood do
-		if Beach.isDeep(door, Tide.waterline(now + t)) then
+		if Beach.isDeep(door, Tide.sea(now + t)) then
 			break
 		end
 		t += 2
@@ -97,7 +97,7 @@ function SecretService.tryEnter(player: Player, secretId: string, returnTo: CFra
 	if (root.Position - returnTo.Position).Magnitude > 20 then
 		return
 	end
-	if Beach.isDeep(returnTo.Position, Tide.waterline()) then
+	if Beach.isDeep(returnTo.Position, Tide.sea()) then
 		notify(player, "The door is underwater. Come back when the tide is out.")
 		return
 	end

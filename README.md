@@ -94,6 +94,44 @@ All six from the design doc are defined in `src/shared/Traders.luau`.
 | Barnacle Boots | waves push 10% less, never below 30% | `WaveController` |
 | Frostrunner Wax | +20% vessel speed | `GrabController` towing and hover |
 
+## The tide and the waves
+
+All of this is computed from the shared clock, so the server and every client agree without sending anything per frame. Every number is in `Config.Tide`, `Config.Waves` and `Config.Beach.Pools`.
+
+**How the tide goes up and down:** `OutShape` and `InShape` are lists of how far out the tide is (0 = high, 1 = low) at evenly spaced moments through that phase. The tide follows a smooth curve through them. Repeat a value to make it pause, or bunch values to make it rush.
+
+**Which part goes down when:** `Sections` are points along the shoreline, each with a delay in seconds. That part of the sea follows the tide this much later: positive drains later and floods later, negative goes first. Between points the delay blends smoothly, so the waterline curves along the beach instead of being a straight line. By default the west end drains first and the east end holds water longest. Each delay must stay shorter than the low-tide hold, which the validator checks.
+
+**Random patterns (the sea seed):** each server picks a random sea seed at startup, so no two servers' seas behave the same.
+- **Waterline:** a smooth random pattern on top of the sections makes some stretches drain up to 25 seconds earlier or later (`Config.Tide.Shuffle`). The pattern slowly turns into a different one over a couple of minutes, so where the waterline is furthest out and furthest in moves about as the tide goes down.
+- **Waves:** each wave has its own front shape (`WobbleAmplitude`) and is up to 35% bigger or smaller at different spots along the beach (`AlongVariation`). The seed also decides which waves are rogue waves.
+- **Admin:** `waves seed` picks a new seed, and `waves seed <n>` sets one, to replay a pattern.
+- **Validator:** it checks that a section's delay plus the shuffle stays shorter than the low-tide hold.
+
+**Rock pools** (`Config.Beach.Pools`): rings of rock that hold still water at a fixed level after the sea leaves. Floating items float in them. They never count as deep water.
+
+**Waves:** each wave rolls in to the local waterline, runs up the exposed sand as a thin sheet, slows to a stop and slides back.
+- **Sizes:** each wave's size varies a little. Every 6th wave is a big one, about 3% are rogue waves, and waves get bigger further out (`ZoneScale`, 1.7x on the Far Sandbar). Size scales how far a wave runs up and how hard it pushes. `waves <n>` still scales all of it.
+- **The ordinary sea is impartial:** it jostles you back and forth but doesn't pull you out.
+  - As each wave approaches, the water rushes out to meet it (the drawback).
+  - As the wave passes over you, its front surges you toward shore (`Push`, `BandWidth`), and the water rocks you in and out (`Rock`).
+  - For a normal wave this nets out to a gentle drift toward the beach.
+  - Between waves the water is still (`Slack` 0), apart from a side-to-side sway (`Sway`).
+  - You pick up the water's speed gradually and keep it for a moment (`Coupling`), so it has momentum.
+- **Big waves are the danger:** the drawback grows with the wave's size *squared* (`Drawback`). Normal waves barely tug, set waves (every 6th) pull hard, and rogue waves pull very hard.
+- **Run-up and backwash:** on the sand, the run-up pushes players, held items, vessels and dropped loot up the beach (`RunUpPush` 12), then the backwash pulls them back (`BackwashPull` 16), both scaled by the wave's size.
+- **Knockdowns:** a push of 28 studs/s or more, after Sea Legs or other wave resistance, knocks you over. Normal waves stay under that near the shore. Set waves get there in knee-deep water, rogue waves almost anywhere, and most waves do on the Far Sandbar. The wave tumbles you and carries you out to sea for 1.6 seconds, and you drop what you're holding. A set wave carries you about 30 studs. A rogue wave can carry you about 60 studs, into water deep enough to drown, so being close to the water is a risk you take for better loot.
+- **Unclaimed items:** after each wave, unclaimed items it reached may be shuffled a few studs: either way for ordinary waves, mostly out to sea for big ones (`DragChance`, `DragDistance`, in `SurfService`). Anything dragged deep enough is lost.
+- **Rogue waves:** clients know they're coming and show a warning banner about 8 seconds before. `waves rogue` sends one.
+
+**Wading:** water is sluggish. Walk speed and jump drop with depth (`Config.Beach.Wading`): 85% in the shallows, 70% knee-deep, 55% waist-deep and 40% once you're fully underwater, blended smoothly in between. Your own client applies it to the speed the server gives you (rewards, trader upgrades, the admin `speed` command).
+
+**What you see** (`SeaController`, client only):
+- The sea in 24-stud strips, each at its own level.
+- White crests rolling in.
+- The run-up sheet with a foam edge, drawn only on the sand. Once the water is back at the waterline it's just the sea.
+- Darker wet sand where the tide was in the last 40 seconds, or where the last wave reached.
+
 ## The sky-beam item
 
 The **Beacon Pearl** is the rarest unlock item. Your doc doesn't name it, so the name is a placeholder.
@@ -197,7 +235,7 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `clearitems [all]` | Remove unclaimed items (or all items) |
 | `tide <out\|hold\|in> [percent]` | Jump the tide, e.g. `tide in 90` |
 | `tidespeed <scale>` | 1 = real 25 min cycle, 0.1 = 2.5 min |
-| `waves <multiplier>` | Wave strength, 0 = calm |
+| `waves <multiplier\|rogue\|seed [n]>` | Wave strength (0 = calm), send a rogue wave, or set a new random sea seed |
 | `tp <shop\|zone\|sandbar\|player> [who]` | Teleport (`sandbar` = the bell tower door) |
 | `heal`, `god`, `speed <n>` | Health/breath, toggle no-drowning, walk speed |
 | `resetdata <player>`, `kick <player> [reason]` | Wipe a save, kick |
