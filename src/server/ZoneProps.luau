@@ -16,54 +16,12 @@ local ZoneProps = {}
 
 local Z = Palette.Zone
 
--- A scenery part: anchored, and passes through everything.
-local function add(parent: Instance, props: { [string]: any }): Part
-	props.CanCollide = false
-	props.CanQuery = false
-	props.CanTouch = false
-	local part = MapParts.part(props)
-	part.Parent = parent
-	return part
-end
+local add = MapParts.scenery
+local ball = MapParts.ball
+local column = MapParts.column
 
 local function ground(x: number, z: number): Vector3
 	return Vector3.new(x, Beach.groundY(z), z)
-end
-
-local function ball(
-	parent: Instance,
-	center: Vector3,
-	diameter: number,
-	color: Color3,
-	material: Enum.Material?
-)
-	return add(parent, {
-		Name = "Ball",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(diameter, diameter, diameter),
-		CFrame = CFrame.new(center),
-		Color = color,
-		Material = material or Palette.Material.Smooth,
-	})
-end
-
--- A vertical cylinder standing on `base`.
-local function column(
-	parent: Instance,
-	base: Vector3,
-	height: number,
-	diameter: number,
-	color: Color3,
-	material: Enum.Material?
-)
-	return add(parent, {
-		Name = "Column",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(height, diameter, diameter),
-		CFrame = CFrame.new(base + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2),
-		Color = color,
-		Material = material or Palette.Material.Wood,
-	})
 end
 
 -- A deck chair: a seat, a backrest tipped back, and four legs.

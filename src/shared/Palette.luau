@@ -146,6 +146,52 @@ Palette.Zone = {
 	Ridge = rgb(226, 204, 152),
 }
 
+-- Biome looks (see BiomeModels): each biome's own colours.
+Palette.Biome = {
+	SandcastleSand = rgb(230, 200, 140),
+	Moat = rgb(70, 170, 220),
+	Rope = rgb(200, 170, 110),
+	Bottle = rgb(110, 190, 130),
+	Boot = rgb(90, 60, 40),
+	Hollow = rgb(60, 40, 25),
+	Starfish = rgb(240, 130, 80),
+	BuoyRed = rgb(230, 60, 60),
+	BuoyWhite = rgb(250, 250, 250),
+	Seagrass = rgb(70, 140, 70),
+	Float = rgb(120, 220, 140),
+	Coconut = rgb(120, 85, 50),
+	Snorkel = rgb(245, 245, 245),
+	JellyBlue = rgb(140, 230, 255),
+	JellyPink = rgb(255, 150, 220),
+	Tentacle = rgb(200, 240, 255),
+	Lagoon = rgb(60, 210, 220),
+	Glow = rgb(120, 255, 240),
+	LighthouseWhite = rgb(245, 245, 240),
+	LighthouseRed = rgb(200, 50, 50),
+	LampGlass = rgb(255, 235, 150),
+	Fog = rgb(240, 245, 250),
+	Foghorn = rgb(180, 160, 60),
+	Hermit = rgb(190, 120, 90),
+	Claw = rgb(230, 110, 90),
+	Tunnel = rgb(200, 170, 120),
+	Spear = rgb(130, 120, 110),
+	SpearTip = rgb(170, 160, 150),
+	GlassTeal = rgb(120, 230, 220),
+	GlassPink = rgb(255, 160, 220),
+	GlassWhite = rgb(235, 250, 255),
+	GlassViolet = rgb(190, 160, 255),
+	IceWhite = rgb(235, 248, 255),
+	IceBlue = rgb(160, 215, 240),
+	IceDeep = rgb(90, 160, 210),
+	IceCave = rgb(60, 120, 170),
+	BlackSand = rgb(35, 32, 32),
+	VentGrey = rgb(70, 65, 65),
+	Lava = rgb(255, 120, 40),
+	Steam = rgb(245, 245, 245),
+	TubeDark = rgb(40, 30, 30),
+	WhirlSand = rgb(215, 190, 140),
+}
+
 Palette.Material = {
 	Sand = Enum.Material.Sand,
 	Wood = Enum.Material.Wood,
@@ -160,6 +206,7 @@ Palette.Material = {
 	Foil = Enum.Material.Foil,
 	Fabric = Enum.Material.Fabric,
 	Dirt = Enum.Material.Ground,
+	Grass = Enum.Material.Grass,
 }
 
 Palette.Font = {

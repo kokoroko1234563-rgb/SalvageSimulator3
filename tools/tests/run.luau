@@ -61,6 +61,7 @@ test("load server services", function()
 			"Buildings",
 			"MapParts",
 			"ZoneProps",
+			"BiomeModels",
 			"ItemService",
 			"GrabService",
 			"ShopService",

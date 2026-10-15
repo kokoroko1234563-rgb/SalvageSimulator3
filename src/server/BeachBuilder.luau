@@ -15,6 +15,7 @@ local Beach = require(Shared.Beach)
 local BeachDressing = require(script.Parent.BeachDressing)
 local Buildings = require(script.Parent.Buildings)
 local MapParts = require(script.Parent.MapParts)
+local BiomeModels = require(script.Parent.BiomeModels)
 local ZoneProps = require(script.Parent.ZoneProps)
 
 local beach = Config.Beach
@@ -402,6 +403,7 @@ function BeachBuilder.build(): Folder
 	buildShop(map)
 	BeachDressing.build(map, Random.new(7))
 	ZoneProps.build(map)
+	BiomeModels.showcase(map)
 
 	map.Parent = Workspace
 	return map
