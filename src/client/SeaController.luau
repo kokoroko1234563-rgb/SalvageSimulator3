@@ -132,7 +132,7 @@ end
 -- The continuous surfaces -------------------------------------------------------------------
 
 local SAMPLE = 12 -- studs along the shore between the columns where the water is worked out
-local SEA_STEP = 4 -- studs between the sea surface's columns over the beach
+local SEA_STEP = 6 -- studs between the sea surface's columns over the beach
 -- Near the shore the sea surface is a band of rows that drapes over the ground: from BAND_BACK
 -- studs up the beach of the waterline (the furthest a dip can flood, MaxDepth / Slope) to
 -- BAND_OUT studs out, every BAND_STEP studs. What's under water is decided from the ground's
@@ -140,16 +140,19 @@ local SEA_STEP = 4 -- studs between the sea surface's columns over the beach
 -- tucks under the sand where it's dry and lies just over any facet poking up where it's wet.
 local BAND_BACK = math.ceil(Config.Beach.Terrain.MaxDepth / Config.Beach.Slope) + 4
 local BAND_OUT = 16
-local BAND_STEP = 2
+local BAND_STEP = 3
 local BAND_ROWS = math.floor((BAND_BACK + BAND_OUT) / BAND_STEP) + 1
 local SEA_REFRESH = 0.1 -- seconds between sea surface updates (the tide moves slowly)
-local SWASH_ROWS = 7 -- points across the run-up sheet and the wet sand
+local SWASH_ROWS = 5 -- points across the run-up sheet and the wet sand
 local CREST_SLOTS = 2 -- crest ribbons (a rolling wave uses slot Index % CREST_SLOTS)
 
 -- A sheet: a grid of points (columns along the shore, rows across), given in world space each
--- frame. Both faces are drawn. A mesh can only hold so many triangles, so a big sheet is
+-- frame. Only its upper face is drawn. A mesh can only hold so many triangles, so a big sheet is
 -- several meshes side by side; neighbours share their edge column, so there's no seam.
 local MAX_TRIANGLES = 10000 -- well under Roblox's limit per editable mesh
+
+-- Every editable mesh made, so they can all be freed if the water falls back to parts.
+local created: { any } = {}
 
 type Chunk = {
 	mesh: any,
@@ -180,13 +183,14 @@ local function newChunk(
 ): Chunk
 	local mesh = AssetService:CreateEditableMesh()
 	assert(mesh, "no memory for an editable mesh")
+	table.insert(created, mesh)
 	local cols = toCol - fromCol + 1
 	local ids = table.create(cols * rows)
 	for i = 1, cols * rows do
 		ids[i] = mesh:AddVertex(Vector3.zero)
 	end
-	-- All lit as if facing up (the water and sand lie nearly flat). Automatic normals would
-	-- cancel out, since each point is shared by both faces.
+	-- All lit as if facing up (the water and sand lie nearly flat), so slopes and folds in
+	-- the sheet don't shade it unevenly.
 	local up = mesh:AddNormal(Vector3.yAxis)
 	local normals = true
 	local function triangle(a: number, b: number, c: number)
@@ -201,8 +205,7 @@ local function newChunk(
 			local v01 = ids[(c - 1) * rows + r + 1]
 			local v10 = ids[c * rows + r]
 			local v11 = ids[c * rows + r + 1]
-			triangle(v00, v10, v01)
-			triangle(v10, v11, v01)
+			-- Counter-clockwise seen from above, so the face looks up.
 			triangle(v00, v01, v10)
 			triangle(v10, v01, v11)
 		end
@@ -248,8 +251,8 @@ local function newSheet(
 	local cols = #colXs
 	local points = table.create(cols * rows, (low + high) / 2)
 	local sheet: Sheet = { chunks = {}, points = points, cols = cols, rows = rows }
-	-- Each gap between two columns holds (rows - 1) * 4 triangles.
-	local span = math.max(1, math.floor(MAX_TRIANGLES / ((rows - 1) * 4)))
+	-- Each gap between two columns holds (rows - 1) * 2 triangles.
+	local span = math.max(1, math.floor(MAX_TRIANGLES / ((rows - 1) * 2)))
 	local fromCol = 1
 	while fromCol < cols do
 		local toCol = math.min(cols, fromCol + span)
@@ -798,6 +801,11 @@ function SeaController.init()
 				.. tostring(built)
 				.. " (in Studio, check Game Settings > Security > Allow Mesh / Image APIs)"
 		)
+		-- Free whatever meshes were made before it failed: they count against the budget.
+		for _, mesh in created do
+			pcall(mesh.Destroy, mesh)
+		end
+		created = {}
 		folder:ClearAllChildren()
 		pieces = buildPieces(folder)
 	end
