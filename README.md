@@ -106,7 +106,9 @@ All of this is computed from the shared clock, so the server and every client ag
 
 **Waves:** each wave rolls in to the local waterline, runs up the exposed sand as a thin sheet, slows to a stop and slides back.
 - **Sizes:** each wave's size varies a little. Every 6th wave is a big one, about 3% are rogue waves, and waves get bigger further out (`ZoneScale`, 1.7x on the Far Sandbar). Size scales how far a wave runs up and how hard it pushes. `waves <n>` still scales all of it.
-- **Danger:** the run-up pushes players, held items, vessels and dropped loot up the beach, and the backwash drags them toward the sea. Following the water out, or staying out on the sandbar, is risky, especially when a big one comes.
+- **Undertow:** the sea always pulls seaward, between and under the waves, harder the deeper it is (`Undertow` 5 studs/s at the waterline, `UndertowDeep` 10 at waist depth, growing half as much as the waves in the outer zones so you can always wade back across the channel). Each wave's front gives only a short shove toward shore, so overall the water drags you out. Standing still in it carries you into deep water.
+- **Danger:** the run-up pushes players, held items, vessels and dropped loot up the beach, and the backwash (24 studs/s) drags them back toward the sea. Following the water out, or staying out on the sandbar, is risky, especially when a big one comes.
+- **Knockdowns:** a push of 30 studs/s or more, after Sea Legs or other wave resistance, knocks you over. Only big and rogue waves get there near the shore, but most waves do on the Far Sandbar. The water throws you, you drop what you're holding, and it carries you for 1.6 seconds before you get up (`KnockdownPush`, `KnockdownTime`, `ThrowFactor`).
 - **Unclaimed items:** after each wave, unclaimed items it reached may be dragged a few studs, mostly seaward (`DragChance`, `DragDistance`, in `SurfService`). Anything dragged deep enough is lost.
 - **Rogue waves:** clients know they're coming and show a warning banner about 8 seconds before. `waves rogue` sends one.
 

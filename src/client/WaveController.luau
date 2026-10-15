@@ -15,6 +15,34 @@ local player = Players.LocalPlayer
 
 local WaveController = {}
 
+local cfg = Config.Waves
+
+-- Knockdown state for this client's character.
+local knockedUntil = 0
+local readyAt = 0
+
+-- Knocks the character over and throws it along with the water. The humanoid stops fighting
+-- (PlatformStand), so the water carries it until it gets back up.
+local function knockDown(character: Model, humanoid: Humanoid, root: BasePart, push: Vector3)
+	local now = os.clock()
+	knockedUntil = now + cfg.KnockdownTime
+	readyAt = knockedUntil + cfg.KnockdownCooldown
+	character:SetAttribute("KnockedDown", true) -- local only; GrabController drops what you hold
+	humanoid.PlatformStand = true
+	root.AssemblyLinearVelocity = Vector3.new(push.X, 0, push.Z) * cfg.ThrowFactor
+		+ Vector3.new(0, cfg.ThrowLift, 0)
+	root.AssemblyAngularVelocity = Vector3.new(math.random() * 6 - 3, 0, math.random() * 6 - 3)
+	task.delay(cfg.KnockdownTime, function()
+		if humanoid.Parent then
+			humanoid.PlatformStand = false
+			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+		end
+		if character.Parent then
+			character:SetAttribute("KnockedDown", nil)
+		end
+	end)
+end
+
 function WaveController.init()
 	RunService.Stepped:Connect(function(_, dt)
 		local sea = Tide.sea()
@@ -26,7 +54,15 @@ function WaveController.init()
 			-- Characters are moved directly: the Humanoid controller would cancel a plain force.
 			local resistance = Stats.wavePush(player)
 			local push = Waves.getPush(root.Position, sea) * Config.Waves.CharacterFactor * resistance
-			if push.Magnitude > 0 then
+			local now = os.clock()
+			if now < knockedUntil then
+				-- Lying in the water: it carries you (velocity, since nothing fights it now).
+				local velocity = root.AssemblyLinearVelocity
+				local target = Vector3.new(push.X, velocity.Y, push.Z)
+				root.AssemblyLinearVelocity = velocity:Lerp(target, math.min(1, dt * 3))
+			elseif push.Magnitude >= cfg.KnockdownPush and now >= readyAt then
+				knockDown(character :: Model, humanoid, root, push)
+			elseif push.Magnitude > 0 then
 				root.CFrame += Vector3.new(push.X, 0, push.Z) * dt
 			end
 		end

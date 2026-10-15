@@ -157,6 +157,20 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 
 	-- Waves and rock pools
 	check(#Config.Waves.ZoneScale >= #Config.Zones, "Config.Waves.ZoneScale needs an entry for every zone")
+	do
+		-- Wading back across the Far Sandbar's channel at knee depth must stay possible.
+		local w = Config.Waves
+		local knee = Config.Beach.KneeDepth / Config.Beach.WaistDepth
+		local zone = 1 + ((w.ZoneScale[sandbar.Zone] or 1) - 1) * w.UndertowZoneScale
+		local pull = (w.Undertow + (w.UndertowDeep - w.Undertow) * knee) * zone
+		check(
+			pull < 14,
+			string.format(
+				"the undertow at knee depth on the Far Sandbar (%.1f studs/s) is too close to walking speed (16)",
+				pull
+			)
+		)
+	end
 	for index, pool in Config.Beach.Pools or {} do
 		local where = "Rock pool " .. index
 		check(

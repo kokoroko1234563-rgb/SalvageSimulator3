@@ -174,8 +174,12 @@ function Waves.getPush(position: Vector3, sea: Sea): Vector3
 		end
 	end
 	if rel > 0 then
-		-- Water running back out to sea between waves.
-		return -SHORE * cfg.Backwash * zoneScale(line) * scale
+		-- Undertow: the sea pulls out between and under the waves, harder where it's deeper.
+		local depth = math.clamp(rel * Config.Beach.Slope / Config.Beach.WaistDepth, 0, 1)
+		local pull = cfg.Undertow + (cfg.UndertowDeep - cfg.Undertow) * depth
+		-- Grows less than the waves further out, so you can always wade back across the channel.
+		local zone = 1 + (zoneScale(line) - 1) * cfg.UndertowZoneScale
+		return -SHORE * pull * zone * scale
 	end
 	return Vector3.zero
 end

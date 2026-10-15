@@ -558,6 +558,17 @@ local function update(dt: number)
 		end
 	end
 
+	-- Knocked over by a wave (WaveController): you lose your grip on whatever you held.
+	local character = player.Character
+	if character and character:GetAttribute("KnockedDown") then
+		local wasItem = current.kind == "item"
+		GrabController.release()
+		if wasItem then
+			HUD.notify("The wave knocked it out of your hands!")
+		end
+		return
+	end
+
 	local root = getRoot()
 	if not root then
 		GrabController.release()

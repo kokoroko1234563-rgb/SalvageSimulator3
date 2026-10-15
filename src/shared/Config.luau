@@ -109,21 +109,36 @@ Config.Tide = {
 }
 
 Config.Waves = {
-	Period = 7, -- seconds between waves
-	Speed = 14, -- studs/s the wave front travels toward shore
-	StartOffset = 70, -- where each wave starts, studs seaward of the waterline
-	BandWidth = 10, -- thickness of the pushing band behind the front
-	Push = 16, -- studs/s shoreward push at the leading edge
-	Backwash = 4, -- studs/s seaward pull in the water between waves
+	Period = 6, -- seconds between waves
+	Speed = 26, -- studs/s the wave front travels toward shore
+	StartOffset = 90, -- where each wave starts, studs seaward of the waterline
+	BandWidth = 6, -- thickness of the pushing band behind the front: a short, sharp shove
+	Push = 18, -- studs/s shoreward push at the leading edge
+
+	-- Undertow: the sea always pulls out, between and under the waves, harder the deeper it
+	-- is. Over a whole wave it outweighs the shove toward shore, so standing still in the
+	-- water drags you out.
+	Undertow = 5, -- studs/s seaward at the waterline...
+	UndertowDeep = 10, -- ...rising to this at waist depth and beyond
+	UndertowZoneScale = 0.5, -- the undertow grows half as much as the waves further out
 
 	-- Run-up: after reaching the waterline each wave keeps running up the exposed sand as a
 	-- thin sheet, slowing down, then slides back. While running up it pushes things up the
 	-- beach; while sliding back it drags them toward the sea.
-	RunUp = 8, -- studs an average wave runs up the sand
+	RunUp = 10, -- studs an average wave runs up the sand
 	RunUpVariation = 0.35, -- each wave is up to this much bigger or smaller (deterministic)
-	RunUpPush = 10, -- studs/s up the beach under the running-up sheet
-	BackwashPull = 12, -- studs/s toward the sea under the sliding-back sheet
-	BackwashRatio = 1.6, -- sliding back takes this many times as long as running up
+	RunUpPush = 14, -- studs/s up the beach under the running-up sheet
+	BackwashPull = 24, -- studs/s toward the sea under the sliding-back sheet
+	BackwashRatio = 1.1, -- sliding back takes this many times as long as running up
+
+	-- Knockdowns: a push this strong (after the player's wave resistance) knocks the player
+	-- over. They're thrown with the water, drop what they're holding, and lie helpless for
+	-- KnockdownTime while the water keeps carrying them.
+	KnockdownPush = 30, -- studs/s: big waves anywhere, most waves on the Far Sandbar
+	KnockdownTime = 1.6,
+	ThrowFactor = 1.4, -- launch speed, as a multiple of the push
+	ThrowLift = 14, -- studs/s upward on the throw
+	KnockdownCooldown = 2.5, -- seconds after getting up before the next knockdown
 	SetEvery = 6, -- every Nth wave is a big one...
 	SetSize = 1.7, -- ...this much bigger
 	RogueChance = 0.03, -- and this fraction of waves are rogue waves...
