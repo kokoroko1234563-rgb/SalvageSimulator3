@@ -206,7 +206,7 @@ local function newChunk(
 			local v01 = ids[(c - 1) * rows + r + 1]
 			local v10 = ids[c * rows + r]
 			local v11 = ids[c * rows + r + 1]
-			-- Counter-clockwise seen from above, so the face looks up.
+			-- Counter-clockwise seen from above when rows run seaward (+Z), so the face looks up.
 			triangle(v00, v01, v10)
 			triangle(v10, v01, v11)
 		end
@@ -485,11 +485,13 @@ local function sampleColumn(x: number, sea: Tide.Sea, wetSea: Tide.Sea): Column
 	return column
 end
 
--- Lays one column of a sheet on the sand from z0 to z1, `lift` above it.
+-- Lays one column of a sheet on the sand between z0 and z1, `lift` above it. A sheet's rows
+-- always run seaward (+Z): that's what makes its faces look up.
 local function layOnSand(sheet: Sheet, col: number, x: number, z0: number, z1: number, lift: number)
 	local rows = sheet.rows
+	local lo, hi = math.min(z0, z1), math.max(z0, z1)
 	for r = 1, rows do
-		local z = z0 + (z1 - z0) * (r - 1) / (rows - 1)
+		local z = lo + (hi - lo) * (r - 1) / (rows - 1)
 		setPoint(sheet, col, r, Vector3.new(x, surfaceY(x, z) + lift, z))
 	end
 end
@@ -589,9 +591,9 @@ local function updateMeshes(m: Meshes, sea: Tide.Sea, columns: { Column })
 		local front = if column.edge < shore - 0.3 then column.edge else shore
 		layOnSand(m.swash, c, x, shore, front, 0.08)
 		if front < shore then
-			setPoint(m.foam, c, 1, Vector3.new(x, surfaceY(x, front + 0.8) + 0.1, front + 0.8))
+			setPoint(m.foam, c, 1, Vector3.new(x, surfaceY(x, front - 0.5) + 0.1, front - 0.5))
 			setPoint(m.foam, c, 2, Vector3.new(x, surfaceY(x, front) + 0.16, front))
-			setPoint(m.foam, c, 3, Vector3.new(x, surfaceY(x, front - 0.5) + 0.1, front - 0.5))
+			setPoint(m.foam, c, 3, Vector3.new(x, surfaceY(x, front + 0.8) + 0.1, front + 0.8))
 		else
 			local folded = Vector3.new(x, surfaceY(x, shore) - 0.2, shore)
 			for r = 1, 3 do
@@ -607,9 +609,9 @@ local function updateMeshes(m: Meshes, sea: Tide.Sea, columns: { Column })
 			local h = column.crestH[i]
 			local y = column.waterY
 			if z and h > 0.02 then
-				setPoint(sheet, c, 1, Vector3.new(x, y - 0.05, z + 1.4))
+				setPoint(sheet, c, 1, Vector3.new(x, y - 0.05, z - 0.9))
 				setPoint(sheet, c, 2, Vector3.new(x, y + h, z))
-				setPoint(sheet, c, 3, Vector3.new(x, y - 0.05, z - 0.9))
+				setPoint(sheet, c, 3, Vector3.new(x, y - 0.05, z + 1.4))
 			else
 				local folded = Vector3.new(x, y - 0.3, z or shore + 20)
 				for r = 1, 3 do
