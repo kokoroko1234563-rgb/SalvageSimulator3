@@ -474,7 +474,8 @@ end
 type Column = {
 	line: number,
 	waterY: number,
-	edge: number, -- how far up the sand the swash reaches (0 or negative, from the waterline)
+	shore: number, -- Z where the sea really meets the sand (Beach.shoreFrom)
+	edge: number, -- Z the swash reaches up to (the shore when there's none)
 	wetTo: number, -- Z the wet sand reaches up to
 	crestZ: { number? }, -- per crest slot: where its crest is (nil: none)
 	crestH: { number },
@@ -483,7 +484,9 @@ type Column = {
 local function sampleColumn(x: number, sea: Tide.Sea, wetSea: Tide.Sea): Column
 	local line = Tide.waterlineAt(sea, x)
 	local waterY = Beach.waterY(line)
-	local column: Column = { line = line, waterY = waterY, edge = 0, wetTo = line, crestZ = {}, crestH = {} }
+	local shore = Beach.shoreFrom(x, line)
+	local column: Column =
+		{ line = line, waterY = waterY, shore = shore, edge = shore, wetTo = shore, crestZ = {}, crestH = {} }
 	for i = 1, CREST_SLOTS do
 		column.crestH[i] = 0
 	end
@@ -500,14 +503,17 @@ local function sampleColumn(x: number, sea: Tide.Sea, wetSea: Tide.Sea): Column
 			end
 		else
 			-- Stopped short by anything solid in its way.
-			local front = Waves.frontAt(x, line, wave.Front)
+			local front = line + Waves.frontAt(x, line, wave.Front)
 			if front < column.edge then
 				column.edge = front
 			end
 		end
 	end
-	local lastReach = -Waves.frontAt(x, line, -Waves.reach(Waves.indexAt(sea.Now) - 1, line, x))
-	column.wetTo = math.min(Tide.waterlineAt(wetSea, x), line - lastReach, line + column.edge)
+	-- Wet sand: up to where the tide was a little while ago, or the last wave reached.
+	local lastReach = line
+		+ Waves.frontAt(x, line, shore - line - Waves.reach(Waves.indexAt(sea.Now) - 1, line, x))
+	local wetLine = Tide.waterlineAt(wetSea, x)
+	column.wetTo = math.min(Beach.shoreFrom(x, wetLine), lastReach, column.edge)
 	return column
 end
 
@@ -524,6 +530,7 @@ local function blend(a: Column, b: Column): Column
 	local c: Column = {
 		line = (a.line + b.line) / 2,
 		waterY = (a.waterY + b.waterY) / 2,
+		shore = (a.shore + b.shore) / 2,
 		edge = (a.edge + b.edge) / 2,
 		wetTo = (a.wetTo + b.wetTo) / 2,
 		crestZ = {},
@@ -549,7 +556,8 @@ local function updateSea(m: Meshes, sea: Tide.Sea)
 		-- Past the headlands (and under the cliffs) it's open sea: flat. The rows keep the
 		-- same Z as the beach's, so the surface joins up without stretching.
 		local open = math.abs(x) >= half - 1
-		local first = line - BAND_BACK
+		local shore = if open then line else Beach.shoreFrom(x, line)
+		local first = math.min(line, shore) - BAND_BACK
 		-- Far up the beach it's all dry: well under the sand.
 		setPoint(m.sea, c, 1, Vector3.new(x, if open then waterY else waterY - 50, zMin))
 		for k = 1, BAND_ROWS do
@@ -557,7 +565,7 @@ local function updateSea(m: Meshes, sea: Tide.Sea)
 			local y = waterY
 			if not open then
 				local ideal = idealY(x, z)
-				local wet = if z >= line then ideal <= waterY + 0.3 else ideal < waterY - 0.3
+				local wet = if z >= shore then ideal <= waterY + 0.3 else ideal < waterY - 0.3
 				local ground = surfaceY(x, z)
 				y = if wet then math.max(waterY, ground + 0.06) else ground - 0.3
 			end
@@ -603,24 +611,23 @@ local function updateMeshes(m: Meshes, sea: Tide.Sea, wetSea: Tide.Sea)
 	end
 	for c, x in m.xs do
 		local column = columns[c]
-		local line = column.line
-		-- The swash sheet and its foam edge. With no swash they fold away at the waterline.
-		local edge = if column.edge < -0.3 then column.edge else 0
-		layOnSand(m.swash, c, x, line, line + edge, 0.08)
-		local front = line + edge
-		if edge < 0 then
+		local shore = column.shore
+		-- The swash sheet and its foam edge, from the shore up. With no swash they fold away.
+		local front = if column.edge < shore - 0.3 then column.edge else shore
+		layOnSand(m.swash, c, x, shore, front, 0.08)
+		if front < shore then
 			setPoint(m.foam, c, 1, Vector3.new(x, surfaceY(x, front + 0.8) + 0.1, front + 0.8))
 			setPoint(m.foam, c, 2, Vector3.new(x, surfaceY(x, front) + 0.16, front))
 			setPoint(m.foam, c, 3, Vector3.new(x, surfaceY(x, front - 0.5) + 0.1, front - 0.5))
 		else
-			local folded = Vector3.new(x, surfaceY(x, line) - 0.2, line)
+			local folded = Vector3.new(x, surfaceY(x, shore) - 0.2, shore)
 			for r = 1, 3 do
 				setPoint(m.foam, c, r, folded)
 			end
 		end
 		-- Wet sand: up to where the tide was a little while ago, or the last wave reached.
-		local wetTo = if column.wetTo < line - 0.5 then column.wetTo else line
-		layOnSand(m.wet, c, x, line, wetTo, 0.05)
+		local wetTo = if column.wetTo < shore - 0.5 then column.wetTo else shore
+		layOnSand(m.wet, c, x, shore, wetTo, 0.05)
 		-- Crests: a ridge of foam on the water, folded to a point where there's none.
 		for i, sheet in m.crests do
 			local z = column.crestZ[i]
@@ -631,7 +638,7 @@ local function updateMeshes(m: Meshes, sea: Tide.Sea, wetSea: Tide.Sea)
 				setPoint(sheet, c, 2, Vector3.new(x, y + h, z))
 				setPoint(sheet, c, 3, Vector3.new(x, y - 0.05, z - 0.9))
 			else
-				local folded = Vector3.new(x, y - 0.3, z or line + 20)
+				local folded = Vector3.new(x, y - 0.3, z or shore + 20)
 				for r = 1, 3 do
 					setPoint(sheet, c, r, folded)
 				end
@@ -699,7 +706,8 @@ local function update()
 			end
 
 			-- The swash sheet and its foam edge.
-			local edge, sliding = 0, false
+			local shore = Beach.shoreFrom(strip.x, line)
+			local edge, sliding = shore - line, false
 			for _, wave in list do
 				if wave.Phase ~= "Rolling" then
 					-- Stopped short by anything solid in its way.
@@ -709,9 +717,9 @@ local function update()
 					end
 				end
 			end
-			if edge < -0.3 then
-				-- Only on the sand: once the water is back at the waterline, it's just the sea.
-				onSand(strip.swash, strip.x, line, line + edge, 0.08, place)
+			if line + edge < shore - 0.3 then
+				-- Only on the sand: once the water is back at the shore, it's just the sea.
+				onSand(strip.swash, strip.x, shore, line + edge, 0.08, place)
 				place(
 					strip.edge,
 					CFrame.new(strip.x, surfaceY(strip.x, line + edge) + 0.1, line + edge) * TILT
@@ -728,11 +736,16 @@ local function update()
 			end
 
 			-- Wet sand: up to where the tide was a little while ago, or the last wave reached.
-			local lastReach =
-				-Waves.frontAt(strip.x, line, -Waves.reach(Waves.indexAt(sea.Now) - 1, line, strip.x))
-			local wetTo = math.min(Tide.waterlineAt(wetSea, strip.x), line - lastReach, line + edge)
-			if wetTo < line - 0.5 then
-				onSand(strip.wet, strip.x, line, wetTo, 0.05, place)
+			local lastReach = line
+				+ Waves.frontAt(
+					strip.x,
+					line,
+					shore - line - Waves.reach(Waves.indexAt(sea.Now) - 1, line, strip.x)
+				)
+			local wetLine = Tide.waterlineAt(wetSea, strip.x)
+			local wetTo = math.min(Beach.shoreFrom(strip.x, wetLine), lastReach, line + edge)
+			if wetTo < shore - 0.5 then
+				onSand(strip.wet, strip.x, shore, wetTo, 0.05, place)
 			else
 				for _, piece in strip.wet do
 					place(piece, FAR)

@@ -88,13 +88,16 @@ function Waves.wave(n: number, x: number, sea: Sea, waterline: number?): WaveAt?
 	end
 	local line = waterline or Tide.waterlineAt(sea, x)
 	local size = Waves.sizeAt(n, x) * zoneScale(line)
+	-- Fronts are measured from the waterline, but waves break where the sea really meets the
+	-- sand (Beach.shoreFrom), which a bank or channel can move out or in.
+	local shore = Beach.shoreFrom(x, line) - line
 	local start = cfg.StartOffset + wobble(x, n)
 	local arrive = start / cfg.Speed
 	if s < arrive then
 		return {
 			Index = n,
 			Size = size,
-			Front = start - cfg.Speed * s,
+			Front = shore + start - cfg.Speed * s,
 			Phase = "Rolling",
 			PhaseProgress = s / arrive,
 			RunUp = cfg.RunUp * size,
@@ -107,7 +110,7 @@ function Waves.wave(n: number, x: number, sea: Sea, waterline: number?): WaveAt?
 		return {
 			Index = n,
 			Size = size,
-			Front = -(cfg.Speed * u - cfg.Speed * u * u / (2 * upTime)),
+			Front = shore - (cfg.Speed * u - cfg.Speed * u * u / (2 * upTime)),
 			Phase = "RunUp",
 			PhaseProgress = u / upTime,
 			RunUp = runUp,
@@ -120,7 +123,7 @@ function Waves.wave(n: number, x: number, sea: Sea, waterline: number?): WaveAt?
 		return {
 			Index = n,
 			Size = size,
-			Front = -runUp * (1 - t * t * (3 - 2 * t)),
+			Front = shore - runUp * (1 - t * t * (3 - 2 * t)),
 			Phase = "Backwash",
 			PhaseProgress = t,
 			RunUp = runUp,
@@ -176,7 +179,7 @@ end
 
 local function pushAt(position: Vector3, sea: Sea, line: number, rel: number, scale: number): Vector3
 	local list = Waves.wavesAt(position.X, sea, line)
-	if rel > 0 then
+	if rel > Beach.shoreFrom(position.X, line) - line then
 		-- In the sea. Each passing wave rocks you in and out (the water circles under it) and
 		-- its front surges you toward the shore; ahead of it, the water rushes out to meet it.
 		local depthFactor = 0.7 + math.clamp(rel, 0, 60) / 60 * 0.6
@@ -235,30 +238,33 @@ function Waves.getPush(position: Vector3, sea: Sea): Vector3
 	local rel = position.Z - line
 	local scale = workspace:GetAttribute(Waves.ScaleAttribute) or 1
 	local push = pushAt(position, sea, line, rel, scale)
-	if rel > 0 then
+	if rel > Beach.shoreFrom(position.X, line) - line then
 		push += sway(position.X, sea.Now, rel) * scale
 	end
 	return push
 end
 
--- Where a run-up's front really is at X: on open sand, `front`; with something solid in the
--- way, stopped just short of it unless the water climbs higher than its top.
+-- Where a run-up's front really is at X (measured from the waterline): on open sand, `front`;
+-- with something solid in the way, stopped just short of it unless the water climbs higher
+-- than its top.
 function Waves.frontAt(x: number, line: number, front: number): number
-	if front >= 0 then
+	local shore = Beach.shoreFrom(x, line) - line
+	if front >= shore then
 		return front
 	end
-	local reachY = Beach.waterY(line) - front * Config.Beach.Slope
+	-- The water climbs above the sea by however far it has run up past the shore.
+	local reachY = Beach.waterY(line) + (shore - front) * Config.Beach.Slope
 	return WaterObstacles.limitFront(x, line, front, reachY)
 end
 
--- How far up the beach the water reaches at X right now (distance from the waterline, 0 or
--- negative), and whether it's sliding back.
+-- How far up the beach the water reaches at X right now (distance from the waterline: the
+-- real shore's when no wave is running up), and whether it's sliding back.
 function Waves.edgeAt(x: number, sea: Sea, waterline: number?): (number, boolean)
-	local edge, sliding = 0, false
-	for _, wave in Waves.wavesAt(x, sea, waterline) do
-		local front = if wave.Phase ~= "Rolling"
-			then Waves.frontAt(x, waterline or Tide.waterlineAt(sea, x), wave.Front)
-			else 0
+	local line = waterline or Tide.waterlineAt(sea, x)
+	local shore = Beach.shoreFrom(x, line) - line
+	local edge, sliding = shore, false
+	for _, wave in Waves.wavesAt(x, sea, line) do
+		local front = if wave.Phase ~= "Rolling" then Waves.frontAt(x, line, wave.Front) else shore
 		if front < edge then
 			edge, sliding = front, wave.Phase == "Backwash"
 		end

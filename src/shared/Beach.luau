@@ -101,6 +101,57 @@ function Beach.waterY(waterline: number): number
 	return -waterline * beach.Slope
 end
 
+-- Where the sea really meets the sand at X, for a tide waterline `line`. The waterline is
+-- where the even slope meets the sea; with the ground's shape (a bank standing out of the
+-- water, a channel cutting in) the real shore can be further out or further in. Coming up the
+-- beach from the sea, it's the first place the ground rises out of the water. The waves break
+-- and run up from here. Cached briefly (the tide moves slowly).
+local SHORE_OUT = 30 -- studs seaward of the waterline the search starts
+local SHORE_BACK = 80 -- and how far up the beach it looks
+local shoreCache: { [number]: number } = {}
+local shoreCount = 0
+local shoreClock = 0
+
+function Beach.shoreFrom(x: number, line: number): number
+	if not (Beach.isRough(line) or Beach.isRough(line + SHORE_OUT) or Beach.isRough(line - SHORE_BACK)) then
+		return line
+	end
+	local now = os.clock()
+	if now - shoreClock > 1 or shoreCount > 20000 then
+		shoreCache, shoreCount, shoreClock = {}, 0, now
+	end
+	local key = math.floor(x + 0.5) * 1e6 + math.floor(line * 10 + 0.5)
+	local cached = shoreCache[key]
+	if cached then
+		return cached
+	end
+	local waterY = Beach.waterY(line)
+	local step = 2
+	local z = line + SHORE_OUT
+	local shore = line - SHORE_BACK
+	while z > line - SHORE_BACK do
+		local next = z - step
+		if Beach.groundAt(x, next) > waterY then
+			-- Between next (dry) and z (wet): find the crossing.
+			local lo, hi = next, z
+			for _ = 1, 6 do
+				local mid = (lo + hi) / 2
+				if Beach.groundAt(x, mid) > waterY then
+					lo = mid
+				else
+					hi = mid
+				end
+			end
+			shore = (lo + hi) / 2
+			break
+		end
+		z = next
+	end
+	shoreCache[key] = shore
+	shoreCount += 1
+	return shore
+end
+
 -- Height of the sea surface at a point along the shoreline (parts of the beach drain at
 -- different times, see Config.Tide.Sections).
 function Beach.waterYAt(sea: Sea, x: number): number

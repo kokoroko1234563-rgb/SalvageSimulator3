@@ -60,12 +60,14 @@ function SurfService.afterWave(n: number)
 		local line = Tide.waterlineAt(sea, position.X)
 		local reach = Waves.reach(n, line, position.X)
 		local rel = position.Z - line
-		-- Not past something solid that stopped this wave's water.
-		local front = Waves.frontAt(position.X, line, -reach)
+		-- The wave runs up from where the sea really meets the sand, and not past something
+		-- solid that stopped its water.
+		local shore = Beach.shoreFrom(position.X, line) - line
+		local front = Waves.frontAt(position.X, line, shore - reach)
 		if rel < front then
 			continue
 		end
-		if rel >= -reach and rel <= cfg.DragShallows then
+		if rel >= shore - reach and rel <= shore + cfg.DragShallows then
 			local size = reach / cfg.RunUp
 			if rng:NextNumber() < math.min(1, cfg.DragChance * size) then
 				drag(item, size)

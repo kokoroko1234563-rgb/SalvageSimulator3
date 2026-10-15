@@ -167,17 +167,22 @@ local function solidAt(x: number, z: number): number?
 end
 
 -- How far up the beach a wave's run-up really gets at X. `front` is how far it would get on
--- open sand (0 or negative: studs up the beach from the waterline `line`), and `reachY` the
--- height its water climbs to. It stops just short of anything solid that rises above that.
+-- open sand (studs from the waterline `line`, negative up the beach; it starts at the real
+-- shore, Beach.shoreFrom), and `reachY` the height its water climbs to. It stops just short of anything solid that rises above that.
 function WaterObstacles.limitFront(x: number, line: number, front: number, reachY: number): number
-	if front >= 0 or not (WaterObstacles.near(x) or Beach.isRough(line) or Beach.isRough(line + front)) then
+	-- The run-up starts where the sea really meets the sand.
+	local shore = Beach.shoreFrom(x, line)
+	if
+		line + front >= shore
+		or not (WaterObstacles.near(x) or Beach.isRough(line) or Beach.isRough(line + front))
+	then
 		return front
 	end
-	local z = line
+	local z = shore
 	while z > line + front do
 		local top = solidAt(x, z)
 		if top and top > reachY then
-			return math.min(0, z + 1 - line)
+			return math.min(shore - line, z + 1 - line)
 		end
 		z -= cfg.Step
 	end

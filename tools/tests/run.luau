@@ -1668,6 +1668,32 @@ test("each planned draft reaches the sea, has shortcuts, and keeps the sightline
 	assert(#problems == 0, table.concat(problems, "; "))
 end)
 
+test("waves break where the sea really meets the sand", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local Waves = h.require("Shared/Waves")
+	local z0 = Beach.zoneRange(3)
+	local line = z0 + 75
+	Layouts.setActive(3, false)
+	-- (Each check looks at a different X: the shore is cached for a moment.)
+	assert(math.abs(Beach.shoreFrom(-6, line) - line) < 0.1, "on the even slope the shore is the waterline")
+	-- A bank standing out of the water 12 studs out: the shore is its seaward face.
+	Layouts.setActive(3, {
+		Name = "bank",
+		Primitives = { { Kind = "Ridge", Path = { { -200, 87 }, { 200, 87 } }, Height = 4, Width = 12 } },
+	})
+	local shore = Beach.shoreFrom(0, line)
+	assert(shore > line + 12 and shore < line + 18, "a bank moves the shore out, got " .. (shore - line))
+	assert(Waves.frontAt(0, line, -10) >= shore - line - 1, "and stops the run-up at its face")
+	-- A channel cut across the waterline: the shore is its landward bank.
+	Layouts.setActive(3, {
+		Name = "cut",
+		Primitives = { { Kind = "Channel", Path = { { -200, 75 }, { 200, 75 } }, Depth = 2, Width = 16 } },
+	})
+	assert(Beach.shoreFrom(1, line) < line - 3, "a channel moves the shore in")
+	Layouts.setActive(3, nil)
+end)
+
 test("cart ramps keep clear of the rock pools' rocks", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
