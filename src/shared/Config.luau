@@ -47,9 +47,9 @@ Config.Beach = {
 		EdgeFade = 30, -- the shape fades out over this many studs at the sides of the beach
 		Zones = {
 			{ Ridges = 0, Height = 0, Width = 0, Trough = 0 },
-			{ Ridges = 2, Height = 2.5, Width = 12, Trough = 1 },
-			{ Ridges = 3, Height = 4.5, Width = 14, Trough = 2 },
-			{ Ridges = 3, Height = 7, Width = 16, Trough = 3, Rock = 5 },
+			{ Ridges = 2, Height = 2.5, Width = 12, Trough = 0.6 },
+			{ Ridges = 3, Height = 4.5, Width = 14, Trough = 1.2 },
+			{ Ridges = 3, Height = 7, Width = 16, Trough = 2, Rock = 5 },
 			{ Ridges = 0, Height = 0, Width = 0, Trough = 0 }, -- the sandbar stays walkable
 		},
 	},

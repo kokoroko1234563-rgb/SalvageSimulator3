@@ -81,9 +81,11 @@ function Beach.feature(x: number, z: number): number
 		local center = z0 + spacing * (i - 0.5) + 10 * math.noise(x / 90, salt * 1.7, 0.5)
 		local gap = math.clamp((math.noise(x / 70, salt * 2.3, 1.5) + 0.15) * 4, 0, 1)
 		height += spec.Height * gap * bump((z - center) / (spec.Width / 2))
-		-- A trough on the landward side of each ridge.
-		local trough = center - spacing / 2
-		height -= spec.Trough * bump((z - trough) / (spacing * 0.35))
+		-- Dips on the landward side of each ridge. They come and go along the beach, so the low
+		-- ground holds separate pools and puddles, not one long canal.
+		local trough = center - spacing / 2 + 6 * math.noise(x / 60, salt * 2.9, 3.5)
+		local pools = math.clamp((math.noise(x / 45, salt * 3.1, 2.5) + 0.05) * 3, 0, 1)
+		height -= spec.Trough * pools * bump((z - trough) / (spacing * 0.3))
 	end
 	-- Fade out at the sides of the beach (the cliffs stand there) and around rock pools.
 	local edge = math.clamp((Beach.HalfWidth - math.abs(x)) / shape.EdgeFade, 0, 1)

@@ -31,6 +31,7 @@ local beach = Config.Beach
 local waves = Config.Waves
 
 local STRIP = 24 -- studs along the shoreline per strip
+local SEGMENTS = 5 -- pieces per strip for the run-up sheet and the wet sand
 local THICKNESS = 4
 local SIDE = 700 -- sea beyond the beach on each side, past the headlands
 local TILT = CFrame.Angles(math.atan(beach.Slope), 0, 0) -- lies flat on the sloping sand
@@ -42,9 +43,9 @@ type Strip = {
 	x: number,
 	width: number,
 	sea: Part,
-	swash: Part,
+	swash: { Part },
 	edge: Part,
-	wet: Part,
+	wet: { Part },
 	crests: { Part },
 }
 
@@ -78,30 +79,36 @@ local function newStrip(folder: Folder, x: number, width: number, detailed: bool
 			Color = Palette.World.Sea,
 			Transparency = 0.3,
 		}),
-		swash = nil :: any,
+		swash = {},
 		edge = nil :: any,
-		wet = nil :: any,
+		wet = {},
 		crests = {},
 	}
 	strip.sea.Parent = folder
 	if detailed then
-		strip.swash = makePart("Swash", {
-			Size = Vector3.new(width + 0.05, 0.1, 1),
-			Material = Palette.Material.Glass,
-			Color = SWASH,
-			Transparency = 0.45,
-		})
+		-- The run-up sheet and the wet sand are a few short pieces each, so they can follow
+		-- the shape of the ground instead of cutting through ridges or floating over dips.
+		for i = 1, SEGMENTS do
+			strip.swash[i] = makePart("Swash", {
+				Size = Vector3.new(width + 0.05, 0.1, 1),
+				Material = Palette.Material.Glass,
+				Color = SWASH,
+				Transparency = 0.45,
+			})
+			strip.swash[i].Parent = folder
+			strip.wet[i] = makePart("WetSand", {
+				Size = Vector3.new(width + 0.05, 0.06, 1),
+				Material = Palette.Material.Sand,
+				Color = Palette.World.WetSand,
+				Transparency = 0.45,
+			})
+			strip.wet[i].Parent = folder
+		end
 		strip.edge = makePart("Foam", {
 			Size = Vector3.new(width + 0.05, 0.14, 1.4),
 			Material = Palette.Material.Smooth,
 			Color = Palette.World.Foam,
 			Transparency = 0.25,
-		})
-		strip.wet = makePart("WetSand", {
-			Size = Vector3.new(width + 0.05, 0.06, 1),
-			Material = Palette.Material.Sand,
-			Color = Palette.World.WetSand,
-			Transparency = 0.45,
 		})
 		for i = 1, 2 do
 			local crest = makePart("Crest" .. i, {
@@ -113,21 +120,64 @@ local function newStrip(folder: Folder, x: number, width: number, detailed: bool
 			crest.Parent = folder
 			strip.crests[i] = crest
 		end
-		strip.swash.Parent = folder
 		strip.edge.Parent = folder
-		strip.wet.Parent = folder
 	end
 	return strip
 end
 
--- A thin part lying on the sand from z0 to z1 (z1 < z0: up the beach).
-local function onSand(part: Part, x: number, z0: number, z1: number, lift: number): CFrame
-	local length = math.abs(z0 - z1)
-	if math.abs(part.Size.Z - length) > 0.15 then
-		part.Size = Vector3.new(part.Size.X, part.Size.Y, math.max(length, 0.2))
+-- The height of the sand as it's actually drawn. Smooth Terrain is built from 4-stud cells,
+-- so its surface can sit a stud or so off Beach.groundAt; the water drawn on it follows the
+-- real surface. Measured once per spot (it never changes) by a ray straight down.
+local surfaceCache: { [number]: number } = {}
+local surfaceParams = RaycastParams.new()
+surfaceParams.FilterType = Enum.RaycastFilterType.Include
+local function surfaceY(x: number, z: number): number
+	local ix, iz = math.floor(x + 0.5), math.floor(z + 0.5)
+	local key = ix * 65536 + iz
+	local cached = surfaceCache[key]
+	if cached then
+		return cached
 	end
-	local z = (z0 + z1) / 2
-	return CFrame.new(x, Beach.groundAt(x, z) + lift, z) * TILT
+	local y = Beach.groundAt(ix, iz)
+	local terrain = Workspace:FindFirstChildOfClass("Terrain")
+	if terrain then
+		surfaceParams.FilterDescendantsInstances = { terrain }
+		local hit = Workspace:Raycast(Vector3.new(ix, y + 30, iz), Vector3.new(0, -60, 0), surfaceParams)
+		if hit then
+			y = hit.Position.Y
+		end
+	end
+	surfaceCache[key] = y
+	return y
+end
+
+-- Lays a run of thin parts on the sand from z0 to z1 (z1 < z0: up the beach), each piece
+-- spanning between two points on the real surface. Pieces too short to see are put away.
+local function onSand(
+	pieces: { Part },
+	x: number,
+	z0: number,
+	z1: number,
+	lift: number,
+	place: (Part, CFrame) -> ()
+)
+	local count = #pieces
+	for i = 1, count do
+		local za = z0 + (z1 - z0) * (i - 1) / count
+		local zb = z0 + (z1 - z0) * i / count
+		local a = Vector3.new(x, surfaceY(x, za) + lift, za)
+		local b = Vector3.new(x, surfaceY(x, zb) + lift, zb)
+		local piece = pieces[i]
+		local length = (b - a).Magnitude
+		if length < 0.05 then
+			place(piece, FAR)
+			continue
+		end
+		if math.abs(piece.Size.Z - (length + 0.15)) > 0.1 then
+			piece.Size = Vector3.new(piece.Size.X, piece.Size.Y, length + 0.15)
+		end
+		place(piece, CFrame.lookAt((a + b) / 2, b))
+	end
 end
 
 local function setTransparency(part: Part, value: number)
@@ -153,7 +203,7 @@ local function update()
 		local line = Tide.waterlineAt(sea, strip.x)
 		local waterY = Beach.waterY(line)
 		place(strip.sea, CFrame.new(strip.x, waterY - THICKNESS / 2, (zMin + zMax) / 2))
-		if not strip.swash then
+		if #strip.swash == 0 then
 			continue
 		end
 
@@ -198,15 +248,16 @@ local function update()
 		end
 		if edge < -0.3 then
 			-- Only on the sand: once the water is back at the waterline, it's just the sea.
-			place(strip.swash, onSand(strip.swash, strip.x, line, line + edge, 0.07))
-			place(
-				strip.edge,
-				CFrame.new(strip.x, Beach.groundAt(strip.x, line + edge) + 0.09, line + edge) * TILT
-			)
-			setTransparency(strip.swash, if sliding then 0.6 else 0.45)
+			onSand(strip.swash, strip.x, line, line + edge, 0.08, place)
+			place(strip.edge, CFrame.new(strip.x, surfaceY(strip.x, line + edge) + 0.1, line + edge) * TILT)
+			for _, piece in strip.swash do
+				setTransparency(piece, if sliding then 0.6 else 0.45)
+			end
 			setTransparency(strip.edge, if sliding then 0.55 else 0.2)
 		else
-			place(strip.swash, FAR)
+			for _, piece in strip.swash do
+				place(piece, FAR)
+			end
 			place(strip.edge, FAR)
 		end
 
@@ -215,9 +266,11 @@ local function update()
 			-Waves.frontAt(strip.x, line, -Waves.reach(Waves.indexAt(sea.Now) - 1, line, strip.x))
 		local wetTo = math.min(Tide.waterlineAt(wetSea, strip.x), line - lastReach, line + edge)
 		if wetTo < line - 0.5 then
-			place(strip.wet, onSand(strip.wet, strip.x, line, wetTo, 0.04))
+			onSand(strip.wet, strip.x, line, wetTo, 0.05, place)
 		else
-			place(strip.wet, FAR)
+			for _, piece in strip.wet do
+				place(piece, FAR)
+			end
 		end
 	end
 	Workspace:BulkMoveTo(parts, frames, Enum.BulkMoveMode.FireCFrameChanged)

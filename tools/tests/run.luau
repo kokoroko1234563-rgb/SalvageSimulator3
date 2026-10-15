@@ -476,18 +476,20 @@ test("troughs flood before the waterline reaches them", function()
 	local Beach = h.require("Shared/Beach")
 	local Tide = h.require("Shared/Tide")
 	local z0, z1 = Beach.zoneRange(4)
-	-- Find the deepest trough in zone 4 along X = 0.
-	local troughZ, deepest = nil, 0
-	for z = z0, z1 do
-		local f = Beach.feature(0, z)
-		if f < deepest then
-			troughZ, deepest = z, f
+	-- Find the deepest dip in zone 4 near the middle of the beach.
+	local troughX, troughZ, deepest = 0, nil, 0
+	for x = -200, 200, 10 do
+		for z = z0, z1 do
+			local f = Beach.feature(x, z)
+			if f < deepest then
+				troughX, troughZ, deepest = x, z, f
+			end
 		end
 	end
-	assert(troughZ, "zone 4 has a trough at X = 0")
+	assert(troughZ, "zone 4 has dips")
 	-- With the sea level just above the trough's floor, the waterline (where the plain slope
 	-- meets the sea) is still seaward of it, but the trough is already under water.
-	local floorY = Beach.groundAt(0, troughZ)
+	local floorY = Beach.groundAt(troughX, troughZ)
 	local seaY = floorY + 0.5
 	local waterline = -seaY / 0.06
 	assert(waterline > troughZ, "the waterline is still further out")
@@ -498,9 +500,9 @@ test("troughs flood before the waterline reaches them", function()
 	local found = false
 	for t = 10000, 10000 + 2000, 2 do
 		local sea = Tide.sea(t)
-		local line = Tide.waterlineAt(sea, 0)
+		local line = Tide.waterlineAt(sea, troughX)
 		if line < waterline and line > troughZ then
-			found = Beach.depthAt(roblox.Vector3.new(0, 0, troughZ), sea) > 0
+			found = Beach.depthAt(roblox.Vector3.new(troughX, 0, troughZ), sea) > 0
 			break
 		end
 	end
