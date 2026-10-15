@@ -250,43 +250,54 @@ local SEA_REFRESH = 0.1 -- seconds between sea surface updates (the tide moves s
 local SWASH_ROWS = 7 -- points across the run-up sheet and the wet sand
 local CREST_SLOTS = 2 -- crest ribbons (a rolling wave uses slot Index % CREST_SLOTS)
 
--- A sheet: a grid of points (columns along the shore, rows across) drawn as one MeshPart.
--- Its points are given in world space each frame. Both faces are drawn.
-type Sheet = {
+-- A sheet: a grid of points (columns along the shore, rows across), given in world space each
+-- frame. Both faces are drawn. A mesh can only hold so many triangles, so a big sheet is
+-- several meshes side by side; neighbours share their edge column, so there's no seam.
+local MAX_TRIANGLES = 10000 -- well under Roblox's limit per editable mesh
+
+type Chunk = {
 	mesh: any,
 	part: MeshPart,
-	center: Vector3,
-	half: Vector3,
-	ids: { number },
-	points: { Vector3 },
-	cols: number,
-	rows: number,
+	ids: { number }, -- vertex ids, for the sheet's points `first` onward
+	first: number,
 	batch: boolean,
 }
 
-local function newSheet(
-	folder: Instance,
-	name: string,
+type Sheet = {
+	chunks: { Chunk },
+	center: Vector3,
+	half: Vector3,
+	points: { Vector3 },
 	cols: number,
 	rows: number,
-	low: Vector3,
-	high: Vector3,
+}
+
+local function newChunk(
+	folder: Instance,
+	name: string,
+	fromCol: number,
+	toCol: number,
+	rows: number,
+	center: Vector3,
+	half: Vector3,
 	props: { [string]: any }
-): Sheet
+): Chunk
 	local mesh = AssetService:CreateEditableMesh()
 	assert(mesh, "no memory for an editable mesh")
-	local center = (low + high) / 2
-	local half = (high - low) / 2
-	local ids, points = table.create(cols * rows), table.create(cols * rows)
+	local cols = toCol - fromCol + 1
+	local ids = table.create(cols * rows)
 	for i = 1, cols * rows do
 		ids[i] = mesh:AddVertex(Vector3.zero)
-		points[i] = center
 	end
-	-- Both faces of every triangle, all lit as if facing up (the water and sand lie nearly
-	-- flat). Automatic normals would cancel out, since each point is shared by both faces.
+	-- All lit as if facing up (the water and sand lie nearly flat). Automatic normals would
+	-- cancel out, since each point is shared by both faces.
 	local up = mesh:AddNormal(Vector3.yAxis)
+	local normals = true
 	local function triangle(a: number, b: number, c: number)
-		mesh:SetFaceNormals(mesh:AddTriangle(a, b, c), { up, up, up })
+		local face = mesh:AddTriangle(a, b, c)
+		if normals then
+			normals = pcall(mesh.SetFaceNormals, mesh, face, { up, up, up })
+		end
 	end
 	for c = 1, cols - 1 do
 		for r = 1, rows - 1 do
@@ -316,17 +327,32 @@ local function newSheet(
 	part.Size = part.MeshSize
 	part.CFrame = CFrame.new(center)
 	part.Parent = folder
-	return {
-		mesh = mesh,
-		part = part,
-		center = center,
-		half = half,
-		ids = ids,
-		points = points,
-		cols = cols,
-		rows = rows,
-		batch = true,
-	}
+	return { mesh = mesh, part = part, ids = ids, first = (fromCol - 1) * rows + 1, batch = true }
+end
+
+local function newSheet(
+	folder: Instance,
+	name: string,
+	cols: number,
+	rows: number,
+	low: Vector3,
+	high: Vector3,
+	props: { [string]: any }
+): Sheet
+	local center = (low + high) / 2
+	local half = (high - low) / 2
+	local points = table.create(cols * rows, center)
+	local sheet: Sheet =
+		{ chunks = {}, center = center, half = half, points = points, cols = cols, rows = rows }
+	-- Each gap between two columns holds (rows - 1) * 4 triangles.
+	local span = math.max(1, math.floor(MAX_TRIANGLES / ((rows - 1) * 4)))
+	local fromCol = 1
+	while fromCol < cols do
+		local toCol = math.min(cols, fromCol + span)
+		table.insert(sheet.chunks, newChunk(folder, name, fromCol, toCol, rows, center, half, props))
+		fromCol = toCol
+	end
+	return sheet
 end
 
 local function setPoint(sheet: Sheet, col: number, row: number, point: Vector3)
@@ -336,25 +362,30 @@ end
 -- Moves the sheet's points to where they were set this frame.
 local function flush(sheet: Sheet)
 	local center, half = sheet.center, sheet.half
-	local count = #sheet.ids
-	local values = table.create(count)
-	for i = 1, count do
-		local p = sheet.points[i] - center
-		values[i] = Vector3.new(
-			math.clamp(p.X, -half.X, half.X),
-			math.clamp(p.Y, -half.Y, half.Y),
-			math.clamp(p.Z, -half.Z, half.Z)
-		)
-	end
-	if sheet.batch then
-		local ok = pcall(sheet.mesh.BatchSetValues, sheet.mesh, sheet.ids, values)
-		if ok then
-			return
+	local points = sheet.points
+	for _, chunk in sheet.chunks do
+		local ids = chunk.ids
+		local count = #ids
+		local values = table.create(count)
+		local first = chunk.first - 1
+		for i = 1, count do
+			local p = points[first + i] - center
+			values[i] = Vector3.new(
+				math.clamp(p.X, -half.X, half.X),
+				math.clamp(p.Y, -half.Y, half.Y),
+				math.clamp(p.Z, -half.Z, half.Z)
+			)
 		end
-		sheet.batch = false
-	end
-	for i = 1, count do
-		sheet.mesh:SetPosition(sheet.ids[i], values[i])
+		if chunk.batch then
+			local ok = pcall(chunk.mesh.BatchSetValues, chunk.mesh, ids, values)
+			if ok then
+				continue
+			end
+			chunk.batch = false
+		end
+		for i = 1, count do
+			chunk.mesh:SetPosition(ids[i], values[i])
+		end
 	end
 end
 
@@ -758,7 +789,7 @@ function SeaController.init()
 	if ok then
 		meshes = built
 	else
-		warn("[Sea] drawing the sea as strips: " .. tostring(built))
+		warn("[Sea] couldn't build the water meshes, drawing the sea as strips instead: " .. tostring(built))
 		folder:ClearAllChildren()
 		local half = Beach.HalfWidth
 		local count = math.ceil(beach.Width / STRIP)
