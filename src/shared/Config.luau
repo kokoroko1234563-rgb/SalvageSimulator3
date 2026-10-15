@@ -53,7 +53,7 @@ Config.Beach = {
 		FootSlope = 0.9, -- the steepest climb a player can walk up (characters' MaxSlopeAngle)
 		MaxHeight = 12, -- the tallest a layout shape can be (but a Wall)
 		WallMaxHeight = 24, -- the tallest a Wall can be: well over a jump (about 7 studs)
-		WallMinWidth = 8, -- the thinnest a Wall can be (the terrain is built in 4-stud cells)
+		WallMinWidth = 12, -- the thinnest a Wall can be: thinner ones get rounded off by the terrain's 4-stud cells
 		MaxDepth = 4, -- the deepest a layout cut can be
 		EyeHeight = 5, -- standing eye height above the ground (for sightlines)
 	},

@@ -1793,7 +1793,7 @@ test("walls are flat-topped rock too steep to climb", function()
 	Layouts.setActive(tile, nil)
 	local tooTall = {
 		Name = "x",
-		Primitives = { { Kind = "Wall", Path = { { 0, 0 }, { 1, 1 } }, Height = 99, Width = 10 } },
+		Primitives = { { Kind = "Wall", Path = { { 0, 0 }, { 1, 1 } }, Height = 99, Width = 14 } },
 	}
 	local tooThin = {
 		Name = "x",

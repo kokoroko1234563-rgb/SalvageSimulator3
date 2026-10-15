@@ -106,8 +106,8 @@ local function build(zone: number)
 				then {
 					Kind = "Wall",
 					Path = { { ends[1], z }, { (ends[1] + ends[2]) / 2, z }, { ends[2], z } },
-					Height = 14,
-					Width = 10,
+					Height = 20,
+					Width = 12,
 				}
 				else {
 					Kind = "Ridge",
