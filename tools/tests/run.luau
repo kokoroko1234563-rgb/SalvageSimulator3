@@ -1694,6 +1694,35 @@ test("waves break where the sea really meets the sand", function()
 	Layouts.setActive(3, nil)
 end)
 
+test("the water meshes fit Roblox's limits", function()
+	local SeaController = h.require("Client/SeaController")
+	local total = 0
+	for _, entry in SeaController._meshPlan() do
+		local sheet = entry.sheet
+		local covered = 1
+		for _, range in entry.ranges do
+			local fromCol, toCol = range[1], range[2]
+			assert(fromCol == covered, sheet.name .. ": the meshes join up")
+			covered = toCol
+			local triangles = (toCol - fromCol) * (sheet.rows - 1) * 2
+			total += triangles
+			assert(
+				triangles <= SeaController._limits.Triangles,
+				sheet.name .. ": too many triangles in one mesh"
+			)
+			local size = roblox.Vector3.new(sheet.colXs[toCol] - sheet.colXs[fromCol] + 2, 0, 0)
+				+ roblox.Vector3.new(0, sheet.high.Y - sheet.low.Y, sheet.high.Z - sheet.low.Z)
+			assert(
+				size.X <= 2048 and size.Y <= 2048 and size.Z <= 2048,
+				sheet.name .. ": a mesh is over 2048 studs"
+			)
+		end
+		assert(covered == #sheet.colXs, sheet.name .. ": the meshes cover every column")
+	end
+	-- Keep the water light: the editable mesh memory budget is small.
+	assert(total <= 14000, "the water has " .. total .. " triangles")
+end)
+
 test("cart ramps keep clear of the rock pools' rocks", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")

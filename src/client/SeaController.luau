@@ -150,6 +150,7 @@ local CREST_SLOTS = 2 -- crest ribbons (a rolling wave uses slot Index % CREST_S
 -- frame. Only its upper face is drawn. A mesh can only hold so many triangles, so a big sheet is
 -- several meshes side by side; neighbours share their edge column, so there's no seam.
 local MAX_TRIANGLES = 10000 -- well under Roblox's limit per editable mesh
+local MAX_WIDTH = 1800 -- studs: a mesh may be at most 2048 across
 
 -- Every editable mesh made, so they can all be freed if the water falls back to parts.
 local created: { any } = {}
@@ -237,6 +238,24 @@ local function newChunk(
 	}
 end
 
+-- How a sheet's columns are split into meshes: { fromCol, toCol } each, sharing edge columns.
+-- Each gap between two columns holds (rows - 1) * 2 triangles; a mesh holds at most
+-- MAX_TRIANGLES and is at most MAX_WIDTH across (but always at least one gap).
+local function chunkRanges(colXs: { number }, rows: number): { { number } }
+	local span = math.max(1, math.floor(MAX_TRIANGLES / ((rows - 1) * 2)))
+	local ranges = {}
+	local fromCol = 1
+	while fromCol < #colXs do
+		local toCol = math.min(#colXs, fromCol + span)
+		while toCol > fromCol + 1 and colXs[toCol] - colXs[fromCol] > MAX_WIDTH do
+			toCol -= 1
+		end
+		table.insert(ranges, { fromCol, toCol })
+		fromCol = toCol
+	end
+	return ranges
+end
+
 -- `colXs` is each column's X. A mesh may be at most 2048 studs across, so each chunk's box
 -- only spans its own columns (and the sheet's full height and depth).
 local function newSheet(
@@ -251,16 +270,12 @@ local function newSheet(
 	local cols = #colXs
 	local points = table.create(cols * rows, (low + high) / 2)
 	local sheet: Sheet = { chunks = {}, points = points, cols = cols, rows = rows }
-	-- Each gap between two columns holds (rows - 1) * 2 triangles.
-	local span = math.max(1, math.floor(MAX_TRIANGLES / ((rows - 1) * 2)))
-	local fromCol = 1
-	while fromCol < cols do
-		local toCol = math.min(cols, fromCol + span)
+	for _, range in chunkRanges(colXs, rows) do
+		local fromCol, toCol = range[1], range[2]
 		local boxLow = Vector3.new(colXs[fromCol] - 1, low.Y, low.Z)
 		local boxHigh = Vector3.new(colXs[toCol] + 1, high.Y, high.Z)
 		local center, half = (boxLow + boxHigh) / 2, (boxHigh - boxLow) / 2
 		table.insert(sheet.chunks, newChunk(folder, name, fromCol, toCol, rows, center, half, props))
-		fromCol = toCol
 	end
 	return sheet
 end
@@ -331,7 +346,17 @@ local function buildColumns()
 	spacing = beach.Width / count / 2
 end
 
-local function buildMeshes(folder: Folder): Meshes
+type Plan = {
+	name: string,
+	colXs: { number },
+	rows: number,
+	low: Vector3,
+	high: Vector3,
+	props: { [string]: any },
+}
+
+-- Every water sheet: its columns, rows and box. (tools/tests checks these fit Roblox's limits.)
+local function plan(): { Plan }
 	local half = Beach.HalfWidth
 	local seaXs = { -half - SIDE }
 	local seaCount = math.ceil(beach.Width / SEA_STEP)
@@ -339,48 +364,76 @@ local function buildMeshes(folder: Folder): Meshes
 		table.insert(seaXs, -half + beach.Width * i / seaCount)
 	end
 	table.insert(seaXs, half + SIDE)
-
 	local low = Beach.groundY(zMax) - 40
 	local beachLow = Vector3.new(-half - 1, low, zMin)
 	local beachHigh = Vector3.new(half + 1, 20, zMax)
+	local sheets: { Plan } = {
+		{
+			name = "Sea",
+			colXs = seaXs,
+			rows = BAND_ROWS + 2,
+			low = Vector3.new(-half - SIDE - 1, low, zMin),
+			high = Vector3.new(half + SIDE + 1, 20, zMax),
+			props = { Material = Palette.Material.Glass, Color = Palette.World.Sea, Transparency = 0.3 },
+		},
+		{
+			name = "Swash",
+			colXs = xs,
+			rows = SWASH_ROWS,
+			low = beachLow,
+			high = beachHigh,
+			props = { Material = Palette.Material.Glass, Color = SWASH, Transparency = 0.45 },
+		},
+		{
+			name = "Foam",
+			colXs = xs,
+			rows = 3,
+			low = beachLow,
+			high = beachHigh,
+			props = { Material = Palette.Material.Smooth, Color = Palette.World.Foam, Transparency = 0.25 },
+		},
+		{
+			name = "WetSand",
+			colXs = xs,
+			rows = SWASH_ROWS,
+			low = beachLow,
+			high = beachHigh,
+			props = { Material = Palette.Material.Sand, Color = Palette.World.WetSand, Transparency = 0.45 },
+		},
+	}
+	for i = 1, CREST_SLOTS do
+		table.insert(sheets, {
+			name = "Crest" .. i,
+			colXs = xs,
+			rows = 3,
+			low = beachLow,
+			high = beachHigh,
+			props = { Material = Palette.Material.Smooth, Color = Palette.World.Foam, Transparency = 0.35 },
+		})
+	end
+	return sheets
+end
+
+local function buildMeshes(folder: Folder): Meshes
+	local built: { [string]: Sheet } = {}
+	local seaXs = {}
+	for _, sheet in plan() do
+		built[sheet.name] =
+			newSheet(folder, sheet.name, sheet.colXs, sheet.rows, sheet.low, sheet.high, sheet.props)
+		if sheet.name == "Sea" then
+			seaXs = sheet.colXs
+		end
+	end
 	local result: Meshes = {
-		sea = newSheet(
-			folder,
-			"Sea",
-			seaXs,
-			BAND_ROWS + 2,
-			Vector3.new(-half - SIDE - 1, low, zMin),
-			Vector3.new(half + SIDE + 1, 20, zMax),
-			{
-				Material = Palette.Material.Glass,
-				Color = Palette.World.Sea,
-				Transparency = 0.3,
-			}
-		),
+		sea = built.Sea,
 		seaXs = seaXs,
-		swash = newSheet(folder, "Swash", xs, SWASH_ROWS, beachLow, beachHigh, {
-			Material = Palette.Material.Glass,
-			Color = SWASH,
-			Transparency = 0.45,
-		}),
-		foam = newSheet(folder, "Foam", xs, 3, beachLow, beachHigh, {
-			Material = Palette.Material.Smooth,
-			Color = Palette.World.Foam,
-			Transparency = 0.25,
-		}),
-		wet = newSheet(folder, "WetSand", xs, SWASH_ROWS, beachLow, beachHigh, {
-			Material = Palette.Material.Sand,
-			Color = Palette.World.WetSand,
-			Transparency = 0.45,
-		}),
+		swash = built.Swash,
+		foam = built.Foam,
+		wet = built.WetSand,
 		crests = {},
 	}
 	for i = 1, CREST_SLOTS do
-		result.crests[i] = newSheet(folder, "Crest" .. i, xs, 3, beachLow, beachHigh, {
-			Material = Palette.Material.Smooth,
-			Color = Palette.World.Foam,
-			Transparency = 0.35,
-		})
+		result.crests[i] = built["Crest" .. i]
 	end
 	return result
 end
@@ -726,6 +779,16 @@ local function updatePieces(p: Pieces, sea: Tide.Sea, columns: { Column }, place
 	end
 end
 
+-- The sea's extent and the columns (once).
+local function setup()
+	if #xs > 0 then
+		return
+	end
+	zMin = -beach.ShopDepth - 60
+	zMax = Beach.Depth + beach.SeaExtent + 200
+	buildColumns()
+end
+
 local warnedRogue = -1
 
 local function update()
@@ -778,8 +841,7 @@ function SeaController.init()
 	folder.Name = "LocalSea"
 	folder.Parent = Workspace
 
-	zMin = -beach.ShopDepth - 60
-	zMax = Beach.Depth + beach.SeaExtent + 200
+	setup()
 
 	Workspace.AttributeChanged:Connect(function(name)
 		if string.match(name, "^ZoneBiome") then
@@ -790,7 +852,6 @@ function SeaController.init()
 		end
 	end)
 
-	buildColumns()
 	local ok, built = pcall(buildMeshes, folder)
 	if ok then
 		meshes = built
@@ -815,5 +876,14 @@ end
 
 -- For tools/tests.
 SeaController._update = update
+SeaController._limits = { Triangles = MAX_TRIANGLES, Width = MAX_WIDTH }
+function SeaController._meshPlan()
+	setup()
+	local list = {}
+	for _, sheet in plan() do
+		table.insert(list, { sheet = sheet, ranges = chunkRanges(sheet.colXs, sheet.rows) })
+	end
+	return list
+end
 
 return SeaController
