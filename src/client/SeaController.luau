@@ -9,8 +9,8 @@
 -- Each of these is one continuous surface (an EditableMesh) whose points are moved every
 -- frame, so the waterline and the foam are smooth curves that follow the ground. The water is
 -- worked out at columns every SAMPLE studs along the shore and drawn at twice that detail.
--- On a device that can't make editable meshes, it falls back to flat strips, one per STRIP
--- studs of shoreline.
+-- On a device that can't make editable meshes, it draws the same columns with narrow parts
+-- instead: the sea ends at the same shore, so the shoreline is still a smooth curve.
 -- It also warns the player when a rogue wave is on its way.
 
 local AssetService = game:GetService("AssetService")
@@ -36,8 +36,6 @@ local SeaController = {}
 local beach = Config.Beach
 local waves = Config.Waves
 
-local STRIP = 24 -- studs along the shoreline per strip
-local SEGMENTS = 5 -- pieces per strip for the run-up sheet and the wet sand
 local THICKNESS = 4
 local SIDE = 700 -- sea beyond the beach on each side, past the headlands
 local TILT = CFrame.Angles(math.atan(beach.Slope), 0, 0) -- lies flat on the sloping sand
@@ -45,17 +43,6 @@ local FAR = CFrame.new(0, -10000, 0)
 
 local SWASH = Palette.World.Sea:Lerp(Color3.new(1, 1, 1), 0.35)
 
-type Strip = {
-	x: number,
-	width: number,
-	sea: Part,
-	swash: { Part },
-	edge: Part,
-	wet: { Part },
-	crests: { Part },
-}
-
-local strips: { Strip } = {}
 local zMin, zMax = 0, 0
 
 local function makePart(name: string, props: { [string]: any }): Part
@@ -73,62 +60,6 @@ local function makePart(name: string, props: { [string]: any }): Part
 		(part :: any)[key] = value
 	end
 	return part
-end
-
-local function newStrip(folder: Folder, x: number, width: number, detailed: boolean): Strip
-	local strip: Strip = {
-		x = x,
-		width = width,
-		sea = makePart("Sea", {
-			Size = Vector3.new(width + 0.05, THICKNESS, zMax - zMin),
-			Material = Palette.Material.Glass,
-			Color = Palette.World.Sea,
-			Transparency = 0.3,
-		}),
-		swash = {},
-		edge = nil :: any,
-		wet = {},
-		crests = {},
-	}
-	strip.sea.Parent = folder
-	if detailed then
-		-- The run-up sheet and the wet sand are a few short pieces each, so they can follow
-		-- the shape of the ground instead of cutting through ridges or floating over dips.
-		for i = 1, SEGMENTS do
-			strip.swash[i] = makePart("Swash", {
-				Size = Vector3.new(width + 0.05, 0.1, 1),
-				Material = Palette.Material.Glass,
-				Color = SWASH,
-				Transparency = 0.45,
-			})
-			strip.swash[i].Parent = folder
-			strip.wet[i] = makePart("WetSand", {
-				Size = Vector3.new(width + 0.05, 0.06, 1),
-				Material = Palette.Material.Sand,
-				Color = Palette.World.WetSand,
-				Transparency = 0.45,
-			})
-			strip.wet[i].Parent = folder
-		end
-		strip.edge = makePart("Foam", {
-			Size = Vector3.new(width + 0.05, 0.14, 1.4),
-			Material = Palette.Material.Smooth,
-			Color = Palette.World.Foam,
-			Transparency = 0.25,
-		})
-		for i = 1, 2 do
-			local crest = makePart("Crest" .. i, {
-				Size = Vector3.new(width + 0.05, 0.6, 2.5),
-				Material = Palette.Material.Smooth,
-				Color = Palette.World.Foam,
-				Transparency = 0.4,
-			})
-			crest.Parent = folder
-			strip.crests[i] = crest
-		end
-		strip.edge.Parent = folder
-	end
-	return strip
 end
 
 -- The height of the sand as it's actually drawn. Smooth Terrain is built from 4-stud cells,
@@ -196,41 +127,6 @@ end
 local function forgetGround()
 	surfaceCache = {}
 	idealCache = {}
-end
-
--- Lays a run of thin parts on the sand from z0 to z1 (z1 < z0: up the beach), each piece
--- spanning between two points on the real surface. Pieces too short to see are put away.
-local function onSand(
-	pieces: { Part },
-	x: number,
-	z0: number,
-	z1: number,
-	lift: number,
-	place: (Part, CFrame) -> ()
-)
-	local count = #pieces
-	for i = 1, count do
-		local za = z0 + (z1 - z0) * (i - 1) / count
-		local zb = z0 + (z1 - z0) * i / count
-		local a = Vector3.new(x, surfaceY(x, za) + lift, za)
-		local b = Vector3.new(x, surfaceY(x, zb) + lift, zb)
-		local piece = pieces[i]
-		local length = (b - a).Magnitude
-		if length < 0.05 then
-			place(piece, FAR)
-			continue
-		end
-		if math.abs(piece.Size.Z - (length + 0.15)) > 0.1 then
-			piece.Size = Vector3.new(piece.Size.X, piece.Size.Y, length + 0.15)
-		end
-		place(piece, CFrame.lookAt((a + b) / 2, b))
-	end
-end
-
-local function setTransparency(part: Part, value: number)
-	if math.abs(part.Transparency - value) > 0.02 then
-		part.Transparency = value
-	end
 end
 
 -- The continuous surfaces -------------------------------------------------------------------
@@ -396,26 +292,33 @@ type Meshes = {
 	foam: Sheet,
 	wet: Sheet,
 	crests: { Sheet },
-	xs: { number }, -- the drawn columns over the beach
-	samples: { number }, -- the columns where the water is worked out (every other drawn one)
 }
 
 local meshes: Meshes? = nil
 
-local function buildMeshes(folder: Folder): Meshes
+-- The columns over the beach: where the water is worked out (`samples`, every SAMPLE studs)
+-- and where it's drawn (`xs`: the samples and the midpoints between them).
+local samples: { number } = {}
+local xs: { number } = {}
+local spacing = 0
+
+local function buildColumns()
 	local half = Beach.HalfWidth
-	local samples = {}
 	local count = math.ceil(beach.Width / SAMPLE)
 	for i = 0, count do
 		table.insert(samples, -half + beach.Width * i / count)
 	end
-	local xs = {}
 	for i, x in samples do
 		table.insert(xs, x)
 		if samples[i + 1] then
 			table.insert(xs, (x + samples[i + 1]) / 2)
 		end
 	end
+	spacing = beach.Width / count / 2
+end
+
+local function buildMeshes(folder: Folder): Meshes
+	local half = Beach.HalfWidth
 	local seaXs = { -half - SIDE }
 	local seaCount = math.ceil(beach.Width / SEA_STEP)
 	for i = 0, seaCount do
@@ -457,8 +360,6 @@ local function buildMeshes(folder: Folder): Meshes
 			Transparency = 0.45,
 		}),
 		crests = {},
-		xs = xs,
-		samples = samples,
 	}
 	for i = 1, CREST_SLOTS do
 		result.crests[i] = newSheet(folder, "Crest" .. i, #xs, 3, beachLow, beachHigh, {
@@ -576,21 +477,17 @@ local function updateSea(m: Meshes, sea: Tide.Sea)
 	flush(m.sea)
 end
 
-local function updateMeshes(m: Meshes, sea: Tide.Sea, wetSea: Tide.Sea)
-	if os.clock() - seaUpdatedAt >= SEA_REFRESH then
-		seaUpdatedAt = os.clock()
-		updateSea(m, sea)
-	end
-
-	local sampled = table.create(#m.samples)
-	for i, x in m.samples do
+-- The water at every drawn column this frame.
+local function computeColumns(sea: Tide.Sea, wetSea: Tide.Sea): { Column }
+	local sampled = table.create(#samples)
+	for i, x in samples do
 		sampled[i] = sampleColumn(x, sea, wetSea)
 	end
-	local columns = table.create(#m.xs)
-	for c in m.xs do
+	local columns = table.create(#xs)
+	for c in xs do
 		columns[c] = if c % 2 == 1 then sampled[(c + 1) // 2] else blend(sampled[c // 2], sampled[c // 2 + 1])
 	end
-	-- Where a crest ends, fold its ribbon at the nearest crest, so it tapers off in place.
+	-- Where a crest ends, fold it at the nearest crest, so it tapers off in place.
 	for i = 1, CREST_SLOTS do
 		local last: number? = nil
 		local gaps = {}
@@ -609,7 +506,16 @@ local function updateMeshes(m: Meshes, sea: Tide.Sea, wetSea: Tide.Sea)
 			end
 		end
 	end
-	for c, x in m.xs do
+	return columns
+end
+
+local function updateMeshes(m: Meshes, sea: Tide.Sea, columns: { Column })
+	if os.clock() - seaUpdatedAt >= SEA_REFRESH then
+		seaUpdatedAt = os.clock()
+		updateSea(m, sea)
+	end
+
+	for c, x in xs do
 		local column = columns[c]
 		local shore = column.shore
 		-- The swash sheet and its foam edge, from the shore up. With no swash they fold away.
@@ -653,6 +559,159 @@ local function updateMeshes(m: Meshes, sea: Tide.Sea, wetSea: Tide.Sea)
 	end
 end
 
+-- The fallback: the same columns drawn with narrow parts --------------------------------------
+
+local LONG = 2000 -- the sea part's length (it's moved, never resized, as the shore moves)
+local BACK = 400 -- the length of the part that floods dips up the beach
+
+type Pieces = {
+	seaOut: { Part }, -- the sea from the shore out
+	seaIn: { Part }, -- water in dips up the beach, a little lower so it never fights the shore
+	lap: { Part }, -- a band of shallow water over the shore, hiding where the sand meets the sea
+	swash: { { Part } },
+	wet: { { Part } },
+	foam: { Part },
+	crests: { { Part } },
+	sides: { Part },
+}
+
+local pieces: Pieces? = nil
+local PIECE_ROWS = 2 -- pieces per column for the run-up sheet and the wet sand
+
+local function buildPieces(folder: Folder): Pieces
+	local width = spacing + 0.1
+	local result: Pieces =
+		{ seaOut = {}, seaIn = {}, lap = {}, swash = {}, wet = {}, foam = {}, crests = {}, sides = {} }
+	local function make(name: string, size: Vector3, props: { [string]: any }): Part
+		props.Size = size
+		local part = makePart(name, props)
+		part.Parent = folder
+		return part
+	end
+	local seaProps = function()
+		return { Material = Palette.Material.Glass, Color = Palette.World.Sea, Transparency = 0.3 }
+	end
+	for c in xs do
+		result.seaOut[c] = make("Sea", Vector3.new(width, THICKNESS, LONG), seaProps())
+		result.seaIn[c] = make("Sea", Vector3.new(width, THICKNESS, BACK), seaProps())
+		result.lap[c] = make("Lap", Vector3.new(width, 0.1, 3), {
+			Material = Palette.Material.Glass,
+			Color = SWASH,
+			Transparency = 0.5,
+		})
+		result.swash[c], result.wet[c] = {}, {}
+		for i = 1, PIECE_ROWS do
+			result.swash[c][i] = make("Swash", Vector3.new(width, 0.1, 1), {
+				Material = Palette.Material.Glass,
+				Color = SWASH,
+				Transparency = 0.45,
+			})
+			result.wet[c][i] = make("WetSand", Vector3.new(width, 0.06, 1), {
+				Material = Palette.Material.Sand,
+				Color = Palette.World.WetSand,
+				Transparency = 0.45,
+			})
+		end
+		result.foam[c] = make("Foam", Vector3.new(width, 0.14, 1.4), {
+			Material = Palette.Material.Smooth,
+			Color = Palette.World.Foam,
+			Transparency = 0.25,
+		})
+		result.crests[c] = {}
+		for i = 1, CREST_SLOTS do
+			result.crests[c][i] = make("Crest", Vector3.new(width, 1.2, 2.5), {
+				Material = Palette.Material.Smooth,
+				Color = Palette.World.Foam,
+				Transparency = 0.35,
+			})
+		end
+	end
+	for i = 1, 2 do
+		result.sides[i] = make("Sea", Vector3.new(SIDE, THICKNESS, zMax - zMin), seaProps())
+	end
+	return result
+end
+
+local function resize(part: Part, length: number)
+	if math.abs(part.Size.Z - length) > 0.3 then
+		part.Size = Vector3.new(part.Size.X, part.Size.Y, length)
+	end
+end
+
+-- Lays a column's pieces on the sand from z0 to z1 (up the beach), each spanning between two
+-- points on the real surface. Pieces too short to see are put away.
+local function layPieces(
+	list: { Part },
+	x: number,
+	z0: number,
+	z1: number,
+	lift: number,
+	place: (Part, CFrame) -> ()
+)
+	local count = #list
+	for i = 1, count do
+		local za = z0 + (z1 - z0) * (i - 1) / count
+		local zb = z0 + (z1 - z0) * i / count
+		local a = Vector3.new(x, surfaceY(x, za) + lift, za)
+		local b = Vector3.new(x, surfaceY(x, zb) + lift, zb)
+		local length = (b - a).Magnitude
+		if length < 0.05 then
+			place(list[i], FAR)
+			continue
+		end
+		resize(list[i], length + 0.2)
+		place(list[i], CFrame.lookAt((a + b) / 2, b))
+	end
+end
+
+local function updatePieces(p: Pieces, sea: Tide.Sea, columns: { Column }, place: (Part, CFrame) -> ())
+	for c, x in xs do
+		local column = columns[c]
+		local shore, waterY = column.shore, column.waterY
+		place(p.seaOut[c], CFrame.new(x, waterY - THICKNESS / 2, shore + LONG / 2))
+		place(p.seaIn[c], CFrame.new(x, waterY - 0.4 - THICKNESS / 2, shore - BACK / 2))
+		-- The lap: over the shore, never below the water or the sand.
+		local a = Vector3.new(x, math.max(waterY, surfaceY(x, shore + 1.5)) + 0.05, shore + 1.5)
+		local b = Vector3.new(x, surfaceY(x, shore - 1.5) + 0.05, shore - 1.5)
+		place(p.lap[c], CFrame.lookAt((a + b) / 2, b))
+
+		local front = if column.edge < shore - 0.3 then column.edge else shore
+		if front < shore then
+			layPieces(p.swash[c], x, shore, front, 0.08, place)
+			place(p.foam[c], CFrame.new(x, surfaceY(x, front) + 0.1, front) * TILT)
+		else
+			for _, piece in p.swash[c] do
+				place(piece, FAR)
+			end
+			place(p.foam[c], FAR)
+		end
+		local wetTo = if column.wetTo < shore - 0.5 then column.wetTo else shore
+		if wetTo < shore then
+			layPieces(p.wet[c], x, shore, wetTo, 0.05, place)
+		else
+			for _, piece in p.wet[c] do
+				place(piece, FAR)
+			end
+		end
+		for i, crest in p.crests[c] do
+			local z = column.crestZ[i]
+			local h = column.crestH[i]
+			if z and h > 0.02 then
+				-- A fixed-size block standing h above the water (the rest is under it).
+				place(crest, CFrame.new(x, waterY + h - crest.Size.Y / 2, z))
+			else
+				place(crest, FAR)
+			end
+		end
+	end
+	-- Plain sea past the headlands, at the level at each end of the beach.
+	local half = Beach.HalfWidth
+	for i, side in { -1, 1 } do
+		local y = Beach.waterY(Tide.waterlineAt(sea, side * half))
+		place(p.sides[i], CFrame.new(side * (half + SIDE / 2), y - THICKNESS / 2, (zMin + zMax) / 2))
+	end
+end
+
 local warnedRogue = -1
 
 local function update()
@@ -666,92 +725,11 @@ local function update()
 		sea.Now - waves.WetSeconds * (Workspace:GetAttribute(Tide.ScaleAttribute) or Config.Tide.TimeScale)
 	)
 
+	local columns = computeColumns(sea, wetSea)
 	if meshes then
-		updateMeshes(meshes, sea, wetSea)
-	else
-		for _, strip in strips do
-			local line = Tide.waterlineAt(sea, strip.x)
-			local waterY = Beach.waterY(line)
-			place(strip.sea, CFrame.new(strip.x, waterY - THICKNESS / 2, (zMin + zMax) / 2))
-			if #strip.swash == 0 then
-				continue
-			end
-
-			local list = Waves.wavesAt(strip.x, sea, line)
-
-			-- Wave crests rolling in, nearest the shore first.
-			local crestIndex = 1
-			for i = #list, 1, -1 do
-				local wave = list[i]
-				local crest = strip.crests[crestIndex]
-				-- Crests vanish where something solid shelters the water from the sea.
-				local crestZ = line + wave.Front + 1.2
-				if
-					wave.Phase == "Rolling"
-					and crest
-					and not WaterObstacles.sheltered(strip.x, crestZ, waterY)
-				then
-					crestIndex += 1
-					local height = 0.35 + 0.35 * wave.Size
-					if math.abs(crest.Size.Y - height) > 0.05 then
-						crest.Size = Vector3.new(crest.Size.X, height, crest.Size.Z)
-					end
-					-- Fades in out at sea, sharpest as it reaches the shore.
-					setTransparency(crest, 0.25 + 0.6 * (1 - wave.PhaseProgress))
-					place(crest, CFrame.new(strip.x, waterY + height * 0.3, crestZ))
-				end
-			end
-			for i = crestIndex, #strip.crests do
-				place(strip.crests[i], FAR)
-			end
-
-			-- The swash sheet and its foam edge.
-			local shore = Beach.shoreFrom(strip.x, line)
-			local edge, sliding = shore - line, false
-			for _, wave in list do
-				if wave.Phase ~= "Rolling" then
-					-- Stopped short by anything solid in its way.
-					local front = Waves.frontAt(strip.x, line, wave.Front)
-					if front < edge then
-						edge, sliding = front, wave.Phase == "Backwash"
-					end
-				end
-			end
-			if line + edge < shore - 0.3 then
-				-- Only on the sand: once the water is back at the shore, it's just the sea.
-				onSand(strip.swash, strip.x, shore, line + edge, 0.08, place)
-				place(
-					strip.edge,
-					CFrame.new(strip.x, surfaceY(strip.x, line + edge) + 0.1, line + edge) * TILT
-				)
-				for _, piece in strip.swash do
-					setTransparency(piece, if sliding then 0.6 else 0.45)
-				end
-				setTransparency(strip.edge, if sliding then 0.55 else 0.2)
-			else
-				for _, piece in strip.swash do
-					place(piece, FAR)
-				end
-				place(strip.edge, FAR)
-			end
-
-			-- Wet sand: up to where the tide was a little while ago, or the last wave reached.
-			local lastReach = line
-				+ Waves.frontAt(
-					strip.x,
-					line,
-					shore - line - Waves.reach(Waves.indexAt(sea.Now) - 1, line, strip.x)
-				)
-			local wetLine = Tide.waterlineAt(wetSea, strip.x)
-			local wetTo = math.min(Beach.shoreFrom(strip.x, wetLine), lastReach, line + edge)
-			if wetTo < shore - 0.5 then
-				onSand(strip.wet, strip.x, shore, wetTo, 0.05, place)
-			else
-				for _, piece in strip.wet do
-					place(piece, FAR)
-				end
-			end
-		end
+		updateMeshes(meshes, sea, columns)
+	elseif pieces then
+		updatePieces(pieces, sea, columns, place)
 		Workspace:BulkMoveTo(parts, frames, Enum.BulkMoveMode.FireCFrameChanged)
 	end
 
@@ -798,26 +776,19 @@ function SeaController.init()
 		end
 	end)
 
+	buildColumns()
 	local ok, built = pcall(buildMeshes, folder)
 	if ok then
 		meshes = built
 		print("[Sea] drawing the water as smooth meshes")
 	else
 		warn(
-			"[Sea] couldn't build the water meshes, drawing the sea as strips instead: "
+			"[Sea] couldn't build the water meshes, drawing the water with parts instead: "
 				.. tostring(built)
 				.. " (in Studio, check Game Settings > Security > Allow Mesh / Image APIs)"
 		)
 		folder:ClearAllChildren()
-		local half = Beach.HalfWidth
-		local count = math.ceil(beach.Width / STRIP)
-		local width = beach.Width / count
-		for i = 0, count - 1 do
-			table.insert(strips, newStrip(folder, -half + width * (i + 0.5), width, true))
-		end
-		-- Plain sea beyond the headlands on each side.
-		table.insert(strips, newStrip(folder, -half - SIDE / 2, SIDE, false))
-		table.insert(strips, newStrip(folder, half + SIDE / 2, SIDE, false))
+		pieces = buildPieces(folder)
 	end
 
 	RunService.RenderStepped:Connect(update)

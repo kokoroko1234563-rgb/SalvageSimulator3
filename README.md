@@ -183,8 +183,8 @@ All of this is computed from the shared clock, so the server and every client ag
 
 **What you see** (`SeaController`, client only):
 - Each part of the water is one continuous surface (an EditableMesh) whose points move every frame, so the waterline, the foam and the crests are smooth curves that follow the ground. The water is worked out every 12 studs along the shore and drawn every 6.
-  - If the device can't make editable meshes, it falls back to flat 24-stud strips (and says so in the output).
-- The sea surface, at the local water level along the beach.
+  - Editable meshes must be allowed for the experience (Game Settings > Security > Enable Mesh / Image APIs). Without them, or on a device out of memory for them, the same columns are drawn with narrow parts instead, and the sea still ends at the same smooth shoreline. The output says which one it used (`[Sea] ...`).
+- The sea surface, at the local water level along the beach. Its edge is where the ground really rises out of the water (`Beach.shoreFrom`), which a bank or channel can move out or in; the waves break and run up from there.
 - White crests rolling in. They taper off where something shelters the water.
 - The run-up sheet with a foam edge, drawn only on the sand. Once the water is back at the waterline it's just the sea.
 - Darker wet sand where the tide was in the last 40 seconds, or where the last wave reached.
