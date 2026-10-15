@@ -8,17 +8,21 @@
 --   * wet sand, from the waterline up to where the tide or the last waves reached.
 -- It also warns the player when a rogue wave is on its way.
 
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
+local Gear = require(Shared.Gear)
 local Palette = require(Shared.Palette)
 local Tide = require(Shared.Tide)
 local Waves = require(Shared.Waves)
 
 local HUD = require(script.Parent.HUD)
+
+local player = Players.LocalPlayer
 
 local SeaController = {}
 
@@ -204,12 +208,27 @@ local function update()
 	Workspace:BulkMoveTo(parts, frames, Enum.BulkMoveMode.FireCFrameChanged)
 
 	-- Rogue waves are known in advance (the waves are deterministic): warn a few seconds out.
-	local upcoming = Waves.indexAt(sea.Now) + 1
-	if upcoming ~= warnedRogue and Waves.isRogue(upcoming) then
-		local arrives = upcoming * waves.Period + waves.StartOffset / waves.Speed
-		if arrives - sea.Now < 8 then
-			warnedRogue = upcoming
-			HUD.banner("A rogue wave is coming! Get away from the water!")
+	-- The Foghorn warns earlier, and about big waves too.
+	local worn = Gear.getAccessory(player:GetAttribute("Accessory"))
+	local extra = if worn and worn.WaveWarning then worn.WaveWarning else 0
+	local lead = 8 + extra
+	local first = Waves.indexAt(sea.Now) + 1
+	for upcoming = first, first + math.ceil(lead / waves.Period) do
+		if upcoming <= warnedRogue then
+			continue
+		end
+		local rogue = Waves.isRogue(upcoming)
+		local big = extra > 0 and Waves.size(upcoming) >= waves.SetSize
+		if rogue or big then
+			local arrives = upcoming * waves.Period + waves.StartOffset / waves.Speed
+			if arrives - sea.Now < lead then
+				warnedRogue = upcoming
+				HUD.banner(
+					if rogue
+						then "A rogue wave is coming! Get away from the water!"
+						else "Your foghorn sounds: a big wave is coming!"
+				)
+			end
 		end
 	end
 end

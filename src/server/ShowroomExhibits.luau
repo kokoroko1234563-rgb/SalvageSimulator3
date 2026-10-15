@@ -160,6 +160,66 @@ local function cosmetics()
 	return list
 end
 
+-- Gear with no model of its own (grabbers are a pull, accessories are worn stats): an info
+-- board with its name, kind and what it does.
+local CLASS_NAMES = { "Light", "Medium", "Heavy", "Very heavy" }
+
+local function board(p: Instance, at: CFrame, title: string, body: string, color: Color3)
+	MapParts.part({
+		Name = "Stand",
+		Size = Vector3.new(7, 0.4, 2),
+		CFrame = at + Vector3.new(0, 0.2, 0),
+		Color = color,
+		Material = Palette.Material.Smooth,
+	}).Parent =
+		p
+	MapParts.sign(p, title .. "\n" .. body, at * CFrame.new(0, 3.2, 0), 7, 4, at.Y + 0.4)
+end
+
+local function kind(def): string
+	return if def.Exotic then "Exotic" elseif def.Magical then "Magical" else "Shop"
+end
+
+local function tools()
+	local list = {}
+	for _, tool in Gear.Tools do
+		table.insert(list, {
+			Name = tool.Name,
+			Note = kind(tool),
+			Build = function(p, at)
+				board(
+					p,
+					at,
+					tool.Name,
+					string.format(
+						"%s · reach %d · lifts %s\n%s",
+						kind(tool),
+						tool.Reach,
+						CLASS_NAMES[tool.Lift] or "?",
+						tool.Note or ""
+					),
+					Palette.Rarity[tool.Rarity] or W.Post
+				)
+			end,
+		})
+	end
+	return list
+end
+
+local function accessories()
+	local list = {}
+	for _, accessory in Gear.Accessories do
+		table.insert(list, {
+			Name = accessory.Name,
+			Note = kind(accessory),
+			Build = function(p, at)
+				board(p, at, accessory.Name, accessory.Note or "", Palette.Rarity[accessory.Rarity] or W.Post)
+			end,
+		})
+	end
+	return list
+end
+
 local function rng(): Random
 	return Random.new(42)
 end
@@ -394,6 +454,12 @@ return function()
 		},
 		{ Name = "Beach items", Description = "Items.Catalog with ItemModels", Exhibits = items() },
 		{ Name = "Vessels", Description = "VesselService builders", Exhibits = vessels() },
+		{ Name = "Grabbers", Description = "Gear.Tools (no model: info boards)", Exhibits = tools() },
+		{
+			Name = "Accessories",
+			Description = "Gear.Accessories (worn: info boards)",
+			Exhibits = accessories(),
+		},
 		{ Name = "Cosmetics", Description = "Gear.Cosmetics", Exhibits = cosmetics() },
 		{ Name = "Beach pieces", Description = "BeachDressing and ZoneProps", Exhibits = pieces() },
 		{ Name = "Buildings", Description = "Buildings", Exhibits = buildings() },

@@ -12,6 +12,8 @@ local Tide = require(Shared.Tide)
 local Stats = require(Shared.Stats)
 local Waves = require(Shared.Waves)
 
+local GearEffects = require(script.Parent.GearEffects)
+
 local player = Players.LocalPlayer
 
 local WaveController = {}
@@ -60,6 +62,9 @@ function WaveController.init()
 		if humanoid and root and humanoid.Health > 0 then
 			-- Water is sluggish: slower walking and lower jumps the deeper you are.
 			local speedScale, jumpScale = Beach.wading(root.Position, sea)
+			local wade = Stats.wadeBonus(player) -- Tidewalker Boots
+			speedScale = 1 - (1 - speedScale) * (1 - wade)
+			jumpScale = 1 - (1 - jumpScale) * (1 - wade)
 			local base = humanoid:GetAttribute("BaseWalkSpeed") or Stats.walkSpeed(player)
 			humanoid.WalkSpeed = base * speedScale
 			local jumpBase = humanoid:GetAttribute("BaseJump")
@@ -76,6 +81,9 @@ function WaveController.init()
 			-- Characters are moved directly: the Humanoid controller would cancel a plain force.
 			local resistance = Stats.wavePush(player)
 			local push = Waves.getPush(root.Position, sea) * Config.Waves.CharacterFactor * resistance
+			if GearEffects.isFrozen(root.Position) then
+				push = Vector3.zero -- the Freeze Wand: still water around you
+			end
 			local now = os.clock()
 			if now < knockedUntil then
 				-- Tumbling: the water carries you out, slowing as the wave spends itself.
@@ -98,7 +106,9 @@ function WaveController.init()
 				local state = item:GetAttribute("State")
 				local scale = item:GetAttribute("WaveScale") -- set by GrabController on magical grabs
 				if (state == "Held" or state == "InVessel") and scale ~= 0 then
-					Waves.applyToPart(item, dt, sea, scale)
+					if not GearEffects.isFrozen(item.Position) then
+						Waves.applyToPart(item, dt, sea, scale)
+					end
 				end
 			end
 		end
@@ -107,7 +117,9 @@ function WaveController.init()
 			if vessel:GetAttribute("Owner") == player.UserId then
 				for _, part in vessel:GetDescendants() do
 					if part:IsA("BasePart") then
-						Waves.applyToPart(part, dt, sea)
+						if not GearEffects.isFrozen(part.Position) then
+							Waves.applyToPart(part, dt, sea)
+						end
 					end
 				end
 			end

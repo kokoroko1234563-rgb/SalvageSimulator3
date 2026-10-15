@@ -35,6 +35,106 @@ Biomes.List = {
 	},
 }
 
+-- The doc's other biomes, written down so their items exist and point somewhere. They don't
+-- roll yet: each needs its decor, entrance, secret course and hazard built first. Moving one
+-- into Biomes.List (with those) is what turns it on. Coin = the normal secret's colored coin;
+-- Rewards = the exotic secret's lootbox (all in Gear); Variant = its rare cosmetic variant.
+Biomes.Planned = {
+	DriftwoodCove = {
+		Name = "Driftwood Cove",
+		Tier = "Common",
+		Loot = { "Plank", "Rope", "GlassBottle", "OldBoot" },
+		UnlockItem = "CarvedIdol",
+		Entrance = "Hollow beached tree trunk",
+		Coin = "Orange",
+	},
+	TidepoolRocks = {
+		Name = "Tidepool Rocks",
+		Tier = "Common",
+		Loot = { "Seashell", "Starfish", "FishingLure" },
+		UnlockItem = "PearlEyedShell",
+		Entrance = "Blowhole in the rocks",
+		Coin = "Blue",
+	},
+	SeagrassShallows = {
+		Name = "Seagrass Shallows",
+		Tier = "Common",
+		Loot = { "Buoy", "Net", "GlassFloat" },
+		UnlockItem = "BarnacledLantern",
+		Entrance = "Under a collapsed jetty",
+		Coin = "Green",
+	},
+	CoralGarden = {
+		Name = "Coral Garden",
+		Tier = "Common",
+		Loot = { "Coral", "Snorkel", "Coconut" },
+		UnlockItem = "CoralComb",
+		Entrance = "Arch in the reef",
+		Coin = "Pink",
+	},
+	JellyfishLagoon = {
+		Name = "Jellyfish Lagoon",
+		Tier = "Uncommon",
+		UnlockItem = "JellyJar",
+		Hazard = "Jellyfish: a sting drops what you hold",
+		Rewards = { "JellyRaft", "GlowPearl" },
+	},
+	FogBank = {
+		Name = "Fog Bank",
+		Tier = "Uncommon",
+		UnlockItem = "LighthouseKey",
+		Hazard = "Thick fog, cleared briefly by a foghorn pulse",
+		Rewards = { "LanternOfClearSight", "Foghorn" },
+	},
+	WhirlwindDunes = {
+		Name = "Whirlwind Dunes",
+		Tier = "Rare",
+		UnlockItem = "WindChime",
+		Hazard = "Tornado circling the zone",
+		Rewards = { "MagicCarpet", "GustGloves" },
+	},
+	HermitHollows = {
+		Name = "Hermit Hollows",
+		Tier = "Rare",
+		Loot = { "BigShell" },
+		UnlockItem = "SpiralConch",
+		Hazard = "Giant hermit crab patrolling tunnels",
+		Rewards = { "ShellWagon", "CrabClaw" },
+	},
+	SpearstoneReef = {
+		Name = "Spearstone Reef",
+		Tier = "Rare",
+		UnlockItem = "SpearstoneShard",
+		Hazard = "Spears shooting from the floor on a timer",
+		Rewards = { "TidewalkerBoots" },
+	},
+	SeaGlassShore = {
+		Name = "Sea-Glass Shore",
+		Tier = "VeryRare",
+		UnlockItem = "PrismShard",
+		Hazard = "Sharp glass patches that slow you",
+		Rewards = { "PrismLens", "GlassSwan" },
+		Variant = "Sea-glass",
+	},
+	StrandedIceberg = {
+		Name = "Stranded Iceberg",
+		Tier = "VeryRare",
+		Loot = { "FrozenFish" },
+		UnlockItem = "FrozenCompass",
+		Hazard = "Slippery ice: vessels slide and spill",
+		Rewards = { "FrostSled", "FreezeWand" },
+		Variant = "Frosted",
+	},
+	BlackSandVents = {
+		Name = "Black Sand Vents",
+		Tier = "VeryRare",
+		UnlockItem = "ObsidianEgg",
+		Hazard = "Steam vents erupting on a timer",
+		Rewards = { "EmberLantern", "ObsidianGrabber" },
+		Variant = "Ember",
+	},
+}
+
 function Biomes.attributeFor(zone: number): string
 	return "ZoneBiome" .. zone
 end

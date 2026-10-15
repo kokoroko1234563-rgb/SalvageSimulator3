@@ -550,7 +550,7 @@ function DataService.lexiconComplete(player: Player): boolean
 	if not profile then
 		return false
 	end
-	for _, item in Items.Catalog do
+	for _, item in Items.Lexicon do
 		if not profile.Lexicon[item.Id] then
 			return false
 		end

@@ -38,9 +38,22 @@ function Stats.wavePush(player: Player): number
 	return math.max(Config.Traders.MinWavePush, push)
 end
 
+local function accessory(player: Player)
+	return Gear.getAccessory(player:GetAttribute("Accessory"))
+end
+
 -- How many times longer a player's breath lasts.
 function Stats.breath(player: Player): number
-	return Traders.breathMultiplier(levels(player)) * (if hasReward(player, "SeaLegs") then 2 else 1)
+	local worn = accessory(player)
+	return Traders.breathMultiplier(levels(player))
+		* (if hasReward(player, "SeaLegs") then 2 else 1)
+		* (1 + (if worn and worn.BreathBonus then worn.BreathBonus else 0))
+end
+
+-- How much of the water's slowdown a player shrugs off (0 = none, 1 = all).
+function Stats.wadeBonus(player: Player): number
+	local worn = accessory(player)
+	return if worn and worn.WadeBonus then worn.WadeBonus else 0
 end
 
 -- The heaviest weight class a player can lift with a tool.

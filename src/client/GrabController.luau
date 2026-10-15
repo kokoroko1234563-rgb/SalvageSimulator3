@@ -219,6 +219,12 @@ local function loadedMass(vessel: Model): number
 	return mass
 end
 
+-- A vessel's own speed (Gear: Speed), from the model its handle belongs to.
+local function vesselSpeed(handle: BasePart): number
+	local model = handle.Parent
+	return if model then model:GetAttribute("Speed") or 1 else 1
+end
+
 local function hasReward(id: string): boolean
 	return string.find("," .. (player:GetAttribute("Rewards") or "") .. ",", "," .. id .. ",", 1, true) ~= nil
 end
@@ -309,7 +315,7 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 	align.Responsiveness = 25
 	align.MaxVelocity = 60
 		* (if hasReward("SwiftFeet") and kind == "vessel" then Rebirth.SwiftFeetSpeed else 1)
-		* (if kind == "vessel" then Traders.vesselSpeedMultiplier(upgrades()) else 1)
+		* (if kind == "vessel" then Traders.vesselSpeedMultiplier(upgrades()) * vesselSpeed(part) else 1)
 	if kind == "item" then
 		align.ApplyAtCenterOfMass = true
 		-- part.Mass, not AssemblyMass: the item may still read as anchored on this client for a
@@ -331,6 +337,7 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 		align.MaxForce = loadedMass(vessel)
 			* grabCfg.TowAcceleration
 			* Traders.vesselSpeedMultiplier(upgrades())
+			* vesselSpeed(part)
 	end
 	align.Position = part.Position
 	align.Parent = part
@@ -460,7 +467,11 @@ local function updateBrake()
 			local flatLook = Vector3.new(look.X, 0, look.Z).Unit
 			local spot = root.Position - flatLook * 7
 			local y = groundBelow(spot) + grabCfg.HoverHeight
-			if vessel:GetAttribute("Swims") then
+			if vessel:GetAttribute("Flies") then
+				-- Flies over sand and sea alike.
+				local waterY = Beach.waterYAt(Tide.sea(), spot.X)
+				y = math.max(y, waterY + grabCfg.HoverHeight)
+			elseif vessel:GetAttribute("Swims") then
 				-- Swims at the surface; on sand it crawls low and slow.
 				local waterY = Beach.waterYAt(Tide.sea(), spot.X)
 				y = math.max(groundBelow(spot) + 1.5, waterY + grabCfg.SwimFloat)
@@ -469,7 +480,10 @@ local function updateBrake()
 			current.upright.CFrame =
 				CFrame.fromMatrix(Vector3.zero, Vector3.yAxis, flatLook:Cross(Vector3.yAxis))
 		end
-		local force = mass * grabCfg.HoverAcceleration * Traders.vesselSpeedMultiplier(upgrades())
+		local force = mass
+			* grabCfg.HoverAcceleration
+			* Traders.vesselSpeedMultiplier(upgrades())
+			* (vessel:GetAttribute("Speed") or 1)
 		if vessel:GetAttribute("Swims") and Beach.depthAt(base.Position, Tide.sea()) <= 0 then
 			force *= grabCfg.SwimSandSpeed
 		end
@@ -575,12 +589,15 @@ local function update(dt: number)
 		return
 	end
 
-	-- Tide Magnet: reels what it holds in toward you while it's in the water.
-	if current.kind == "item" and current.mode == "drag" and currentTool().Magnet then
-		if Beach.depthAt(part.Position, Tide.sea()) > 0 then
+	-- Tide Magnet: reels what it holds in toward you while it's in the water. Gust Gloves
+	-- reel faster, and out of the water too.
+	local reeler = currentTool()
+	if current.kind == "item" and current.mode == "drag" and reeler.Magnet then
+		if reeler.PullAnywhere or Beach.depthAt(part.Position, Tide.sea()) > 0 then
 			local camera = Workspace.CurrentCamera
 			local closest = (root.Position - camera.CFrame.Position).Magnitude + 4
-			current.holdDistance = math.max(closest, current.holdDistance - grabCfg.MagnetPull * dt)
+			local pull = reeler.PullSpeed or grabCfg.MagnetPull
+			current.holdDistance = math.max(closest, current.holdDistance - pull * dt)
 		end
 	end
 	local target = targetPosition(current, root)
@@ -590,6 +607,7 @@ local function update(dt: number)
 		current.align.MaxForce = loadedMass(part.Parent :: Model)
 			* grabCfg.TowAcceleration
 			* Traders.vesselSpeedMultiplier(upgrades())
+			* vesselSpeed(part)
 	end
 
 	if DEBUG and not current.checkedOwnership and os.clock() - current.startedAt > 1 then
