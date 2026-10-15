@@ -81,7 +81,8 @@ local function gridY(ix: number, iz: number): number
 	local terrain = Workspace:FindFirstChildOfClass("Terrain")
 	if terrain then
 		surfaceParams.FilterDescendantsInstances = { terrain }
-		local hit = Workspace:Raycast(Vector3.new(x, y + 30, z), Vector3.new(0, -60, 0), surfaceParams)
+		local hit =
+			Workspace:Raycast(Beach.rayFrom(Vector3.new(x, y, z), 30), Vector3.new(0, -60, 0), surfaceParams)
 		if hit then
 			y = hit.Position.Y
 		end

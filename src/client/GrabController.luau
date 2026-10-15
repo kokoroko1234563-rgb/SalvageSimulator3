@@ -387,7 +387,7 @@ local function groundBelow(position: Vector3): number
 		local params = RaycastParams.new()
 		params.FilterType = Enum.RaycastFilterType.Include
 		params.FilterDescendantsInstances = { map, Workspace.Terrain }
-		local hit = Workspace:Raycast(position + Vector3.new(0, 30, 0), Vector3.new(0, -100, 0), params)
+		local hit = Workspace:Raycast(Beach.rayFrom(position, 30), Vector3.new(0, -100, 0), params)
 		if hit then
 			return hit.Position.Y
 		end

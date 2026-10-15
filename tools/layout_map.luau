@@ -10,7 +10,7 @@
 	Usage (from the repo root): lune run tools/layout_map.luau [docs/layouts]
 	Without a folder it only prints. Each map is 72 columns (10 studs each) by 15 rows (10 studs
 	each), top edge first. Legend: # rock, ^ raised sand, . flat, ~ floods at mid-tide,
-	= cart ramp, o entrance flat, ' ' open sand.
+	= cart ramp, o entrance flat, R under a roof, ' ' open sand.
 ]]
 
 local fs = require("@lune/fs")
@@ -239,6 +239,9 @@ local function cellChar(layout, zone: number, x: number, lz: number, mid: number
 				return "="
 			end
 		end
+	end
+	if Layouts.roofIn(layout, x, lz) then
+		return "R"
 	end
 	local f, rock = Beach.shapeAt(x, z0 + lz)
 	if rock and f > cfg.RockMin then

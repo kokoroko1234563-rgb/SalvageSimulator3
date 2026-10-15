@@ -118,6 +118,10 @@ local function build(zone: number)
 				}
 		)
 	end
+	if rock then
+		-- Where it rolls, a roof rests on the middle of the maze: its corridors there are tunnels.
+		table.insert(walls, { Kind = "Roof", At = { -25, 84 }, Radius = 45, Clearance = 16, Thickness = 6 })
+	end
 	return {
 		Name = "Hermit Hollows (zone " .. zone .. ", draft)",
 		Primitives = concat(bank(zone), ramps(), walls, {

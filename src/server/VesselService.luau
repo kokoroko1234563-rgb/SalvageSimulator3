@@ -1231,7 +1231,7 @@ function VesselService.spotNear(player: Player): (CFrame?, string?)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { Workspace.Map, Workspace.Terrain }
-	local hit = Workspace:Raycast(spot + Vector3.new(0, 30, 0), Vector3.new(0, -120, 0), params)
+	local hit = Workspace:Raycast(Beach.rayFrom(spot, 30), Vector3.new(0, -120, 0), params)
 	local groundY = if hit then hit.Position.Y else Beach.groundAt(spot.X, spot.Z)
 	local ground = Vector3.new(spot.X, groundY, spot.Z)
 	if Beach.isDeep(ground, Tide.sea()) then

@@ -30,7 +30,7 @@ function TerrainBuilder.bounds(): (Vector3, Vector3)
 	local half = Beach.HalfWidth + 40
 	local zEnd = Beach.Depth + beach.SeaExtent
 	local low = Beach.groundY(zEnd) - beach.FarSandbar.ChannelDepth - 12
-	local high = 4 + math.max(shape.MaxHeight, shape.WallMaxHeight)
+	local high = 4 + math.max(shape.MaxHeight, shape.WallMaxHeight, shape.RoofMaxTop)
 	local function snap(v: number, up: boolean): number
 		return (if up then math.ceil(v / VOXEL) else math.floor(v / VOXEL)) * VOXEL
 	end
@@ -56,12 +56,22 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 			local height, rock = Beach.shapeAt(x, z)
 			local h = Beach.groundY(z) + height
 			local material = if rock then Palette.Material.Rock else Palette.Material.Sand
+			local roofBottom, roofTop = Beach.roofAt(x, z)
 			for iy = 1, ny do
 				local bottom = lo.Y + (iy - 1) * VOXEL
 				local fill = math.clamp((h - bottom) / VOXEL, 0, 1)
 				if fill > 0 then
 					mx[iy][iz] = material
 					ox[iy][iz] = fill
+				end
+				if roofBottom then
+					-- The roof: rock between its underside and its top.
+					local overlap = math.min(roofTop :: number, bottom + VOXEL) - math.max(roofBottom, bottom)
+					local roof = math.clamp(overlap / VOXEL, 0, 1)
+					if roof > ox[iy][iz] then
+						mx[iy][iz] = Palette.Material.Rock
+						ox[iy][iz] = roof
+					end
 				end
 			end
 		end
@@ -89,7 +99,7 @@ function TerrainBuilder.heightRange(z0: number, z1: number): (number, number)
 		z = math.min(z + VOXEL, z1)
 	end
 	return snap(low - shape.MaxDepth - CRUST, false),
-		snap(high + math.max(shape.MaxHeight, shape.WallMaxHeight) + 4, true)
+		snap(high + math.max(shape.MaxHeight, shape.WallMaxHeight, shape.RoofMaxTop) + 4, true)
 end
 
 -- Writes the terrain between two Z positions (snapped out to whole voxels).

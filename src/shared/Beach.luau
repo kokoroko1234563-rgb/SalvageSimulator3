@@ -112,6 +112,34 @@ function Beach.groundAt(x: number, z: number): number
 	return Beach.groundY(z) + Beach.feature(x, z)
 end
 
+-- The roof over a point (a cave or tunnel in the tile's layout): the world height of its
+-- underside and its top, or nil where it's open to the sky.
+function Beach.roofAt(x: number, z: number): (number?, number?)
+	local tile = Beach.tileAt(z)
+	if not tile then
+		return nil, nil
+	end
+	local z0 = Beach.tileRange(tile)
+	local bottom, top = Layouts.roofAt(tile, x, z - z0)
+	if not bottom then
+		return nil, nil
+	end
+	local slope = Beach.groundY(z)
+	return slope + bottom, slope + (top :: number)
+end
+
+-- Where a downward ray looking for the ground under `position` should start: `above` studs
+-- over it, but under a roof when `position` is beneath one (so the ray finds the cave floor,
+-- not the roof).
+function Beach.rayFrom(position: Vector3, above: number): Vector3
+	local y = position.Y + above
+	local bottom, top = Beach.roofAt(position.X, position.Z)
+	if bottom and position.Y < (top :: number) then
+		y = math.min(y, bottom - 0.5)
+	end
+	return Vector3.new(position.X, y, position.Z)
+end
+
 -- Whether the ground has any shape near this Z (a quick check before scanning it).
 function Beach.isRough(z: number): boolean
 	local tile = Beach.tileAt(z)

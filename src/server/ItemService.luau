@@ -95,7 +95,7 @@ function ItemService.dropToGround(item: BasePart)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { mapFolder, Workspace.Terrain }
-	local origin = item.Position + Vector3.new(0, 10, 0)
+	local origin = Beach.rayFrom(item.Position, 10)
 	local hit = Workspace:Raycast(origin, Vector3.new(0, -80, 0), params)
 	local groundY = if hit then hit.Position.Y else Beach.groundAt(item.Position.X, item.Position.Z)
 	local _, yaw, _ = item.CFrame:ToOrientation()

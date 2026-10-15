@@ -14,6 +14,12 @@
 --   Ridge   { Path = {{x, z}, ...}, Height, Width, Rock? }  a bank along a path
 --   Wall    { Path = {{x, z}, ...}, Height, Width }         a rock wall: flat top, sides too
 --                                                           steep to climb (a maze, a cave)
+--   Roof    { Path, Width } or { At, Radius },              a slab of rock overhead: its
+--           Clearance, Thickness                            underside Clearance studs over the
+--                                                           slope, Thickness thick (a tunnel, a
+--                                                           cave). The ground under it is still
+--                                                           the floor: water, waves and items
+--                                                           go by the floor, so caves flood.
 --   Mound   { At = {x, z}, Radius, Height, Rock? }          a hump or boulder
 --   Channel { Path = {{x, z}, ...}, Depth, Width }          a cut along a path
 --   Hollow  { At = {x, z}, Radius, Depth }                  a round dip (a pool)
@@ -58,6 +64,7 @@ export type Layout = { Name: string, Primitives: { Primitive } }
 Layouts.Kinds = {
 	Ridge = { Path = true, Height = true, Width = true, Rock = false },
 	Wall = { Path = true, Height = true, Width = true },
+	Roof = { Path = false, Width = false, At = false, Radius = false, Clearance = true, Thickness = true },
 	Mound = { At = true, Radius = true, Height = true, Rock = false },
 	Channel = { Path = true, Depth = true, Width = true },
 	Hollow = { At = true, Radius = true, Depth = true },
@@ -223,8 +230,10 @@ type Compiled = {
 	raised: { any },
 	cuts: { any },
 	masks: { any },
-	cells: { [number]: { raised: { any }, cuts: { any }, masks: { any } } },
+	roofs: { any },
+	cells: { [number]: { raised: { any }, cuts: { any }, masks: { any }, roofs: { any } } },
 	count: number,
+	roofCount: number,
 }
 
 local compiled: { [Layout]: Compiled } = setmetatable({}, { __mode = "k" }) :: any
@@ -250,7 +259,8 @@ local function compile(layout: Layout): Compiled
 	if result then
 		return result
 	end
-	local c: Compiled = { raised = {}, cuts = {}, masks = {}, cells = {}, count = 0 }
+	local c: Compiled =
+		{ raised = {}, cuts = {}, masks = {}, roofs = {}, cells = {}, count = 0, roofCount = 0 }
 	for _, p in layout.Primitives do
 		local entry: any = { kind = p.Kind, rock = p.Rock == true }
 		local reach: number
@@ -263,7 +273,12 @@ local function compile(layout: Layout): Compiled
 			entry.half = p.Radius or 0
 		end
 		local list
-		if p.Kind == "Wall" then
+		if p.Kind == "Roof" then
+			entry.clearance = p.Clearance or 0
+			entry.thickness = p.Thickness or 0
+			reach = entry.half
+			list = c.roofs
+		elseif p.Kind == "Wall" then
 			-- Rock with a flat top and sides too steep to climb.
 			entry.amount = p.Height or 0
 			entry.rock = true
@@ -291,19 +306,27 @@ local function compile(layout: Layout): Compiled
 				minZ = math.min(minZ, s[2], s[4])
 				maxZ = math.max(maxZ, s[2], s[4])
 			end
-			local bucket = if list == c.raised then "raised" elseif list == c.cuts then "cuts" else "masks"
+			local bucket = if list == c.raised
+				then "raised"
+				elseif list == c.cuts then "cuts"
+				elseif list == c.roofs then "roofs"
+				else "masks"
 			for cx = math.floor((minX - reach) / CELL), math.floor((maxX + reach) / CELL) do
 				for cz = math.floor((minZ - reach) / CELL), math.floor((maxZ + reach) / CELL) do
 					local key = cellKey(cx, cz)
 					local cell = c.cells[key]
 					if not cell then
-						cell = { raised = {}, cuts = {}, masks = {} }
+						cell = { raised = {}, cuts = {}, masks = {}, roofs = {} }
 						c.cells[key] = cell
 					end
 					table.insert(cell[bucket], entry)
 				end
 			end
-			c.count += 1
+			if list == c.roofs then
+				c.roofCount += 1 -- a roof isn't ground: the floor under it is
+			else
+				c.count += 1
+			end
 		end
 	end
 	compiled[layout] = c
@@ -398,6 +421,35 @@ end
 function Layouts.isShaped(tile: number): boolean
 	local layout = Layouts.active(tile)
 	return layout ~= nil and compile(layout).count > 0
+end
+
+-- A layout's roof over (x, local z): its underside and top, in studs over the slope, or nil.
+function Layouts.roofIn(layout: Layout, x: number, z: number): (number?, number?)
+	local c = compile(layout)
+	if c.roofCount == 0 then
+		return nil, nil
+	end
+	local cell = c.cells[cellKey(math.floor(x / CELL), math.floor(z / CELL))]
+	if not cell then
+		return nil, nil
+	end
+	local bottom, top = nil, nil
+	for _, p in cell.roofs do
+		if distance(p.segments, x, z) <= p.half then
+			bottom = if bottom then math.min(bottom, p.clearance) else p.clearance
+			top = if top then math.max(top, p.clearance + p.thickness) else p.clearance + p.thickness
+		end
+	end
+	return bottom, top
+end
+
+-- The active roof on a tile at (x, local z).
+function Layouts.roofAt(tile: number, x: number, z: number): (number?, number?)
+	local layout = Layouts.active(tile)
+	if not layout then
+		return nil, nil
+	end
+	return Layouts.roofIn(layout, x, z)
 end
 
 -- What the tile's active layout places on its ground: loot spots and entrance spots in world
@@ -546,7 +598,26 @@ function Layouts.problems(layout: any): { string }
 				add(where .. " (" .. p.Kind .. "): needs " .. key)
 			end
 		end
-		if p.Kind == "Wall" then
+		if p.Kind == "Roof" then
+			local path = p.Path ~= nil and p.Width ~= nil and p.At == nil and p.Radius == nil
+			local area = p.At ~= nil and p.Radius ~= nil and p.Path == nil and p.Width == nil
+			if not path and not area then
+				add(where .. " (Roof): needs either Path and Width, or At and Radius")
+			end
+			if type(p.Thickness) == "number" and p.Thickness < cfg.RoofMinThickness then
+				add(where .. ": a Roof must be at least Config.Beach.Terrain.RoofMinThickness thick")
+			end
+			if type(p.Clearance) == "number" and p.Clearance < cfg.RoofMinClearance then
+				add(where .. ": Clearance is under Config.Beach.Terrain.RoofMinClearance")
+			end
+			if
+				type(p.Clearance) == "number"
+				and type(p.Thickness) == "number"
+				and p.Clearance + p.Thickness > cfg.RoofMaxTop
+			then
+				add(where .. ": a Roof's top (Clearance + Thickness) is over Config.Beach.Terrain.RoofMaxTop")
+			end
+		elseif p.Kind == "Wall" then
 			if type(p.Height) == "number" and p.Height > cfg.WallMaxHeight then
 				add(where .. ": Height is over Config.Beach.Terrain.WallMaxHeight")
 			end

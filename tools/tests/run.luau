@@ -1533,14 +1533,14 @@ test("layouts stay within their zone's height, and rock and walls start at zone 
 		local banks = { Name = entry.Layout.Name, Primitives = {} }
 		local walls = false
 		for _, p in entry.Layout.Primitives do
-			if p.Kind == "Wall" then
+			if p.Kind == "Wall" or p.Kind == "Roof" then
 				walls = true
 			else
 				table.insert(banks.Primitives, p)
 			end
 		end
 		if walls and entry.Zone < 4 then
-			table.insert(problems, entry.Source .. " has walls before zone 4")
+			table.insert(problems, entry.Source .. " has walls or roofs before zone 4")
 		end
 		for x = -350, 350, 2 do
 			for z = 0, 150, 2 do
@@ -1830,6 +1830,79 @@ test("walls get an invisible barrier inside them, open where a ramp cuts through
 	Layouts.setActive(tile, nil)
 	WallBarriers.build(tile)
 	assert(#h.game.Workspace.WallBarriers["Tile" .. tile]:GetChildren() == 0, "and gone with the wall")
+end)
+
+test("roofs make caves: rock overhead, the floor still the ground", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local TerrainBuilder = h.require("Server/TerrainBuilder")
+	local tile = 15
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "tunnel",
+		Primitives = {
+			{ Kind = "Roof", Path = { { -40, 75 }, { 40, 75 } }, Width = 20, Clearance = 10, Thickness = 6 },
+		},
+	})
+	local z = z0 + 75
+	local bottom, top = Beach.roofAt(0, z)
+	local slope = Beach.groundY(z)
+	assert(
+		bottom and math.abs(bottom - (slope + 10)) < 0.01 and math.abs((top :: number) - (slope + 16)) < 0.01,
+		"underside and top"
+	)
+	assert(Beach.roofAt(0, z + 20) == nil and Beach.roofAt(80, z) == nil, "open sky beside it")
+	assert(Beach.groundAt(0, z) == slope, "the floor is still the ground")
+	assert(not Beach.isRough(z) or Beach.feature(0, z) == 0, "a roof isn't ground shape")
+	-- A ray from above, looking for the ground under someone in the tunnel, starts under the roof.
+	local start = Beach.rayFrom(roblox.Vector3.new(0, slope + 3, z), 30)
+	assert(start.Y < (bottom :: number), "under the roof")
+	assert(
+		Beach.rayFrom(roblox.Vector3.new(0, slope + 20, z), 30).Y > (top :: number),
+		"but not for someone on top of it"
+	)
+	-- The terrain: sand floor, air, then rock.
+	local zA = math.floor(z / 4) * 4
+	local yLow, yHigh = TerrainBuilder.heightRange(zA, zA + 4)
+	local materials, occupancy = TerrainBuilder.slab(
+		roblox.Vector3.new(-2, yLow, zA),
+		roblox.Vector3.new(2, yHigh, zA + 4),
+		zA,
+		zA + 4
+	)
+	local solid, air, rock = 0, 0, 0
+	for iy = 1, #occupancy[1] do
+		local cellBottom = yLow + (iy - 1) * 4
+		if cellBottom > slope + 1 and cellBottom + 4 < slope + 9 then
+			air += if occupancy[1][iy][1] == 0 then 1 else 0
+		end
+		if cellBottom >= slope + 10 and cellBottom + 4 <= slope + 16 then
+			solid += occupancy[1][iy][1]
+			rock += if materials[1][iy][1] == roblox.Enum.Material.Slate then 1 else 0
+		end
+	end
+	assert(air >= 1, "room to walk under it")
+	assert(solid >= 1 and rock >= 1, "rock overhead")
+	Layouts.setActive(tile, nil)
+	local function problems(roof)
+		return #Layouts.problems({ Name = "x", Primitives = { roof } })
+	end
+	assert(
+		problems({ Kind = "Roof", At = { 0, 0 }, Radius = 20, Clearance = 10, Thickness = 6 }) == 0,
+		"a chamber"
+	)
+	assert(
+		problems({ Kind = "Roof", At = { 0, 0 }, Width = 20, Clearance = 10, Thickness = 6 }) > 0,
+		"needs a shape"
+	)
+	assert(
+		problems({ Kind = "Roof", At = { 0, 0 }, Radius = 20, Clearance = 4, Thickness = 6 }) > 0,
+		"too low to walk under"
+	)
+	assert(
+		problems({ Kind = "Roof", At = { 0, 0 }, Radius = 20, Clearance = 30, Thickness = 6 }) > 0,
+		"too high"
+	)
 end)
 
 test("hazards are data: kinds, settings and problems", function()
