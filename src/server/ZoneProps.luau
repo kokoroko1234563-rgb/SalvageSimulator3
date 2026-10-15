@@ -411,4 +411,23 @@ function ZoneProps.build(map: Instance)
 	end
 end
 
+-- The pieces on their own, for the showroom (ShowroomExhibits).
+ZoneProps.pieces = {
+	lounger = lounger,
+	towel = towel,
+	hut = hut,
+	sandbank = sandbank,
+	driftwoodPile = driftwoodPile,
+	net = net,
+	boat = boat,
+	wreck = wreck,
+	rockCluster = rockCluster,
+	tidepool = tidepool,
+	coralPatch = coralPatch,
+	pilingRow = pilingRow,
+	pier = pier,
+	bellTower = bellTower,
+	ruinedColumn = ruinedColumn,
+}
+
 return ZoneProps

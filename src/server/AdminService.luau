@@ -23,6 +23,7 @@ local AuctionService = require(script.Parent.AuctionService)
 local BiomeService = require(script.Parent.BiomeService)
 local DataService = require(script.Parent.DataService)
 local LexiconService = require(script.Parent.LexiconService)
+local Showroom = require(script.Parent.Showroom)
 local MonetizationService = require(script.Parent.MonetizationService)
 local TraderService = require(script.Parent.TraderService)
 local RebirthService = require(script.Parent.RebirthService)
@@ -466,13 +467,15 @@ command(
 
 command(
 	"tp",
-	"tp <shop|zone number|sandbar|player> [who]",
+	"tp <shop|zone number|sandbar|showroom|player> [who]",
 	"Teleport, e.g. tp 3, tp shop, tp sandbar (the bell tower door), tp bob",
 	function(caller, args)
 		local where = (args[1] or ""):lower()
 		local destination: Vector3?
 		if where == "shop" then
 			destination = Vector3.new(0, 5, -45)
+		elseif where == "showroom" then
+			destination = Showroom.Entrance
 		elseif where == "sandbar" or where == "tower" then
 			local z = Config.Beach.FarSandbar.DoorZ - 6
 			destination = Vector3.new(0, Beach.groundY(z) + 4, z)
@@ -490,7 +493,7 @@ command(
 			destination = root.Position + Vector3.new(0, 0, -4)
 		end
 		if not destination then
-			return { "Usage: tp <shop|zone number|sandbar|player> [who]" }
+			return { "Usage: tp <shop|zone number|sandbar|showroom|player> [who]" }
 		end
 		local lines = {}
 		return eachTarget(caller, args[2], function(target)
@@ -502,6 +505,34 @@ command(
 		end) or lines
 	end
 )
+
+command("showroom", "showroom [section]", "Go to the showroom, or one of its sections", function(caller, args)
+	local name = table.concat(args, " "):lower()
+	local character = caller.Character
+	if not character then
+		return { "You have no character" }
+	end
+	local spot = if name == "" then Showroom.Entrance else Showroom.Sections[name]
+	if not spot then
+		-- Not a full name: take the first section that starts with it.
+		for section, position in Showroom.Sections do
+			if section:sub(1, #name) == name then
+				spot = position
+				break
+			end
+		end
+	end
+	if not spot then
+		local sections = {}
+		for section in Showroom.Sections do
+			table.insert(sections, section)
+		end
+		table.sort(sections)
+		return { "Sections: " .. table.concat(sections, ", ") }
+	end
+	character:PivotTo(CFrame.new(spot))
+	return { "Teleported to the showroom" }
+end)
 
 command("heal", "heal [player]", "Full health and breath", function(caller, args)
 	local lines = {}

@@ -665,4 +665,8 @@ function BiomeModels.showcase(map: Instance)
 	end
 end
 
+-- Every biome's name, ground colour and builder, and the plot size, for the showroom.
+BiomeModels.list = BIOMES
+BiomeModels.PlotSize = SIZE
+
 return BiomeModels

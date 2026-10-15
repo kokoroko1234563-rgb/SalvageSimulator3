@@ -190,5 +190,7 @@ BeachDressing.scenery = scenery
 BeachDressing.palm = palm
 BeachDressing.umbrella = umbrella
 BeachDressing.driftwood = driftwood
+BeachDressing.shell = shell
+BeachDressing.lifeguardTower = lifeguardTower
 
 return BeachDressing

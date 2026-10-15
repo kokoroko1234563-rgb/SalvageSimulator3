@@ -219,6 +219,20 @@ Press **I** (or the purple bag button) to open it.
 
 All tuning numbers are in `src/shared/Config.luau`, `Gear.luau` and `Items.luau`.
 
+## Showroom
+
+An open-air gallery off the map (`Config.Showroom`, X = 6000 on the shop side, so no tide or wave reaches it) that shows every model, material and colour in the game side by side. Each exhibit stands on its own tile or pedestal, with its name on a sign.
+
+- **Getting there:** `tp showroom` goes to the entrance. `showroom <section>` jumps to a section (`showroom biomes`, `showroom vessels`), and `showroom` on its own lists them.
+- **Sections:**
+  - Materials and colour swatches: every Palette group, each swatch labelled with its RGB value.
+  - Beach items with their models (items without a model yet are marked).
+  - Vessels, cosmetics, beach pieces (BeachDressing and ZoneProps), buildings and people.
+  - The secret doors, including the Sunken Bell Tower.
+  - All fourteen biomes.
+- **Adding something:** add an entry to `src/server/ShowroomExhibits.luau`: a name, an optional note and pedestal height, and a `Build(parent, at)` function that builds the thing around `at`. The showroom builds each exhibit at a staging point, measures it and lays the room out, so builders don't need to know their size or final position. Doors lose their prompts in the showroom.
+- **Failures:** an exhibit that fails to build shows as a red block, with a warning in the output. The tests check that every exhibit builds (except the person, which needs Roblox's avatar service) and that nothing ends up with a broken position.
+
 ## Admin console
 
 Press **F2** (or the gold **Admin** button, top right) to open it. Type `help` for every
@@ -236,7 +250,8 @@ is checked on the server, so non-admins can't use it even with exploits.
 | `tide <out\|hold\|in> [percent]` | Jump the tide, e.g. `tide in 90` |
 | `tidespeed <scale>` | 1 = real 25 min cycle, 0.1 = 2.5 min |
 | `waves <multiplier\|rogue\|seed [n]>` | Wave strength (0 = calm), send a rogue wave, or set a new random sea seed |
-| `tp <shop\|zone\|sandbar\|player> [who]` | Teleport (`sandbar` = the bell tower door) |
+| `tp <shop\|zone\|sandbar\|showroom\|player> [who]` | Teleport (`sandbar` = the bell tower door) |
+| `showroom [section]` | Go to the showroom or one of its sections; lists the sections |
 | `heal`, `god`, `speed <n>` | Health/breath, toggle no-drowning, walk speed |
 | `resetdata <player>`, `kick <player> [reason]` | Wipe a save, kick |
 | `biomes` | Show each zone's biome and the biomes that exist |

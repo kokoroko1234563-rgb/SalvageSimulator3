@@ -225,6 +225,19 @@ Config.Secrets = {
 	MaxFlood = 180, -- ...and at most this many, depending on when in the tide cycle you enter
 }
 
+-- The showroom: a gallery off the map showing every model, material and colour (Showroom,
+-- ShowroomExhibits). Admins get there with `tp showroom`. It's on the shop side (Z < 0), far
+-- along X, where no tide or wave reaches.
+Config.Showroom = {
+	Enabled = true,
+	Origin = Vector3.new(6000, 0, -300), -- the entrance; the room runs back toward -Z
+	RowWidth = 360, -- studs of exhibits per row
+	Gap = 6, -- studs between exhibits
+	Aisle = 10, -- studs between rows
+	SectionGap = 24, -- studs between sections
+	WallHeight = 4,
+}
+
 Config.Lexicon = {
 	TowerManChance = 0.001, -- per zone, per tide cycle
 }

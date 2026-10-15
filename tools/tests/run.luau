@@ -82,6 +82,8 @@ test("load server services", function()
 			"FarSandbarService",
 			"MonetizationService",
 			"SurfService",
+			"Showroom",
+			"ShowroomExhibits",
 		}
 	do
 		h.require("Server/" .. name)
@@ -319,6 +321,36 @@ test("waves run up and slide back", function()
 	assert(at(life + 0.5) == nil, "gone after its lifetime")
 	assert(Waves.size(cfg.SetEvery * 50) > Waves.size(cfg.SetEvery * 50 + 1) * 1.1, "set waves are bigger")
 	assert(Waves.reach(n, 700) > Waves.reach(n, 100), "waves are bigger further out")
+end)
+
+test("build the showroom", function()
+	local Showroom = h.require("Server/Showroom")
+	local catalogue = h.require("Server/ShowroomExhibits")()
+	local parent = Harness.wrap(roblox.Instance.new("Folder"))
+	local room = Showroom.build(parent, catalogue)
+	assert(room:FindFirstChild("Floor"), "the room has a floor")
+	-- Every exhibit built (a failed one is replaced by a red BuildFailed block).
+	local failed = {}
+	for _, d in room:GetDescendants() do
+		if d.Name == "BuildFailed" then
+			table.insert(failed, d.Parent.Name)
+		end
+	end
+	-- Avatars need Roblox's servers, so the person can't be built here.
+	local expected = { Person = true }
+	for _, name in failed do
+		assert(expected[name], "showroom exhibit failed to build: " .. name)
+	end
+	-- Nothing ends up on the beach or in the sea: the whole room is on the shop side.
+	local _, hi = Showroom._bounds(room)
+	assert(hi and hi.Z < 0, "the showroom must stay at Z < 0, away from the tide")
+	-- No exhibit may produce broken (NaN) positions.
+	for _, d in room:GetDescendants() do
+		if d:IsA("BasePart") then
+			local p = d.CFrame.Position
+			assert(p == p, "NaN position in showroom part " .. d:GetFullName())
+		end
+	end
 end)
 
 test("build the bell tower", function()

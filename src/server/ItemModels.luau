@@ -84,12 +84,16 @@ local function bar(
 	color: Color3,
 	material: Enum.Material?
 )
+	-- A vertical bar is parallel to lookAt's default up vector, which has no defined roll:
+	-- use another up vector for those.
+	local direction = (to - from).Unit
+	local up = if math.abs(direction.Y) > 0.99 then Vector3.xAxis else Vector3.yAxis
 	piece(
 		root,
 		name,
 		Block,
 		Vector3.new(thickness, thickness, (to - from).Magnitude),
-		CFrame.lookAt((from + to) / 2, to),
+		CFrame.lookAt((from + to) / 2, to, up),
 		color,
 		material
 	)
