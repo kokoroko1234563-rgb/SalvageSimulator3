@@ -788,8 +788,13 @@ function SeaController.init()
 	local ok, built = pcall(buildMeshes, folder)
 	if ok then
 		meshes = built
+		print("[Sea] drawing the water as smooth meshes")
 	else
-		warn("[Sea] couldn't build the water meshes, drawing the sea as strips instead: " .. tostring(built))
+		warn(
+			"[Sea] couldn't build the water meshes, drawing the sea as strips instead: "
+				.. tostring(built)
+				.. " (in Studio, check Game Settings > Security > Allow Mesh / Image APIs)"
+		)
 		folder:ClearAllChildren()
 		local half = Beach.HalfWidth
 		local count = math.ceil(beach.Width / STRIP)
