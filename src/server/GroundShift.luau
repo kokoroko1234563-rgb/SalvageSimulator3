@@ -1,6 +1,6 @@
--- Keeps things standing on the ground when a zone's ground changes shape (its biome rolled a
+-- Keeps things standing on the ground when a tile's ground changes shape (its biome rolled a
 -- new layout and TerrainBuilder rebuilt it). Before the change, GroundShift.capture notes
--- every prop, loose item and player in the zone and the ground height under it; the function
+-- every prop, loose item and player on the tile and the ground height under it; the function
 -- it returns, called after the rebuild, moves each one up or down by however much the ground
 -- under it moved. Props are the Models and parts in Workspace.Map (each Model moves as one).
 
@@ -18,8 +18,8 @@ local SKIP = { Shop = true, RockPools = true }
 
 type Record = { target: Instance, x: number, z: number, before: number, player: boolean? }
 
-function GroundShift.capture(zone: number): () -> ()
-	local z0, z1 = Beach.zoneRange(zone)
+function GroundShift.capture(tile: number): () -> ()
+	local z0, z1 = Beach.tileRange(tile)
 	local records: { Record } = {}
 	local function note(target: Instance, position: Vector3, isPlayer: boolean?)
 		if position.Z >= z0 and position.Z <= z1 then

@@ -1,5 +1,5 @@
--- Rolls a biome for every zone at the start of each tide cycle, and builds what goes with it:
--- the biome's ground (its layout, see src/shared/Layouts: the zone's terrain is rebuilt and
+-- Rolls a biome for every tile of the beach at the start of each tide cycle, and builds what goes with it:
+-- the biome's ground (its layout, see src/shared/Layouts: the tile's terrain is rebuilt and
 -- props are moved to stay on it), decor so players can tell (rare biomes are never announced, but you can see them), the
 -- secret's entrance, and the biome's beach hazard.
 -- Admins can set or reroll biomes from the console (see AdminService).
@@ -44,8 +44,8 @@ end
 
 local decorBuilders = {}
 
--- Small sandcastles scattered over the zone.
-function decorBuilders.Sandcastle(zoneFolder: Folder, biome, startZ: number, endZ: number)
+-- Small sandcastles scattered over the tile.
+function decorBuilders.Sandcastle(tileFolder: Folder, biome, startZ: number, endZ: number)
 	for _ = 1, 10 do
 		local x = rng:NextNumber(-Beach.HalfWidth + 15, Beach.HalfWidth - 15)
 		local z = rng:NextNumber(startZ + 10, endZ - 10)
@@ -59,7 +59,7 @@ function decorBuilders.Sandcastle(zoneFolder: Folder, biome, startZ: number, end
 			CanCollide = false,
 			CanQuery = false,
 		}).Parent =
-			zoneFolder
+			tileFolder
 		makePart({
 			Name = "Tower",
 			Shape = Enum.PartType.Cylinder,
@@ -69,12 +69,12 @@ function decorBuilders.Sandcastle(zoneFolder: Folder, biome, startZ: number, end
 			CanCollide = false,
 			CanQuery = false,
 		}).Parent =
-			zoneFolder
+			tileFolder
 	end
 end
 
 -- Broken planks and ribs half-buried in the sand.
-function decorBuilders.Wreck(zoneFolder: Folder, biome, startZ: number, endZ: number)
+function decorBuilders.Wreck(tileFolder: Folder, biome, startZ: number, endZ: number)
 	for _ = 1, 14 do
 		local x = rng:NextNumber(-Beach.HalfWidth + 15, Beach.HalfWidth - 15)
 		local z = rng:NextNumber(startZ + 10, endZ - 10)
@@ -89,7 +89,7 @@ function decorBuilders.Wreck(zoneFolder: Folder, biome, startZ: number, endZ: nu
 			CanCollide = false,
 			CanQuery = false,
 		}).Parent =
-			zoneFolder
+			tileFolder
 	end
 end
 
@@ -155,10 +155,10 @@ function entranceBuilders.Wreck(wreck: Model, biome, x: number, z: number, groun
 	})
 end
 
-local function buildEntrance(zoneFolder: Folder, biome, zone: number)
-	local startZ = Beach.zoneRange(zone)
+local function buildEntrance(tileFolder: Folder, biome, tile: number)
+	local startZ = Beach.tileRange(tile)
 	local x = biome.EntranceSpots[rng:NextInteger(1, #biome.EntranceSpots)]
-	local z = startZ + 30
+	local z = startZ + 30 -- where the layouts keep the spots flat
 	local groundY = Beach.groundAt(x, z)
 	local model = Instance.new("Model")
 	model.Name = "SecretEntrance"
@@ -177,18 +177,18 @@ local function buildEntrance(zoneFolder: Folder, biome, zone: number)
 		-- Players come back out in front of the door.
 		onEntrance(player, biome.Secret, door.CFrame * CFrame.new(0, 0, -5))
 	end)
-	model.Parent = zoneFolder
+	model.Parent = tileFolder
 end
 
 -- Hazards ----------------------------------------------------------------------------
 
 -- Shipwreck Shallows: barrels roll down the sand on a fixed timer. Getting hit knocks
 -- whatever you're holding out of your hands. Learnable, so a hit feels like a mistake.
-local function rollBarrel(zoneFolder: Folder, zone: number)
-	local startZ = Beach.zoneRange(zone)
+local function rollBarrel(tileFolder: Folder, tile: number)
+	local startZ = Beach.tileRange(tile)
 	local fromZ = math.max(startZ + 5, 1)
 	if Beach.isDeep(Vector3.new(0, 0, fromZ), Tide.sea()) then
-		return -- the top of the zone is under water: nothing to roll down
+		return -- the top of the tile is under water: nothing to roll down
 	end
 	local barrel = makePart({
 		Name = "RollingBarrel",
@@ -218,7 +218,7 @@ local function rollBarrel(zoneFolder: Folder, zone: number)
 			end
 		end
 	end)
-	barrel.Parent = zoneFolder
+	barrel.Parent = tileFolder
 	pcall(barrel.SetNetworkOwner, barrel, nil)
 
 	task.delay(12, function()
@@ -231,60 +231,60 @@ end
 local setCallbacks: { (number, any, Folder) -> () } = {}
 local rerollCallbacks: { () -> () } = {}
 
--- Called after a zone gets a biome, with its folder (things built there go when it changes).
+-- Called after a tile gets a biome, with its folder (things built there go when it changes).
 function BiomeService.onBiomeSet(callback: (number, any, Folder) -> ())
 	table.insert(setCallbacks, callback)
 end
 
--- Called after every zone has been rolled for a new tide cycle.
+-- Called after every tile has been rolled for a new tide cycle.
 function BiomeService.onRerolled(callback: () -> ())
 	table.insert(rerollCallbacks, callback)
 end
 
-function BiomeService.zoneFolder(zone: number): Folder?
-	return folder and folder:FindFirstChild("Zone" .. zone) :: Folder?
+function BiomeService.tileFolder(tile: number): Folder?
+	return folder and folder:FindFirstChild("Tile" .. tile) :: Folder?
 end
 
-function BiomeService.get(zone: number): string?
-	return Workspace:GetAttribute(Biomes.attributeFor(zone))
+function BiomeService.get(tile: number): string?
+	return Workspace:GetAttribute(Biomes.attributeFor(tile))
 end
 
--- Sets (or clears, with nil) a zone's biome and rebuilds its decor and entrance.
-function BiomeService.set(zone: number, biomeId: string?)
+-- Sets (or clears, with nil) a tile's biome and rebuilds its decor and entrance.
+function BiomeService.set(tile: number, biomeId: string?)
 	local biome = biomeId and Biomes.List[biomeId]
-	local wasLayout = Layouts.active(zone)
-	local settle = GroundShift.capture(zone)
-	Workspace:SetAttribute(Biomes.attributeFor(zone), if biome then biome.Id else nil)
-	if Layouts.active(zone) ~= wasLayout then
-		-- The biome brings its own ground: rebuild the zone's terrain and keep things on it.
-		TerrainBuilder.buildZone(zone)
+	local wasLayout = Layouts.active(tile)
+	local settle = GroundShift.capture(tile)
+	Workspace:SetAttribute(Biomes.attributeFor(tile), if biome then biome.Id else nil)
+	if Layouts.active(tile) ~= wasLayout then
+		-- The biome brings its own ground: rebuild the tile's terrain and keep things on it.
+		TerrainBuilder.buildTile(tile)
 		settle()
 	end
-	local old = folder:FindFirstChild("Zone" .. zone)
+	local old = folder:FindFirstChild("Tile" .. tile)
 	if old then
 		old:Destroy()
 	end
 	if biome then
-		local zoneFolder = Instance.new("Folder")
-		zoneFolder.Name = "Zone" .. zone
-		local startZ, endZ = Beach.zoneRange(zone)
-		decorBuilders[biome.Entrance](zoneFolder, biome, startZ, endZ)
-		buildEntrance(zoneFolder, biome, zone)
-		zoneFolder.Parent = folder
+		local tileFolder = Instance.new("Folder")
+		tileFolder.Name = "Tile" .. tile
+		local startZ, endZ = Beach.tileRange(tile)
+		decorBuilders[biome.Entrance](tileFolder, biome, startZ, endZ)
+		buildEntrance(tileFolder, biome, tile)
+		tileFolder.Parent = folder
 		for _, callback in setCallbacks do
-			task.spawn(callback, zone, biome, zoneFolder)
+			task.spawn(callback, tile, biome, tileFolder)
 		end
 	end
 end
 
--- Rolls every zone from Config.Biomes.Weights.
+-- Rolls every tile, from its zone's weights (Config.Biomes.ByZone) or Config.Biomes.Weights.
 function BiomeService.reroll()
-	local weights = Config.Biomes.Weights
-	local total = 0
-	for _, weight in weights do
-		total += weight
-	end
-	for zone = 1, Config.Beach.ActiveZones do
+	for tile = 1, Beach.ActiveTiles do
+		local weights = Config.Biomes.ByZone[Beach.zoneOfTile(tile)] or Config.Biomes.Weights
+		local total = 0
+		for _, weight in weights do
+			total += weight
+		end
 		local roll = rng:NextNumber() * total
 		local picked: string? = nil
 		for id, weight in weights do
@@ -294,7 +294,7 @@ function BiomeService.reroll()
 				break
 			end
 		end
-		BiomeService.set(zone, if picked and Biomes.List[picked] then picked else nil)
+		BiomeService.set(tile, if picked and Biomes.List[picked] then picked else nil)
 	end
 	for _, callback in rerollCallbacks do
 		task.spawn(callback)
@@ -330,11 +330,11 @@ function BiomeService.init(entranceCallback: (Player, string, CFrame) -> (), not
 	task.spawn(function()
 		while true do
 			task.wait(Config.Hazards.BarrelPeriod)
-			for zone = 1, Config.Beach.ActiveZones do
-				local biome = Biomes.activeIn(zone)
-				local zoneFolder = folder:FindFirstChild("Zone" .. zone)
-				if biome and biome.Hazard == "Barrels" and zoneFolder then
-					rollBarrel(zoneFolder :: Folder, zone)
+			for tile = 1, Beach.ActiveTiles do
+				local biome = Biomes.activeIn(tile)
+				local tileFolder = folder:FindFirstChild("Tile" .. tile)
+				if biome and biome.Hazard == "Barrels" and tileFolder then
+					rollBarrel(tileFolder :: Folder, tile)
 				end
 			end
 		end

@@ -43,7 +43,7 @@ local FAR = CFrame.new(0, -10000, 0)
 
 local SWASH = Palette.World.Sea:Lerp(Color3.new(1, 1, 1), 0.35)
 
-local zMin, zMax = 0, 0
+local zMax = 0
 
 local function makePart(name: string, props: { [string]: any }): Part
 	local part = Instance.new("Part")
@@ -142,6 +142,10 @@ local BAND_BACK = math.ceil(Config.Beach.Terrain.MaxDepth / Config.Beach.Slope) 
 local BAND_OUT = 16
 local BAND_STEP = 3
 local BAND_ROWS = math.floor((BAND_BACK + BAND_OUT) / BAND_STEP) + 1
+local FAR_LENGTH = 2000 -- the open sea parts' length (a part can be at most 2048)
+local SEA_OUT = 900 -- studs out to sea the sea mesh reaches past the waterline (then flat parts)
+local BOX_BACK = 400 -- each sheet's box reaches this far up the beach of the tide's anchor
+local BOX_OUT = 1200 -- and this far out to sea
 local SEA_REFRESH = 0.1 -- seconds between sea surface updates (the tide moves slowly)
 local SWASH_ROWS = 5 -- points across the run-up sheet and the wet sand
 local CREST_SLOTS = 2 -- crest ribbons (a rolling wave uses slot Index % CREST_SLOTS)
@@ -161,7 +165,7 @@ type Chunk = {
 	ids: { number }, -- vertex ids, for the sheet's points `first` onward
 	first: number,
 	batch: boolean,
-	center: Vector3, -- the middle of its box (its points are stored relative to this)
+	center: Vector3, -- the middle of its box; Z is from the sheet's anchor (see flush)
 	half: Vector3,
 }
 
@@ -285,10 +289,17 @@ local function setPoint(sheet: Sheet, col: number, row: number, point: Vector3)
 end
 
 -- Moves the sheet's points to where they were set this frame.
-local function flush(sheet: Sheet)
+-- The sheets cover a stretch around the waterline, not the whole sea (a mesh can only be 2048
+-- studs across): their boxes' Z is measured from `anchorZ`, which follows the tide, and each
+-- mesh moves with it.
+local function flush(sheet: Sheet, anchorZ: number)
 	local points = sheet.points
 	for _, chunk in sheet.chunks do
-		local center, half = chunk.center, chunk.half
+		local half = chunk.half
+		local center = chunk.center + Vector3.new(0, 0, anchorZ)
+		if math.abs(chunk.part.Position.Z - center.Z) > 0.01 then
+			chunk.part.CFrame = CFrame.new(center)
+		end
 		local ids = chunk.ids
 		local count = #ids
 		local values = table.create(count)
@@ -321,9 +332,15 @@ type Meshes = {
 	foam: Sheet,
 	wet: Sheet,
 	crests: { Sheet },
+	far: { Part }, -- flat open sea past the sea mesh's reach, one for each half of the width
 }
 
 local meshes: Meshes? = nil
+
+-- Where the sheets are anchored this frame: the waterline in the middle of the beach.
+local function anchorFor(sea: Tide.Sea): number
+	return Tide.waterlineAt(sea, 0)
+end
 
 -- The columns over the beach: where the water is worked out (`samples`, every SAMPLE studs)
 -- and where it's drawn (`xs`: the samples and the midpoints between them).
@@ -365,15 +382,15 @@ local function plan(): { Plan }
 	end
 	table.insert(seaXs, half + SIDE)
 	local low = Beach.groundY(zMax) - 40
-	local beachLow = Vector3.new(-half - 1, low, zMin)
-	local beachHigh = Vector3.new(half + 1, 20, zMax)
+	local beachLow = Vector3.new(-half - 1, low, -BOX_BACK)
+	local beachHigh = Vector3.new(half + 1, 20, BOX_OUT)
 	local sheets: { Plan } = {
 		{
 			name = "Sea",
 			colXs = seaXs,
 			rows = BAND_ROWS + 2,
-			low = Vector3.new(-half - SIDE - 1, low, zMin),
-			high = Vector3.new(half + SIDE + 1, 20, zMax),
+			low = Vector3.new(-half - SIDE - 1, low, -BOX_BACK),
+			high = Vector3.new(half + SIDE + 1, 20, BOX_OUT),
 			props = { Material = Palette.Material.Glass, Color = Palette.World.Sea, Transparency = 0.3 },
 		},
 		{
@@ -431,9 +448,20 @@ local function buildMeshes(folder: Folder): Meshes
 		foam = built.Foam,
 		wet = built.WetSand,
 		crests = {},
+		far = {},
 	}
 	for i = 1, CREST_SLOTS do
 		result.crests[i] = built["Crest" .. i]
+	end
+	for i = 1, 2 do
+		local part = makePart("FarSea", {
+			Size = Vector3.new(Beach.HalfWidth + SIDE, THICKNESS, FAR_LENGTH),
+			Material = Palette.Material.Glass,
+			Color = Palette.World.Sea,
+			Transparency = 0.3,
+		})
+		part.Parent = folder
+		result.far[i] = part
 	end
 	return result
 end
@@ -529,9 +557,9 @@ local function updateSea(m: Meshes, sea: Tide.Sea)
 		local shore = if open then line else Beach.shoreFrom(x, line)
 		local first = math.min(line, shore) - BAND_BACK
 		-- Far up the beach it's all dry: well under the sand.
-		setPoint(m.sea, c, 1, Vector3.new(x, if open then waterY else waterY - 50, zMin))
+		setPoint(m.sea, c, 1, Vector3.new(x, if open then waterY else waterY - 50, first - 40))
 		for k = 1, BAND_ROWS do
-			local z = math.max(first + (k - 1) * BAND_STEP, zMin + k * 0.01)
+			local z = first + (k - 1) * BAND_STEP
 			local y = waterY
 			if not open then
 				local ideal = idealY(x, z)
@@ -541,9 +569,16 @@ local function updateSea(m: Meshes, sea: Tide.Sea)
 			end
 			setPoint(m.sea, c, k + 1, Vector3.new(x, y, z))
 		end
-		setPoint(m.sea, c, rows, Vector3.new(x, waterY, zMax))
+		setPoint(m.sea, c, rows, Vector3.new(x, waterY, line + SEA_OUT))
 	end
-	flush(m.sea)
+	flush(m.sea, anchorFor(sea))
+	-- The open sea beyond, a hair under the mesh where they meet.
+	for i, side in { -1, 1 } do
+		local line = Tide.waterlineAt(sea, side * half)
+		local y = Beach.waterY(line) - 0.05
+		local z = math.min(line, Tide.waterlineAt(sea, 0)) + SEA_OUT - 20 + FAR_LENGTH / 2
+		m.far[i].CFrame = CFrame.new(side * (half + SIDE) / 2, y - THICKNESS / 2, z)
+	end
 end
 
 -- The water at every drawn column this frame.
@@ -620,11 +655,12 @@ local function updateMeshes(m: Meshes, sea: Tide.Sea, columns: { Column })
 			end
 		end
 	end
-	flush(m.swash)
-	flush(m.foam)
-	flush(m.wet)
+	local anchor = anchorFor(sea)
+	flush(m.swash, anchor)
+	flush(m.foam, anchor)
+	flush(m.wet, anchor)
 	for _, sheet in m.crests do
-		flush(sheet)
+		flush(sheet, anchor)
 	end
 end
 
@@ -696,7 +732,7 @@ local function buildPieces(folder: Folder): Pieces
 		end
 	end
 	for i = 1, 2 do
-		result.sides[i] = make("Sea", Vector3.new(SIDE, THICKNESS, zMax - zMin), seaProps())
+		result.sides[i] = make("Sea", Vector3.new(SIDE, THICKNESS, FAR_LENGTH), seaProps())
 	end
 	return result
 end
@@ -777,7 +813,11 @@ local function updatePieces(p: Pieces, sea: Tide.Sea, columns: { Column }, place
 	local half = Beach.HalfWidth
 	for i, side in { -1, 1 } do
 		local y = Beach.waterY(Tide.waterlineAt(sea, side * half))
-		place(p.sides[i], CFrame.new(side * (half + SIDE / 2), y - THICKNESS / 2, (zMin + zMax) / 2))
+		local line = Tide.waterlineAt(sea, side * half)
+		place(
+			p.sides[i],
+			CFrame.new(side * (half + SIDE / 2), y - THICKNESS / 2, line + FAR_LENGTH / 2 - 400)
+		)
 	end
 end
 
@@ -786,7 +826,6 @@ local function setup()
 	if #xs > 0 then
 		return
 	end
-	zMin = -beach.ShopDepth - 60
 	zMax = Beach.Depth + beach.SeaExtent + 200
 	buildColumns()
 end
@@ -846,8 +885,8 @@ function SeaController.init()
 	setup()
 
 	Workspace.AttributeChanged:Connect(function(name)
-		if string.match(name, "^ZoneBiome") then
-			-- The zone's terrain is rebuilt (and replicates a moment later).
+		if string.match(name, "^TileBiome") then
+			-- The tile's terrain is rebuilt (and replicates a moment later).
 			forgetGround()
 			seaUpdatedAt = -math.huge
 			task.delay(3, forgetGround)

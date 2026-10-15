@@ -117,6 +117,17 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 
 	-- Zones
 	check(#Config.Zones >= Config.Beach.ActiveZones, "Config.Zones has fewer zones than Beach.ActiveZones")
+	check(
+		Config.Beach.ZoneLength == Config.Beach.TileLength * Config.Beach.TilesPerZone,
+		"Config.Beach.ZoneLength must be TileLength * TilesPerZone"
+	)
+	for index = 1, Config.Beach.ActiveZones do
+		local zone = Config.Zones[index]
+		check(
+			zone ~= nil and type(zone.CrossTime) == "number" and zone.CrossTime > 0,
+			"Config.Zones[" .. index .. "] needs a CrossTime (seconds to cross it on foot)"
+		)
+	end
 	local sandbar = Config.Beach.FarSandbar
 	check(Config.Zones[sandbar.Zone] ~= nil, "Config.Zones has no entry for the Far Sandbar")
 	check(

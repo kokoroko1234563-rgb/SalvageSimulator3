@@ -45,7 +45,7 @@ function MusicController.place(position: Vector3): string
 		return "Shop"
 	elseif zone <= 2 then
 		return "Shore"
-	elseif zone <= 4 then
+	elseif zone <= Config.Beach.ActiveZones then
 		return "Outer"
 	end
 	return "Sandbar"

@@ -200,7 +200,7 @@ The **Beacon Pearl** is the rarest unlock item. Your doc doesn't name it, so the
 
 ## The Far Sandbar and the Sunken Bell Tower
 
-- **The sandbar:** zone 5, past the other zones (Z 640 to 760), with x15 values. A deep channel (Z 600 to 640) cuts it off. You can only cross the channel around low tide, when the waterline reaches Z 700 (`Config.Beach.FarSandbar`, `Config.Tide.LowWaterline`).
+- **The sandbar:** zone 7, past the other zones (Z 3640 to 3760), with x25 values. A deep channel (Z 3600 to 3640) cuts it off. You can only cross the channel around low tide, when the waterline reaches Z 3700 (`Config.Beach.FarSandbar`, `Config.Tide.LowWaterline`).
 - **The bell tower:** its top sticks out of the sand at Z 680 (`FarSandbarService`). The door is only above water for a short window around low tide.
 - **The secret:** bank a Beacon Pearl, then use it at the door. It's an exotic secret, so the climb ends in a lootbox: the **Leviathan Rowboat** (exotic vessel, holds 20) or the **Tide Crown** (exotic accessory, waves push you 25% less). There's a 1.5% chance of the Gilded variant. The climb is the longest of the three, 20 ledges around the tower walls. It floods over a fixed 150 seconds instead of following the tide, because the door is always about to go under when you enter.
 - **Admin:** `tp sandbar` puts you in front of the door, and `give beaconpearl` gives you the key.
@@ -395,22 +395,28 @@ Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down 
    +--------------------------+   Z < 0: shop house, buyer, sell pad, bank house
    |  shop   sell   vessels   |
  ==+==========================+== Z = 0: top of the beach
-   |  zone 1  Shopside Shore  |   Z = 0-150, a gentle even slope toward +Z
+   |  zone 1  Shopside Shore  |   Z = 0-600, gentle, readable (tiles 1-4)
    |..........................|   <- waterline at high tide (Z = 60)
-   |  zone 2  Sunny Stretch   |   Z = 150-300, low dune ridges
-   |  zone 3  Middle Banks    |   Z = 300-450, taller ridges and troughs
-   |  zone 4  Outer Shore     |   Z = 450-600, big ridges and rock spines
-   |~~~~~~ deep channel ~~~~~~|   Z = 600 to 640
-   |  zone 5  Far Sandbar     |   bell tower door at Z = 680
-   |..........................|   <- waterline at low tide (Z = 700)
+   |  zone 2  Sunny Stretch   |   Z = 600-1200, low dunes (tiles 5-8)
+   |  zone 3  Middle Banks    |   Z = 1200-1800, banks and flooding channels
+   |  zone 4  Outer Shore     |   Z = 1800-2400, rock spines
+   |  zone 5  The Shoals      |   Z = 2400-3000
+   |  zone 6  Drowned Reach   |   Z = 3000-3600, the deepest, slowest ground
+   |~~~~~~ deep channel ~~~~~~|   Z = 3600 to 3640
+   |  zone 7  Far Sandbar     |   bell tower door at Z = 3680
+   |..........................|   <- waterline at low tide (Z = 3700)
    |  open sea                |
    +--------------------------+
  headland     X ->     headland
 ```
 
 The shoreline runs along X (720 studs wide, between two rocky headlands). The zones are
-150-stud bands running out to sea along +Z. The sand slopes down 0.06 studs per stud, plus
-the ridges and troughs of the terrain, so
+600-stud bands running out to sea along +Z, each four 150-stud tiles deep: a tile is the unit
+of the hand-built ground layouts and of biomes (each tile rolls its own). The walk down is
+meant to take about 7 minutes: the tide takes 10 to go out, so you follow it down, holds for
+5, and takes 10 to come back in, so you race it back. Each zone has a target crossing time
+(`Config.Zones[i].CrossTime`) that `tools/layout_map.luau` measures the layouts against.
+The sand slopes down 0.06 studs per stud, plus the shape of the layouts, so
 the tide is simply the sea level rising and falling: as it drops, the waterline moves out
 and uncovers the richer zones. Items wash up in the surf around the current waterline, and
 their zone (value and rarity) depends on where they land. Water depth sets the bands:

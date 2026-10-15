@@ -11,7 +11,21 @@ The maps and flood orders in these notes are generated from the game's own groun
 The tests in `tools/tests/run.luau` check the layouts themselves (ramps, reachability, shortcuts,
 sightlines, heights, the pier, the entrance spots and the pools).
 
+## The long beach
+
+The beach is now six zones of four tiles each (see the main README). Each zone's layouts are
+used on all four of its tiles; zones 5 and 6 use zone 4's until they get their own. The tests
+and `tools/layout_map.luau` try zone N's layouts on one tile (the tests on tile N, the map tool
+on the zone's own first tile, where the tide really meets it).
+
+The map tool also reports the fastest crossing on foot against each zone's `CrossTime`. Every
+layout so far crosses in about 7.4 seconds a tile, the same as walking straight down: each
+layout's cart ramp runs nearly straight across, and it's the fastest way on foot too. To reach
+the target times, the lower zones need ramps that wind and walls that close off straight lines.
+
 ## Checking the layouts against the water
+
+(Measured on the earlier, 4-zone test beach.)
 
 To check the layouts against the tide, the ground was flowed with the sea (connected water only,
 flowing in from the seaward edge) at four moments of the tide cycle: high (waterline Z 60), ebb

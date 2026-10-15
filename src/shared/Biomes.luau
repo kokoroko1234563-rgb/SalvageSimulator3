@@ -1,5 +1,5 @@
--- Biomes. Each tide cycle every zone rolls a biome (or none). The server stores the result
--- on Workspace attributes ("ZoneBiome1", ...) so every client sees the same thing.
+-- Biomes. Each tide cycle every tile of the beach rolls a biome (or none). The server stores
+-- the result on Workspace attributes ("TileBiome1", ...) so every client sees the same thing.
 -- So far: Sandcastle Flats (common, normal secret) and Shipwreck Shallows (rare, exotic
 -- secret). The rest of the doc's biomes slot in here.
 
@@ -135,15 +135,17 @@ Biomes.Planned = {
 	},
 }
 
-function Biomes.attributeFor(zone: number): string
-	return "ZoneBiome" .. zone
+-- Each tile of the beach (see Beach.tileAt) rolls its own biome.
+function Biomes.attributeFor(tile: number): string
+	return "TileBiome" .. tile
 end
 
-function Biomes.activeIn(zone: number?): any
-	if not zone or zone < 1 then
+-- The biome on a tile right now (nil: none).
+function Biomes.activeIn(tile: number?): any
+	if not tile or tile < 1 then
 		return nil
 	end
-	local id = Workspace:GetAttribute(Biomes.attributeFor(zone))
+	local id = Workspace:GetAttribute(Biomes.attributeFor(tile))
 	return id and Biomes.List[id] or nil
 end
 

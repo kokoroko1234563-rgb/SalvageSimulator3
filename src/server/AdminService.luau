@@ -617,11 +617,15 @@ command("kick", "kick <player> [reason]", "Kick a player", function(caller, args
 	end) or lines
 end)
 
-command("biomes", "biomes", "Show each zone's biome and the biomes that exist", function()
+command("biomes", "biomes", "Show each tile's biome and the biomes that exist", function()
 	local lines = {}
 	for zone = 1, Config.Beach.ActiveZones do
-		local biome = Biomes.activeIn(zone)
-		table.insert(lines, string.format("Zone %d: %s", zone, if biome then biome.Name else "(none)"))
+		local tiles = {}
+		for tile = (zone - 1) * Config.Beach.TilesPerZone + 1, zone * Config.Beach.TilesPerZone do
+			local biome = Biomes.activeIn(tile)
+			table.insert(tiles, string.format("%d %s", tile, if biome then biome.Name else "-"))
+		end
+		table.insert(lines, string.format("Zone %d: %s", zone, table.concat(tiles, ", ")))
 	end
 	local biomeIds = {}
 	for id in Biomes.List do
@@ -634,16 +638,16 @@ end)
 
 command(
 	"biome",
-	"biome <zone|all> <biome|none|reroll>",
-	"Set a zone's biome, e.g. biome 2 sandcastle, biome all none, biome all reroll",
+	"biome <tile|all> <biome|none|reroll>",
+	"Set a tile's biome (tiles are numbered from the shop: biomes lists them), e.g. biome 2 sandcastle, biome all none, biome all reroll",
 	function(_, args)
 		local which, choice = (args[1] or ""):lower(), (args[2] or ""):lower()
 		if which == "" or choice == "" then
-			return { "Usage: biome <zone|all> <biome|none|reroll>" }
+			return { "Usage: biome <tile|all> <biome|none|reroll>" }
 		end
 		if choice == "reroll" then
 			BiomeService.reroll()
-			return { "Rerolled every zone. Type biomes to see the result." }
+			return { "Rerolled every tile. Type biomes to see the result." }
 		end
 		local biomeId: string? = nil
 		if choice ~= "none" then
@@ -653,24 +657,24 @@ command(
 			end
 			biomeId = biome.Id
 		end
-		local zones = {}
+		local tiles = {}
 		if which == "all" then
-			for zone = 1, Config.Beach.ActiveZones do
-				table.insert(zones, zone)
+			for tile = 1, Beach.ActiveTiles do
+				table.insert(tiles, tile)
 			end
 		else
-			local zone = tonumber(which)
-			if not zone or zone < 1 or zone > Config.Beach.ActiveZones then
-				return { "Zone must be 1-" .. Config.Beach.ActiveZones .. " or all" }
+			local tile = tonumber(which)
+			if not tile or tile < 1 or tile > Beach.ActiveTiles then
+				return { "Tile must be 1-" .. Beach.ActiveTiles .. " or all" }
 			end
-			table.insert(zones, math.floor(zone))
+			table.insert(tiles, math.floor(tile))
 		end
-		for _, zone in zones do
-			BiomeService.set(zone, biomeId)
+		for _, tile in tiles do
+			BiomeService.set(tile, biomeId)
 		end
 		return {
 			string.format(
-				"Zone %s is now %s (until the next tide cycle rerolls it)",
+				"Tile %s is now %s (until the next tide cycle rerolls it)",
 				which,
 				if biomeId then Biomes.List[biomeId].Name else "no biome"
 			),
@@ -887,7 +891,7 @@ command("trader", "trader <id> [zone]", "Make a special trader appear, e.g. trad
 	local parent = Workspace:FindFirstChild("AdminTraders") or Instance.new("Folder")
 	parent.Name = "AdminTraders"
 	parent.Parent = Workspace
-	TraderService.spawn(trader, zone, parent)
+	TraderService.spawn(trader, (zone - 1) * Config.Beach.TilesPerZone + 1, parent) -- the zone's first tile
 	return {
 		trader.Name
 			.. " is in zone "

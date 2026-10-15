@@ -253,8 +253,8 @@ function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
 		return nil
 	end
 
-	-- A biome zone sometimes washes up its secret's unlock item, and mostly its own loot.
-	local biome = Biomes.activeIn(zoneIndex)
+	-- A biome tile sometimes washes up its secret's unlock item, and mostly its own loot.
+	local biome = Biomes.activeIn(Beach.tileAt(z))
 	local def
 	-- Private servers scale rare spawns down with the player count (MonetizationService).
 	local rareScale = Workspace:GetAttribute("RareSpawnScale") or 1

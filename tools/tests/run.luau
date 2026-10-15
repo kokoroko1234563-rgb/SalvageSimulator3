@@ -459,7 +459,7 @@ test("layout primitives shape the ground", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
 	local Config = h.require("Shared/Config")
-	local z0 = Beach.zoneRange(2)
+	local z0 = Beach.tileRange(2)
 	local layout = {
 		Name = "test",
 		Primitives = {
@@ -507,7 +507,7 @@ end)
 -- climbing a step steeper than `slope`?
 local function reachesSea(Beach, slope: number): boolean
 	local STEP = 4
-	local _, bottom = Beach.zoneRange(4)
+	local _, bottom = Beach.tileRange(Beach.ActiveTiles)
 	local seen = {}
 	local queue = {}
 	local function key(ix, iz)
@@ -545,12 +545,12 @@ test("a cart can get from the shop to the sea on the base layouts", function()
 	local Beach = h.require("Shared/Beach")
 	local Config = h.require("Shared/Config")
 	local Layouts = h.require("Shared/Layouts")
-	for zone = 1, Config.Beach.ActiveZones do
-		Layouts.setActive(zone, "Base")
+	for tile = 1, Beach.ActiveTiles do
+		Layouts.setActive(tile, "Base")
 	end
-	assert(reachesSea(Beach, Config.Beach.Terrain.CartSlope), "a cart gets through")
-	for zone = 1, Config.Beach.ActiveZones do
-		Layouts.setActive(zone, nil)
+	assert(reachesSea(Beach, Config.Beach.Terrain.CartSlope), "a cart gets through, all the way down")
+	for tile = 1, Beach.ActiveTiles do
+		Layouts.setActive(tile, nil)
 	end
 end)
 
@@ -694,7 +694,9 @@ test("music picks tracks by place and time", function()
 	local Config = h.require("Shared/Config")
 	assert(Music.place(roblox.Vector3.new(0, 5, -40)) == "Shop", "the shop")
 	assert(Music.place(roblox.Vector3.new(0, 0, 100)) == "Shore", "zone 1 is the shore")
-	assert(Music.place(roblox.Vector3.new(0, -40, 700)) == "Sandbar", "the sandbar")
+	local doorZ = Config.Beach.FarSandbar.DoorZ
+	assert(Music.place(roblox.Vector3.new(0, -40, doorZ)) == "Sandbar", "the sandbar")
+	assert(Music.place(roblox.Vector3.new(0, -40, 3000)) == "Outer", "the deepest zones are outer")
 	-- Every place has something for every time of day.
 	for _, place in { "Shop", "Shore", "Outer", "Sandbar", "Secret", "Showroom" } do
 		for _, time in { "Day", "Twilight", "Night" } do
@@ -1133,11 +1135,32 @@ test("cosmetics are placed across the map", function()
 	)
 end)
 
--- The descent layouts (docs/layouts). Carts and players on foot walk a 4-stud grid over zones 1-4:
--- a step is allowed only where the climb is at most the slope they can take.
+-- The descent layouts (docs/layouts). Layouts are drawn per tile and only meet their
+-- neighbours at the shared ramp anchors, so each zone's layouts are tested on one tile: zone
+-- N's on tile N, one after another from the shop. Carts and players on foot walk a 4-stud grid
+-- over those tiles: a step is allowed only where the climb is at most the slope they can take.
 local LAYOUT_GRID = 4
+
+-- The rock pools that lie on a zone's tiles, in tile coordinates (z from the tile's start).
+-- A pool on the line between two tiles counts for both.
+local function poolsOnZone(Beach, zone: number)
+	local list = {}
+	for _, pool in Beach.Pools do
+		local seen = {}
+		for _, z in { pool.Z, pool.Z - 0.001 } do
+			local tile = Beach.tileAt(z)
+			if tile and not seen[tile] and Beach.zoneOfTile(tile) == zone then
+				seen[tile] = true
+				table.insert(list, { X = pool.X, Z = pool.Z - Beach.tileRange(tile), Radius = pool.Radius })
+			end
+		end
+	end
+	return list
+end
 local LAYOUT_COLS = 84 -- grid columns either side of X = 0 (336 studs)
-local LAYOUT_ROWS = { -1, 148 } -- z = -4 (the shop side) to z = 592 (the seaward end of zone 4)
+local LAYOUT_UNITS = 6 -- zones tested, one tile each (Config.Beach.ActiveZones)
+local LAYOUT_END = LAYOUT_UNITS * 150 - 8 -- the seaward end of the last tested tile
+local LAYOUT_ROWS = { -1, LAYOUT_UNITS * 150 / LAYOUT_GRID - 1 } -- z = -4 (the shop side) onward
 local layoutGridCache = nil
 
 local function layoutKey(ix: number, iz: number): number
@@ -1156,7 +1179,7 @@ local function layoutGrid()
 	local Biomes = h.require("Shared/Biomes")
 	local grid = { zoneOfRow = {}, options = {}, shop = {} }
 	for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
-		grid.zoneOfRow[iz] = Beach.zoneAt(iz * LAYOUT_GRID) or 0
+		grid.zoneOfRow[iz] = Beach.tileAt(iz * LAYOUT_GRID) or 0
 	end
 	for ix = -LAYOUT_COLS, LAYOUT_COLS do
 		grid.shop[layoutKey(ix, -1)] = Beach.groundAt(ix * LAYOUT_GRID, -LAYOUT_GRID)
@@ -1170,7 +1193,7 @@ local function layoutGrid()
 		end
 		grid.options[zone] = {}
 		for _, name in names do
-			Layouts.setActive(zone, name)
+			Layouts.setActive(zone, name, zone)
 			local heights = {}
 			for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
 				if grid.zoneOfRow[iz] == zone then
@@ -1292,7 +1315,7 @@ end
 local function layoutHidden(zone: number): number
 	local Beach = h.require("Shared/Beach")
 	local Config = h.require("Shared/Config")
-	local z0, z1 = Beach.zoneRange(zone)
+	local z0, z1 = Beach.tileRange(zone)
 	local eye = Config.Beach.Terrain.EyeHeight
 	local eyes = {}
 	for _, x in { -320, -240, -160, -80, 0, 80, 160, 240, 320 } do
@@ -1356,7 +1379,7 @@ test("ramps stay within the cart slope and are clear of the ground's shape", fun
 	local z0 = nil
 	for _, entry in Layouts.all(true) do
 		Layouts.setActive(entry.Zone, entry.Layout)
-		z0 = Beach.zoneRange(entry.Zone)
+		z0 = Beach.tileRange(entry.Zone)
 		for _, p in entry.Layout.Primitives do
 			if p.Kind == "Ramp" then
 				for i = 1, #p.Path - 1 do
@@ -1396,11 +1419,11 @@ test("a cart and a player on foot reach the sea whatever the biomes", function()
 	eachLayoutChoice(grid, function(choice)
 		combos += 1
 		local cart = layoutFlood(grid, choice, Config.Beach.Terrain.CartSlope)
-		if layoutReaches(cart, 0, 592) then
+		if layoutReaches(cart, 0, LAYOUT_END) then
 			carts += 1
 		end
 		local foot = layoutFlood(grid, choice, Config.Beach.Terrain.FootSlope)
-		if layoutReaches(foot, 0, 592) then
+		if layoutReaches(foot, 0, LAYOUT_END) then
 			feet += 1
 		end
 	end)
@@ -1422,7 +1445,7 @@ test("a player on foot can reach every biome's entrance spot in every zone it ro
 			local biome = Biomes.List[option.name]
 			if biome then
 				seen = seen or layoutFlood(grid, choice, Config.Beach.Terrain.FootSlope)
-				local zStart = Beach.zoneRange(zone)
+				local zStart = Beach.tileRange(zone)
 				for _, x in biome.EntranceSpots do
 					checked += 1
 					if not layoutReaches(seen, x, zStart + 30) then
@@ -1467,7 +1490,7 @@ test("zone 1 is readable from the top, and zones 2 to 4 hide their lower half", 
 	local problems = {}
 	for zone = 1, Config.Beach.ActiveZones do
 		for _, option in grid.options[zone] do
-			Layouts.setActive(zone, option.name)
+			Layouts.setActive(zone, option.name, zone)
 			local hidden = layoutHidden(zone)
 			Layouts.setActive(zone, nil)
 			if zone == 1 and hidden > 0.2 then
@@ -1524,14 +1547,12 @@ test("the pier's path and every entrance spot are clear of shapes", function()
 	local problems = {}
 	for zone = 1, 4 do
 		for _, option in grid.options[zone] do
-			Layouts.setActive(zone, option.name)
-			local zStart, zEnd = Beach.zoneRange(zone)
-			if zone == 2 or zone == 3 then
-				local from, to = 20, 150 -- the pier runs through zone 2 (local z 20 to 150) ...
-				if zone == 3 then
-					from, to = 0, 60 -- ... and on into zone 3 (local z 0 to 60)
-				end
-				for z = zStart + from, zStart + to, 2 do
+			Layouts.setActive(zone, option.name, zone)
+			local zStart = Beach.tileRange(zone)
+			if zone == 2 then
+				-- The pier runs along x = 40 over the first two tiles of zone 2: the whole way
+				-- through any tile there.
+				for z = zStart, zStart + 150, 2 do
 					if Beach.feature(40, z) ~= 0 then
 						table.insert(problems, option.name .. ": the pier is blocked at z " .. z)
 						break
@@ -1576,10 +1597,9 @@ test("the rock pools keep their ground, so nothing is cut or raised through them
 		return best
 	end
 	for _, entry in Layouts.all(true) do
-		local zStart, zEnd = Beach.zoneRange(entry.Zone)
-		for _, pool in Config.Beach.Pools do
-			if pool.Z >= zStart and pool.Z < zEnd then
-				local local_pool = { X = pool.X, Z = pool.Z - zStart, Radius = pool.Radius }
+		for _, pool in poolsOnZone(Beach, entry.Zone) do
+			do
+				local local_pool = pool
 				for _, p in entry.Layout.Primitives do
 					if p.Kind == "Ridge" or p.Kind == "Mound" or p.Kind == "Channel" then
 						local d = distanceTo(local_pool, p)
@@ -1614,7 +1634,7 @@ test("each planned draft reaches the sea, has shortcuts, and keeps the sightline
 		for id in Biomes.Planned do
 			if Layouts.forPlanned(id, zone) then
 				-- This zone takes the draft; every other zone keeps its base layout.
-				Layouts.setActive(zone, id)
+				Layouts.setActive(zone, id, zone)
 				local option = { name = id, heights = {} }
 				for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
 					if grid.zoneOfRow[iz] == zone then
@@ -1633,10 +1653,10 @@ test("each planned draft reaches the sea, has shortcuts, and keeps the sightline
 					byZone.options[other] = if other == zone then { option } else { grid.options[other][1] }
 					choice[other] = 1
 				end
-				if not layoutReaches(layoutFlood(byZone, choice, cfg.CartSlope), 0, 592) then
+				if not layoutReaches(layoutFlood(byZone, choice, cfg.CartSlope), 0, LAYOUT_END) then
 					table.insert(problems, label .. ": a cart can't reach the sea")
 				end
-				if not layoutReaches(layoutFlood(byZone, choice, cfg.FootSlope), 0, 592) then
+				if not layoutReaches(layoutFlood(byZone, choice, cfg.FootSlope), 0, LAYOUT_END) then
 					table.insert(problems, label .. ": a player on foot can't reach the sea")
 				end
 				local count = 0
@@ -1672,7 +1692,7 @@ test("waves break where the sea really meets the sand", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
 	local Waves = h.require("Shared/Waves")
-	local z0 = Beach.zoneRange(3)
+	local z0 = Beach.tileRange(3)
 	local line = z0 + 75
 	Layouts.setActive(3, false)
 	-- (Each check looks at a different X: the shore is cached for a moment.)
@@ -1728,10 +1748,10 @@ test("cart ramps keep clear of the rock pools' rocks", function()
 	local Layouts = h.require("Shared/Layouts")
 	local problems = {}
 	for _, entry in Layouts.all(true) do
-		local z0 = Beach.zoneRange(entry.Zone)
+		local z0 = 0 -- pools and paths both in tile coordinates
 		for _, p in entry.Layout.Primitives do
 			if p.Kind == "Ramp" then
-				for _, pool in Beach.Pools do
+				for _, pool in poolsOnZone(Beach, entry.Zone) do
 					-- The rocks stand on a ring of pool.Radius, about 2 studs either side of it.
 					local clear = pool.Radius + 2 + p.Width / 2
 					for i = 1, #p.Path - 1 do

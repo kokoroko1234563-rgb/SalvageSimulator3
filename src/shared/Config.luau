@@ -18,11 +18,16 @@ Config.Admins = {
 -- World layout. The shoreline runs along X (the beach is Width studs wide, centred on X = 0).
 -- The shop and dunes are at Z < 0. From Z = 0 the sand slopes gently down into the sea toward
 -- +Z, and the zones are bands running out to sea: zone 1 nearest the shop, the last zone
--- furthest out, only uncovered at low tide.
+-- furthest out, only uncovered at low tide. Each zone is a few tiles deep: a tile is the unit
+-- of the ground's hand-built layouts and of biomes (each tile rolls its own biome).
+-- The descent is meant to take about 7 minutes: the tide takes 10 to go out, so you follow it
+-- down, and 10 to come back in, so you race it back with your finds.
 Config.Beach = {
 	Width = 720, -- studs along the shoreline
-	ZoneLength = 150, -- studs each zone runs out to sea
-	ActiveZones = 4, -- zones 1-4, then the Far Sandbar's channel
+	TileLength = 150, -- studs each tile runs out to sea
+	TilesPerZone = 4,
+	ZoneLength = 600, -- TileLength * TilesPerZone
+	ActiveZones = 6, -- zones 1-6, then the Far Sandbar's channel
 	ShopDepth = 80, -- dry ground behind Z = 0 for the shop and boardwalk
 	Slope = 0.06, -- studs of drop per stud out to sea
 	SeaExtent = 300, -- seabed continues this far past the last zone
@@ -54,10 +59,10 @@ Config.Beach = {
 	-- Rock pools: rings of rock that hold water after the sea leaves (a fixed level, Depth
 	-- studs above the ground at the ring's seaward edge). X, Z is the centre.
 	Pools = {
-		{ X = -280, Z = 150, Radius = 9, Depth = 1.4 },
-		{ X = 140, Z = 270, Radius = 12, Depth = 1.8 },
-		{ X = -60, Z = 430, Radius = 10, Depth = 1.6 },
-		{ X = 260, Z = 520, Radius = 8, Depth = 1.4 },
+		{ X = -280, Z = 620, Radius = 9, Depth = 1.4 }, -- just past where zone 1 meets zone 2
+		{ X = 140, Z = 720, Radius = 12, Depth = 1.8 },
+		{ X = -60, Z = 1330, Radius = 10, Depth = 1.6 },
+		{ X = 260, Z = 1870, Radius = 8, Depth = 1.4 },
 	},
 
 	-- Wading: walk speed and jump at each water depth (studs over the ground), blended
@@ -79,29 +84,52 @@ Config.Beach = {
 	-- The Far Sandbar: a fixed final zone past the others, across a deep channel that's
 	-- only shallow enough to cross around low tide (about 5 minutes per cycle).
 	FarSandbar = {
-		Zone = 5, -- its entry in Config.Zones (x15 values)
-		ChannelStart = 600,
-		ChannelEnd = 640,
+		Zone = 7, -- its entry in Config.Zones
+		ChannelStart = 3600, -- ZoneLength * ActiveZones
+		ChannelEnd = 3640,
 		ChannelDepth = 8, -- extra depth of the channel below the normal slope
-		DoorZ = 680, -- the Sunken Bell Tower's door, uncovered for a while around low tide
-		End = 760,
+		DoorZ = 3680, -- the Sunken Bell Tower's door, uncovered for a while around low tide
+		End = 3760,
 	},
 }
 
+-- The zones, from the shop out. CrossTime: about how many seconds the fastest way across the
+-- zone should take on foot (tools/layout_map.luau measures it from the layouts). Together
+-- they make the walk down about 7 minutes, with wading, waves and wrong turns: the lower
+-- zones are slower, more maze-like ground.
 Config.Zones = {
-	{ Name = "Shopside Shore", Multiplier = 1, Rarity = { Common = 90, Uncommon = 10 } },
-	{ Name = "Sunny Stretch", Multiplier = 2, Rarity = { Common = 70, Uncommon = 25, Rare = 5 } },
+	{ Name = "Shopside Shore", Multiplier = 1, CrossTime = 35, Rarity = { Common = 90, Uncommon = 10 } },
+	{
+		Name = "Sunny Stretch",
+		Multiplier = 2,
+		CrossTime = 40,
+		Rarity = { Common = 70, Uncommon = 25, Rare = 5 },
+	},
 	{
 		Name = "Middle Banks",
 		Multiplier = 4,
+		CrossTime = 45,
 		Rarity = { Common = 50, Uncommon = 32, Rare = 15, VeryRare = 3 },
 	},
 	{
 		Name = "Outer Shore",
 		Multiplier = 8,
+		CrossTime = 55,
 		Rarity = { Common = 30, Uncommon = 35, Rare = 25, VeryRare = 10 },
 	},
-	{ Name = "The Far Sandbar", Multiplier = 15, Rarity = { Rare = 60, VeryRare = 40 } },
+	{
+		Name = "The Shoals",
+		Multiplier = 12,
+		CrossTime = 65,
+		Rarity = { Common = 20, Uncommon = 35, Rare = 30, VeryRare = 15 },
+	},
+	{
+		Name = "The Drowned Reach",
+		Multiplier = 18,
+		CrossTime = 85,
+		Rarity = { Common = 10, Uncommon = 30, Rare = 38, VeryRare = 22 },
+	},
+	{ Name = "The Far Sandbar", Multiplier = 25, Rarity = { Rare = 60, VeryRare = 40 } },
 }
 
 -- Tide: the sea level falls (uncovering the outer zones), holds at low tide, then rises
@@ -112,9 +140,9 @@ Config.Tide = {
 	OutTime = 600,
 	HoldTime = 300,
 	InTime = 600,
-	TimeScale = 0.4, -- 0.4 => 10 minute cycle for testing. Set to 1 for the real 25 minutes.
+	TimeScale = 1, -- 1 = the real 25-minute cycle. Lower it (or use the admin console) to test faster.
 	HighWaterline = 60, -- waterline Z at high tide (inside zone 1)
-	LowWaterline = 700, -- waterline Z at low tide: the channel to the Far Sandbar is crossable
+	LowWaterline = 3700, -- waterline Z at low tide: the channel to the Far Sandbar is crossable
 
 	-- How the tide goes out and comes back in. Each list is how far out the tide is (0 = high,
 	-- 1 = low) at evenly spaced moments through that phase, joined by a smooth curve. Repeat
@@ -130,15 +158,16 @@ Config.Tide = {
 	-- parts drain first, and slowly changes over time, so the highest and lowest stretches of
 	-- the waterline move about as the tide goes out. Each server has its own seed.
 	Shuffle = {
-		Amplitude = 25, -- up to this many seconds earlier or later (scaled by TimeScale)
+		Amplitude = 4, -- up to this many seconds earlier or later (scaled by TimeScale)
 		Wavelength = 260, -- studs along the shoreline between high and low stretches (roughly)
 		Change = 120, -- seconds for the pattern to change into a different one
 	},
 	Sections = {
-		{ X = -360, Lag = -30 }, -- the west end drains first
+		-- (The tide crosses about 6 studs a second, so a few seconds bends the shore a lot.)
+		{ X = -360, Lag = -5 }, -- the west end drains first
 		{ X = -120, Lag = 0 },
-		{ X = 80, Lag = 20 },
-		{ X = 360, Lag = 45 }, -- the east end holds water longest
+		{ X = 80, Lag = 3.5 },
+		{ X = 360, Lag = 7.5 }, -- the east end holds water longest
 	},
 }
 
@@ -189,7 +218,7 @@ Config.Waves = {
 	RogueChance = 0.03, -- and this fraction of waves are rogue waves...
 	RogueSize = 3, -- ...this much bigger. The admin console can send one (wave rogue).
 	-- Waves get bigger further out: by zone (where the water reaches), 1 = normal.
-	ZoneScale = { 1, 1.15, 1.35, 1.65, 2 },
+	ZoneScale = { 1, 1.1, 1.25, 1.45, 1.7, 2, 2.3 },
 
 	-- Unclaimed items near the waterline get moved by the swash: after each wave, items it
 	-- reached may be dragged a little (mostly seaward, sometimes up the beach).
@@ -215,11 +244,12 @@ Config.Waves = {
 }
 
 -- Sea mist: the haze thickens the further out you are, so the lower zones feel closed in and
--- you can't see far ahead (or back). Atmosphere density by zone (shop, then zones 1-5); it
+-- you can't see far ahead (or back). Atmosphere density by zone (shop, then zones 1-6 and the
+-- Far Sandbar); it
 -- blends smoothly across zone edges. The Lantern of Clear Sight divides it.
 Config.Mist = {
 	Shop = 0.2,
-	Zones = { 0.24, 0.32, 0.42, 0.55, 0.68 },
+	Zones = { 0.24, 0.3, 0.37, 0.45, 0.54, 0.63, 0.7 },
 	Blend = 40, -- studs over which one zone's mist blends into the next
 	Response = 0.8, -- how quickly the mist follows you (per second)
 }
@@ -236,12 +266,15 @@ Config.Water = {
 
 -- Biomes: each tide cycle, every zone rolls whether it becomes a biome (see Biomes.luau).
 Config.Biomes = {
-	-- Each cycle every zone rolls one of these (relative weights). Rare biomes are never announced.
+	-- Each cycle every tile rolls one of these (relative weights). Rare biomes are never announced.
 	Weights = {
 		None = 40,
 		SandcastleFlats = 45,
 		ShipwreckShallows = 15,
 	},
+	-- Weights for particular zones (by zone number), in place of Weights: which biomes can turn
+	-- up how deep. Rarer biomes belong further out.
+	ByZone = {},
 }
 
 -- Rare unlock items for secrets.

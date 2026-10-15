@@ -328,7 +328,7 @@ end
 builders[2] = function(folder: Folder, rng: Random, zMin: number, zMax: number)
 	hut(folder, ground(-200, zMin + 40), 0.1, Z.HutWall, Z.HutTealRoof)
 	hut(folder, ground(180, zMin + 70), -0.2, Z.HutWall, Z.HutThatch)
-	pier(folder, 40, zMin + 20, zMax + 60, 2.2)
+	pier(folder, 40, zMin + 20, zMin + 210, 2.2)
 	for _ = 1, 10 do
 		local x = rng:NextNumber(-300, 300)
 		local z = rng:NextNumber(zMin + 10, zMax - 10)
@@ -387,8 +387,10 @@ builders[4] = function(folder: Folder, rng: Random, zMin: number, zMax: number)
 	pilingRow(folder, 230, zMin + 10, zMax - 10, 4)
 end
 
--- Zone 5: The Far Sandbar. A sandbar spit with the ruined bell tower and its colonnade.
-builders[5] = function(folder: Folder, rng: Random, zMin: number, zMax: number)
+-- Zones 5 and 6 (The Shoals, The Drowned Reach) have no models of their own yet.
+
+-- The Far Sandbar. A sandbar spit with the ruined bell tower and its colonnade.
+builders[Config.Beach.FarSandbar.Zone] = function(folder: Folder, rng: Random, zMin: number, zMax: number)
 	local zMid = (zMin + zMax) / 2
 	bellTower(folder, ground(0, zMid))
 	for i = 0, 7 do
@@ -404,9 +406,7 @@ builders[5] = function(folder: Folder, rng: Random, zMin: number, zMax: number)
 	end
 end
 
--- Builds every zone's models into `map`. Zones beyond Config.Beach.ActiveZones are built too,
--- so they're there when the map grows. Zones 4 and 5 sit below the lowest tide until the sea
--- floor is raised, so they can't be seen in the current build.
+-- Builds every zone's models into `map`, the Far Sandbar's included.
 function ZoneProps.build(map: Instance)
 	local folder = Instance.new("Folder")
 	folder.Name = "ZoneProps"

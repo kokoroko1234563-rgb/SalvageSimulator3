@@ -184,8 +184,8 @@ local function buy(player: Player, encounterId: any): (boolean, string?)
 end
 
 -- Builds a trader standing in a zone. Returns the model.
-function TraderService.spawn(trader, zone: number, parent: Instance): Model
-	local startZ = Beach.zoneRange(zone)
+function TraderService.spawn(trader, tile: number, parent: Instance): Model
+	local startZ = Beach.tileRange(tile)
 	local z = startZ + 65
 	local x = rng:NextNumber(-Beach.HalfWidth + 30, Beach.HalfWidth - 30)
 	local groundY = Beach.groundAt(x, z)
@@ -239,10 +239,10 @@ local function readTide(player: Player)
 		return
 	end
 	local rare
-	for zone = 1, Config.Beach.ActiveZones do
-		local biome = Biomes.activeIn(zone)
+	for tile = 1, Beach.ActiveTiles do
+		local biome = Biomes.activeIn(tile)
 		if biome and biome.Tier ~= "Common" then
-			rare = { biome = biome, zone = zone }
+			rare = { biome = biome, zone = Beach.zoneOfTile(tile) }
 			break
 		end
 	end
@@ -269,12 +269,12 @@ function TraderService.init(notifyFn: (Player, string) -> ())
 	openRemote = Remotes.get("TraderOpen")
 	Remotes.handle("TraderBuy", buy)
 
-	BiomeService.onBiomeSet(function(zone, biome, zoneFolder)
+	BiomeService.onBiomeSet(function(tile, biome, tileFolder)
 		for _, trader in Traders.List do
 			if trader.Biome == biome.Id then
 				local chance = if biome.Tier == "Common" then cfg.CommonChance else cfg.RareChance
 				if rng:NextNumber() < chance then
-					TraderService.spawn(trader, zone, zoneFolder)
+					TraderService.spawn(trader, tile, tileFolder)
 				end
 			end
 		end

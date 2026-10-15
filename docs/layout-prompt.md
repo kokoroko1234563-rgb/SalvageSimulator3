@@ -175,7 +175,7 @@ return {
    tide comes in. Set their depths so that **some fords cut off before others**. Read
    `Tide.luau` for the range of the waterline. Describe the order in your design note.
 5. **Entrances.** Each biome in `Biomes.List` has `EntranceSpots` (X positions where its
-   secret entrance can stand, at the middle of the zone, z = 75). Put a `Flat` with a radius
+   secret entrance can stand, 30 studs into the tile, local z = 30). Put a `Flat` with a radius
    of at least 10 at every one of these, and make sure each spot can be reached on foot.
 6. **Items.** Items wash in from the sea and settle in low ground. Hollows and the backs of
    ridges are where finds collect. Spread them out so the player has to explore.

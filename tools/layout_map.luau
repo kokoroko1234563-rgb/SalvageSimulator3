@@ -1,7 +1,8 @@
 --[[
 	Draws each descent layout as an ASCII map, from the game's own ground data (Beach.groundAt),
 	and prints what the layout does: how much of its lower half a player at the top edge can't
-	see, whether carts and players on foot can reach the sea, and how tall and deep it is.
+	see, whether carts and players on foot can reach the sea, how tall and deep it is, and how
+	long the fastest way across takes on foot against its zone's CrossTime (Config.Zones).
 
 	It also writes the maps into the layout notes, between the <!-- map ... --> markers, so the
 	notes can't drift from the layouts.
@@ -34,7 +35,7 @@ local VIEWS = { -320, -240, -160, -80, 0, 80, 160, 240, 320 }
 -- Hidden share of the zone's lower half, from the top edge at eye height. A target counts as
 -- hidden only if no viewpoint on the top edge can see it.
 local function hiddenShare(zone: number): number
-	local z0, z1 = Beach.zoneRange(zone)
+	local z0, z1 = Beach.tileRange(zone)
 	local eyes = {}
 	for _, x in VIEWS do
 		local z = z0 + 1
@@ -73,7 +74,7 @@ end
 
 -- Shortest route (in cells) from the zone's top row to its bottom row, with a slope limit.
 local function route(zone: number, slope: number): number?
-	local z0, z1 = Beach.zoneRange(zone)
+	local z0, z1 = Beach.tileRange(zone)
 	local n = math.floor(Beach.HalfWidth / STEP)
 	local top = math.floor(z0 / STEP)
 	local bottom = math.floor(z1 / STEP)
@@ -114,7 +115,7 @@ end
 
 -- Shortest route from one start point on the top edge (cells), or nil.
 local function routeFrom(zone: number, startX: number, slope: number): number?
-	local z0, z1 = Beach.zoneRange(zone)
+	local z0, z1 = Beach.tileRange(zone)
 	local n = math.floor(Beach.HalfWidth / STEP)
 	local top = math.floor(z0 / STEP)
 	local bottom = math.floor(z1 / STEP)
@@ -149,6 +150,44 @@ local function routeFrom(zone: number, startX: number, slope: number): number?
 	return nil
 end
 
+-- The fastest way across a tile on foot, in seconds at walking speed (20 studs a second): from
+-- anywhere on its top edge to anywhere on its bottom edge, in 4-stud steps along X and Z.
+local WALK_SPEED = 20
+local function crossSeconds(tile: number): number?
+	local z0, z1 = Beach.tileRange(tile)
+	local n = math.floor(Beach.HalfWidth / STEP)
+	local top = math.floor(z0 / STEP)
+	local bottom = math.floor(z1 / STEP)
+	local dist = {}
+	local queue, head = {}, 1
+	local function key(ix, iz)
+		return ix * 10000 + iz
+	end
+	for ix = -n, n do
+		dist[key(ix, top)] = 0
+		table.insert(queue, { ix, top })
+	end
+	while head <= #queue do
+		local ix, iz = queue[head][1], queue[head][2]
+		head += 1
+		local d = dist[key(ix, iz)]
+		if iz >= bottom then
+			return d * STEP / WALK_SPEED
+		end
+		local y = Beach.groundAt(ix * STEP, iz * STEP)
+		for _, step in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local nx, nz = ix + step[1], iz + step[2]
+			if math.abs(nx) <= n and nz >= top and nz <= bottom and dist[key(nx, nz)] == nil then
+				if math.abs(Beach.groundAt(nx * STEP, nz * STEP) - y) <= cfg.FootSlope * STEP then
+					dist[key(nx, nz)] = d + 1
+					table.insert(queue, { nx, nz })
+				end
+			end
+		end
+	end
+	return nil
+end
+
 -- How many of a few start points on the top edge are shorter on foot than by cart.
 local function shortcuts(zone: number): number
 	local count = 0
@@ -164,7 +203,7 @@ end
 
 -- Largest height above the slope, and deepest cut, inside a zone.
 local function extremes(zone: number): (number, number)
-	local z0, z1 = Beach.zoneRange(zone)
+	local z0, z1 = Beach.tileRange(zone)
 	local high, low = 0, 0
 	for z = z0, z1, 2 do
 		for x = -350, 350, 2 do
@@ -182,7 +221,7 @@ local COLS, ROWS = 72, 15
 
 -- The character for one cell of a zone's map, from the layout's own primitives first.
 local function cellChar(layout, zone: number, x: number, lz: number, mid: number): string
-	local z0 = Beach.zoneRange(zone)
+	local z0 = Beach.tileRange(zone)
 	for _, p in layout.Primitives do
 		if p.Kind == "Flat" and p.At then
 			if math.sqrt((x - p.At[1]) ^ 2 + (lz - p.At[2]) ^ 2) <= p.Radius then
@@ -234,20 +273,22 @@ end
 
 -- Flood order ----------------------------------------------------------------------------
 
--- The ground on a grid of 2-stud cells over the whole beach (zones 1 to 4, with `zone` set to
--- `layout`), so the sea can be flowed through it.
+-- The ground on a grid of 2-stud cells around a tile (from a little up the beach of it to
+-- well out past it, with the tile set to `layout`), so the sea can be flowed through it.
 local FLOOD_STEP = 2
-local FLOOD_X0, FLOOD_COLS, FLOOD_ROWS = -360, 361, 381 -- X -360..360, Z 0..760
+local FLOOD_X0, FLOOD_COLS, FLOOD_ROWS = -360, 361, 171 -- X -360..360, Z 340 studs from FLOOD_Z0
+local FLOOD_Z0 = 0
 
 local function floodGrid(zone: number?, layout): { number }
-	Layouts.setActive(1, nil)
 	local grid = {}
 	if zone then
 		Layouts.setActive(zone, layout)
+		FLOOD_Z0 = Beach.tileRange(zone) - 40
 	end
 	for j = 0, FLOOD_ROWS - 1 do
 		for i = 0, FLOOD_COLS - 1 do
-			grid[j * FLOOD_COLS + i + 1] = Beach.groundAt(FLOOD_X0 + i * FLOOD_STEP, j * FLOOD_STEP)
+			grid[j * FLOOD_COLS + i + 1] =
+				Beach.groundAt(FLOOD_X0 + i * FLOOD_STEP, FLOOD_Z0 + j * FLOOD_STEP)
 		end
 	end
 	if zone then
@@ -296,8 +337,8 @@ end
 -- monotonic: a lower tide floods more). Nil if the sea never reaches it.
 local function floodLine(grid: { number }, x: number, z: number): number?
 	local i = math.floor((x - FLOOD_X0) / FLOOD_STEP + 0.5)
-	local j = math.floor(z / FLOOD_STEP + 0.5)
-	local lo, hi = 0, 760
+	local j = math.floor((z - FLOOD_Z0) / FLOOD_STEP + 0.5)
+	local lo, hi = math.floor(FLOOD_Z0 - 300), math.floor(FLOOD_Z0 + 450)
 	if not reachedBySea(grid, lo, i, j) then
 		return nil
 	end
@@ -314,7 +355,7 @@ end
 
 -- The cuts of a zone's layout, seaward first, with the waterline at which the sea reaches each.
 local function floodOrder(layout, zone: number): { string }
-	local z0 = Beach.zoneRange(zone)
+	local z0 = Beach.tileRange(zone)
 	local grid = floodGrid(zone, layout)
 	local lines = {}
 	for _, p in layout.Primitives do
@@ -352,14 +393,18 @@ end
 local maps = {}
 local floods = {}
 
+-- Each zone's layouts are measured on the zone's own first tile, where the tide meets them.
 local function report(zone: number, source: string, layout): string
-	Layouts.setActive(zone, layout)
-	local hidden = hiddenShare(zone)
-	local high, low = extremes(zone)
-	local short = shortcuts(zone)
-	Layouts.setActive(zone, nil)
-	maps[source .. "@" .. zone] = mapOf(layout, zone)
-	floods[source .. "@" .. zone] = table.concat(floodOrder(layout, zone), "\n")
+	local tile = (zone - 1) * Config.Beach.TilesPerZone + 1
+	Layouts.setActive(tile, layout)
+	local hidden = hiddenShare(tile)
+	local high, low = extremes(tile)
+	local short = shortcuts(tile)
+	local cross = crossSeconds(tile)
+	Layouts.setActive(tile, nil)
+	maps[source .. "@" .. zone] = mapOf(layout, tile)
+	local order = floodOrder(layout, tile)
+	floods[source .. "@" .. zone] = table.concat(order, "\n")
 	local lines = {
 		string.format(
 			"Zone %d %s: hidden from the top %d%%, highest %.1f, deepest cut %.1f, shortcut starts %d of 5",
@@ -370,8 +415,15 @@ local function report(zone: number, source: string, layout): string
 			low,
 			short
 		),
+		-- A zone is TilesPerZone tiles of this layout (when no biome rolls there).
+		string.format(
+			"  fastest crossing on foot: %s s per tile, about %s s for the zone (target %d s)",
+			if cross then string.format("%.1f", cross) else "no way across",
+			if cross then string.format("%.0f", cross * Config.Beach.TilesPerZone) else "-",
+			Config.Zones[zone].CrossTime
+		),
 	}
-	for _, line in floodOrder(layout, zone) do
+	for _, line in order do
 		table.insert(lines, "  " .. line)
 	end
 	return table.concat(lines, "\n") .. "\n" .. maps[source .. "@" .. zone]
@@ -379,7 +431,17 @@ end
 
 local out = {}
 for zone = 1, Config.Beach.ActiveZones do
-	table.insert(out, report(zone, "Zones/Zone" .. zone, Layouts.base(zone)))
+	-- (Zones without a layout of their own use the one above them: nothing new to report.)
+	local own = Layouts.all()
+	local hasOwn = false
+	for _, entry in own do
+		if entry.Source == "Zones/Zone" .. zone then
+			hasOwn = true
+		end
+	end
+	if hasOwn then
+		table.insert(out, report(zone, "Zones/Zone" .. zone, Layouts.base(zone)))
+	end
 	for id in Biomes.List do
 		local layout = Layouts.forBiome(id, zone)
 		if layout then

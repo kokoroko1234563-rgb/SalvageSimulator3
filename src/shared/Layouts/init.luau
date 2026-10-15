@@ -1,13 +1,15 @@
--- Hand-built ground layouts: the shape of zones 1-4 on top of the even slope.
+-- Hand-built ground layouts: the shape of the beach on top of the even slope.
 --
--- Every zone has a base layout (Layouts/Zones/ZoneN), used when it has no biome. A biome that
--- rolls in a zone swaps in its own layout (Layouts/Biomes/<BiomeId>), so the ground changes
--- with the biome. A biome's module returns one layout, or a table of them indexed by zone
+-- The beach is made of tiles, 150 studs deep and the full width, a few to each zone (see
+-- Beach.tileAt). Every zone has a base layout (Layouts/Zones/ZoneN) for its tiles that have
+-- no biome; a zone without its own file uses the nearest one above it. A biome that rolls on
+-- a tile swaps in its own layout (Layouts/Biomes/<BiomeId>), so the ground changes with the
+-- biome. A biome's module returns one layout, or a table of them indexed by zone
 -- ({ [1] = layout, [2] = ... }) when it differs by zone. Layouts/Biomes/Planned holds layouts
 -- for biomes that don't roll yet.
 --
 -- A layout is { Name = "...", Primitives = { ... } }. Coordinates are X (-360 to 360) and z
--- local to the zone (0 at its landward edge, 150 at its seaward edge); heights are studs
+-- local to the tile (0 at its landward edge, 150 at its seaward edge); heights are studs
 -- above (or below) the base slope. Primitive kinds:
 --   Ridge   { Path = {{x, z}, ...}, Height, Width, Rock? }  a bank along a path
 --   Mound   { At = {x, z}, Radius, Height, Rock? }          a hump or boulder
@@ -18,9 +20,9 @@
 -- Raised shapes take the highest, cuts the lowest, and the two add. Ramps and Flats apply
 -- last and blend into the ground around them over Config.Beach.Terrain.Blend studs. Rock
 -- shapes have steeper faces and are built from rock. Beach.feature adds the fades at the
--- zone edges, the cliffs and the rock pools.
+-- tile edges, the cliffs and the rock pools.
 --
--- Which layout is active comes from the zone's biome (a Workspace attribute the server
+-- Which layout is active comes from the tile's biome (a Workspace attribute the server
 -- sets), so the server and every client agree on the ground. Layouts.setActive overrides
 -- that, for tools/tests.
 
@@ -102,9 +104,20 @@ local function pick(value: any, zone: number): Layout?
 	return value[zone]
 end
 
--- The base layout of a zone (nil: flat).
+-- The base layout of a zone (nil: flat). A zone without its own uses the nearest above it.
 function Layouts.base(zone: number): Layout?
-	return data().base[zone]
+	local base = data().base
+	for index = zone, 1, -1 do
+		if base[index] then
+			return base[index]
+		end
+	end
+	return nil
+end
+
+-- The zone a tile belongs to.
+local function zoneOfTile(tile: number): number
+	return math.ceil(tile / Config.Beach.TilesPerZone)
 end
 
 -- A biome's layout in a zone (nil: it has none and the base layout stays).
@@ -122,7 +135,7 @@ function Layouts.all(includePlanned: boolean?): { { Source: string, Zone: number
 	local list = {}
 	local zones = Config.Beach.ActiveZones
 	for zone = 1, zones do
-		local base = Layouts.base(zone)
+		local base = data().base[zone]
 		if base then
 			table.insert(list, { Source = "Zones/Zone" .. zone, Zone = zone, Layout = base })
 		end
@@ -153,32 +166,36 @@ end
 
 local overrides: { [number]: Layout | false } = {}
 
--- For tools/tests: force a zone's layout. Pass a layout, a biome id, "Base" for the base
--- layout, false for flat ground, or nil to go back to following the zone's biome.
-function Layouts.setActive(zone: number, layout: Layout | string | boolean | nil)
+-- For tools/tests: force a tile's layout. Pass a layout, a biome id, "Base" for the base
+-- layout, false for flat ground, or nil to go back to following the tile's biome. Names are
+-- looked up for the tile's own zone, or for `zone` when given (to try any zone's layouts on
+-- any tile: they only meet their neighbours at the shared ramp anchors).
+function Layouts.setActive(tile: number, layout: Layout | string | boolean | nil, zone: number?)
+	local forZone = zone or zoneOfTile(tile)
 	if layout == nil then
-		overrides[zone] = nil
+		overrides[tile] = nil
 	elseif layout == false then
-		overrides[zone] = false
+		overrides[tile] = false
 	elseif layout == "Base" then
-		overrides[zone] = Layouts.base(zone) or false
+		overrides[tile] = Layouts.base(forZone) or false
 	elseif type(layout) == "string" then
-		overrides[zone] = Layouts.forBiome(layout, zone)
-			or Layouts.forPlanned(layout, zone)
-			or Layouts.base(zone)
+		overrides[tile] = Layouts.forBiome(layout, forZone)
+			or Layouts.forPlanned(layout, forZone)
+			or Layouts.base(forZone)
 			or false
 	else
-		overrides[zone] = layout :: Layout
+		overrides[tile] = layout :: Layout
 	end
 end
 
--- The layout shaping a zone right now (nil: flat).
-function Layouts.active(zone: number): Layout?
-	local forced = overrides[zone]
+-- The layout shaping a tile right now (nil: flat).
+function Layouts.active(tile: number): Layout?
+	local forced = overrides[tile]
 	if forced ~= nil then
 		return forced or nil
 	end
-	local biome = Biomes.activeIn(zone)
+	local zone = zoneOfTile(tile)
+	local biome = Biomes.activeIn(tile)
 	return (biome and Layouts.forBiome(biome.Id, zone)) or Layouts.base(zone)
 end
 
@@ -336,18 +353,18 @@ function Layouts.evaluate(layout: Layout, x: number, z: number): (number, boolea
 	return (up - down) * mask, rock and up * mask > cfg.RockMin
 end
 
--- The active layout's shape in a zone at (x, local z).
-function Layouts.shapeAt(zone: number, x: number, z: number): (number, boolean)
-	local layout = Layouts.active(zone)
+-- The active layout's shape on a tile at (x, local z).
+function Layouts.shapeAt(tile: number, x: number, z: number): (number, boolean)
+	local layout = Layouts.active(tile)
 	if not layout then
 		return 0, false
 	end
 	return Layouts.evaluate(layout, x, z)
 end
 
--- Whether a zone has any shape right now.
-function Layouts.isShaped(zone: number): boolean
-	local layout = Layouts.active(zone)
+-- Whether a tile has any shape right now.
+function Layouts.isShaped(tile: number): boolean
+	local layout = Layouts.active(tile)
 	return layout ~= nil and compile(layout).count > 0
 end
 

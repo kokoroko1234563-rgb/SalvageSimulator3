@@ -22,7 +22,7 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 ..............=........................................==...............
 ..............==.......................................==...............
 ...............=......................................==................
-..^^^^^..^^^^^^==^^^^^^^^^^^^^^^^^ .. ^^^^^^^^^^^^^^^== ^^^^^^^^^^^^^^..
+..^^^^^^^^^^^^^==^^^^^^^^^^^^^^^^^ .. ^^^^^^^^^^^^^^^== ^^^^^^^^^^^^^^..
 ```
 <!-- /map -->
 <!-- map Biomes/Planned/SeagrassShallows@2 -->
@@ -54,27 +54,27 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 ...........==...........................................==..............
 ...........==............................................=..............
 ............==..........................................==..............
-~~~~~~^ ~~~~==~~~~~~~~~~~~~~~ ^^^^~~~~~~~~~~^^^^^^^^^~~~==~~~ ^^^^^^^^ ~
-~~~~~~~^^^^~~==^^^^^^^^^^^^^^^~~~~~~~~~~~~~~~~~~~~~~~~~~==^^^^~~~~~~~~~~
-~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~
+......^ ....==............... ^^^^..........^^^^^^^^^...==... ^^^^^^^^ .
+......^^^^^ .==^^^^^^^^^^^^^^^^ .......................^==^^^^^ ........
+.............==...................                 .....=...............
+......       .=                   ...................  ==   ............
+..............==.......................................==...............
+...............=......................................==................
+...............==....................................==.................
 ```
 <!-- /map -->
 <!-- map Biomes/Planned/SeagrassShallows@4 -->
 ```text
-~~~~~~~~~~~~~~===~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~~
-~#########===###~~#####~~~~~~~~~##################~~~~~==~~~~~~~~~~~~~~~
-~~~~~~~~~~==~~~~~~~~~~####~~~~~~#~~~~~~~~~~~~~~~~~##~~##==#############~
-~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~
-~~~~~~~~~~~==~~~~~~~##~~~~~~~~~~~~~~~~~##~~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~
-~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~
-~~~~~~~~~~~~==~~~~~########~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~#####~~
-~~~~~########==#~~~####################~~~~########~~~##==############~~
+..............===....................................==.................
+.............==.......................................==................
+............==.........................................=................
+.#########===###..#####^........##################^....==............ ^.
+.^ .......==......... ####......#^...............^##..##==#############.
+...........==...........................................==..............
+...........==.......##.........~~......##..............  =..............
+............==..........................................==..............
+~~~~~~~~~~~~==~~~~~########^ ~~~~~~~~~~~~~~~^ ~~~~~~~~~~==~~~~~~^#####^~
+~~~~~########==#~~^####################~~~~########^~~##==############~~
 ~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~#~~#~~~~~~~~
 ~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~#~~#~~~~~~~~
@@ -94,22 +94,22 @@ Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 78
 Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 73
 <!-- /floods -->
 <!-- floods Biomes/Planned/SeagrassShallows@2 -->
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 259
-Channel at x -60, z 104: the sea reaches it when the waterline is below Z 259
-Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 229
-Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 223
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 709
+Channel at x -60, z 104: the sea reaches it when the waterline is below Z 709
+Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 679
+Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 673
 <!-- /floods -->
 <!-- floods Biomes/Planned/SeagrassShallows@3 -->
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 409
-Channel at x -60, z 104: the sea reaches it when the waterline is below Z 409
-Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 379
-Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 373
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 1309
+Channel at x -60, z 104: the sea reaches it when the waterline is below Z 1309
+Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 1279
+Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 1273
 <!-- /floods -->
 <!-- floods Biomes/Planned/SeagrassShallows@4 -->
-Channel at x -60, z 104: the sea reaches it when the waterline is below Z 559
-Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 529
-Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 523
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 479
+Channel at x -60, z 104: the sea reaches it when the waterline is below Z 1909
+Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 1879
+Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 1873
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 1829
 <!-- /floods -->
 
 ## Shortcuts

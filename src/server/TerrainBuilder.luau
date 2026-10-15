@@ -1,9 +1,12 @@
 -- Builds the beach and the seabed as smooth Terrain from Beach.groundAt: the even slope plus
--- each zone's layout (src/shared/Layouts), the channel to the Far Sandbar, the sandbar and the
+-- each tile's layout (src/shared/Layouts), the channel to the Far Sandbar, the sandbar and the
 -- sea floor beyond. Terrain collides and blocks the view, so the lower zones are hidden from
--- the top and slow to cross. Rock shapes are built from rock. When a zone's biome changes,
--- TerrainBuilder.buildZone rebuilds just that zone. Props sit on it by placing themselves
+-- the top and slow to cross. Rock shapes are built from rock. When a tile's biome changes,
+-- TerrainBuilder.buildTile rebuilds just that tile. Props sit on it by placing themselves
 -- with Beach.groundAt.
+-- The ground is a crust: it's solid for Crust studs under the surface and empty below that,
+-- and each stretch is only written between the lowest and highest the ground there can be,
+-- so the long beach is quick to build and rebuilding a tile always replaces all of it.
 
 local Workspace = game:GetService("Workspace")
 
@@ -18,6 +21,7 @@ local beach = Config.Beach
 local shape = beach.Terrain
 local VOXEL = shape.Voxel
 local SLAB = 32 -- voxels along Z written per call, to keep memory down
+local CRUST = 12 -- studs of solid ground under the lowest the surface can be
 
 -- The area the terrain covers: the whole beach and seabed, a little past the sides.
 function TerrainBuilder.bounds(): (Vector3, Vector3)
@@ -68,6 +72,23 @@ local function snap(v: number, up: boolean): number
 	return (if up then math.ceil(v / VOXEL) else math.floor(v / VOXEL)) * VOXEL
 end
 
+-- The heights a stretch of ground (z0 to z1) can lie between, whatever its layout: from the
+-- deepest a cut can go (less the crust) to the tallest a shape can stand.
+function TerrainBuilder.heightRange(z0: number, z1: number): (number, number)
+	local low, high = math.huge, -math.huge
+	local z = z0
+	while true do
+		local y = Beach.groundY(z)
+		low = math.min(low, y)
+		high = math.max(high, y)
+		if z >= z1 then
+			break
+		end
+		z = math.min(z + VOXEL, z1)
+	end
+	return snap(low - shape.MaxDepth - CRUST, false), snap(high + shape.MaxHeight + 4, true)
+end
+
 -- Writes the terrain between two Z positions (snapped out to whole voxels).
 function TerrainBuilder.buildRange(fromZ: number, toZ: number)
 	local terrain = Workspace:FindFirstChildOfClass("Terrain")
@@ -79,16 +100,19 @@ function TerrainBuilder.buildRange(fromZ: number, toZ: number)
 	local stop = math.min(hi.Z, snap(toZ, true))
 	while z0 < stop do
 		local z1 = math.min(z0 + SLAB * VOXEL, stop)
-		local materials, occupancy = TerrainBuilder.slab(lo, hi, z0, z1)
-		local region = Region3.new(Vector3.new(lo.X, lo.Y, z0), Vector3.new(hi.X, hi.Y, z1))
+		local yLow, yHigh = TerrainBuilder.heightRange(z0, z1)
+		local slabLo = Vector3.new(lo.X, yLow, z0)
+		local slabHi = Vector3.new(hi.X, yHigh, z1)
+		local materials, occupancy = TerrainBuilder.slab(slabLo, slabHi, z0, z1)
+		local region = Region3.new(slabLo, slabHi)
 		terrain:WriteVoxels(region, VOXEL, materials, occupancy)
 		z0 = z1
 	end
 end
 
--- Rebuilds one zone's terrain (after its layout changed).
-function TerrainBuilder.buildZone(zone: number)
-	local z0, z1 = Beach.zoneRange(zone)
+-- Rebuilds one tile's terrain (after its layout changed).
+function TerrainBuilder.buildTile(tile: number)
+	local z0, z1 = Beach.tileRange(tile)
 	TerrainBuilder.buildRange(z0, z1)
 end
 

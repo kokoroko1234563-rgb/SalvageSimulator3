@@ -42,6 +42,28 @@ function Beach.zoneRange(index: number): (number, number)
 	return (index - 1) * beach.ZoneLength, index * beach.ZoneLength
 end
 
+-- Tiles: each zone is TilesPerZone tiles deep. A tile is the unit of the ground's layouts and
+-- of biomes. Tiles are numbered from 1 at the shop end to ActiveTiles.
+Beach.ActiveTiles = beach.ActiveZones * beach.TilesPerZone
+
+-- Tile index for a Z position (nil outside zones 1 to ActiveZones).
+function Beach.tileAt(z: number): number?
+	if z < 0 then
+		return nil
+	end
+	local index = math.floor(z / beach.TileLength) + 1
+	return if index <= Beach.ActiveTiles then index else nil
+end
+
+function Beach.tileRange(tile: number): (number, number)
+	return (tile - 1) * beach.TileLength, tile * beach.TileLength
+end
+
+-- The zone a tile belongs to.
+function Beach.zoneOfTile(tile: number): number
+	return math.ceil(tile / beach.TilesPerZone)
+end
+
 -- Height of the sand/seabed surface at a given Z.
 function Beach.groundY(z: number): number
 	if z <= 0 then
@@ -55,19 +77,19 @@ function Beach.groundY(z: number): number
 	return -z * beach.Slope
 end
 
--- The ground's shape on top of the even slope, from the zone's layout (src/shared/Layouts):
+-- The ground's shape on top of the even slope, from the tile's layout (src/shared/Layouts):
 -- its height above the slope at (x, z), and whether it's rock. It fades out at the edges of
--- each zone (so zones join without a seam), at the sides of the beach (the cliffs stand
+-- each tile (so tiles join without a seam), at the sides of the beach (the cliffs stand
 -- there) and around rock pools.
 local shape = beach.Terrain
 
 function Beach.shapeAt(x: number, z: number): (number, boolean)
-	local zone = Beach.zoneAt(z)
-	if not zone or zone < 1 or zone > beach.ActiveZones then
+	local tile = Beach.tileAt(z)
+	if not tile then
 		return 0, false
 	end
-	local z0, z1 = Beach.zoneRange(zone)
-	local height, rock = Layouts.shapeAt(zone, x, z - z0)
+	local z0, z1 = Beach.tileRange(tile)
+	local height, rock = Layouts.shapeAt(tile, x, z - z0)
 	if height == 0 then
 		return 0, false
 	end
@@ -92,8 +114,8 @@ end
 
 -- Whether the ground has any shape near this Z (a quick check before scanning it).
 function Beach.isRough(z: number): boolean
-	local zone = Beach.zoneAt(z)
-	return zone ~= nil and zone >= 1 and zone <= beach.ActiveZones and Layouts.isShaped(zone)
+	local tile = Beach.tileAt(z)
+	return tile ~= nil and Layouts.isShaped(tile)
 end
 
 -- Height of the sea surface for a waterline position.
