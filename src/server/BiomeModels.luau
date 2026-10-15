@@ -642,6 +642,10 @@ local BIOMES = {
 local ROW_Z = { -200, -320 }
 local COLUMN_X = { -300, -200, -100, 0, 100, 200, 300 }
 
+-- The centre of each biome's plot, by biome name, filled in by showcase. The cosmetic props
+-- use it to dress each biome.
+BiomeModels.Plots = {} :: { [string]: Vector3 }
+
 function BiomeModels.showcase(map: Instance)
 	local folder = Instance.new("Folder")
 	folder.Name = "BiomeShowcase"
@@ -661,6 +665,7 @@ function BiomeModels.showcase(map: Instance)
 		local index = i - 1
 		local c = Vector3.new(COLUMN_X[index % #COLUMN_X + 1], 0, ROW_Z[math.floor(index / #COLUMN_X) + 1])
 		local p = plot(folder, c, name, ground)
+		BiomeModels.Plots[name] = c
 		build(p, c, Random.new(300 + i))
 	end
 end

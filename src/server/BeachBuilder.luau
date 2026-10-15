@@ -17,6 +17,8 @@ local BeachDressing = require(script.Parent.BeachDressing)
 local Buildings = require(script.Parent.Buildings)
 local MapParts = require(script.Parent.MapParts)
 local BiomeModels = require(script.Parent.BiomeModels)
+local Cosmetics = require(script.Parent.Cosmetics)
+local MapEdge = require(script.Parent.MapEdge)
 local ZoneProps = require(script.Parent.ZoneProps)
 
 local beach = Config.Beach
@@ -25,7 +27,7 @@ local BeachBuilder = {}
 
 local SAND = Palette.World.Sand
 local WET_SAND = Palette.World.WetSand
-local ROCK = Palette.World.Rock
+local ROCK = Palette.World.Rock -- the rock pools
 
 -- Where the shop buildings stand, on the dry sand behind the shoreline.
 local HOUSE_Z = -50
@@ -477,15 +479,16 @@ function BeachBuilder.build(): Folder
 	buildSandPatches(map)
 	buildSea(map)
 
-	-- Rocky headlands on both sides, pushed out and kept low so the cove reads as open.
+	-- What keeps players in at the sides: an invisible barrier. The rocky coast you actually see
+	-- is MapEdge's scenery, which is built outside it.
 	for side = -1, 1, 2 do
 		local length = seaEnd + beach.ShopDepth + 40
 		MapParts.part({
-			Name = "Headland",
+			Name = "EdgeBarrier",
 			Size = Vector3.new(80, 70, length),
 			CFrame = CFrame.new(side * (half + 60), -25, -beach.ShopDepth - 40 + length / 2),
-			Color = ROCK,
-			Material = Palette.Material.Rock,
+			Transparency = 1,
+			CanQuery = false,
 		}).Parent =
 			map
 	end
@@ -498,6 +501,8 @@ function BeachBuilder.build(): Folder
 	BeachCheer.build(map, Random.new(41))
 	ZoneProps.build(map)
 	BiomeModels.showcase(map)
+	MapEdge.build(map)
+	Cosmetics.build(map)
 
 	map.Parent = Workspace
 	return map
