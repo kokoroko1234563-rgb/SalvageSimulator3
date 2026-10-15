@@ -157,12 +157,12 @@ type Chunk = {
 	ids: { number }, -- vertex ids, for the sheet's points `first` onward
 	first: number,
 	batch: boolean,
+	center: Vector3, -- the middle of its box (its points are stored relative to this)
+	half: Vector3,
 }
 
 type Sheet = {
 	chunks: { Chunk },
-	center: Vector3,
-	half: Vector3,
 	points: { Vector3 },
 	cols: number,
 	rows: number,
@@ -223,28 +223,39 @@ local function newChunk(
 	part.Size = part.MeshSize
 	part.CFrame = CFrame.new(center)
 	part.Parent = folder
-	return { mesh = mesh, part = part, ids = ids, first = (fromCol - 1) * rows + 1, batch = true }
+	return {
+		mesh = mesh,
+		part = part,
+		ids = ids,
+		first = (fromCol - 1) * rows + 1,
+		batch = true,
+		center = center,
+		half = half,
+	}
 end
 
+-- `colXs` is each column's X. A mesh may be at most 2048 studs across, so each chunk's box
+-- only spans its own columns (and the sheet's full height and depth).
 local function newSheet(
 	folder: Instance,
 	name: string,
-	cols: number,
+	colXs: { number },
 	rows: number,
 	low: Vector3,
 	high: Vector3,
 	props: { [string]: any }
 ): Sheet
-	local center = (low + high) / 2
-	local half = (high - low) / 2
-	local points = table.create(cols * rows, center)
-	local sheet: Sheet =
-		{ chunks = {}, center = center, half = half, points = points, cols = cols, rows = rows }
+	local cols = #colXs
+	local points = table.create(cols * rows, (low + high) / 2)
+	local sheet: Sheet = { chunks = {}, points = points, cols = cols, rows = rows }
 	-- Each gap between two columns holds (rows - 1) * 4 triangles.
 	local span = math.max(1, math.floor(MAX_TRIANGLES / ((rows - 1) * 4)))
 	local fromCol = 1
 	while fromCol < cols do
 		local toCol = math.min(cols, fromCol + span)
+		local boxLow = Vector3.new(colXs[fromCol] - 1, low.Y, low.Z)
+		local boxHigh = Vector3.new(colXs[toCol] + 1, high.Y, high.Z)
+		local center, half = (boxLow + boxHigh) / 2, (boxHigh - boxLow) / 2
 		table.insert(sheet.chunks, newChunk(folder, name, fromCol, toCol, rows, center, half, props))
 		fromCol = toCol
 	end
@@ -257,9 +268,9 @@ end
 
 -- Moves the sheet's points to where they were set this frame.
 local function flush(sheet: Sheet)
-	local center, half = sheet.center, sheet.half
 	local points = sheet.points
 	for _, chunk in sheet.chunks do
+		local center, half = chunk.center, chunk.half
 		local ids = chunk.ids
 		local count = #ids
 		local values = table.create(count)
@@ -333,7 +344,7 @@ local function buildMeshes(folder: Folder): Meshes
 		sea = newSheet(
 			folder,
 			"Sea",
-			#seaXs,
+			seaXs,
 			BAND_ROWS + 2,
 			Vector3.new(-half - SIDE - 1, low, zMin),
 			Vector3.new(half + SIDE + 1, 20, zMax),
@@ -344,17 +355,17 @@ local function buildMeshes(folder: Folder): Meshes
 			}
 		),
 		seaXs = seaXs,
-		swash = newSheet(folder, "Swash", #xs, SWASH_ROWS, beachLow, beachHigh, {
+		swash = newSheet(folder, "Swash", xs, SWASH_ROWS, beachLow, beachHigh, {
 			Material = Palette.Material.Glass,
 			Color = SWASH,
 			Transparency = 0.45,
 		}),
-		foam = newSheet(folder, "Foam", #xs, 3, beachLow, beachHigh, {
+		foam = newSheet(folder, "Foam", xs, 3, beachLow, beachHigh, {
 			Material = Palette.Material.Smooth,
 			Color = Palette.World.Foam,
 			Transparency = 0.25,
 		}),
-		wet = newSheet(folder, "WetSand", #xs, SWASH_ROWS, beachLow, beachHigh, {
+		wet = newSheet(folder, "WetSand", xs, SWASH_ROWS, beachLow, beachHigh, {
 			Material = Palette.Material.Sand,
 			Color = Palette.World.WetSand,
 			Transparency = 0.45,
@@ -362,7 +373,7 @@ local function buildMeshes(folder: Folder): Meshes
 		crests = {},
 	}
 	for i = 1, CREST_SLOTS do
-		result.crests[i] = newSheet(folder, "Crest" .. i, #xs, 3, beachLow, beachHigh, {
+		result.crests[i] = newSheet(folder, "Crest" .. i, xs, 3, beachLow, beachHigh, {
 			Material = Palette.Material.Smooth,
 			Color = Palette.World.Foam,
 			Transparency = 0.35,
