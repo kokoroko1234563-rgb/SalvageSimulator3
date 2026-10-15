@@ -118,7 +118,7 @@ return {
 		-- A guaranteed cart route. Along its path, the ground is evened out so the climb
 		-- never exceeds Config.Beach.Terrain.CartSlope, and it overrides everything else
 		-- within Width.
-		{ Kind = "Ramp", Path = { { -160, 0 }, { -180, 75 }, { -160, 150 } }, Width = 16 },
+		{ Kind = "Ramp", Path = { { -200, 0 }, { -180, 75 }, { -200, 150 } }, Width = 16 },
 		-- Clears the shape back to the bare slope (for entrance spots, the pier and so on).
 		{ Kind = "Flat", At = { 40, 75 }, Radius = 12 },
 	},
@@ -161,9 +161,9 @@ return {
      there at z = 0). That way a cart can always get from the shop to zone 4's seaward edge,
      whatever biomes rolled.
    - To make that work, **every layout (base and biome) must have ramps that cross z = 0 and
-     z = 150 at the same anchor X positions:** x = -160 and x = 180. Between the edges, a
-     ramp may wander freely. (x = -160 keeps clear of the rock pool at x = -210 on the
-     zone 1/2 boundary.)
+     z = 150 at the same anchor X positions:** x = -200 and x = 180. Between the edges, a
+     ramp may wander freely. (The rock pool that sat on x = -200 at the zone 1/2 boundary
+     was moved to x = -280, out of the way.)
 2. **Foot shortcuts.** Give each zone at least two places where a player on foot can cut
    through faster than the ramps, up a slope steeper than `CartSlope` but no steeper than
    `FootSlope`. They should feel like a risk-for-time trade: a narrow gap between two rock
@@ -223,7 +223,7 @@ return {
    `Layouts.setActive` or whatever the engine exposes; read it):
    - Every layout loads and has only known primitive kinds and fields.
    - **Cart test:** for every layout, walk each Ramp's path in 2-stud steps. The slope
-     between steps must never exceed `CartSlope`, and the anchors must sit at x = -160 and
+     between steps must never exceed `CartSlope`, and the anchors must sit at x = -200 and
      x = 180 at z = 0 and z = 150. Then check that from the shop (z = -5) a cart can get to
      z = 595 under every combination of base and biome layouts across zones 1–4. To do
      that, run a flood-fill on a 4-stud grid where a step between neighbours is allowed

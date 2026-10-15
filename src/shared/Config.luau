@@ -54,7 +54,7 @@ Config.Beach = {
 	-- Rock pools: rings of rock that hold water after the sea leaves (a fixed level, Depth
 	-- studs above the ground at the ring's seaward edge). X, Z is the centre.
 	Pools = {
-		{ X = -210, Z = 150, Radius = 9, Depth = 1.4 },
+		{ X = -280, Z = 150, Radius = 9, Depth = 1.4 },
 		{ X = 140, Z = 270, Radius = 12, Depth = 1.8 },
 		{ X = -60, Z = 430, Radius = 10, Depth = 1.6 },
 		{ X = 260, Z = 520, Radius = 8, Depth = 1.4 },

@@ -1668,5 +1668,43 @@ test("each planned draft reaches the sea, has shortcuts, and keeps the sightline
 	assert(#problems == 0, table.concat(problems, "; "))
 end)
 
+test("cart ramps keep clear of the rock pools' rocks", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local problems = {}
+	for _, entry in Layouts.all(true) do
+		local z0 = Beach.zoneRange(entry.Zone)
+		for _, p in entry.Layout.Primitives do
+			if p.Kind == "Ramp" then
+				for _, pool in Beach.Pools do
+					-- The rocks stand on a ring of pool.Radius, about 2 studs either side of it.
+					local clear = pool.Radius + 2 + p.Width / 2
+					for i = 1, #p.Path - 1 do
+						local a, b = p.Path[i], p.Path[i + 1]
+						for t = 0, 1, 0.02 do
+							local x = a[1] + (b[1] - a[1]) * t
+							local z = z0 + a[2] + (b[2] - a[2]) * t
+							if math.sqrt((x - pool.X) ^ 2 + (z - pool.Z) ^ 2) < clear then
+								table.insert(
+									problems,
+									entry.Source
+										.. " zone "
+										.. entry.Zone
+										.. ": a ramp runs into the pool at "
+										.. pool.X
+										.. ", "
+										.. pool.Z
+								)
+								break
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	assert(#problems == 0, table.concat(problems, "\n      "))
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)
