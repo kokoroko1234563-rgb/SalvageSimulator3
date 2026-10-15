@@ -1,7 +1,6 @@
 -- Seagrass Shallows (planned, draft): low, flood-prone flats. Shallow channels cut across the zone, so
 -- the flats flood in stages as the waterline comes in. A bank across the zone gives players on foot
--- a shortcut that carts can't take. Heights follow the zone's limit. Rock only in zone 4.
-local LIMIT = { 2, 4.5, 6.5, 9 }
+-- a shortcut that carts can't take. Rock only in zone 4.
 
 -- The bank across the zone: foot-only in zones 1 to 3 (carts take the ramps), rock with a gap in zone 4.
 local function bank(zone: number)

@@ -182,8 +182,10 @@ All of this is computed from the shared clock, so the server and every client ag
 **Wading:** water is sluggish. Walk speed and jump drop with depth (`Config.Beach.Wading`): 85% in the shallows, 70% knee-deep, 55% waist-deep and 40% once you're fully underwater, blended smoothly in between. Your own client applies it to the speed the server gives you (rewards, trader upgrades, the admin `speed` command).
 
 **What you see** (`SeaController`, client only):
-- The sea in 24-stud strips, each at its own level.
-- White crests rolling in.
+- Each part of the water is one continuous surface (an EditableMesh) whose points move every frame, so the waterline, the foam and the crests are smooth curves that follow the ground. The water is worked out every 12 studs along the shore and drawn every 6.
+  - If the device can't make editable meshes, it falls back to flat 24-stud strips (and says so in the output).
+- The sea surface, at the local water level along the beach.
+- White crests rolling in. They taper off where something shelters the water.
 - The run-up sheet with a foam edge, drawn only on the sand. Once the water is back at the waterline it's just the sea.
 - Darker wet sand where the tide was in the last 40 seconds, or where the last wave reached.
 
