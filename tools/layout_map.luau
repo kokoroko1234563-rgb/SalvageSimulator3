@@ -234,39 +234,115 @@ end
 
 -- Flood order ----------------------------------------------------------------------------
 
--- The waterline Z at which each cut floods, as the tide comes in: a cut floods once the sea
--- reaches its floor, which is Depth below the slope, so the waterline must fall to Z + Depth / slope.
+-- The ground on a grid of 2-stud cells over the whole beach (zones 1 to 4, with `zone` set to
+-- `layout`), so the sea can be flowed through it.
+local FLOOD_STEP = 2
+local FLOOD_X0, FLOOD_COLS, FLOOD_ROWS = -360, 361, 381 -- X -360..360, Z 0..760
+
+local function floodGrid(zone: number?, layout): { number }
+	Layouts.setActive(1, nil)
+	local grid = {}
+	if zone then
+		Layouts.setActive(zone, layout)
+	end
+	for j = 0, FLOOD_ROWS - 1 do
+		for i = 0, FLOOD_COLS - 1 do
+			grid[j * FLOOD_COLS + i + 1] = Beach.groundAt(FLOOD_X0 + i * FLOOD_STEP, j * FLOOD_STEP)
+		end
+	end
+	if zone then
+		Layouts.setActive(zone, nil)
+	end
+	return grid
+end
+
+-- Whether the sea, at a waterline Z, flows in from the seaward edge to a point (through cells
+-- below the sea surface only). A cut that is walled off by higher ground stays dry.
+local function reachedBySea(grid: { number }, waterline: number, i: number, j: number): boolean
+	local level = Beach.waterY(waterline)
+	local seen, queue, head = {}, {}, 1
+	local function at(a: number, b: number): number
+		return (b * FLOOD_COLS) + a + 1
+	end
+	for a = 0, FLOOD_COLS - 1 do
+		local k = at(a, FLOOD_ROWS - 1)
+		if grid[k] < level then
+			seen[k] = true
+			table.insert(queue, { a, FLOOD_ROWS - 1 })
+		end
+	end
+	local target = at(i, j)
+	while head <= #queue do
+		local a, b = queue[head][1], queue[head][2]
+		head += 1
+		if seen[target] then
+			return true
+		end
+		for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local na, nb = a + d[1], b + d[2]
+			if na >= 0 and na < FLOOD_COLS and nb >= 0 and nb < FLOOD_ROWS then
+				local k = at(na, nb)
+				if not seen[k] and grid[k] < level then
+					seen[k] = true
+					table.insert(queue, { na, nb })
+				end
+			end
+		end
+	end
+	return seen[target] == true
+end
+
+-- The highest waterline Z at which the sea reaches a cut's floor, by bisection (reaching is
+-- monotonic: a lower tide floods more). Nil if the sea never reaches it.
+local function floodLine(grid: { number }, x: number, z: number): number?
+	local i = math.floor((x - FLOOD_X0) / FLOOD_STEP + 0.5)
+	local j = math.floor(z / FLOOD_STEP + 0.5)
+	local lo, hi = 0, 760
+	if not reachedBySea(grid, lo, i, j) then
+		return nil
+	end
+	while hi - lo > 1 do
+		local mid = (lo + hi) // 2
+		if reachedBySea(grid, mid, i, j) then
+			lo = mid
+		else
+			hi = mid
+		end
+	end
+	return lo
+end
+
+-- The cuts of a zone's layout, seaward first, with the waterline at which the sea reaches each.
 local function floodOrder(layout, zone: number): { string }
 	local z0 = Beach.zoneRange(zone)
+	local grid = floodGrid(zone, layout)
 	local lines = {}
-	for index, p in layout.Primitives do
+	for _, p in layout.Primitives do
 		if p.Kind == "Channel" or p.Kind == "Hollow" then
-			-- A channel floods from its seaward end, so use the point furthest out.
+			-- A channel floods from its seaward end, so test the point furthest out.
 			local point = if p.Path then p.Path[1] else p.At
 			for _, q in p.Path or {} do
 				if q[2] > point[2] then
 					point = q
 				end
 			end
-			local floods = z0 + point[2] + p.Depth / Config.Beach.Slope
-			table.insert(lines, {
-				floods = floods,
-				text = string.format(
-					"%s at x %d, z %d floods when the waterline is below Z %d",
-					p.Kind,
-					point[1],
-					point[2],
-					floods
-				),
-			})
+			local line = floodLine(grid, point[1], z0 + point[2])
+			local text = string.format(
+				"%s at x %d, z %d: the sea reaches it when the waterline is below Z %s",
+				p.Kind,
+				point[1],
+				point[2],
+				tostring(line and math.floor(line) or "never")
+			)
+			table.insert(lines, { line = line or -1, text = text })
 		end
 	end
 	table.sort(lines, function(a, b)
-		return a.floods > b.floods
+		return a.line > b.line
 	end)
 	local out = {}
-	for _, line in lines do
-		table.insert(out, line.text)
+	for _, entry in lines do
+		table.insert(out, entry.text)
 	end
 	return out
 end

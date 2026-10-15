@@ -28,12 +28,12 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 
 ## Flood order
 
-As the tide comes in, each cut floods once the waterline falls to its floor. Deeper and further-out cuts flood first.
+As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
 
 <!-- floods Zones/Zone4@4 -->
-Channel at x 100, z 132 floods when the waterline is below Z 632
-Hollow at x -40, z 66 floods when the waterline is below Z 549
-Hollow at x 200, z 62 floods when the waterline is below Z 545
+Channel at x 100, z 132: the sea reaches it when the waterline is below Z 587
+Hollow at x -40, z 66: the sea reaches it when the waterline is below Z 527
+Hollow at x 200, z 62: the sea reaches it when the waterline is below Z 521
 <!-- /floods -->
 
 ## Shortcuts

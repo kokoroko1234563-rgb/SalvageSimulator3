@@ -85,31 +85,31 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 
 ## Flood order
 
-As the tide comes in, each cut floods once the waterline falls to its floor. Deeper and further-out cuts flood first.
+As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
 
 <!-- floods Biomes/Planned/SeagrassShallows@1 -->
-Channel at x -60, z 104 floods when the waterline is below Z 134
-Channel at x -100, z 96 floods when the waterline is below Z 117
-Hollow at x -180, z 70 floods when the waterline is below Z 91
-Hollow at x 200, z 66 floods when the waterline is below Z 87
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 109
+Channel at x -60, z 104: the sea reaches it when the waterline is below Z 109
+Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 78
+Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 73
 <!-- /floods -->
 <!-- floods Biomes/Planned/SeagrassShallows@2 -->
-Channel at x -60, z 104 floods when the waterline is below Z 289
-Channel at x -100, z 96 floods when the waterline is below Z 272
-Hollow at x -180, z 70 floods when the waterline is below Z 246
-Hollow at x 200, z 66 floods when the waterline is below Z 242
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 259
+Channel at x -60, z 104: the sea reaches it when the waterline is below Z 259
+Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 229
+Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 223
 <!-- /floods -->
 <!-- floods Biomes/Planned/SeagrassShallows@3 -->
-Channel at x -60, z 104 floods when the waterline is below Z 444
-Channel at x -100, z 96 floods when the waterline is below Z 427
-Hollow at x -180, z 70 floods when the waterline is below Z 401
-Hollow at x 200, z 66 floods when the waterline is below Z 397
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 409
+Channel at x -60, z 104: the sea reaches it when the waterline is below Z 409
+Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 379
+Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 373
 <!-- /floods -->
 <!-- floods Biomes/Planned/SeagrassShallows@4 -->
-Channel at x -60, z 104 floods when the waterline is below Z 595
-Channel at x -100, z 96 floods when the waterline is below Z 579
-Hollow at x -180, z 70 floods when the waterline is below Z 553
-Hollow at x 200, z 66 floods when the waterline is below Z 549
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 559
+Channel at x -60, z 104: the sea reaches it when the waterline is below Z 559
+Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 529
+Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 523
 <!-- /floods -->
 
 ## Shortcuts

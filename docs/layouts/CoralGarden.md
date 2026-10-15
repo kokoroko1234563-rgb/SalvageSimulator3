@@ -85,23 +85,23 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 
 ## Flood order
 
-As the tide comes in, each cut floods once the waterline falls to its floor. Deeper and further-out cuts flood first.
+As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
 
 <!-- floods Biomes/Planned/CoralGarden@1 -->
-Hollow at x -100, z 100 floods when the waterline is below Z 125
-Hollow at x 250, z 100 floods when the waterline is below Z 125
+Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 107
+Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 107
 <!-- /floods -->
 <!-- floods Biomes/Planned/CoralGarden@2 -->
-Hollow at x -100, z 100 floods when the waterline is below Z 275
-Hollow at x 250, z 100 floods when the waterline is below Z 275
+Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 257
+Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 257
 <!-- /floods -->
 <!-- floods Biomes/Planned/CoralGarden@3 -->
-Hollow at x -100, z 100 floods when the waterline is below Z 425
-Hollow at x 250, z 100 floods when the waterline is below Z 425
+Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 407
+Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 407
 <!-- /floods -->
 <!-- floods Biomes/Planned/CoralGarden@4 -->
-Hollow at x -100, z 100 floods when the waterline is below Z 575
-Hollow at x 250, z 100 floods when the waterline is below Z 575
+Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 557
+Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 557
 <!-- /floods -->
 
 ## Shortcuts

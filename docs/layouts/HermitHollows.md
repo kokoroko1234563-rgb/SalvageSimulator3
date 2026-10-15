@@ -85,7 +85,7 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 
 ## Flood order
 
-As the tide comes in, each cut floods once the waterline falls to its floor. Deeper and further-out cuts flood first.
+As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
 
 <!-- floods Biomes/Planned/HermitHollows@1 -->
 

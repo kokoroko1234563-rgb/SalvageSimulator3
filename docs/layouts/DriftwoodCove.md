@@ -85,19 +85,19 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 
 ## Flood order
 
-As the tide comes in, each cut floods once the waterline falls to its floor. Deeper and further-out cuts flood first.
+As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
 
 <!-- floods Biomes/Planned/DriftwoodCove@1 -->
-Hollow at x -80, z 90 floods when the waterline is below Z 115
+Hollow at x -80, z 90: the sea reaches it when the waterline is below Z 99
 <!-- /floods -->
 <!-- floods Biomes/Planned/DriftwoodCove@2 -->
-Hollow at x -80, z 90 floods when the waterline is below Z 265
+Hollow at x -80, z 90: the sea reaches it when the waterline is below Z 249
 <!-- /floods -->
 <!-- floods Biomes/Planned/DriftwoodCove@3 -->
-Hollow at x -80, z 90 floods when the waterline is below Z 415
+Hollow at x -80, z 90: the sea reaches it when the waterline is below Z 399
 <!-- /floods -->
 <!-- floods Biomes/Planned/DriftwoodCove@4 -->
-Hollow at x -80, z 90 floods when the waterline is below Z 565
+Hollow at x -80, z 90: the sea reaches it when the waterline is below Z 549
 <!-- /floods -->
 
 ## Shortcuts
