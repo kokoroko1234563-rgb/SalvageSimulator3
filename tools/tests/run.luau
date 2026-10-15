@@ -60,6 +60,7 @@ test("load server services", function()
 			"BeachDressing",
 			"Buildings",
 			"MapParts",
+			"ZoneProps",
 			"ItemService",
 			"GrabService",
 			"ShopService",

@@ -118,6 +118,34 @@ Palette.World = {
 	SandDark = rgb(222, 200, 150),
 }
 
+-- Props that give each zone its look (see ZoneProps).
+Palette.Zone = {
+	ChairWhite = rgb(248, 248, 244),
+	ChairCoral = rgb(255, 120, 90),
+	ChairSky = rgb(90, 180, 225),
+	TowelRed = rgb(230, 70, 90),
+	TowelBlue = rgb(70, 150, 230),
+	TowelYellow = rgb(250, 200, 60),
+	HutWall = rgb(238, 224, 192),
+	HutTealRoof = rgb(60, 150, 150),
+	HutThatch = rgb(190, 150, 80),
+	Pier = rgb(150, 110, 70),
+	Piling = rgb(95, 72, 50),
+	RockGrey = rgb(128, 122, 116),
+	RockDark = rgb(82, 80, 78),
+	Coral1 = rgb(255, 110, 130),
+	Coral2 = rgb(255, 165, 70),
+	Coral3 = rgb(190, 115, 235),
+	Pool = rgb(70, 205, 225),
+	Net = rgb(205, 200, 185),
+	Hull = rgb(60, 130, 200),
+	HullInside = rgb(250, 248, 240),
+	StoneLight = rgb(196, 186, 170),
+	StoneDark = rgb(150, 140, 128),
+	Bell = rgb(220, 170, 60),
+	Ridge = rgb(226, 204, 152),
+}
+
 Palette.Material = {
 	Sand = Enum.Material.Sand,
 	Wood = Enum.Material.Wood,

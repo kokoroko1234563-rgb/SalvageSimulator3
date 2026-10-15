@@ -185,4 +185,10 @@ function BeachDressing.build(map: Instance, rng: Random)
 	lifeguardTower(folder, groundAt(-265, -22))
 end
 
+-- The zone props reuse these.
+BeachDressing.scenery = scenery
+BeachDressing.palm = palm
+BeachDressing.umbrella = umbrella
+BeachDressing.driftwood = driftwood
+
 return BeachDressing
