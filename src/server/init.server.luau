@@ -70,6 +70,8 @@ Workspace:SetAttribute(
 )
 
 local map = BeachBuilder.build()
+-- The water's lookup of solid things on the beach (the map marks them as it builds).
+require(Shared.WaterObstacles).init()
 
 -- Order matters for PlayerRemoving: items are released before vessels are removed.
 CollisionGroups.init()

@@ -15,6 +15,7 @@
 local Config = require(script.Parent.Config)
 local Beach = require(script.Parent.Beach)
 local Tide = require(script.Parent.Tide)
+local WaterObstacles = require(script.Parent.WaterObstacles)
 
 type Sea = Tide.Sea
 
@@ -205,11 +206,16 @@ local function pushAt(position: Vector3, sea: Sea, line: number, rel: number, sc
 		if push == Vector3.zero then
 			push = -SHORE * undertow(rel, line) * cfg.Slack * scale
 		end
+		-- Behind something solid standing out of the water, the waves barely reach you.
+		if WaterObstacles.sheltered(position.X, position.Z, Beach.waterY(line)) then
+			push *= Config.Water.ShelterFactor
+		end
 		return push
 	end
-	-- On the sand: under a running-up sheet or a sliding-back one.
+	-- On the sand: under a running-up sheet or a sliding-back one, unless something solid
+	-- stopped the water before it got here.
 	for _, wave in list do
-		if wave.Phase ~= "Rolling" and rel >= wave.Front then
+		if wave.Phase ~= "Rolling" and rel >= Waves.frontAt(position.X, line, wave.Front) then
 			local strength = wave.Size * scale
 			if wave.Phase == "RunUp" then
 				return SHORE * cfg.RunUpPush * (1 - wave.PhaseProgress) * strength
@@ -235,13 +241,26 @@ function Waves.getPush(position: Vector3, sea: Sea): Vector3
 	return push
 end
 
+-- Where a run-up's front really is at X: on open sand, `front`; with something solid in the
+-- way, stopped just short of it unless the water climbs higher than its top.
+function Waves.frontAt(x: number, line: number, front: number): number
+	if front >= 0 then
+		return front
+	end
+	local reachY = Beach.waterY(line) - front * Config.Beach.Slope
+	return WaterObstacles.limitFront(x, line, front, reachY)
+end
+
 -- How far up the beach the water reaches at X right now (distance from the waterline, 0 or
 -- negative), and whether it's sliding back.
 function Waves.edgeAt(x: number, sea: Sea, waterline: number?): (number, boolean)
 	local edge, sliding = 0, false
 	for _, wave in Waves.wavesAt(x, sea, waterline) do
-		if wave.Phase ~= "Rolling" and wave.Front < edge then
-			edge, sliding = wave.Front, wave.Phase == "Backwash"
+		local front = if wave.Phase ~= "Rolling"
+			then Waves.frontAt(x, waterline or Tide.waterlineAt(sea, x), wave.Front)
+			else 0
+		if front < edge then
+			edge, sliding = front, wave.Phase == "Backwash"
 		end
 	end
 	return edge, sliding

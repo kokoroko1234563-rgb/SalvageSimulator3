@@ -27,6 +27,7 @@ local function start(name: string, init: () -> ())
 	end
 end
 
+start("WaterObstacles", require(game:GetService("ReplicatedStorage").Shared.WaterObstacles).init)
 start("HUD", HUD.init)
 start("HotbarUI", HotbarUI.init)
 start("GearEffects", GearEffects.init)

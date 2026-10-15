@@ -198,6 +198,15 @@ Config.Waves = {
 	MinPushFraction = 0.3, -- future stat stacking can never reduce waves below this
 }
 
+-- How the water treats objects on the beach (WaterObstacles).
+Config.Water = {
+	Bucket = 16, -- studs along X per lookup bucket
+	Step = 1, -- studs between samples when the run-up looks for something in its way
+	ShelterRange = 40, -- solid things up to this far out to sea shelter what's behind them
+	ShelterHeight = 0.3, -- they shelter only where they stand at least this far out of the water
+	ShelterFactor = 0.15, -- waves push this much behind shelter
+}
+
 -- Biomes: each tide cycle, every zone rolls whether it becomes a biome (see Biomes.luau).
 Config.Biomes = {
 	-- Each cycle every zone rolls one of these (relative weights). Rare biomes are never announced.

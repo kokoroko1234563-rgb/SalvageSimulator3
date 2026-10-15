@@ -141,6 +141,15 @@ All of this is computed from the shared clock, so the server and every client ag
 - **Admin:** `waves seed` picks a new seed, and `waves seed <n>` sets one, to replay a pattern.
 - **Validator:** it checks that a section's delay plus the shuffle stays shorter than the low-tide hold.
 
+**Things the water reacts to** (`WaterObstacles`, `Config.Water`): tag a part `WaterObstacle` and give it a `Water` attribute (or call `WaterObstacles.mark(part, kind)` from code).
+- **`Solid`** (the default): the water can't pass through it.
+  - **Run-up:** the run-up stops against it unless the wave climbs higher than its top, so a big wave overtops a low sandbank and a small one stops at it.
+  - **Shelter:** out in the sea, waves are sheltered behind it, within 40 studs, wherever it stands out of the water. They push at 15% there, and their crests vanish.
+- **`Under`**: the water runs underneath it (a pier deck, an arch).
+- **Shape:** its top comes from the part's shape. A block has a flat top, a cylinder lying along X is a ridge (like the sandbanks), and a ball is a dome (like a boulder). Parts may be turned about the vertical axis.
+- **Already set up:** the sandbanks, the rock clusters and the beached wreck are solid; the pier deck is `Under`.
+- **Everything agrees:** the pushes on players and items, the swash dragging items, and the sea visuals all use the same lookup.
+
 **Rock pools** (`Config.Beach.Pools`): rings of rock that hold still water at a fixed level after the sea leaves. Floating items float in them. They never count as deep water.
 
 **Waves:** each wave rolls in to the local waterline, runs up the exposed sand as a thin sheet, slows to a stop and slides back.

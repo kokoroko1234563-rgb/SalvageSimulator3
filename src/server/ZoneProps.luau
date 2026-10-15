@@ -6,6 +6,7 @@
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Palette = require(Shared.Palette)
+local WaterObstacles = require(Shared.WaterObstacles)
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 
@@ -113,7 +114,7 @@ local function sandbank(parent: Instance, x0: number, x1: number, z: number, hei
 	local h = math.min(height, SANDBANK_MAX_HEIGHT)
 	local half = width / 2
 	local radius = (half * half + h * h) / (2 * h) -- the circle through the cap's edges and top
-	add(parent, {
+	local bank = add(parent, {
 		Name = "Sandbank",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(x1 - x0, radius * 2, radius * 2),
@@ -121,6 +122,8 @@ local function sandbank(parent: Instance, x0: number, x1: number, z: number, hei
 		Color = Z.Ridge,
 		Material = Palette.Material.Sand,
 	})
+	-- The run-up stops against it unless a wave climbs over it (WaterObstacles).
+	WaterObstacles.mark(bank, "Solid")
 end
 
 -- A stack of driftwood logs.
@@ -175,13 +178,14 @@ end
 -- The ribs of a wreck, tipped on its side and half-buried.
 local function wreck(parent: Instance, position: Vector3, yaw: number)
 	local cf = CFrame.new(position) * CFrame.Angles(0, yaw, math.rad(20))
-	add(parent, {
+	local hull = add(parent, {
 		Name = "WreckHull",
 		Size = Vector3.new(16, 4, 5),
 		CFrame = cf * CFrame.new(0, 1, 0),
 		Color = Palette.World.DarkWood,
 		Material = Palette.Material.WoodPlanks,
 	})
+	WaterObstacles.mark(hull, "Solid")
 	add(parent, {
 		Name = "WreckMast",
 		Size = Vector3.new(14, 0.8, 0.8),
@@ -197,7 +201,7 @@ local function rockCluster(parent: Instance, center: Vector3, count: number, rng
 		local diameter = rng:NextNumber(2.5, 6)
 		local offset = Vector3.new(rng:NextNumber(-8, 8), diameter * 0.3, rng:NextNumber(-8, 8))
 		local color = if rng:NextNumber() < 0.5 then Z.RockGrey else Z.RockDark
-		ball(parent, center + offset, diameter, color, Palette.Material.Rock)
+		WaterObstacles.mark(ball(parent, center + offset, diameter, color, Palette.Material.Rock), "Solid")
 	end
 end
 
@@ -241,13 +245,14 @@ end
 
 -- A wooden pier on pilings, running out from the shore.
 local function pier(parent: Instance, x: number, z0: number, z1: number, deckY: number)
-	add(parent, {
+	local deck = add(parent, {
 		Name = "PierDeck",
 		Size = Vector3.new(8, 0.8, z1 - z0),
 		CFrame = CFrame.new(x, deckY, (z0 + z1) / 2),
 		Color = Z.Pier,
 		Material = Palette.Material.WoodPlanks,
 	})
+	WaterObstacles.mark(deck, "Under") -- the water runs underneath
 	for _, side in { -3.5, 3.5 } do
 		pilingRow(parent, x + side, z0, z1, deckY - 0.4)
 	end

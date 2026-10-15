@@ -19,6 +19,7 @@ local Gear = require(Shared.Gear)
 local Palette = require(Shared.Palette)
 local Tide = require(Shared.Tide)
 local Waves = require(Shared.Waves)
+local WaterObstacles = require(Shared.WaterObstacles)
 
 local HUD = require(script.Parent.HUD)
 
@@ -163,7 +164,13 @@ local function update()
 		for i = #list, 1, -1 do
 			local wave = list[i]
 			local crest = strip.crests[crestIndex]
-			if wave.Phase == "Rolling" and crest then
+			-- Crests vanish where something solid shelters the water from the sea.
+			local crestZ = line + wave.Front + 1.2
+			if
+				wave.Phase == "Rolling"
+				and crest
+				and not WaterObstacles.sheltered(strip.x, crestZ, waterY)
+			then
 				crestIndex += 1
 				local height = 0.35 + 0.35 * wave.Size
 				if math.abs(crest.Size.Y - height) > 0.05 then
@@ -171,7 +178,7 @@ local function update()
 				end
 				-- Fades in out at sea, sharpest as it reaches the shore.
 				setTransparency(crest, 0.25 + 0.6 * (1 - wave.PhaseProgress))
-				place(crest, CFrame.new(strip.x, waterY + height * 0.3, line + wave.Front + 1.2))
+				place(crest, CFrame.new(strip.x, waterY + height * 0.3, crestZ))
 			end
 		end
 		for i = crestIndex, #strip.crests do
@@ -181,8 +188,12 @@ local function update()
 		-- The swash sheet and its foam edge.
 		local edge, sliding = 0, false
 		for _, wave in list do
-			if wave.Phase ~= "Rolling" and wave.Front < edge then
-				edge, sliding = wave.Front, wave.Phase == "Backwash"
+			if wave.Phase ~= "Rolling" then
+				-- Stopped short by anything solid in its way.
+				local front = Waves.frontAt(strip.x, line, wave.Front)
+				if front < edge then
+					edge, sliding = front, wave.Phase == "Backwash"
+				end
 			end
 		end
 		if edge < -0.3 then
@@ -197,7 +208,8 @@ local function update()
 		end
 
 		-- Wet sand: up to where the tide was a little while ago, or the last wave reached.
-		local lastReach = Waves.reach(Waves.indexAt(sea.Now) - 1, line, strip.x)
+		local lastReach =
+			-Waves.frontAt(strip.x, line, -Waves.reach(Waves.indexAt(sea.Now) - 1, line, strip.x))
 		local wetTo = math.min(Tide.waterlineAt(wetSea, strip.x), line - lastReach, line + edge)
 		if wetTo < line - 0.5 then
 			place(strip.wet, onSand(strip.wet, strip.x, line, wetTo, 0.04))

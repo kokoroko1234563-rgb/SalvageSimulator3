@@ -37,6 +37,7 @@ for _, name in
 		"Secrets",
 		"Rebirth",
 		"Hotbar",
+		"WaterObstacles",
 		"Traders",
 		"Tide",
 		"Beach",
@@ -390,6 +391,42 @@ test("the sea seed changes the patterns", function()
 	assert(sizeA ~= sizeB, "different seeds give different waves")
 	-- The pattern changes over time too.
 	assert(Tide.lagAt(0, 0) ~= Tide.lagAt(0, 600), "the waterline pattern changes as time goes on")
+end)
+
+test("water stops at solid things, passes under decks, and shelters behind rocks", function()
+	local WaterObstacles = h.require("Shared/WaterObstacles")
+	local Waves = h.require("Shared/Waves")
+	local Beach = h.require("Shared/Beach")
+	WaterObstacles._clear()
+	local function part(shape, size, cf, kind)
+		local p = Harness.wrap(roblox.Instance.new("Part"))
+		p.Shape = roblox.Enum.PartType[shape]
+		p.Size = size
+		p.CFrame = cf
+		WaterObstacles.mark(p, kind)
+		return p
+	end
+	local line = 300
+	local ground = Beach.groundY(line - 10)
+	-- A low wall 10 studs up the beach, 2 studs above the sand there.
+	part("Block", roblox.Vector3.new(20, 4, 2), roblox.CFrame.new(0, ground, line - 10), "Solid")
+	-- A pier deck high over the sand at X = 100: the water ignores it.
+	part("Block", roblox.Vector3.new(8, 1, 40), roblox.CFrame.new(100, ground + 3, line - 10), "Under")
+	local small = Waves.frontAt(0, line, -20) -- climbs 20 * slope = 1.2 studs: stopped
+	assert(small > -10 and small <= 0, "a small run-up stops at the wall, got " .. small)
+	-- The wall's top is 2.6 studs above the sea (0.6 of slope + its 2 studs).
+	local big = Waves.frontAt(0, line, -40) -- climbs 2.4 studs: just under the top
+	assert(big > -10, "the wall is taller than this run-up too, got " .. big)
+	local huge = Waves.frontAt(0, line, -60) -- 3.6 studs: over the top
+	assert(huge == -60, "a big enough run-up overtops it")
+	assert(Waves.frontAt(100, line, -20) == -20, "the water runs under a deck")
+	assert(Waves.frontAt(50, line, -20) == -20, "open sand elsewhere")
+	-- A boulder standing out of the sea shelters the water behind (landward of) it.
+	local sea = line + 40
+	part("Ball", roblox.Vector3.new(8, 8, 8), roblox.CFrame.new(-100, Beach.waterY(line) + 1, sea), "Solid")
+	assert(WaterObstacles.sheltered(-100, sea - 10, Beach.waterY(line)), "behind the boulder is sheltered")
+	assert(not WaterObstacles.sheltered(-100, sea + 10, Beach.waterY(line)), "seaward of it is not")
+	WaterObstacles._clear()
 end)
 
 test("waves run up and slide back", function()
