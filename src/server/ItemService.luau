@@ -18,6 +18,7 @@ local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 local Biomes = require(Shared.Biomes)
 local Items = require(Shared.Items)
+local Layouts = require(Shared.Layouts)
 local Tide = require(Shared.Tide)
 local Waves = require(Shared.Waves)
 
@@ -237,23 +238,27 @@ function ItemService.spawnAt(def, zoneIndex: number, position: Vector3): BasePar
 	return createItem(def, zoneIndex, position)
 end
 
--- Washes one item up somewhere in the surf around the current waterline. The zone (and so
--- the value and rarity) comes from where it lands, so low tide brings richer loot.
-function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
-	local beach = Config.Beach
-	-- Heavy things sit out in deeper water; lighter ones anywhere from the wet sand out.
-	local heavyRoll = rng:NextNumber()
-	local depth = if heavyRoll < 0.3
-		then rng:NextNumber(beach.ShallowDepth, beach.WaistDepth - 0.3)
-		else rng:NextNumber(-0.3, beach.WaistDepth - 0.3)
-	local x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
-	local z = Beach.zForDepth(depth, sea, x)
-	local zoneIndex = Beach.zoneAt(z)
-	if not zoneIndex or zoneIndex < 1 then
-		return nil
-	end
+-- Whether an item can rest at (x, z): not on rock (a wall's top, a boulder), where nobody
+-- could reach it.
+local function restsAt(x: number, z: number): boolean
+	local _, rock = Beach.shapeAt(x, z)
+	return not rock
+end
 
-	-- A biome tile sometimes washes up its secret's unlock item, and mostly its own loot.
+-- The rarest of `rolls` rarity rolls.
+local function rollRarity(weights: { [string]: number }, rolls: number): string
+	local best = 1
+	for _ = 1, rolls do
+		local rarity = Items.rollRarity(weights, rng)
+		best = math.max(best, table.find(Items.Rarities, rarity) or 1)
+	end
+	return Items.Rarities[best]
+end
+
+-- What washes up at a point in a zone: a biome's secret unlock item or own loot sometimes,
+-- the sky-beam item on the Far Sandbar, else an item of the zone's rarity (the rarest of
+-- `rarityRolls` rolls). `heavy` keeps to heavy (true) or lighter (false) items, nil for any.
+local function chooseDef(zoneIndex: number, z: number, heavy: boolean?, rarityRolls: number)
 	local biome = Biomes.activeIn(Beach.tileAt(z))
 	local def
 	-- Private servers scale rare spawns down with the player count (MonetizationService).
@@ -283,11 +288,11 @@ function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
 		def = Items.get(biome.Loot[rng:NextInteger(1, #biome.Loot)])
 	end
 	if not def then
-		local rarity = Items.rollRarity(Items.scaleRare(Config.Zones[zoneIndex].Rarity, rareScale), rng)
+		local rarity = rollRarity(Items.scaleRare(Config.Zones[zoneIndex].Rarity, rareScale), rarityRolls)
 		local choices = {}
 		for _, candidate in Items.ofRarity(rarity) do
 			-- Only heavy items in the deeper spots, only lighter ones in the shallows.
-			if (candidate.Class >= 3) == (heavyRoll < 0.3) then
+			if heavy == nil or (candidate.Class >= 3) == heavy then
 				table.insert(choices, candidate)
 			end
 		end
@@ -296,9 +301,87 @@ function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
 		end
 		def = choices[rng:NextInteger(1, #choices)]
 	end
+	return def
+end
 
+-- Washes one item up somewhere in the surf around the current waterline. The zone (and so
+-- the value and rarity) comes from where it lands, so low tide brings richer loot.
+function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
+	local beach = Config.Beach
+	-- Heavy things sit out in deeper water; lighter ones anywhere from the wet sand out.
+	local heavy = rng:NextNumber() < 0.3
+	local x, z
+	for _ = 1, 6 do
+		local depth = if heavy
+			then rng:NextNumber(beach.ShallowDepth, beach.WaistDepth - 0.3)
+			else rng:NextNumber(-0.3, beach.WaistDepth - 0.3)
+		x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
+		z = Beach.zForDepth(depth, sea, x)
+		if restsAt(x, z) then
+			break
+		end
+		x = nil
+	end
+	if not x then
+		return nil
+	end
+	local zoneIndex = Beach.zoneAt(z)
+	if not zoneIndex or zoneIndex < 1 then
+		return nil
+	end
+	local def = chooseDef(zoneIndex, z, heavy, 1)
+	if not def then
+		return nil
+	end
 	local y = Beach.groundAt(x, z) + def.Size.Y / 2
 	return createItem(def, zoneIndex, Vector3.new(x, y, z))
+end
+
+-- The layouts' loot spots: once each tide, as the sea goes out and leaves a spot dry, it
+-- leaves finds there (dead ends and hidden corners, where the layouts put them). A spot's
+-- Weight raises its chance of a find and how rare the find is.
+local settled: { [string]: number } = {} -- spot key -> the tide cycle it last settled in
+
+function ItemService.settleSpots(sea: Tide.Sea, cycle: number): number
+	local spawned = 0
+	for tile = 1, Beach.ActiveTiles do
+		local layout = Layouts.active(tile)
+		if not layout then
+			continue
+		end
+		local z0 = Beach.tileRange(tile)
+		for index, spot in Layouts.lootSpots(tile, z0) do
+			local key = tile .. "/" .. layout.Name .. "/" .. index
+			if settled[key] == cycle then
+				continue
+			end
+			local middle = Vector3.new(spot.X, Beach.groundAt(spot.X, spot.Z), spot.Z)
+			if Beach.seaDepthAt(middle, sea) > 0 then
+				continue -- still under the sea
+			end
+			settled[key] = cycle
+			local zoneIndex = Beach.zoneAt(spot.Z)
+			if not zoneIndex or zoneIndex < 1 or rng:NextNumber() >= cfg.SpotChance * spot.Weight then
+				continue
+			end
+			local x, z
+			for _ = 1, 6 do
+				local angle, r = rng:NextNumber() * math.pi * 2, spot.Radius * math.sqrt(rng:NextNumber())
+				x, z = spot.X + math.cos(angle) * r, spot.Z + math.sin(angle) * r
+				if restsAt(x, z) then
+					break
+				end
+				x = nil
+			end
+			local rolls = math.clamp(math.round(spot.Weight), 1, cfg.SpotRarityRolls)
+			local def = x and chooseDef(zoneIndex, z, nil, rolls)
+			if def then
+				createItem(def, zoneIndex, Vector3.new(x, Beach.groundAt(x, z) + def.Size.Y / 2, z))
+				spawned += 1
+			end
+		end
+	end
+	return spawned
 end
 
 local function spawnTick()
@@ -315,6 +398,9 @@ local function spawnTick()
 	end
 	if total < cfg.MaxTotal and inSurf < cfg.MaxSurfItems then
 		ItemService.spawnInSurf(sea)
+	end
+	if total < cfg.MaxTotal then
+		ItemService.settleSpots(sea, Tide.getState().Cycle)
 	end
 end
 

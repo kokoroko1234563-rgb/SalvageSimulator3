@@ -527,6 +527,10 @@ Config.Items = {
 	LooseTimeout = 25, -- a claimed item left alone this long freezes and becomes unclaimed
 	TimedOutLifetime = 90, -- a timed-out item despawns if nobody grabs it within this
 	FreshLifetime = 360, -- surf spawns are recycled after this long untouched
+	-- The layouts' loot spots: each time the tide leaves one dry, a find there with this chance
+	-- times the spot's Weight, the rarest of up to Weight rarity rolls (at most SpotRarityRolls).
+	SpotChance = 0.35,
+	SpotRarityRolls = 4,
 	ReachSlack = 4, -- extra studs the server allows on top of a tool's reach (latency)
 	HeldLeash = 14, -- server force-drops a held item this far past reach
 	MaxHeldSpeed = 140,

@@ -1880,6 +1880,52 @@ test("scenery only stands on level ground, not across walls or under roofs", fun
 	Layouts.setActive(tile, nil)
 end)
 
+test("the tide leaves finds at the layouts' loot spots, once each tide", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local Tide = h.require("Shared/Tide")
+	local ItemService = h.require("Server/ItemService")
+	local tile = 14
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "spotted",
+		Primitives = { { Kind = "Wall", Path = { { -150, 40 }, { 150, 40 } }, Height = 18, Width = 16 } },
+		Loot = { { At = { 0, 100 }, Radius = 6, Weight = 4 } },
+	})
+	local chance = Config.Items.SpotChance
+	Config.Items.SpotChance = 1
+	local function near(): { BasePart }
+		local found = {}
+		for item in ItemService.all() do
+			local p = item.CFrame.Position
+			if math.abs(p.X) < 8 and math.abs(p.Z - (z0 + 100)) < 8 then
+				table.insert(found, item)
+			end
+		end
+		return found
+	end
+	local highSea, lowSea = Tide.sea(0), Tide.sea(1000)
+	assert(Beach.seaDepthAt(roblox.Vector3.new(0, 0, z0 + 100), highSea) > 0, "covered at high tide")
+	ItemService.settleSpots(highSea, 1)
+	assert(#near() == 0, "nothing settles under the sea")
+	ItemService.settleSpots(lowSea, 1)
+	assert(#near() == 1, "a find once the tide leaves the spot dry")
+	ItemService.settleSpots(lowSea, 1)
+	assert(#near() == 1, "only once each tide")
+	ItemService.settleSpots(lowSea, 2)
+	assert(#near() == 2, "and again the next tide")
+	for _, item in near() do
+		local _, rock = Beach.shapeAt(item.CFrame.X, item.CFrame.Z)
+		assert(not rock, "never on rock")
+	end
+	for item in ItemService.all() do
+		ItemService.destroy(item)
+	end
+	Config.Items.SpotChance = chance
+	Layouts.setActive(tile, nil)
+end)
+
 test("roofs make caves: rock overhead, the floor still the ground", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")

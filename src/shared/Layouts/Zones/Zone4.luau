@@ -87,8 +87,8 @@ return {
 		{ At = { 110, 50 }, Radius = 6, Weight = 3 },
 		{ At = { 20, 94 }, Radius = 5, Weight = 2 },
 		{ At = { -330, 100 }, Radius = 6, Weight = 2 },
-		{ At = { 320, 160 }, Radius = 6, Weight = 2 },
+		{ At = { 320, 8 }, Radius = 6, Weight = 2 },
 		{ At = { -60, 112 }, Radius = 6, Weight = 1 },
-		{ At = { 0, 162 }, Radius = 6, Weight = 1 },
+		{ At = { 0, 10 }, Radius = 6, Weight = 1 },
 	},
 }

@@ -497,6 +497,13 @@ local function isPoint(value: any): boolean
 	return type(value) == "table" and type(value[1]) == "number" and type(value[2]) == "number"
 end
 
+-- Whether a point (tile coordinates) lies on the tile.
+local function onTile(point: { number }): boolean
+	return math.abs(point[1]) <= Config.Beach.Width / 2
+		and point[2] >= 0
+		and point[2] <= Config.Beach.TileLength
+end
+
 -- What's wrong with a layout, as a list of messages (empty: nothing).
 function Layouts.problems(layout: any): { string }
 	local problems = {}
@@ -529,11 +536,15 @@ function Layouts.problems(layout: any): { string }
 			add(where .. ": needs At = {x, z} and a Radius")
 		elseif spot.Weight ~= nil and (type(spot.Weight) ~= "number" or spot.Weight <= 0) then
 			add(where .. ": Weight must be a positive number")
+		elseif not onTile(spot.At) then
+			add(where .. ": outside the tile")
 		end
 	end
 	for index, point in layout.Entrances or {} do
 		if not isPoint(point) then
 			add(layout.Name .. " entrance " .. index .. ": must be {x, z}")
+		elseif not onTile(point) then
+			add(layout.Name .. " entrance " .. index .. ": outside the tile")
 		end
 	end
 	for index, placement in layout.Hazards or {} do
