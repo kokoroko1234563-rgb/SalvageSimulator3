@@ -690,10 +690,12 @@ if JOB.routes ~= false then
 		if best then
 			fastest = math.min(fastest, best.seconds)
 			if best.steepest > footSlope * 1.15 then
-				problem(
-					"path too steep",
+				-- A note, not a problem: Roblox's pathfinder doesn't know the climb limit (the
+				-- terrain walk, which does, is the measure that counts).
+				table.insert(
+					report.notes,
 					string.format(
-						"from x %d: the pathfinder climbs a %.2f slope, steeper than players can (%.2f)",
+						"from x %d: Roblox's pathfinder climbs a %.2f slope, steeper than players can (%.2f)",
 						x,
 						best.steepest,
 						footSlope
