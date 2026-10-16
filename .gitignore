@@ -7,3 +7,6 @@ tools/.cache/
 roblox.yml
 tools/preview/node_modules/
 tools/preview/out/
+
+# Subagent working copies (git worktrees)
+.claude/worktrees/
