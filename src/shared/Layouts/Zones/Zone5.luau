@@ -48,7 +48,7 @@ end
 local function ford(c, z)
 	return {
 		{ Kind = "Channel", Path = { { c, z - 22 }, { c, z + 22 } }, Depth = 4, Width = 12 },
-		{ Kind = "Ridge", Path = { { c - 4, z }, { c + 4, z } }, Height = 3.5, Width = 16 },
+		{ Kind = "Ridge", Path = { { c - 4, z }, { c + 4, z } }, Height = 5, Width = 16 },
 	}
 end
 
@@ -145,15 +145,17 @@ end
 -- A crossing: the ford door and the ramp door of each bar, and its own lane furniture.
 -- A reef across a lane with two gaps: one for feet at g and one wide enough for the cart ramp at r.
 local function baffle(z, g, r)
-	local gaps = { { g - 14, g + 14 }, { r - 26, r + 26 } }
+	local gaps = { { g - 14, g + 14 }, { r - 30, r + 30 } }
 	table.sort(gaps, function(p, q)
 		return p[1] < q[1]
 	end)
 	local out = {}
 	local x = -362
 	for _, gap in gaps do
-		table.insert(out, wall(x, z, gap[1], z))
-		x = gap[2]
+		if gap[1] > x then
+			table.insert(out, wall(x, z, gap[1], z))
+		end
+		x = math.max(x, gap[2])
 	end
 	table.insert(out, wall(x, z, 362, z))
 	return out
