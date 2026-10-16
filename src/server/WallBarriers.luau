@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
+local Config = require(Shared.Config)
 local Layouts = require(Shared.Layouts)
 
 local WallBarriers = {}
@@ -51,6 +52,15 @@ function WallBarriers.slabsFor(tile: number): { { cframe: CFrame, size: Vector3 
 		for i = 1, #p.Path - 1 do
 			local a = Vector3.new(p.Path[i][1], 0, z0 + p.Path[i][2])
 			local b = Vector3.new(p.Path[i + 1][1], 0, z0 + p.Path[i + 1][2])
+			-- A wall that reaches the beach's side carries on into the cliff (Beach.shapeAt), and
+			-- so does its barrier.
+			local reach = Beach.HalfWidth - 0.5
+			if math.abs(a.X) >= reach and (a - b).Magnitude > 0.1 then
+				a += (a - b).Unit * (Config.Beach.Terrain.CliffReach + 2)
+			end
+			if math.abs(b.X) >= reach and (b - a).Magnitude > 0.1 then
+				b += (b - a).Unit * (Config.Beach.Terrain.CliffReach + 2)
+			end
 			local length = (b - a).Magnitude
 			if length < 0.1 then
 				continue

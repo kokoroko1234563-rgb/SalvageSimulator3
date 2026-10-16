@@ -47,8 +47,15 @@ Problems (each with examples and positions):
 
 Measurements:
 
-- `crossing`: the fastest way across the zone on foot (seconds at walking speed, from seven
-  starts along the top edge), against the zone's `CrossTime` target.
+- `crossing`: the fastest way down the zone on foot and the fastest way back up (seconds at
+  walking speed), against the zone's `CrossTime` target, from each of seven starts along the top
+  edge, and the fastest route's turning points (to see where it gets through). It's measured by
+  walking a 4-stud grid over the **real terrain**: a step may climb no steeper than players can
+  (FootSlope, or a small step up), may drop any height, and never crosses a wall. Roblox's own
+  pathfinder is reported alongside, but it doesn't know the climbing limit (it jumps and climbs
+  over walls), so it can be quicker than any player could be.
+- **no way back**: walking the terrain, there's no way back up the zone (drops you can't climb).
+- **one-way spot**: a loot spot or entrance you can drop into but not walk back out of.
 - `tides`: at each waterline, how much of the zone is under water, how much too deep to stand
   in, and how much of its tunnels (under roofs) are flooded.
 - `terrainOffset`, `roofOffset`, `wallWidths`: how closely the real terrain matches the layouts.

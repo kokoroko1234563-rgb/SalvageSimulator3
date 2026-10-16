@@ -47,7 +47,12 @@ Config.Beach = {
 	-- plus each zone's hand-built layout (src/shared/Layouts), which changes with its biome.
 	Terrain = {
 		Voxel = 4, -- smooth Terrain resolution
-		EdgeFade = 30, -- the shape fades out over this many studs at the sides of the beach
+		-- Past the beach's sides (x = +-360) the shape carries on as it is at the edge, out to the
+		-- side cliffs' faces (about 14 studs further), so a wall that reaches the edge runs into
+		-- the cliff: an open strip down each side got round every maze (found by the Test Range).
+		-- Then it fades out over EdgeFade studs, under the cliffs.
+		CliffReach = 16,
+		EdgeFade = 4,
 		-- The shape of zones 1-4 comes from hand-built layouts (src/shared/Layouts).
 		ZoneFade = 6, -- it fades out over this many studs at each zone's landward and seaward edge
 		Blend = 8, -- Ramps and Flats blend into the ground around them over this many studs

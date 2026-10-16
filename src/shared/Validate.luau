@@ -197,6 +197,7 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		{
 			"Voxel",
 			"EdgeFade",
+			"CliffReach",
 			"ZoneFade",
 			"Blend",
 			"RockMin",
