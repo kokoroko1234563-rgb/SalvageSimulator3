@@ -1,0 +1,173 @@
+-- Hermit Hollows. Zone 4 is drawn as a whole: a giant hermit crab's warren, a lattice of
+-- rock-walled corridors 16 studs wide, almost all of it roofed. Zones 5 and 6 are still the old
+-- 152-stud layouts, repeated down the zone. See docs/layouts/HermitHollows.md.
+--
+-- Zone 4's warren is a grid of 24 x 21 cells. A cell is a 16 x 16 floor; the walls between
+-- cells are 12 thick, so cells are 28 apart. Node lines (where walls cross) run at
+-- x = -336 + 28 i and z = 12 + 28 j, all on the 4-stud grid, so every wall face lands on 4k + 2.
+-- Mazes are drawn as text: 2 n + 1 lines of 2 m + 1 characters. Nodes sit at even positions
+-- ('+'); between two nodes a wall is '-' (across) or '|' (down), 'r' is a rubble pile in a
+-- doorway (a scramble for players on foot, too steep for a cart), and a blank is a door.
+-- Cells sit at odd positions: 'c' is a chamber and 'S' a side-room slot (both unroofed), '.' a
+-- gap in the roof, and a blank is a roofed corridor.
+local Tiled = require(script.Parent.Parent.Tiled)
+
+local PITCH = 28
+local WALL_HEIGHT = 22
+local ZONE_DEPTH = 608
+
+local function parse(rows)
+	local nodeRows = (#rows - 1) // 2
+	local nodeCols = (#rows[1] - 1) // 2
+	local lattice = { cols = nodeCols, rows = nodeRows, H = {}, V = {}, cell = {} }
+	for j = 0, nodeRows do
+		local line = rows[2 * j + 1]
+		lattice.H[j] = {}
+		for c = 0, nodeCols - 1 do
+			lattice.H[j][c] = string.sub(line, 2 * c + 2, 2 * c + 2)
+		end
+	end
+	for r = 0, nodeRows - 1 do
+		local line = rows[2 * r + 2]
+		lattice.V[r] = {}
+		lattice.cell[r] = {}
+		for i = 0, nodeCols do
+			lattice.V[r][i] = string.sub(line, 2 * i + 1, 2 * i + 1)
+		end
+		for c = 0, nodeCols - 1 do
+			lattice.cell[r][c] = string.sub(line, 2 * c + 2, 2 * c + 2)
+		end
+	end
+	return lattice
+end
+
+-- The warren's coordinates, or a side room's (origin 0, 0).
+local function gridOf(ox, oz)
+	return {
+		nodeX = function(i)
+			return ox + PITCH * i
+		end,
+		nodeZ = function(j)
+			return oz + PITCH * j
+		end,
+		cellX = function(c)
+			return ox + 14 + PITCH * c
+		end,
+		cellZ = function(r)
+			return oz + 14 + PITCH * r
+		end,
+	}
+end
+
+local WARREN = gridOf(-336, 12)
+
+local function wall(path)
+	return { Kind = "Wall", Path = path, Height = WALL_HEIGHT, Width = 12 }
+end
+
+-- The walls of a maze that the `base` maze doesn't already have. With `inner`, the maze's own
+-- border is left to whoever drew it (a room's border is the frame's, with its door).
+local function wallsOf(lattice, grid, base, inner)
+	local list = {}
+	local function has(l, kind, a, b)
+		return l ~= nil and l[kind][a][b] == (if kind == "H" then "-" else "|")
+	end
+	for j = 0, lattice.rows do
+		if not (inner and (j == 0 or j == lattice.rows)) then
+			for c = 0, lattice.cols do
+				local here = c < lattice.cols and has(lattice, "H", j, c) and not has(base, "H", j, c)
+				if here then
+					table.insert(list, wall({ { grid.nodeX(c), grid.nodeZ(j) }, { grid.nodeX(c + 1), grid.nodeZ(j) } }))
+				end
+			end
+		end
+	end
+	for i = 0, lattice.cols do
+		if not (inner and (i == 0 or i == lattice.cols)) then
+			for r = 0, lattice.rows do
+				local here = r < lattice.rows and has(lattice, "V", r, i) and not has(base, "V", r, i)
+				if here then
+					table.insert(list, wall({ { grid.nodeX(i), grid.nodeZ(r) }, { grid.nodeX(i), grid.nodeZ(r + 1) } }))
+				end
+			end
+		end
+	end
+	return list
+end
+
+-- Rubble in the doorways: a pile of sand across each 'r'.
+local function rubbleOf(lattice, grid)
+	local list = {}
+	local function pile(x1, z1, x2, z2)
+		table.insert(list, { Kind = "Ridge", Path = { { x1, z1 }, { x2, z2 } }, Height = 4.2, Width = 24 })
+	end
+	for j = 0, lattice.rows do
+		for c = 0, lattice.cols - 1 do
+			if lattice.H[j][c] == "r" then
+				pile(grid.nodeX(c), grid.nodeZ(j), grid.nodeX(c + 1), grid.nodeZ(j))
+			end
+		end
+	end
+	for r = 0, lattice.rows - 1 do
+		for i = 0, lattice.cols do
+			if lattice.V[r][i] == "r" then
+				pile(grid.nodeX(i), grid.nodeZ(r), grid.nodeX(i), grid.nodeZ(r + 1))
+			end
+		end
+	end
+	return list
+end
+
+-- Roofs over every corridor cell: a slab resting on the walls, row by row. A cell stays open
+-- where `lattice` or `frame` marks it (a chamber, a slot, a gap in the roof).
+local function roofsOf(lattice, grid, frame)
+	local list = {}
+	for r = 0, lattice.rows - 1 do
+		local start = nil
+		for c = 0, lattice.cols do
+			local roofed = c < lattice.cols
+				and lattice.cell[r][c] == " "
+				and (frame == nil or frame.cell[r][c] == " ")
+			if roofed and not start then
+				start = c
+			elseif not roofed and start then
+				local z = grid.cellZ(r)
+				local path = if start == c - 1 then { { grid.cellX(start), z } } else { { grid.cellX(start), z }, { grid.cellX(c - 1), z } }
+				table.insert(list, { Kind = "Roof", Path = path, Width = 32, Clearance = 20, Thickness = 8 })
+				start = nil
+			end
+		end
+	end
+	return list
+end
+
+local function point(grid, cell)
+	return { grid.cellX(cell[1]), grid.cellZ(cell[2]) }
+end
+
+local function patrolsOf(grid, crabs)
+	local list = {}
+	for _, cells in crabs do
+		local path = {}
+		for _, cell in cells do
+			table.insert(path, point(grid, cell))
+		end
+		table.insert(list, { Type = "Patrol", Path = path, Count = 1 })
+	end
+	return list
+end
+
+local function lootOf(grid, spots)
+	local list = {}
+	for _, spot in spots do
+		local at = point(grid, spot)
+		table.insert(list, { At = at, Radius = 6, Weight = spot[3] })
+	end
+	return list
+end
+
+local function append(into, from)
+	for _, item in from do
+		table.insert(into, item)
+	end
+end
