@@ -1831,9 +1831,11 @@ test("walls get an invisible barrier inside them, open where a ramp cuts through
 	end
 	WallBarriers.build(tile)
 	assert(#h.game.Workspace.WallBarriers["Tile" .. tile]:GetChildren() == 2, "built as parts")
-	Layouts.setActive(tile, nil)
+	Layouts.setActive(tile, false)
 	WallBarriers.build(tile)
 	assert(#h.game.Workspace.WallBarriers["Tile" .. tile]:GetChildren() == 0, "and gone with the wall")
+	Layouts.setActive(tile, nil)
+	WallBarriers.build(tile)
 end)
 
 test("roofs make caves: rock overhead, the floor still the ground", function()
