@@ -189,7 +189,7 @@ local function wreck(parent: Instance, position: Vector3, yaw: number)
 	add(parent, {
 		Name = "WreckMast",
 		Size = Vector3.new(14, 0.8, 0.8),
-		CFrame = cf * CFrame.new(3, 8, 0) * CFrame.Angles(0, 0, math.pi / 2 - math.rad(8)),
+		CFrame = cf * CFrame.new(3, 6, 0) * CFrame.Angles(0, 0, math.pi / 2 - math.rad(8)), -- its foot in the sand
 		Color = Palette.World.Mast,
 		Material = Palette.Material.Wood,
 	})
