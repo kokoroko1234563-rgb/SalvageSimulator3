@@ -105,9 +105,11 @@ Placements, all optional and in tile coordinates:
    - Other shapes: at most 12 high and 4 deep.
    - Rock ridges: at least 16 wide. Narrower ones get rounded off by the terrain.
    - Nothing narrower than 8 studs. The terrain is built in 4-stud cells.
-   - **Put walls on the 4-stud grid**: a wall's centre line at z (and x, for walls running down
-     the beach) a multiple of 4, and an even `Width` that's a multiple of 4. Off the grid, a wall
-     is drawn a few studs wider or narrower than its layout says.
+   - **Put walls' faces on the 4-stud grid**: both faces at 4k+2 (the centre line ± Width/2,
+     in z, or x for walls running down the beach). So a Width of 12 or 20 needs its centre on a
+     multiple of 4, and 16 or 24 a centre on 4k+2 (34, 94, ...). Off the grid, a wall is drawn
+     up to 5 studs narrower than its layout says. Walls under about 12 tall get their tops
+     rounded off and draw narrower too.
 6. **Rock pools.** Keep shapes 6+ studs clear of the rock pools that lie in your zone (see
    `Config.Beach.Pools`; the tests check the pools against the zone they lie in).
 7. **Edges.** Shapes fade to flat over the first and last 6 studs of a tile and the last 30

@@ -138,7 +138,22 @@ function Cosmetics.build(map: Instance): { Models: number, Textures: number }
 			else
 				position = bandSpot(ZONE_OF_THEME[kind.Theme], rng)
 			end
+			local before = #kindFolder:GetChildren()
 			kind.Build(kindFolder, position, rng)
+			if kind.Region ~= "plot" then
+				-- A stamp's pieces spread a few studs round its middle: each follows the ground
+				-- under itself (the layouts' ground isn't level, next to a wall or a bank).
+				local middle = Beach.groundAt(position.X, position.Z)
+				for index, piece in kindFolder:GetChildren() do
+					if index > before and piece:IsA("BasePart") then
+						local at = piece.CFrame.Position
+						local rise = Beach.groundAt(at.X, at.Z) - middle
+						if math.abs(rise) > 0.01 then
+							piece.CFrame += Vector3.new(0, rise, 0)
+						end
+					end
+				end
+			end
 			placedTextures += 1
 		end
 	end
