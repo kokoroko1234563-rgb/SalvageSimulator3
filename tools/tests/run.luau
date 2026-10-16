@@ -1182,7 +1182,7 @@ local function poolsOnZone(Beach, zone: number)
 	end
 	return list
 end
-local LAYOUT_COLS = 84 -- grid columns either side of X = 0 (336 studs)
+local LAYOUT_COLS = 88 -- grid columns either side of X = 0 (352 studs)
 local LAYOUT_UNITS = 6 -- zones tested, one tile each (Config.Beach.ActiveZones)
 local LAYOUT_LENGTH = 608 -- Config.Beach.TileLength: a tile is a zone
 local LAYOUT_END = LAYOUT_UNITS * LAYOUT_LENGTH - 8 -- the seaward end of the last zone
@@ -1438,25 +1438,36 @@ local function layoutHidden(zone: number): number
 	return hidden / math.max(total, 1)
 end
 
-test("every layout keeps a ramp on each side, anchored where the zones join", function()
+test("every way through a zone has a cart ramp from its top edge to its bottom edge", function()
+	local Config = h.require("Shared/Config")
 	local Layouts = h.require("Shared/Layouts")
+	local length = Config.Beach.TileLength
 	local function anchored(p, x)
 		local first, last = p.Path[1], p.Path[#p.Path]
 		return first[1] == x and first[2] == 0 and last[1] == x and last[2] == 150
 	end
 	for _, entry in Layouts.all(true) do
-		local left, right = false, false
-		for _, p in entry.Layout.Primitives do
+		local layout: any = entry.Layout
+		local top, bottom, left, right = false, false, false, false
+		for _, p in layout.Primitives do
 			if p.Kind == "Ramp" then
 				assert(p.Width >= 14, entry.Source .. ": a ramp is at least 14 studs wide")
+				local first, last = p.Path[1], p.Path[#p.Path]
+				top = top or first[2] <= 8 or last[2] <= 8
+				bottom = bottom or first[2] >= length - 8 or last[2] >= length - 8
 				left = left or anchored(p, -200)
 				right = right or anchored(p, 180)
 			end
 		end
-		assert(
-			left and right,
-			entry.Source .. " (zone " .. entry.Zone .. "): needs ramps from x = -200 and x = 180"
-		)
+		if layout.FadeEvery then
+			-- Old 152-stud layouts: ramps on both sides, anchored at each old tile edge.
+			assert(left and right, entry.Source .. ": needs ramps from x = -200 and x = 180")
+		else
+			assert(
+				top and bottom,
+				entry.Source .. ": needs ramps from the zone's top edge to its bottom edge"
+			)
+		end
 	end
 end)
 
@@ -1545,6 +1556,75 @@ test("a player on foot can reach every biome's entrance spot in every zone it ro
 	end)
 	assert(checked > 0, "there are entrance spots to check")
 	assert(#failures == 0, "unreachable on foot: " .. table.concat(failures, "; "))
+end)
+
+test("every loot spot and entrance can be reached on foot, whichever way the zone comes out", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local grid = layoutGrid()
+	local failures = {}
+	for zone = 1, Config.Beach.ActiveZones do
+		for _, option in grid.options[zone] do
+			-- Every cell reachable from the zone's top edge on foot.
+			local rows = {}
+			for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
+				if grid.zoneOfRow[iz] == zone then
+					table.insert(rows, iz)
+				end
+			end
+			local top, bottom = rows[1], rows[#rows]
+			local seen, queue, head = {}, {}, 1
+			for ix = -LAYOUT_COLS, LAYOUT_COLS do
+				seen[layoutKey(ix, top)] = true
+				table.insert(queue, { ix, top })
+			end
+			local slope = Config.Beach.Terrain.FootSlope * LAYOUT_GRID
+			while head <= #queue do
+				local ix, iz = queue[head][1], queue[head][2]
+				head += 1
+				local y = option.heights[layoutKey(ix, iz)]
+				for _, step in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+					local nx, nz = ix + step[1], iz + step[2]
+					local k = layoutKey(nx, nz)
+					if math.abs(nx) <= LAYOUT_COLS and nz >= top and nz <= bottom and not seen[k] then
+						local ny = option.heights[k]
+						-- Up only as steep as players can walk; down any drop.
+						if ny and ny - y <= slope then
+							seen[k] = true
+							table.insert(queue, { nx, nz })
+						end
+					end
+				end
+			end
+			Layouts.setActive(zone, option.id, zone, option.choice)
+			local z0 = Beach.tileRange(zone)
+			local spots = {}
+			for _, spot in Layouts.lootSpots(zone, z0) do
+				table.insert(spots, { spot.X, spot.Z, "loot spot" })
+			end
+			for _, point in Layouts.entrances(zone, z0) do
+				table.insert(spots, { point.X, point.Y, "entrance" })
+			end
+			Layouts.setActive(zone, nil)
+			for _, spot in spots do
+				if not layoutReaches(seen, spot[1], spot[2]) then
+					table.insert(
+						failures,
+						string.format(
+							"%s (zone %d): %s at (%d, %d)",
+							option.name,
+							zone,
+							spot[3],
+							spot[1],
+							spot[2] - z0
+						)
+					)
+				end
+			end
+		end
+	end
+	assert(#failures == 0, "can't be reached on foot: " .. table.concat(failures, "; "))
 end)
 
 test("every zone has at least two shortcuts a player on foot can take faster than a cart", function()
