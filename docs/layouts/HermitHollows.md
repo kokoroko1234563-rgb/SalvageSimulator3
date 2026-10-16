@@ -87,14 +87,14 @@ RRRRRRRRRRRRRRR==RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==RRRRRRRRRRRRRRRRR
 RRRRRRR==========RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==========RRRRRRRRR
 RRRRRRR==RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==RRRRRRRRR
 RRRRRRR=========RRRRRRRRRRRRRRRRR~~~~~~~~RRRRRRRRRRRRR=========RRRRRRRRR
-RRRRRRR==========RRRRRRRRRRRRRRR~##~o~~~~RRRRRRRRRRRR==========RRRRRRRRR
-RRRRRRRRRRRRRRR==RRRRRRRRRRRRRR~~~~ooo~##~RRRRRRRRRRR==RRRRRRRRRRRRRRRRR
-RRRRRRRR=========RRRRRRRRRRRRRRR~~~#o~~##RRRRRRRRRRRR=========RRR~~~~~~~
-RRRRRRR=========RRRRRRRRRRRRRRRR########RRRRRRRRRRRRRR=========RR#######
+RRRRRRR==========RRRRRRRRRRRRRRR~~~~o~~~~RRRRRRRRRRRR==========RRRRRRRRR
+RRRRRRRRRRRRRRR==RRRRRRRRRRRRRR####ooo####RRRRRRRRRRR==RRRRRRRRRRRRRRRRR
+RRRRRRRR=========RRRRRRRRRRRRRRR~~~~o~~~~RRRRRRRRRRRR=========RRR~~~~~~~
+RRRRRRR=========RRRRRRRRRRRRRRRR~~~~~~~~RRRRRRRRRRRRRR=========RR~~~~~~~
 RRRRRRR==RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==R~~~~~~~~
-RRRRRRR==========RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==========RR~~~~~~~
-RRRRRRRR=========RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR=========RRR~~~~~~~
-###############==####~~###########RR############~~###==##############~##
+RRRRRRR==========RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==========RR#######
+RRRRRRRR=========RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR=========RRR#######
+~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~RR~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~
 ```
 <!-- /map -->
@@ -137,11 +137,11 @@ The deepest burrow. Walls 24 tall, roofs at 20, and everything roofed but one ch
 <!-- map Biomes/HermitHollows@6 -->
 ```text
 ~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~==~~~~~RR~~~~~~~~~~~~~~~~~~~~RR~~~~~~~==~~~~~~~~~~~~~~~~~
+##############~==~##~~RR#####~~#############RR##~~##~==~################
 RRRRRRRRRRRRRRR==RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==RRRRRRRRRRRRRRRRR
 RRR==============RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==============RRRRR
 RRR==RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==RRRRR
-RRR=============RRR#~~~#~~RRRRRRRRRRRRRRRRRRRRRRRRRRRR=============RRRRR
+RRR=============RRR#####~~RRRRRRRRRRRRRRRRRRRRRRRRRRRR=============RRRRR
 RRR==============RR~~~~~~RRRRRRRRRRRRRRRRRRRRRRRRRRRR==============RRRRR
 RRRRRRRRRRRRRRR==R~~~oo~~~RRRRRRRRRRRRRRRRRRRRRRRRRRR==RRRRRRRRRRRRRRRRR
 RRRR=============RR~~oo~~RRRRRRRRRRRRRRRRRRRRRRRRRRRR=============RRRRRR
@@ -149,7 +149,7 @@ RRR=============RRR######RRRRRRRRRRRRRRRRRRRRRRRRRRRRR=============RRRRR
 RRR==RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==RRRRR
 RRR==============RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==============RRRRR
 RRRR=============RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR=============RRRRRR
-###############==####~~##RR#####################~~###==##############~##
+##############~==~#######RR##~~#####################~==~################
 ~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~
 ```
 <!-- /map -->
