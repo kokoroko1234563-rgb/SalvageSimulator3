@@ -67,6 +67,45 @@ local function pole(handle: BasePart, tip: number, thickness: number, color: Col
 	sleeve(handle, "Grip", 0.75, 0.05, thickness * 1.7, T.Red, Smooth)
 end
 
+builders.Lantern = function(handle)
+	-- A storm lantern hanging from the hand by its bail: iron cap and base, glowing glass.
+	local tool = Gear.getTool("Lantern")
+	bar(handle, "Bail", point(-0.25, 0, -0.1), point(0.25, 0, -0.1), 0.08, T.LanternIron, Metal)
+	piece(
+		handle,
+		"Cap",
+		Cylinder,
+		Vector3.new(0.25, 0.7, 0.7),
+		CFrame.new(0, -0.35, -0.1) * CFrame.Angles(0, 0, math.pi / 2),
+		T.LanternIron,
+		Metal
+	)
+	local glass = piece(
+		handle,
+		"Glass",
+		Cylinder,
+		Vector3.new(0.8, 0.55, 0.55),
+		CFrame.new(0, -0.9, -0.1) * CFrame.Angles(0, 0, math.pi / 2),
+		T.LanternGlass,
+		Neon
+	)
+	piece(
+		handle,
+		"Base",
+		Cylinder,
+		Vector3.new(0.2, 0.75, 0.75),
+		CFrame.new(0, -1.4, -0.1) * CFrame.Angles(0, 0, math.pi / 2),
+		T.LanternIron,
+		Metal
+	)
+	local light = Instance.new("PointLight")
+	light.Color = tool.Light.Color
+	light.Range = tool.Light.Range
+	light.Brightness = tool.Light.Brightness
+	light.Shadows = false
+	light.Parent = glass
+end
+
 builders.BeachRake = function(handle)
 	pole(handle, -2.1, 0.14, T.Pole, Wood)
 	bar(handle, "Head", point(-0.75, 0, -2.15), point(0.75, 0, -2.15), 0.14, T.Steel, Metal)

@@ -160,7 +160,7 @@ end
 
 -- Finds what the player is pointing at: the part under the pointer if it's grabbable,
 -- otherwise the nearest grabbable thing close to where the pointer ray landed.
-local function pick(screenPosition: Vector2): (BasePart?, ("item" | "vessel")?, Vector3?, string)
+local function pickAny(screenPosition: Vector2): (BasePart?, ("item" | "vessel")?, Vector3?, string)
 	local hit = raycastFrom(screenPosition)
 	if not hit then
 		return nil, nil, nil, "pointer hit nothing"
@@ -258,6 +258,16 @@ local function cleanup()
 end
 
 -- Whether this client is holding something (an item or a vessel's handle).
+-- What the pointer is on, for the tool in hand: a tool that can't pick things up (the
+-- Lantern) only takes vessels.
+local function pick(screenPosition: Vector2): (BasePart?, ("item" | "vessel")?, Vector3?, string)
+	local part, kind, at, why = pickAny(screenPosition)
+	if kind == "item" and currentTool().NoGrab then
+		return nil, nil, nil, "the tool in hand can't pick things up"
+	end
+	return part, kind, at, why
+end
+
 function GrabController.isHolding(): boolean
 	return held ~= nil
 end

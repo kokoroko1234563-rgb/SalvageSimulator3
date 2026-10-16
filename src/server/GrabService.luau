@@ -59,6 +59,9 @@ local function grabItem(player: Player, item: BasePart, root: BasePart): (boolea
 	end
 
 	local tool = Gear.getTool(player:GetAttribute("Tool"))
+	if tool.NoGrab then
+		return false, "Your " .. tool.Name .. " can't pick things up"
+	end
 	if (item.Position - root.Position).Magnitude > tool.Reach + cfg.ReachSlack then
 		return false, "Too far away"
 	end

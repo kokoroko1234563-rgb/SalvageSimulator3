@@ -300,6 +300,8 @@ Palette.ToolModel = {
 	Lava = rgb(255, 112, 40),
 	Ice = rgb(170, 235, 255),
 	Frost = rgb(232, 250, 255),
+	LanternGlass = rgb(255, 226, 160),
+	LanternIron = rgb(60, 58, 56),
 }
 
 -- Paint for the vessels (src/server/VesselTrim.luau).

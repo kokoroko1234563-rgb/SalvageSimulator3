@@ -217,6 +217,24 @@ Gear.Tools = {
 		Exotic = true,
 		Freeze = { Duration = 5, Cooldown = 25, Radius = 30 },
 	},
+	{
+		-- Temporary, for exploring the dark deep zones: given with the admin console (give
+		-- lantern), not sold. Held from the hotbar like a tool, it lights the way but picks
+		-- nothing up (carts can still be towed).
+		Id = "Lantern",
+		Rarity = "Common",
+		Name = "Lantern",
+		Price = 0,
+		Reach = 0,
+		Lift = Gear.WeightClass.Light,
+		Depth = Gear.Depth.Dry,
+		Grip = 0,
+		GripBreak = 0,
+		NoGrab = true,
+		Light = { Color = Color3.fromRGB(255, 214, 140), Range = 40, Brightness = 2.5 },
+		Note = "Lights the way; can't pick anything up",
+		Available = false,
+	},
 }
 
 Gear.Vessels = {
@@ -398,6 +416,15 @@ Gear.Vessels = {
 -- Worn items. Exotic ones need attunement.
 Gear.Accessories = {
 	{
+		-- Temporary, for exploring the dark deep zones: given with the admin console (give
+		-- headlamp), not sold. To be replaced by proper lamp gear.
+		Id = "Headlamp",
+		Name = "Headlamp",
+		Rarity = "Common",
+		Light = { Color = Color3.fromRGB(255, 244, 220), Range = 40, Brightness = 2.5 },
+		Note = "Lights up the dark around you",
+	},
+	{
 		Id = "DeckhandsSatchel",
 		Name = "Deckhand's Satchel",
 		Rarity = "Exotic",
@@ -569,7 +596,7 @@ end
 function Gear.bestTool(owned: { [string]: boolean })
 	local best = Gear.Tools[1]
 	for _, tool in Gear.Tools do
-		if owned[tool.Id] and not tool.Exotic and not tool.Magical then
+		if owned[tool.Id] and not tool.Exotic and not tool.Magical and not tool.NoGrab then
 			best = tool
 		end
 	end
