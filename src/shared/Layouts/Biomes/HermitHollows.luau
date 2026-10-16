@@ -1,147 +1,141 @@
--- Hermit Hollows (draft; it rolls in zones 4 to 6): a tight maze of rock-walled corridors, about 12 studs wide, with
--- dead ends and one way through. The maze sits between the cart ramps, so the ramps still go round
--- the outside. Walls alternate their gap from end to end. A bank across the zone gives players on
--- foot a shortcut that carts can't take. Heights follow the zone's limit. Rock only in zone 4.
-local LIMIT = { 2, 4.5, 6.5, 9 }
-
--- The bank across the zone: foot-only in zones 1 to 3 (carts take the ramps), rock with a gap in zone 4.
-local function bank(zone: number)
-	if zone == 1 then
-		return {
-			{
-				Kind = "Ridge",
-				Path = { { -360, 138 }, { -200, 144 }, { 0, 138 }, { 200, 144 }, { 360, 138 } },
-				Height = 2,
-				Width = 12,
-			},
-		}
-	elseif zone == 2 then
-		return {
-			{
-				Kind = "Ridge",
-				Path = { { -360, 44 }, { -180, 50 }, { 0, 42 }, { 180, 50 }, { 360, 44 } },
-				Height = 4.8,
-				Width = 18,
-			},
-			{
-				Kind = "Ridge",
-				Path = { { -360, 100 }, { -120, 104 }, { 120, 100 }, { 360, 102 } },
-				Height = 4,
-				Width = 16,
-			},
-		}
-	elseif zone == 3 then
-		return {
-			{
-				Kind = "Ridge",
-				Path = { { -360, 40 }, { -200, 46 }, { 0, 38 }, { 200, 46 }, { 360, 40 } },
-				Height = 4.8,
-				Width = 18,
-			},
-			{
-				Kind = "Ridge",
-				Path = { { -360, 100 }, { -120, 104 }, { 120, 100 }, { 360, 102 } },
-				Height = 4,
-				Width = 16,
-			},
-		}
-	end
-	return {
-		{
-			Kind = "Ridge",
-			Path = { { -360, 40 }, { -200, 36 }, { -100, 42 } },
-			Height = 9,
-			Width = 12,
-			Rock = true,
-		},
-		{
-			Kind = "Ridge",
-			Path = { { -20, 42 }, { 120, 36 }, { 360, 40 } },
-			Height = 9,
-			Width = 12,
-			Rock = true,
-		},
-		{
-			Kind = "Ridge",
-			Path = { { -300, 96 }, { -120, 90 }, { 20, 98 } },
-			Height = 8,
-			Width = 16,
-			Rock = true,
-		},
-		{
-			Kind = "Ridge",
-			Path = { { 80, 92 }, { 220, 84 }, { 340, 96 } },
-			Height = 8,
-			Width = 16,
-			Rock = true,
-		},
-	}
+-- Hermit Hollows, zone 4. Generated layout; see docs/layouts/HermitHollows.md.
+local function wall(path)
+	return { Kind = "Wall", Path = path, Height = 22, Width = 12 }
 end
 
-local function ramps()
-	return {
-		{ Kind = "Ramp", Path = { { -200, 0 }, { -250, 40 }, { -225, 90 }, { -200, 150 } }, Width = 16 },
-		{ Kind = "Ramp", Path = { { 180, 0 }, { 215, 60 }, { 205, 110 }, { 180, 150 } }, Width = 16 },
-	}
+local function roof(path, width)
+	return { Kind = "Roof", Path = path, Width = width, Clearance = 20, Thickness = 8 }
 end
 
-local function concat(...)
-	local out = {}
-	for _, list in { ... } do
-		table.move(list, 1, #list, #out + 1, out)
-	end
-	return out
-end
-
-local function build(zone: number)
-	local top, rock = LIMIT[zone], zone == 4
-	local walls = {}
-	-- Walls spaced 24 apart leave corridors 12 wide. Each leaves its gap at one end, alternately.
-	for i, z in { 60, 84, 108 } do
-		local ends = if i % 2 == 1 then { -120, 70 } else { -70, 120 }
-		-- Where it rolls (zone 4 and below), the walls are real rock walls you can't climb.
-		table.insert(
-			walls,
-			if rock
-				then {
-					Kind = "Wall",
-					Path = { { ends[1], z }, { (ends[1] + ends[2]) / 2, z }, { ends[2], z } },
-					Height = 20,
-					Width = 12,
-				}
-				else {
-					Kind = "Ridge",
-					Path = { { ends[1], z }, { (ends[1] + ends[2]) / 2, z }, { ends[2], z } },
-					Height = top * 0.8,
-					Width = 12,
-					Rock = rock,
-				}
-		)
-	end
-	if rock then
-		-- Where it rolls, a roof rests on the middle of the maze: its corridors there are tunnels.
-		table.insert(walls, { Kind = "Roof", At = { -25, 84 }, Radius = 45, Clearance = 16, Thickness = 6 })
-	end
-	return {
-		Name = "Hermit Hollows (zone " .. zone .. ", draft)",
-		Primitives = concat(bank(zone), ramps(), walls, {
-			-- Dead-end stubs off the corridors.
-			{
-				Kind = "Ridge",
-				Path = { { -60, 72 }, { -20, 72 } },
-				Height = top * 0.6,
-				Width = 10,
-				Rock = rock,
+local layout = {
+	Name = "Hermit Hollows (zone 4)",
+	Primitives = {
+		-- Cart ramps
+		{
+			Kind = "Ramp",
+			Path = {
+				{ -200, 0 },
+				{ -200, 34 },
+				{ -124, 34 },
+				{ -124, 62 },
+				{ -200, 62 },
+				{ -200, 90 },
+				{ -124, 90 },
+				{ -124, 118 },
+				{ -200, 118 },
+				{ -200, 150 },
 			},
-			{
-				Kind = "Ridge",
-				Path = { { 50, 96 }, { 100, 96 } },
-				Height = top * 0.6,
-				Width = 10,
-				Rock = rock,
+			Width = 14,
+		},
+		{
+			Kind = "Ramp",
+			Path = {
+				{ 180, 0 },
+				{ 180, 34 },
+				{ 104, 34 },
+				{ 104, 62 },
+				{ 180, 62 },
+				{ 180, 90 },
+				{ 104, 90 },
+				{ 104, 118 },
+				{ 180, 118 },
+				{ 180, 150 },
 			},
-		}),
-	}
-end
+			Width = 14,
+		},
+		-- Row walls and dividers
+		wall({ { -358, 20 }, { -214, 20 } }),
+		wall({ { -186, 20 }, { 46, 20 } }),
+		wall({ { 74, 20 }, { 166, 20 } }),
+		wall({ { 194, 20 }, { 280, 20 }, { 358, 20 } }),
+		wall({ { -358, 48 }, { -304, 48 } }),
+		wall({ { -276, 48 }, { -138, 48 } }),
+		wall({ { -110, 48 }, { -34, 48 } }),
+		wall({ { -6, 48 }, { 90, 48 } }),
+		wall({ { 118, 48 }, { 226, 48 } }),
+		wall({ { 306, 48 }, { 358, 48 } }),
+		wall({ { -358, 76 }, { -334, 76 } }),
+		wall({ { -306, 76 }, { -214, 76 } }),
+		wall({ { -186, 76 }, { -66, 76 } }),
+		wall({ { 16, 76 }, { 166, 76 } }),
+		wall({ { 194, 76 }, { 226, 76 } }),
+		wall({ { 306, 76 }, { 358, 76 } }),
+		wall({ { -358, 104 }, { -304, 104 } }),
+		wall({ { -276, 104 }, { -138, 104 } }),
+		wall({ { -110, 104 }, { 14, 104 } }),
+		wall({ { 74, 104 }, { 90, 104 } }),
+		wall({ { 118, 104 }, { 248, 104 } }),
+		wall({ { 276, 104 }, { 358, 104 } }),
+		wall({ { -358, 132 }, { -214, 132 } }),
+		wall({ { -186, 132 }, { -34, 132 } }),
+		wall({ { -6, 132 }, { 166, 132 } }),
+		wall({ { 194, 132 }, { 358, 132 } }),
+		wall({ { -250, 48 }, { -250, 76 }, { -250, 104 }, { -250, 132 } }),
+		wall({ { -70, 20 }, { -70, 48 }, { -70, 76 } }),
+		wall({ { -70, 104 }, { -70, 132 } }),
+		wall({ { 90, 20 }, { 90, 48 } }),
+		wall({ { 90, 76 }, { 90, 104 }, { 90, 132 } }),
+		wall({ { 232, 20 }, { 232, 48 }, { 232, 76 } }),
+		wall({ { 232, 104 }, { 232, 132 } }),
+		wall({ { 300, 20 }, { 300, 48 }, { 300, 76 }, { 300, 104 } }),
+		-- Foot scrambles
+		{ Kind = "Ridge", Path = { { 20, 104 }, { 56, 104 } }, Height = 5, Width = 20 },
+		-- Roofs
+		roof({ { -340, 34 }, { 232, 34 } }, 28),
+		roof({ { 300, 34 }, { 340, 34 } }, 28),
+		roof({ { -340, 62 }, { -60, 62 } }, 28),
+		roof({ { 10, 62 }, { 232, 62 } }, 28),
+		roof({ { 300, 62 }, { 340, 62 } }, 28),
+		roof({ { -340, 90 }, { -60, 90 } }, 28),
+		roof({ { 10, 90 }, { 232, 90 } }, 28),
+		roof({ { 300, 90 }, { 340, 90 } }, 28),
+		roof({ { -340, 118 }, { 340, 118 } }, 28),
+		roof({ { -200, 17 }, { -200, 23 } }, 20),
+		roof({ { 60, 17 }, { 60, 23 } }, 20),
+		roof({ { 180, 17 }, { 180, 23 } }, 20),
+		roof({ { -124, 45 }, { -124, 51 } }, 20),
+		roof({ { -290, 45 }, { -290, 51 } }, 20),
+		roof({ { -20, 45 }, { -20, 51 } }, 20),
+		roof({ { 104, 45 }, { 104, 51 } }, 20),
+		roof({ { -200, 73 }, { -200, 79 } }, 20),
+		roof({ { -320, 73 }, { -320, 79 } }, 20),
+		roof({ { 180, 73 }, { 180, 79 } }, 20),
+		roof({ { -124, 101 }, { -124, 107 } }, 20),
+		roof({ { -290, 101 }, { -290, 107 } }, 20),
+		roof({ { 60, 101 }, { 60, 107 } }, 20),
+		roof({ { 104, 101 }, { 104, 107 } }, 20),
+		roof({ { 262, 101 }, { 262, 107 } }, 20),
+		roof({ { -200, 129 }, { -200, 135 } }, 20),
+		roof({ { -20, 129 }, { -20, 135 } }, 20),
+		roof({ { 180, 129 }, { 180, 135 } }, 20),
+		-- Chambers
+		{ Kind = "Mound", At = { -52, 92 }, Radius = 8, Height = 6, Rock = true },
+		{ Kind = "Mound", At = { 6, 92 }, Radius = 8, Height = 6, Rock = true },
+		{ Kind = "Mound", At = { 292, 60 }, Radius = 8, Height = 6, Rock = true },
+		{ Kind = "Mound", At = { 276, 34 }, Radius = 8, Height = 5, Rock = true },
+		{ Kind = "Flat", At = { -25, 76 }, Radius = 12 },
+	},
+	Loot = {
+		{ At = { -332, 118 }, Radius = 6, Weight = 5 },
+		{ At = { -268, 90 }, Radius = 6, Weight = 3 },
+		{ At = { -332, 62 }, Radius = 6, Weight = 3 },
+		{ At = { -236, 90 }, Radius = 6, Weight = 1 },
+		{ At = { -54, 34 }, Radius = 6, Weight = 2 },
+		{ At = { 80, 34 }, Radius = 6, Weight = 2 },
+		{ At = { 215, 90 }, Radius = 6, Weight = 3 },
+		{ At = { 288, 88 }, Radius = 6, Weight = 3 },
+		{ At = { 322, 118 }, Radius = 6, Weight = 5 },
+		{ At = { 270, 118 }, Radius = 6, Weight = 3 },
+	},
+	Entrances = { { -25, 76 } },
+	Hazards = {
+		{ Type = "Patrol", Path = { { -190, 62 }, { -134, 62 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -190, 90 }, { -134, 90 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -190, 118 }, { -134, 118 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { 170, 34 }, { 114, 34 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { 170, 90 }, { 114, 90 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -60, 62 }, { 40, 62 } }, Count = 1 },
+	},
+}
 
-return { build(1), build(2), build(3), build(4) }
+return { [4] = layout }
