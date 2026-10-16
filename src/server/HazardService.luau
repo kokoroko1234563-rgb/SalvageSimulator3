@@ -533,6 +533,86 @@ function builders.Undertow(tile, settings, folder)
 	})
 end
 
+-- Gloom: a living darkness, drawn as an inky fog over its area, drifting back and forth along
+-- its Path (or lying still), swelling once the tide turns. The dread it causes is each
+-- client's to feel (HazardController); the server only moves it and takes whoever it fills.
+local GLOOM_SMOKE = "rbxasset://textures/particles/smoke_main.dds"
+
+function builders.Gloom(tile, settings, folder)
+	local z0 = Beach.tileRange(tile)
+	local glooms = {}
+	for _, placement in Layouts.hazardPlacements(tile, "Gloom") do
+		local path = {}
+		for _, point in placement.Path or { placement.At } do
+			table.insert(path, Vector2.new(point[1], z0 + point[2]))
+		end
+		if #path == 0 then
+			continue
+		end
+		local radius = placement.Radius or settings.Radius
+		local part = makePart({
+			Name = "Gloom",
+			Size = Vector3.new(radius * 2, 10, radius * 2),
+			CFrame = CFrame.new(path[1].X, Beach.groundAt(path[1].X, path[1].Y) + 5, path[1].Y),
+			Transparency = 1,
+		})
+		arm(part, settings)
+		part:SetAttribute("HitRadius", radius)
+		part:SetAttribute("Fill", settings.Fill)
+		part:SetAttribute("LightFill", settings.LightFill)
+		part:SetAttribute("Drain", settings.Drain)
+		local smoke = Instance.new("ParticleEmitter")
+		smoke.Texture = GLOOM_SMOKE
+		smoke.Color = ColorSequence.new(settings.Color)
+		smoke.Size = NumberSequence.new(9, 14)
+		smoke.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.3, 0.15),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		smoke.Lifetime = NumberRange.new(3, 5)
+		smoke.Rate = 30
+		smoke.Speed = NumberRange.new(0.2, 0.8)
+		smoke.Rotation = NumberRange.new(0, 360)
+		smoke.RotSpeed = NumberRange.new(-10, 10)
+		smoke.LightInfluence = 0
+		smoke.Shape = Enum.ParticleEmitterShape.Box
+		smoke.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		smoke.Parent = part
+		part.Parent = folder
+		local length = 0
+		for i = 1, #path - 1 do
+			length += (path[i + 1] - path[i]).Magnitude
+		end
+		table.insert(glooms, { part = part, path = path, length = length, radius = radius, smoke = smoke })
+	end
+	if #glooms == 0 then
+		return
+	end
+	table.insert(running, {
+		folder = folder,
+		step = function(now)
+			local swell = if Tide.getState().Phase == "In" then settings.Swell else 1
+			for _, g in glooms do
+				local at = g.path[1]
+				if g.length > 0 then
+					-- Back and forth along its path.
+					local travelled = (now * settings.Speed) % (g.length * 2)
+					local along = if travelled > g.length then g.length * 2 - travelled else travelled
+					at = HazardService.alongPath(g.path, along)
+				end
+				local radius = g.radius * swell
+				if g.part:GetAttribute("HitRadius") ~= radius then
+					g.part:SetAttribute("HitRadius", radius)
+					g.part.Size = Vector3.new(radius * 2, 10, radius * 2)
+					g.smoke.Rate = 30 * swell * swell
+				end
+				g.part.CFrame = CFrame.new(at.X, Beach.groundAt(at.X, at.Y) + 5, at.Y)
+			end
+		end,
+	})
+end
+
 HazardService.Builders = builders
 
 -- Builds a source's hazards on a tile into its folder: a biome's, or a plain zone's
@@ -563,7 +643,10 @@ function HazardService.init()
 			return
 		end
 		local effect = part:GetAttribute("Effect")
-		if (effect ~= "Harm" and effect ~= "Sink") or part:GetAttribute("Active") == false then
+		if
+			(effect ~= "Harm" and effect ~= "Sink" and effect ~= "Gloom")
+			or part:GetAttribute("Active") == false
+		then
 			return
 		end
 		local character = player.Character

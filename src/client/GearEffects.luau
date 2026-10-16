@@ -222,9 +222,12 @@ local function updateLights()
 				entry = { part = part, light = light }
 				have[slot] = entry
 			end
+			-- Your own light gutters in the Gloom (HazardController sets your "Gloom").
+			local gloom = if other == player then player:GetAttribute("Gloom") or 0 else 0
+			local flicker = if gloom > 0 then 1 - gloom * 0.6 * (0.8 + 0.2 * math.sin(os.clock() * 23)) else 1
 			entry.light.Color = want.spec.Color
-			entry.light.Range = want.spec.Range
-			entry.light.Brightness = want.spec.Brightness
+			entry.light.Range = want.spec.Range * (1 - gloom * 0.4)
+			entry.light.Brightness = want.spec.Brightness * flicker
 			entry.part.CFrame = want.target.CFrame
 		end
 	end

@@ -19,6 +19,11 @@
 --           pebbles trickling down; it Harms whoever it lands on. Placement: At = {x, z}.
 --   Undertow  while the sea covers it (deeper than MinDepth), a current along a ford or
 --           channel drags you toward the sea at Strength studs/s. Placement: Path, Width.
+--   Gloom   a living, magical darkness (the Drowned Reach's): an inky fog Radius studs across
+--           that drifts along its Path at Speed (or lies still At a spot), and swells by Swell
+--           once the tide turns. Inside it your dread rises: in Fill seconds it takes you
+--           (Damage), in LightFill if you carry a light. Out of it, or within a GloomWard's
+--           light (glowing decor), it drains. Placement: Path or At, Radius.
 --
 -- What a hazard does to a player who gets within HitRadius of it is its Effect:
 --   Knockdown  knocked over (you drop what you hold) and thrown Push studs/s away from it.
@@ -27,6 +32,7 @@
 --   Sink       slowed, and swallowed if you stay in it (Sink hazards).
 --   Current    dragged along (Undertow hazards): into deep water, where you drown.
 --   Harm       Damage taken (100 kills), and thrown Push studs/s away from it.
+--   Gloom      dread rising while you're in it (Gloom hazards); full, it takes you (Damage).
 -- Dangers are meant to be deadly: a hazard that only slows you is scenery.
 -- The server builds and moves the hazards (HazardService); each player's own client checks its
 -- character against them and applies the effect (HazardController), like the waves.
@@ -35,7 +41,10 @@ local Hazards = {}
 
 Hazards.Tag = "Hazard" -- CollectionService tag on the part a hazard hits with
 
-Hazards.Effects = { Knockdown = true, Drop = true, Slow = true, Sink = true, Current = true, Harm = true }
+Hazards.Effects =
+	{ Knockdown = true, Drop = true, Slow = true, Sink = true, Current = true, Harm = true, Gloom = true }
+
+Hazards.WardTag = "GloomWard" -- a light the Gloom can't reach: a part with a WardRadius attribute
 
 -- Each kind's settings and their defaults. A biome's entry overrides any of them.
 Hazards.Types = {
@@ -119,6 +128,21 @@ Hazards.Types = {
 		Push = 0,
 		HitText = "",
 	},
+	Gloom = {
+		Count = 2,
+		Radius = 22,
+		Speed = 2.5, -- studs/s along its Path
+		Swell = 1.5, -- its size once the tide is coming back in
+		Fill = 7, -- seconds inside it, without a light, until it takes you
+		LightFill = 16, -- with a light
+		Drain = 3, -- how much faster the dread drains than it rises
+		Damage = 100,
+		Color = Color3.fromRGB(12, 10, 20),
+		Effect = "Gloom",
+		HitRadius = 22,
+		Push = 0,
+		HitText = "The Gloom took you.",
+	},
 }
 
 -- Every kind may set Scatter: whether it's scattered over a zone without placements.
@@ -135,6 +159,7 @@ Hazards.Placement = {
 	Sink = { At = true, Radius = true },
 	Rockfall = { At = true },
 	Undertow = { Path = true, Width = true },
+	Gloom = { Path = true, At = true, Radius = true },
 }
 
 -- A biome's hazard entry with every setting filled in from its kind's defaults.

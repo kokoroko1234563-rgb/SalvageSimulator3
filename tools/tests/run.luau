@@ -2323,6 +2323,7 @@ test("a plain zone's own dangers go where its layout puts them, and they're dead
 			{ Type = "Sink", At = { 100, 200 }, Radius = 10 },
 			{ Type = "Rockfall", At = { 0, 120 } },
 			{ Type = "Undertow", Path = { { -200, 300 }, { -200, 400 } }, Width = 12 },
+			{ Type = "Gloom", Path = { { 100, 400 }, { 250, 400 } }, Radius = 20 },
 		},
 	})
 	local folder = Harness.wrap(roblox.Instance.new("Folder"))
@@ -2338,6 +2339,17 @@ test("a plain zone's own dangers go where its layout puts them, and they're dead
 		effects.Sink == 1 and effects.Harm == 1 and (effects.Current or 0) >= 3,
 		"each where it was placed"
 	)
+	assert(effects.Gloom == 1, "and the Gloom")
+	local gloom
+	for _, part in folder:GetChildren() do
+		if part.Name == "Gloom" then
+			gloom = part
+		end
+	end
+	HazardService._step(0, 0.1)
+	local startX = gloom.CFrame.X
+	HazardService._step(20, 0.1)
+	assert(math.abs(gloom.CFrame.X - startX) > 20, "the Gloom drifts along its path")
 	for _, entry in Config.Zones[tile].Hazards do
 		local settings = Hazards.settings(entry)
 		if settings.Damage then
