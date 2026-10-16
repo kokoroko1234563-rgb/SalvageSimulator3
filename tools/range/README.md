@@ -22,7 +22,8 @@ python3 tools/range/run.py --zone 2 --no-routes
   middle and bottom, and low tide.
 - `--no-routes`: skip pathfinding (quicker). `--no-publish`: reuse the last published build.
 
-A check takes about 15 to 60 seconds. The report is printed and saved to `tools/range/out/zone<N>.json`;
+A check takes about 15 to 60 seconds. Only one runs at a time (every run publishes its own build
+to the one Test Range place); others wait their turn. The report is printed and saved to `tools/range/out/zone<N>.json`;
 the exit code is 1 when it found problems.
 
 ## What it checks

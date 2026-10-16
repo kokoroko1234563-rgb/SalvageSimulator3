@@ -28,6 +28,7 @@ tools/range/out/zone<N>.json and summarised on screen. Exit code 1 if it found p
 """
 
 import argparse
+import fcntl
 import json
 import os
 import ssl
@@ -131,9 +132,17 @@ def main():
     if args.tide:
         job["tides"] = args.tide
 
-    if not args.no_publish:
-        publish()
-    report, messages = run_check(job)
+    # One Test Range run at a time: every run publishes its own build to the one place, so
+    # runs from other worktrees wait their turn.
+    with open("/tmp/salvage-test-range.lock", "w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("waiting for another Test Range run to finish ...")
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        if not args.no_publish:
+            publish()
+        report, messages = run_check(job)
     out = os.path.join(HERE, "out", f"zone{args.zone}.json")
     with open(out, "w") as f:
         json.dump({"report": report, "logs": messages}, f, indent=2)

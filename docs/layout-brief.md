@@ -1,8 +1,8 @@
 # Brief: the lower zones' layouts (for the layout subagents)
 
-> **For the user:** this is what each layout subagent gets. Part 1 is shared by all of them.
-> Part 2 is the four assignments; each subagent gets one. Tell me what to change before I start
-> them.
+> Part 1 is shared by every layout subagent; Part 2 is the assignments, one each. The first
+> round is zone 4 only: its base layout (A) and Hermit Hollows in zone 4 (D), so the plain and
+> the complex version can be played side by side. Zones 5 and 6 (B, C) follow after that.
 
 ---
 
@@ -178,7 +178,7 @@ Keep it short:
 - **Note:** zones 5 and 6 use this layout until theirs exist, and Hermit Hollows' ramps meet it
   at the tile edges.
 
-### B. Zone 5, The Shoals (`src/shared/Layouts/Zones/Zone5.luau`, new)
+### B. Zone 5, The Shoals (next round) (`src/shared/Layouts/Zones/Zone5.luau`, new)
 
 - **Files:** `Zones/Zone5.luau`, `docs/layouts/Zone5.md`.
 - **Target:** 65 s for the zone, about 16 s per tile.
@@ -186,7 +186,7 @@ Keep it short:
   low walls you have to go round, and a cave chamber or two to shelter in. The tide is the main
   danger here: the quick way is through the fords, and they go under first.
 
-### C. Zone 6, The Drowned Reach (`src/shared/Layouts/Zones/Zone6.luau`, new)
+### C. Zone 6, The Drowned Reach (next round) (`src/shared/Layouts/Zones/Zone6.luau`, new)
 
 - **Files:** `Zones/Zone6.luau`, `docs/layouts/Zone6.md`.
 - **Target:** 85 s for the zone, about 21 s per tile.
@@ -197,8 +197,9 @@ Keep it short:
 ### D. Hermit Hollows (`src/shared/Layouts/Biomes/HermitHollows.luau`, rewrite)
 
 - **Files:** `Biomes/HermitHollows.luau`, `docs/layouts/HermitHollows.md`.
-- **Where it rolls:** zones 4 to 6 only (its entries for zones 1 to 3 can stay as they are or be
-  removed). Write one layout per zone: `{ [4] = ..., [5] = ..., [6] = ... }`.
+- **Where it rolls:** zones 4 to 6 only. **This round: zone 4 only.** Return `{ [4] = layout }`.
+  Zones 5 and 6 use the zone 4 version until they get their own, so drop the old drafts for
+  zones 1 to 3. Check it with `--zone 4 --all HermitHollows`.
 - **Target:** at least the zone's own crossing time. A rare biome may be slower: up to 30% over is
   fine.
 - **Feel:** a giant hermit crab's tunnels. A maze of rock-walled, mostly roofed corridors 12 to 16
