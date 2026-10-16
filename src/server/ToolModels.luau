@@ -1,7 +1,9 @@
 -- Models for the grabbing tools, held in the player's right hand. Each is built around the
 -- hand's grip point, with the business end pointing forward (-Z) and up as +Y. Bare Hands
--- have none. The model is an Accessory attached by the hand's "RightGripAttachment", the way
--- cosmetics attach to the head, so it follows the hand and never collides with anything.
+-- have none. The model is a Roblox Tool held by the character: the engine welds it to the
+-- hand (and keeps it there when the avatar's body loads and replaces the hand), and the
+-- default character animation holds the arm out while a tool is held. It never collides with
+-- anything, can't be dropped, and clicking doesn't activate it (grabbing is GrabController's).
 
 local Players = game:GetService("Players")
 
@@ -415,16 +417,21 @@ end
 
 ToolModels._builders = builders
 
--- A tool's model as an Accessory: an invisible Handle at the grip point, with the model
--- welded to it, joined to the hand by the shared "RightGripAttachment".
-function ToolModels.build(id: string): Accessory?
+-- A tool's model as a Tool: an invisible Handle at the grip point, with the model welded to
+-- it. (Its "RightGripAttachment" marks the grip point; the Tool's Grip lines it up with the
+-- hand's.)
+function ToolModels.build(id: string): Tool?
 	local builder = builders[id]
 	if not builder then
 		return nil
 	end
-	local accessory = Instance.new("Accessory")
-	accessory.Name = WORN
-	accessory:SetAttribute("ToolId", id)
+	local tool = Instance.new("Tool")
+	tool.Name = WORN
+	tool:SetAttribute("ToolId", id)
+	tool.CanBeDropped = false
+	tool.RequiresHandle = true
+	tool.ManualActivationOnly = true
+	tool.Grip = CFrame.identity
 	local handle = Instance.new("Part")
 	handle.Name = "Handle"
 	handle.Size = Vector3.new(0.2, 0.2, 0.2)
@@ -433,12 +440,12 @@ function ToolModels.build(id: string): Accessory?
 	handle.CanQuery = false
 	handle.CanTouch = false
 	handle.Massless = true
-	handle.Parent = accessory
+	handle.Parent = tool
 	local attachment = Instance.new("Attachment")
 	attachment.Name = "RightGripAttachment"
 	attachment.Parent = handle
 	builder(handle)
-	return accessory
+	return tool
 end
 
 function ToolModels.dress(player: Player)
@@ -447,20 +454,37 @@ function ToolModels.dress(player: Player)
 	if not character or not humanoid then
 		return
 	end
-	local old = character:FindFirstChild(WORN)
-	if old then
-		old:Destroy()
+	for _, old in character:GetChildren() do
+		if old.Name == WORN then
+			old:Destroy()
+		end
 	end
-	local accessory = ToolModels.build(Gear.getTool(player:GetAttribute("Tool")).Id)
-	if accessory then
-		humanoid:AddAccessory(accessory)
+	local tool = ToolModels.build(Gear.getTool(player:GetAttribute("Tool")).Id)
+	if tool then
+		tool.Parent = character -- held: the engine welds it to the hand
 	end
 end
 
 function ToolModels.init()
 	local function onPlayer(player: Player)
 		player.CharacterAdded:Connect(function(character)
+			-- The avatar's body loads after the character spawns and can replace the hand the
+			-- tool was welded to: hold it again when a new hand (or arm) arrives.
+			local pending = false
+			character.ChildAdded:Connect(function(child)
+				if (child.Name == "RightHand" or child.Name == "Right Arm") and not pending then
+					pending = true
+					task.defer(function()
+						pending = false
+						ToolModels.dress(player)
+					end)
+				end
+			end)
 			character:WaitForChild("Humanoid")
+			ToolModels.dress(player)
+		end)
+		-- Once the avatar's body has loaded (it can replace the hand), hold it again.
+		player.CharacterAppearanceLoaded:Connect(function()
 			ToolModels.dress(player)
 		end)
 		player:GetAttributeChangedSignal("Tool"):Connect(function()

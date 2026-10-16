@@ -226,6 +226,10 @@ test("tools have models that attach at the hand", function()
 		else
 			assert(ToolModels.has(tool.Id), tool.Id .. " has no model")
 			local accessory = ToolModels.build(tool.Id)
+			assert(
+				accessory and accessory:IsA("Tool") and not accessory.CanBeDropped,
+				tool.Id .. " is held as a tool"
+			)
 			local handle = accessory and accessory:FindFirstChild("Handle")
 			assert(
 				handle and handle:FindFirstChild("RightGripAttachment"),

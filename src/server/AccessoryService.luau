@@ -13,24 +13,41 @@ local LIGHT = "AccessoryLight"
 
 function AccessoryService.apply(player: Player)
 	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not root then
+	if not character then
 		return
 	end
-	local old = root:FindFirstChild(LIGHT)
-	if old then
-		old:Destroy()
+	for _, old in character:GetDescendants() do
+		if old.Name == LIGHT then
+			old:Destroy()
+		end
 	end
+	-- On the head (a headlamp, a lantern held up), or the root if there's no head yet.
+	local holder = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
 	local worn = Gear.getAccessory(player:GetAttribute("Accessory"))
-	if worn and worn.Light then
+	if holder and worn and worn.Light then
 		local light = Instance.new("PointLight")
 		light.Name = LIGHT
 		light.Color = worn.Light.Color
 		light.Range = worn.Light.Range
 		light.Brightness = worn.Light.Brightness
 		light.Shadows = false
-		light.Parent = root
+		light.Parent = holder
 	end
+end
+
+-- The avatar's body loads after the character spawns and can replace its parts: whatever
+-- was put on the old ones is left behind. Put it on again when the head or root changes.
+local function rebuildOnNewParts(character: Model, rebuild: () -> ())
+	local pending = false
+	character.ChildAdded:Connect(function(child)
+		if (child.Name == "Head" or child.Name == "HumanoidRootPart") and not pending then
+			pending = true
+			task.defer(function()
+				pending = false
+				rebuild()
+			end)
+		end
+	end)
 end
 
 function AccessoryService.init()
@@ -38,11 +55,20 @@ function AccessoryService.init()
 		player:GetAttributeChangedSignal("Accessory"):Connect(function()
 			AccessoryService.apply(player)
 		end)
-		player.CharacterAdded:Connect(function(character)
+		local function onCharacter(character: Model)
+			rebuildOnNewParts(character, function()
+				AccessoryService.apply(player)
+			end)
 			character:WaitForChild("HumanoidRootPart", 10)
 			AccessoryService.apply(player)
+		end
+		player.CharacterAdded:Connect(onCharacter)
+		player.CharacterAppearanceLoaded:Connect(function()
+			AccessoryService.apply(player)
 		end)
-		AccessoryService.apply(player)
+		if player.Character then
+			task.spawn(onCharacter, player.Character)
+		end
 	end
 	Players.PlayerAdded:Connect(onPlayer)
 	for _, player in Players:GetPlayers() do
