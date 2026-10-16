@@ -395,7 +395,7 @@ Target 55 s (a rare biome may be up to 30% slower).
 | Crossing | Map tool | Test Range |
 |---|---|---|
 | 1 Basin run | 65 s | 56 s |
-| 2 Antler descent | 66 s | 55 s |
+| 2 Antler descent | 66 s | 57 s |
 | 3 Throne road | 68 s | 57 s |
 | 4 East flank | 65 s | 55 s |
 | 5 Cellar spiral | 63 s | 56 s |
