@@ -89,11 +89,13 @@ function Beach.shapeAt(x: number, z: number): (number, boolean)
 		return 0, false
 	end
 	local z0, z1 = Beach.tileRange(tile)
-	local height, rock = Layouts.shapeAt(tile, x, z - z0)
+	-- Past the sides, the shape at the edge carries on out to the cliffs.
+	local edgeX = math.clamp(x, -Beach.HalfWidth, Beach.HalfWidth)
+	local height, rock = Layouts.shapeAt(tile, edgeX, z - z0)
 	if height == 0 then
 		return 0, false
 	end
-	local fade = math.clamp((Beach.HalfWidth - math.abs(x)) / shape.EdgeFade, 0, 1)
+	local fade = math.clamp((Beach.HalfWidth + shape.CliffReach - math.abs(x)) / shape.EdgeFade, 0, 1)
 		* math.clamp(math.min(z - z0, z1 - z) / shape.ZoneFade, 0, 1)
 	for _, pool in Beach.Pools or {} do
 		local d = math.sqrt((x - pool.X) ^ 2 + (z - pool.Z) ^ 2)

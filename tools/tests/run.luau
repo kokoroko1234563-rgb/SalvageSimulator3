@@ -496,13 +496,20 @@ test("layout primitives shape the ground", function()
 	assert(near(Beach.feature(-30, z0 + 100), -2), "beyond the flat's blend the channel is untouched")
 	assert(Beach.feature(-60 + 10 + blend / 2, z0 + 100) > -2, "inside the blend it eases in")
 	assert(near(Beach.groundAt(-50, z0 + 40), Beach.groundY(z0 + 40) + 6), "groundAt adds the shape")
-	-- Zones join without a seam, and the shape stays inside the beach.
+	-- Zones join without a seam.
 	Layouts.setActive(2, {
 		Name = "edge",
 		Primitives = { { Kind = "Ridge", Path = { { -360, 0 }, { 360, 0 } }, Height = 5, Width = 40 } },
 	})
 	assert(Beach.feature(0, z0) == 0, "the shape fades out at the zone's edge")
-	assert(Beach.feature(Beach.HalfWidth, z0 + 2) == 0, "and at the sides")
+	-- At the sides it carries on as it is at the edge out to the cliffs, then fades under them.
+	local edge = Beach.feature(Beach.HalfWidth, z0 + 10)
+	assert(edge > 0 and near(Beach.feature(Beach.HalfWidth + 10, z0 + 10), edge), "out to the cliffs")
+	local cfg = Config.Beach.Terrain
+	assert(
+		Beach.feature(Beach.HalfWidth + cfg.CliffReach + cfg.EdgeFade, z0 + 10) == 0,
+		"and fades under them"
+	)
 	assert(Beach.isRough(z0 + 10), "a shaped zone is rough")
 	Layouts.setActive(2, false)
 	assert(Beach.feature(-50, z0 + 40) == 0 and not Beach.isRough(z0 + 10), "false makes it flat")
