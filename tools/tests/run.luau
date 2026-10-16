@@ -1926,6 +1926,43 @@ test("the tide leaves finds at the layouts' loot spots, once each tide", functio
 	Layouts.setActive(tile, nil)
 end)
 
+test("each zone looks its own, darker and foggier all the way down, and biomes on top", function()
+	local Beach = h.require("Shared/Beach")
+	local Biomes = h.require("Shared/Biomes")
+	local Config = h.require("Shared/Config")
+	local Looks = h.require("Shared/Looks")
+	local problems = Looks.problems()
+	assert(#problems == 0, table.concat(problems, "; "))
+	local zoneLength = Config.Beach.ZoneLength
+	local function middle(zone: number): number
+		return (zone - 0.5) * zoneLength
+	end
+	for zone = 2, Config.Beach.ActiveZones do
+		assert(Looks.at(middle(zone)).Fog > Looks.at(middle(zone - 1)).Fog, "zone " .. zone .. " is foggier")
+	end
+	assert(Looks.at(middle(6)).Brightness < Looks.at(middle(1)).Brightness, "the deep zones are darker")
+	local deep = Looks.terrainAt(0, middle(6))
+	assert(deep ~= Looks.terrainAt(0, middle(1)), "the deep floor is a different ground")
+
+	-- A biome stands out where it rolls, and still gets foggier deeper down.
+	local workspace = h.game:GetService("Workspace")
+	local shallowTile, deepTile = Beach.tileAt(middle(2)), Beach.tileAt(middle(6))
+	local plain = Looks.at(middle(6)).Fog
+	workspace:SetAttribute(Biomes.attributeFor(shallowTile :: number), "ShipwreckShallows")
+	workspace:SetAttribute(Biomes.attributeFor(deepTile :: number), "ShipwreckShallows")
+	local z0, z1 = Beach.tileRange(deepTile :: number)
+	local mid = (z0 + z1) / 2
+	assert(Looks.at(mid).Fog > plain, "the wreck is foggier than its zone")
+	assert(Looks.at(mid).Fog > Looks.at(Beach.tileRange(shallowTile :: number) + 76).Fog, "deeper is foggier")
+	assert(Looks.terrainAt(0, mid) == roblox.Enum.Material.Pavement, "the wreck brings its own ground")
+	for x = -300, 300, 4 do
+		assert(Looks.terrainAt(x, z0 - 2) ~= roblox.Enum.Material.Pavement, "which stops at its tile's edge")
+		assert(Looks.terrainAt(x, z1 + 2) ~= roblox.Enum.Material.Pavement, "on both sides")
+	end
+	workspace:SetAttribute(Biomes.attributeFor(shallowTile :: number), nil)
+	workspace:SetAttribute(Biomes.attributeFor(deepTile :: number), nil)
+end)
+
 test("roofs make caves: rock overhead, the floor still the ground", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")

@@ -219,7 +219,9 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 			check(false, "Layouts/" .. entry.Source .. ": " .. problem)
 		end
 	end
-	check(#Config.Mist.Zones >= #Config.Zones, "Config.Mist.Zones needs a density for every zone")
+	for _, problem in require(script.Parent.Looks).problems() do
+		check(false, "Config.Looks: " .. problem)
+	end
 
 	-- Wading
 	local wading = Config.Beach.Wading

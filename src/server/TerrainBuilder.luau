@@ -13,7 +13,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
-local Palette = require(Shared.Palette)
+local Looks = require(Shared.Looks)
 
 local WallBarriers = require(script.Parent.WallBarriers)
 
@@ -91,7 +91,8 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 			local z = z0 + (iz - 0.5) * VOXEL
 			local height, rock = shrunkShape(x, z)
 			local h = Beach.groundY(z) + height - DRAWN_BIGGER
-			local material = if rock then Palette.Material.Rock else Palette.Material.Sand
+			local floorMaterial, rockMaterial = Looks.terrainAt(x, z)
+			local material = if rock then rockMaterial else floorMaterial
 			local roofBottom, roofTop = shrunkRoof(x, z)
 			for iy = 1, ny do
 				local bottom = lo.Y + (iy - 1) * VOXEL
@@ -106,7 +107,7 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 						- math.max(roofBottom + DRAWN_BIGGER, bottom)
 					local roof = math.clamp(overlap / VOXEL, 0, 1)
 					if roof > ox[iy][iz] then
-						mx[iy][iz] = Palette.Material.Rock
+						mx[iy][iz] = rockMaterial
 						ox[iy][iz] = roof
 					end
 				end
@@ -173,8 +174,7 @@ function TerrainBuilder.build()
 	if not terrain then
 		return
 	end
-	terrain:SetMaterialColor(Palette.Material.Sand, Palette.World.Sand)
-	terrain:SetMaterialColor(Palette.Material.Rock, Palette.World.Rock)
+	Looks.paint(terrain)
 	local lo, hi = TerrainBuilder.bounds()
 	TerrainBuilder.buildRange(lo.Z, hi.Z)
 end

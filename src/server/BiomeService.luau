@@ -13,6 +13,7 @@ local Biomes = require(Shared.Biomes)
 local Config = require(Shared.Config)
 local Items = require(Shared.Items)
 local Layouts = require(Shared.Layouts)
+local Looks = require(Shared.Looks)
 local Tide = require(Shared.Tide)
 
 local GroundShift = require(script.Parent.GroundShift)
@@ -232,10 +233,12 @@ end
 function BiomeService.set(tile: number, biomeId: string?)
 	local biome = biomeId and Biomes.List[biomeId]
 	local wasLayout = Layouts.active(tile)
+	local wasOwnGround = Looks.hasOwnGround(Biomes.activeIn(tile))
 	local settle = GroundShift.capture(tile)
 	Workspace:SetAttribute(Biomes.attributeFor(tile), if biome then biome.Id else nil)
-	if Layouts.active(tile) ~= wasLayout then
-		-- The biome brings its own ground: rebuild the tile's terrain and keep things on it.
+	if Layouts.active(tile) ~= wasLayout or wasOwnGround or Looks.hasOwnGround(biome) then
+		-- The biome brings its own ground (its shape or its materials): rebuild the tile's
+		-- terrain and keep things on it.
 		TerrainBuilder.buildTile(tile)
 		settle()
 	end

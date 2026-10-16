@@ -1,5 +1,5 @@
--- Sea mist: the haze around you thickens the further out to sea you are (Config.Mist), so the
--- lower zones feel closed in and you can't see far ahead or back up the beach. The Lantern of
+-- Sea mist: the haze around you thickens the further out to sea you are (each zone's and
+-- biome's Look sets its Fog, Config.Looks), so the lower zones feel closed in and you can't see far ahead or back up the beach. The Lantern of
 -- Clear Sight thins it. Works through the Atmosphere's density (Roblox ignores the old fog
 -- settings when there's an Atmosphere), and sets the fog distances too in case there isn't one.
 
@@ -8,9 +8,9 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
-local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
+local Looks = require(Shared.Looks)
 
 local player = Players.LocalPlayer
 local cfg = Config.Mist
@@ -19,23 +19,10 @@ local MistController = {}
 
 local current: number? = nil
 
--- The mist's density at a point along the beach (Z), blended across zone edges.
+-- The mist's density at a point along the beach (Z): its look's Fog (each zone's, thickening
+-- all the way down, and each biome's on top), blended across edges.
 function MistController.densityAt(z: number): number
-	local function zoneDensity(at: number): number
-		local zone = Beach.zoneAt(at)
-		if not zone or zone > #cfg.Zones then
-			return cfg.Zones[#cfg.Zones]
-		elseif zone <= 0 then
-			return cfg.Shop
-		end
-		return cfg.Zones[zone]
-	end
-	-- Average over a window, so crossing a zone edge doesn't jump.
-	local samples, total = 5, 0
-	for i = 0, samples - 1 do
-		total += zoneDensity(z + (i / (samples - 1) - 0.5) * cfg.Blend)
-	end
-	return total / samples
+	return Looks.at(z).Fog
 end
 
 local function update(dt: number)

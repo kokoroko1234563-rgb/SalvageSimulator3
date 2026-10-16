@@ -261,11 +261,138 @@ Config.Waves = {
 -- Far Sandbar); it
 -- blends smoothly across zone edges. The Lantern of Clear Sight divides it.
 Config.Mist = {
-	Shop = 0.2,
-	Zones = { 0.24, 0.3, 0.37, 0.45, 0.54, 0.63, 0.7 },
-	Blend = 40, -- studs over which one zone's mist blends into the next
+	Shop = 0.2, -- in the secrets and the showroom (each zone's and biome's is its Look's Fog)
 	Response = 0.8, -- how quickly the mist follows you (per second)
 }
+
+-- How each part of the beach looks: its ground and rock (terrain materials) and its light (the
+-- haze, the ambient light and the colour grading), going from bright sunny sand at the shop to
+-- dark, cold, drowned rock in the last zone, then back out into the light on the Far Sandbar.
+-- Read by src/shared/Looks.luau: the terrain takes Floor and Rock, the client blends the rest as
+-- you walk (and darkens it under roofs). Fog is the mist's density: it thickens all the way
+-- down. A biome lays its own Look over its zone's (Biomes.luau), any of these fields.
+local function rgb(r: number, g: number, b: number): Color3
+	return Color3.fromRGB(r, g, b)
+end
+Config.Looks = {
+	-- Terrain materials and their colours. Roblox gives each material one colour for the whole
+	-- map, so each look picks its own materials rather than recolouring shared ones.
+	Materials = {
+		Sand = rgb(250, 222, 150), -- dry golden sand
+		Salt = rgb(222, 196, 140), -- firm damp sand
+		Ground = rgb(168, 154, 124), -- wet grey sand
+		Mud = rgb(112, 108, 84), -- dark silt
+		Limestone = rgb(96, 108, 112), -- drowned blue-grey silt
+		Sandstone = rgb(178, 150, 122), -- warm rock
+		Slate = rgb(122, 126, 128), -- grey rock
+		Rock = rgb(92, 106, 92), -- weed-stained rock
+		Basalt = rgb(46, 54, 62), -- black, drowned rock
+		-- For the biomes:
+		Pavement = rgb(118, 100, 80), -- tarry, timber-strewn sand (Shipwreck Shallows)
+		Concrete = rgb(206, 176, 156), -- crushed-shell grit (Hermit Hollows)
+		Cobblestone = rgb(160, 122, 112), -- shell-crusted rock (Hermit Hollows)
+		LeafyGrass = rgb(86, 120, 72), -- seagrass meadow
+		Glacier = rgb(190, 225, 240), -- iceberg ice
+		Snow = rgb(232, 240, 245),
+		CrackedLava = rgb(40, 36, 36), -- black sand over hot vents
+	},
+	Blend = 24, -- studs over which one zone's ground and light blend into the next
+	Response = 1.2, -- how quickly the light follows you (per second)
+	-- Under a roof (a cave or tunnel), on top of the zone's look.
+	UnderRoof = { Light = 0.55, Exposure = -0.12, Saturation = -0.1 },
+	-- By zone: [0] the shop, 1 to 6, [7] the Far Sandbar (and the sea past it).
+	Zones = {
+		[0] = {
+			Fog = 0.2,
+			Floor = "Sand",
+			Rock = "Sandstone",
+			Haze = rgb(190, 225, 250),
+			Decay = rgb(120, 185, 235),
+			Outdoor = rgb(185, 178, 165),
+			Ambient = rgb(120, 118, 115),
+			Brightness = 2.6,
+			Saturation = 0.35,
+			Contrast = 0.05,
+			Exposure = 0.04,
+			Tint = rgb(255, 249, 238),
+		},
+		-- 1 and 2 are the same as the shop (filled in below).
+		[3] = {
+			Fog = 0.38,
+			Floor = "Salt",
+			Rock = "Sandstone",
+			Haze = rgb(184, 214, 236),
+			Decay = rgb(114, 170, 214),
+			Outdoor = rgb(176, 172, 164),
+			Ambient = rgb(114, 114, 112),
+			Brightness = 2.45,
+			Saturation = 0.26,
+			Contrast = 0.06,
+			Exposure = 0.02,
+			Tint = rgb(250, 248, 240),
+		},
+		[4] = {
+			Fog = 0.48,
+			Floor = "Ground",
+			Rock = "Slate",
+			Haze = rgb(168, 188, 204),
+			Decay = rgb(98, 132, 162),
+			Outdoor = rgb(150, 152, 155),
+			Ambient = rgb(104, 107, 112),
+			Brightness = 2.2,
+			Saturation = 0.1,
+			Contrast = 0.08,
+			Exposure = 0,
+			Tint = rgb(238, 244, 250),
+		},
+		[5] = {
+			Fog = 0.6,
+			Floor = "Mud",
+			Rock = "Rock",
+			Haze = rgb(146, 172, 160),
+			Decay = rgb(78, 112, 100),
+			Outdoor = rgb(124, 134, 126),
+			Ambient = rgb(86, 96, 90),
+			Brightness = 1.9,
+			Saturation = -0.02,
+			Contrast = 0.1,
+			Exposure = -0.03,
+			Tint = rgb(226, 240, 230),
+		},
+		[6] = {
+			Fog = 0.74,
+			Floor = "Limestone",
+			Rock = "Basalt",
+			Haze = rgb(84, 118, 130),
+			Decay = rgb(36, 66, 82),
+			Outdoor = rgb(94, 106, 118),
+			Ambient = rgb(62, 72, 84),
+			Brightness = 1.6,
+			Saturation = -0.14,
+			Contrast = 0.14,
+			Exposure = -0.06,
+			Tint = rgb(204, 224, 236),
+		},
+		[7] = {
+			Fog = 0.66,
+			Floor = "Sand",
+			Rock = "Sandstone",
+			Haze = rgb(206, 232, 250),
+			Decay = rgb(140, 200, 240),
+			Outdoor = rgb(196, 188, 172),
+			Ambient = rgb(126, 122, 118),
+			Brightness = 2.8,
+			Saturation = 0.4,
+			Contrast = 0.05,
+			Exposure = 0.06,
+			Tint = rgb(255, 250, 236),
+		},
+	},
+}
+Config.Looks.Zones[1] = table.clone(Config.Looks.Zones[0])
+Config.Looks.Zones[1].Fog = 0.24
+Config.Looks.Zones[2] = table.clone(Config.Looks.Zones[0])
+Config.Looks.Zones[2].Fog = 0.3
 
 -- How the water treats objects on the beach (WaterObstacles).
 Config.Water = {

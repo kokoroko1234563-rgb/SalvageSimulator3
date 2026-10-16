@@ -157,8 +157,8 @@ local function roofOf(clearance, thickness)
 end
 
 -- A roof over a gap in the wall line at z, centred on x.
-local function gapRoof(roof, x, z)
-	return roof({ { x, z - 3 }, { x, z + 3 } }, 20)
+local function gapRoof(makeRoof, x, z)
+	return makeRoof({ { x, z - 3 }, { x, z + 3 } }, 20)
 end
 
 -- Zone 5: the sump. Lower and wetter: lower roofs, and the middle maze's lanes are sunk
