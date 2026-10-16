@@ -1,8 +1,8 @@
 # Brief: the lower zones' layouts (for the layout subagents)
 
 > Part 1 is shared by every layout subagent; Part 2 is the assignments, one each. The first
-> round is zone 4 only: its base layout (A) and Hermit Hollows in zone 4 (D), so the plain and
-> the complex version can be played side by side. Zones 5 and 6 (B, C) follow after that.
+> round was zone 4: its base layout (A) and Hermit Hollows in zone 4 (D), both done. The second
+> round is zones 5 and 6 (B, C) and Hermit Hollows in zones 5 and 6 (E).
 
 ---
 
@@ -105,6 +105,9 @@ Placements, all optional and in tile coordinates:
    - Other shapes: at most 12 high and 4 deep.
    - Rock ridges: at least 16 wide. Narrower ones get rounded off by the terrain.
    - Nothing narrower than 8 studs. The terrain is built in 4-stud cells.
+   - **Put walls on the 4-stud grid**: a wall's centre line at z (and x, for walls running down
+     the beach) a multiple of 4, and an even `Width` that's a multiple of 4. Off the grid, a wall
+     is drawn a few studs wider or narrower than its layout says.
 6. **Rock pools.** Keep shapes 6+ studs clear of the rock pools that lie in your zone (see
    `Config.Beach.Pools`; the tests check the pools against the zone they lie in).
 7. **Edges.** Shapes fade to flat over the first and last 6 studs of a tile and the last 30
@@ -147,8 +150,9 @@ Placements, all optional and in tile coordinates:
 ### Done when
 
 - `bash tools/check.sh` passes.
-- The Test Range for your zone reports no problems in your layout. Props from the rest of the
-  game (cosmetics, the zone's models) may still be listed; don't fix those, but note them.
+- The Test Range for your zone reports no problems. (The game's own scenery is put away
+  wherever it would straddle a wall or stand under a roof, so props from the rest of the game
+  shouldn't be listed any more; if some are, note them, don't fix them.)
 - **The Test Range's fastest crossing is within 15% of your target**, or the gap is explained in
   your report.
 - **Every loot spot and entrance is reachable on foot.**
@@ -178,7 +182,7 @@ Keep it short:
 - **Note:** zones 5 and 6 use this layout until theirs exist, and Hermit Hollows' ramps meet it
   at the tile edges.
 
-### B. Zone 5, The Shoals (next round) (`src/shared/Layouts/Zones/Zone5.luau`, new)
+### B. Zone 5, The Shoals (`src/shared/Layouts/Zones/Zone5.luau`, new)
 
 - **Files:** `Zones/Zone5.luau`, `docs/layouts/Zone5.md`.
 - **Target:** 65 s for the zone, about 16 s per tile.
@@ -186,7 +190,7 @@ Keep it short:
   low walls you have to go round, and a cave chamber or two to shelter in. The tide is the main
   danger here: the quick way is through the fords, and they go under first.
 
-### C. Zone 6, The Drowned Reach (next round) (`src/shared/Layouts/Zones/Zone6.luau`, new)
+### C. Zone 6, The Drowned Reach (`src/shared/Layouts/Zones/Zone6.luau`, new)
 
 - **Files:** `Zones/Zone6.luau`, `docs/layouts/Zone6.md`.
 - **Target:** 85 s for the zone, about 21 s per tile.
@@ -194,7 +198,7 @@ Keep it short:
   switchback ramps for carts. Low ground everywhere, so most of it floods early on the way back.
   Dead ends hold the best finds.
 
-### D. Hermit Hollows (`src/shared/Layouts/Biomes/HermitHollows.luau`, rewrite)
+### D. Hermit Hollows (`src/shared/Layouts/Biomes/HermitHollows.luau`, rewrite) (done)
 
 - **Files:** `Biomes/HermitHollows.luau`, `docs/layouts/HermitHollows.md`.
 - **Where it rolls:** zones 4 to 6 only. **This round: zone 4 only.** Return `{ [4] = layout }`.
@@ -213,3 +217,18 @@ Keep it short:
 - **Entrance:** add one `Entrances` spot per layout, in a chamber, kept flat, for when its secret
   is built.
 - **Loot:** spots at the dead ends, with the best (`Weight`) deepest in the maze.
+
+### E. Hermit Hollows in zones 5 and 6 (`src/shared/Layouts/Biomes/HermitHollows.luau`, add to)
+
+- **Files:** `Biomes/HermitHollows.luau`, `docs/layouts/HermitHollows.md`.
+- **What:** add `[5]` and `[6]` layouts next to the existing `[4]` (keep `[4]` as it is). Check
+  them with `--zone 5 --all HermitHollows` and `--zone 6 --all HermitHollows`.
+- **Targets:** at least the zone's own crossing time (zone 5: 65 s, zone 6: 85 s), up to 30% over.
+- **Feel:** the same crab tunnels as zone 4, going deeper: zone 5's are lower and wetter (more
+  of the corridors below the slope, so they flood early), zone 6's a true labyrinth, nearly all
+  roofed, with the best loot in its far dead ends. Each should feel like a step down from the
+  one above, not a copy.
+- **Hazards, entrance and loot** as in D: about 4 to 6 crabs per tile (a few more in zone 6 is
+  fine), one flat entrance spot in a chamber, the best loot deepest in.
+- The ramps meet the zone's base layout at the tile edges (x = -200 and x = 180), whatever the
+  base layout does in between.
