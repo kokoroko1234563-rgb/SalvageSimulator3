@@ -100,6 +100,7 @@ RebirthService.init(notify, ShopService.nearShop)
 AuctionService.init(notify)
 MonetizationService.init(notify)
 AdminService.init()
+require(script.ReviewService).init() -- the review place only
 
 -- The showroom (admins: tp showroom). Built last, off the startup path: some exhibits load
 -- avatars, which waits on Roblox.

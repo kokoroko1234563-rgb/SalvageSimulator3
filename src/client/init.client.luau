@@ -2,6 +2,7 @@
 
 local AdminConsole = require(script.AdminConsole)
 local AuctionUI = require(script.AuctionUI)
+local ReviewUI = require(script.ReviewUI)
 local FishController = require(script.FishController)
 local HUD = require(script.HUD)
 local HotbarUI = require(script.HotbarUI)
@@ -49,3 +50,4 @@ start("TradeUI", TradeUI.init)
 start("TraderUI", TraderUI.init)
 start("AuctionUI", AuctionUI.init)
 start("AdminConsole", AdminConsole.init)
+start("ReviewUI", ReviewUI.init)

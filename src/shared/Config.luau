@@ -394,6 +394,17 @@ Config.Looks.Zones[1].Fog = 0.24
 Config.Looks.Zones[2] = table.clone(Config.Looks.Zones[0])
 Config.Looks.Zones[2].Fog = 0.3
 
+-- The review place: a separate experience where the layouts are appraised by playing them.
+-- There (and only there) admins get the review panel: where they are (zone, biome, crossing,
+-- room), buttons to step through the variations, a stopwatch for each zone, and notes pinned
+-- where they stand, saved to a DataStore for tools/review/review.py to read.
+Config.Review = {
+	PlaceIds = { 127663217727008 },
+	DataStore = "ReviewNotes",
+	TrailEvery = 3, -- seconds between the points of the path logged while reviewing
+	Tags = { "too dark", "samey", "lost", "too easy", "too hard", "cart snag", "exploit", "ugly", "great" },
+}
+
 -- How the water treats objects on the beach (WaterObstacles).
 Config.Water = {
 	Bucket = 16, -- studs along X per lookup bucket

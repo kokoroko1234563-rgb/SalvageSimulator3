@@ -2185,6 +2185,36 @@ test("a zone is a frame, one of its crossings and a room in each slot, rolled ea
 	)
 end)
 
+test("the review place says where you are: zone, crossing, slot and room", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local Review = h.require("Shared/Review")
+	assert(not Review.enabled(), "only in the review place")
+	local def = {
+		Name = "review test",
+		Primitives = {},
+		Crossings = { { Name = "left", Primitives = {} }, { Name = "right", Primitives = {} } },
+		Slots = {
+			{
+				Name = "pocket",
+				At = { 100, 300 },
+				Size = { 80, 60 },
+				Rooms = { { Name = "a", Primitives = {} }, { Name = "b", Primitives = {} } },
+			},
+		},
+	}
+	local tile = 4
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, def, nil, { Crossing = 2, Rooms = { 2 } })
+	local where = Review.where(roblox.Vector3.new(120, 0, z0 + 310))
+	assert(where.Zone == 4 and where.Z == 310, "the zone, and z from its top edge")
+	assert(where.CrossingName == "right" and where.Choice == "2:2", "the crossing that rolled")
+	assert(where.SlotName == "pocket" and where.RoomName == "b", "the slot and room stood in")
+	assert(Review.where(roblox.Vector3.new(0, 0, z0 + 100)).Slot == nil, "outside the slots, none")
+	assert(Review.nearestSlot(tile, roblox.Vector3.new(0, 0, z0 + 100)) == 1, "the nearest slot")
+	Layouts.setActive(tile, nil)
+end)
+
 test("roofs make caves: rock overhead, the floor still the ground", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")

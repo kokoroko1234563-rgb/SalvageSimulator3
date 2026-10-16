@@ -195,6 +195,22 @@ each tide as the sea leaves them dry; Weight raises both the chance and the rari
    same for a single run. Each run takes about a minute, and only one runs at a time across all
    the agents (the runner waits its turn).
 
+### Notes from the review place
+
+The game is also played and appraised in the **review place**, where notes are pinned to the
+spot they're about, with the zone, crossing, slot and room they were left in. **Before you start,
+read the open notes for your zone and address each one:**
+
+```
+python3 tools/review/review.py notes --zone 5      # open notes, one per line
+python3 tools/review/review.py times --zone 5      # crossings timed by playing, per variation
+```
+
+Positions are in your layout's coordinates (x, and z from the zone's top edge). In your
+report, say what you did about each note by its number (`#12: moved the door, see crossing 3`);
+the coordinator marks them resolved. Notes outrank the measurements: a crossing that times
+right but plays badly still needs fixing.
+
 ### Keeping the work cheap (rules)
 
 - **Run the Test Range in the foreground and wait for it.** Never start background tasks,
