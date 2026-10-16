@@ -41,7 +41,7 @@ Problems (each with examples and positions):
   their edges.
 - **patrol route blocked**: a layout's patrol route crossing raised ground.
 - **no way across**: Roblox's pathfinding finds no way from the zone's top edge to its bottom.
-- **path too steep**: the pathfinder's route climbs steeper than players can (FootSlope);
+- (a note, not a problem) the pathfinder's route climbing steeper than players can (FootSlope);
   Roblox's pathfinding doesn't know the game's climb limit, so treat that route as suspect.
 - **unreachable spot**: a layout's loot spot or entrance that pathfinding can't reach on foot.
 
