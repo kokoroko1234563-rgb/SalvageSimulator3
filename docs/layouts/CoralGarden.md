@@ -92,16 +92,16 @@ Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 107
 Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 107
 <!-- /floods -->
 <!-- floods Biomes/Planned/CoralGarden@2 -->
-Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 683
-Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 660
+Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 691
+Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 668
 <!-- /floods -->
 <!-- floods Biomes/Planned/CoralGarden@3 -->
-Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 1283
-Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 1260
+Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 1299
+Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 1276
 <!-- /floods -->
 <!-- floods Biomes/Planned/CoralGarden@4 -->
-Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 1907
-Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 1907
+Hollow at x -100, z 100: the sea reaches it when the waterline is below Z 1931
+Hollow at x 250, z 100: the sea reaches it when the waterline is below Z 1931
 <!-- /floods -->
 
 ## Shortcuts

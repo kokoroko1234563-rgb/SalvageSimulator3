@@ -1,6 +1,6 @@
 -- Hand-built ground layouts: the shape of the beach on top of the even slope.
 --
--- The beach is made of tiles, 150 studs deep and the full width, a few to each zone (see
+-- The beach is made of tiles, 152 studs deep and the full width, a few to each zone (see
 -- Beach.tileAt). Every zone has a base layout (Layouts/Zones/ZoneN) for its tiles that have
 -- no biome; a zone without its own file uses the nearest one above it. A biome that rolls on
 -- a tile swaps in its own layout (Layouts/Biomes/<BiomeId>), so the ground changes with the
@@ -9,7 +9,8 @@
 -- for biomes that don't roll yet.
 --
 -- A layout is { Name = "...", Primitives = { ... } }. Coordinates are X (-360 to 360) and z
--- local to the tile (0 at its landward edge, 150 at its seaward edge); heights are studs
+-- local to the tile (0 at its landward edge, 150 at its seaward edge: the last 2 of its 152
+-- studs are the flat strip where tiles meet); heights are studs
 -- above (or below) the base slope. Primitive kinds:
 --   Ridge   { Path = {{x, z}, ...}, Height, Width, Rock? }  a bank along a path
 --   Wall    { Path = {{x, z}, ...}, Height, Width }         a rock wall: flat top, sides too

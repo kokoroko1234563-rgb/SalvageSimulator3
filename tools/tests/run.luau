@@ -603,21 +603,25 @@ end)
 test("the terrain voxels follow the ground", function()
 	local TerrainBuilder = h.require("Server/TerrainBuilder")
 	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	Layouts.setActive(3, false) -- on the plain slope
 	local lo = roblox.Vector3.new(0, -40, 0)
 	local hi = roblox.Vector3.new(8, 12, 0)
 	local z0, z1 = 440, 448
 	local materials, occupancy = TerrainBuilder.slab(lo, hi, z0, z1)
-	-- Column (1, 1): x = 2, z = 442. Sum of occupancy * 4 + bottom = the ground height.
+	-- Column (1, 1): x = 2, z = 442. Sum of occupancy * 4 + bottom = the ground height, less
+	-- the half cell Roblox draws the surface higher by.
 	local filled = 0
 	for iy = 1, #occupancy[1] do
 		filled += occupancy[1][iy][1] * 4
 	end
-	local h = Beach.groundAt(2, 442)
+	local h = Beach.groundAt(2, 442) - 2
 	assert(
 		math.abs((lo.Y + filled) - h) < 0.01,
 		"voxels reach the ground height " .. h .. ", got " .. (lo.Y + filled)
 	)
 	assert(materials[1][1][1] ~= roblox.Enum.Material.Air, "the bottom is solid")
+	Layouts.setActive(3, nil)
 end)
 
 test("waves run up and slide back", function()
@@ -1168,8 +1172,8 @@ local function poolsOnZone(Beach, zone: number)
 end
 local LAYOUT_COLS = 84 -- grid columns either side of X = 0 (336 studs)
 local LAYOUT_UNITS = 6 -- zones tested, one tile each (Config.Beach.ActiveZones)
-local LAYOUT_END = LAYOUT_UNITS * 150 - 8 -- the seaward end of the last tested tile
-local LAYOUT_ROWS = { -1, LAYOUT_UNITS * 150 / LAYOUT_GRID - 1 } -- z = -4 (the shop side) onward
+local LAYOUT_END = LAYOUT_UNITS * 152 - 8 -- the seaward end of the last tested tile
+local LAYOUT_ROWS = { -1, LAYOUT_UNITS * 152 / LAYOUT_GRID - 1 } -- z = -4 (the shop side) onward
 local layoutGridCache = nil
 
 local function layoutKey(ix: number, iz: number): number
@@ -1870,19 +1874,20 @@ test("roofs make caves: rock overhead, the floor still the ground", function()
 		zA,
 		zA + 4
 	)
+	-- (Roblox draws solid terrain 2 studs bigger all round, so the 6-stud roof is written 2 thick.)
 	local solid, air, rock = 0, 0, 0
 	for iy = 1, #occupancy[1] do
 		local cellBottom = yLow + (iy - 1) * 4
 		if cellBottom > slope + 1 and cellBottom + 4 < slope + 9 then
 			air += if occupancy[1][iy][1] == 0 then 1 else 0
 		end
-		if cellBottom >= slope + 10 and cellBottom + 4 <= slope + 16 then
-			solid += occupancy[1][iy][1]
+		if cellBottom + 4 > slope + 10 and cellBottom < slope + 16 then
+			solid += occupancy[1][iy][1] * 4
 			rock += if materials[1][iy][1] == roblox.Enum.Material.Slate then 1 else 0
 		end
 	end
 	assert(air >= 1, "room to walk under it")
-	assert(solid >= 1 and rock >= 1, "rock overhead")
+	assert(math.abs(solid - 2) < 0.01 and rock >= 1, "rock overhead, written 2 thick: " .. solid)
 	Layouts.setActive(tile, nil)
 	local function problems(roof)
 		return #Layouts.problems({ Name = "x", Primitives = { roof } })

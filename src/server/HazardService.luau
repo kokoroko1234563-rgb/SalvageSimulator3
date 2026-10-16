@@ -202,6 +202,7 @@ function builders.Patrol(tile, settings, folder)
 			end
 			for i = 1, count do
 				local model = creature(settings, Vector3.new(path[1].X, 0, path[1].Y))
+				place(model, path[1], Vector2.new(0, 1)) -- on the ground from the start
 				model.Parent = folder
 				-- Spread out along the route, coming and going.
 				table.insert(walkers, { model = model, path = path, offset = 2 * length * (i - 1) / count })
@@ -211,6 +212,7 @@ function builders.Patrol(tile, settings, folder)
 		for _ = 1, settings.Count do
 			local x, z = randomSpot(tile)
 			local model = creature(settings, Vector3.new(x, 0, z))
+			place(model, Vector2.new(x, z), Vector2.new(0, 1))
 			model.Parent = folder
 			local home = Vector2.new(x, z)
 			table.insert(walkers, { model = model, home = home, at = home, target = home })

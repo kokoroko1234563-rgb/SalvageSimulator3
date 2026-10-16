@@ -36,6 +36,9 @@ Two more safeguards live in the game itself:
 - **Palette:** `src/shared/Palette.luau` holds every shared colour, material and font by name. Code uses `Palette.UI.Accent` or `Palette.Material.Wood`, never inline values, so one look changes in one place.
 - **Data validator:** `src/shared/Validate.luau` checks that the data fits together when the server starts. For example: every secret has a coin *or* a loot table, every loot item exists, every rarity has a colour, and every ownable vessel has a builder. Problems print to Output as `[Validate]` warnings.
 
+
+**The Test Range** (`tools/range`, see its README): checks a zone of the beach inside the real Roblox engine, through Open Cloud, without Studio: props floating, buried or inside rock, terrain and walls against their layouts, creatures' routes, Roblox pathfinding across the zone against its target time, and the water at several tide levels. `python3 tools/range/run.py --zone 4 --all HermitHollows`.
+
 ## The look: models, paint and scenery
 
 Everything you see is built from parts in code (no uploaded meshes or textures), so the surface
@@ -220,7 +223,7 @@ The **Beacon Pearl** is the rarest unlock item. Your doc doesn't name it, so the
 
 ## The Far Sandbar and the Sunken Bell Tower
 
-- **The sandbar:** zone 7, past the other zones (Z 3640 to 3760), with x25 values. A deep channel (Z 3600 to 3640) cuts it off. You can only cross the channel around low tide, when the waterline reaches Z 3700 (`Config.Beach.FarSandbar`, `Config.Tide.LowWaterline`).
+- **The sandbar:** zone 7, past the other zones (Z 3688 to 3808), with x25 values. A deep channel (Z 3648 to 3688) cuts it off. You can only cross the channel around low tide, when the waterline reaches Z 3748 (`Config.Beach.FarSandbar`, `Config.Tide.LowWaterline`).
 - **The bell tower:** its top sticks out of the sand at Z 680 (`FarSandbarService`). The door is only above water for a short window around low tide.
 - **The secret:** bank a Beacon Pearl, then use it at the door. It's an exotic secret, so the climb ends in a lootbox: the **Leviathan Rowboat** (exotic vessel, holds 20) or the **Tide Crown** (exotic accessory, waves push you 25% less). There's a 1.5% chance of the Gilded variant. The climb is the longest of the three, 20 ledges around the tower walls. It floods over a fixed 150 seconds instead of following the tide, because the door is always about to go under when you enter.
 - **Admin:** `tp sandbar` puts you in front of the door, and `give beaconpearl` gives you the key.
@@ -415,23 +418,23 @@ Players can be `me` (default), `all`, `others`, or the start of a name. Up/Down 
    +--------------------------+   Z < 0: shop house, buyer, sell pad, bank house
    |  shop   sell   vessels   |
  ==+==========================+== Z = 0: top of the beach
-   |  zone 1  Shopside Shore  |   Z = 0-600, gentle, readable (tiles 1-4)
+   |  zone 1  Shopside Shore  |   Z = 0-608, gentle, readable (tiles 1-4)
    |..........................|   <- waterline at high tide (Z = 60)
-   |  zone 2  Sunny Stretch   |   Z = 600-1200, low dunes (tiles 5-8)
-   |  zone 3  Middle Banks    |   Z = 1200-1800, banks and flooding channels
-   |  zone 4  Outer Shore     |   Z = 1800-2400, rock spines
-   |  zone 5  The Shoals      |   Z = 2400-3000
-   |  zone 6  Drowned Reach   |   Z = 3000-3600, the deepest, slowest ground
-   |~~~~~~ deep channel ~~~~~~|   Z = 3600 to 3640
-   |  zone 7  Far Sandbar     |   bell tower door at Z = 3680
-   |..........................|   <- waterline at low tide (Z = 3700)
+   |  zone 2  Sunny Stretch   |   Z = 608-1216, low dunes (tiles 5-8)
+   |  zone 3  Middle Banks    |   Z = 1216-1824, banks and flooding channels
+   |  zone 4  Outer Shore     |   Z = 1824-2432, rock spines
+   |  zone 5  The Shoals      |   Z = 2432-3040
+   |  zone 6  Drowned Reach   |   Z = 3040-3648, the deepest, slowest ground
+   |~~~~~~ deep channel ~~~~~~|   Z = 3648 to 3688
+   |  zone 7  Far Sandbar     |   bell tower door at Z = 3728
+   |..........................|   <- waterline at low tide (Z = 3748)
    |  open sea                |
    +--------------------------+
  headland     X ->     headland
 ```
 
 The shoreline runs along X (720 studs wide, between two rocky headlands). The zones are
-600-stud bands running out to sea along +Z, each four 150-stud tiles deep: a tile is the unit
+608-stud bands running out to sea along +Z, each four 152-stud tiles deep: a tile is the unit
 of the hand-built ground layouts and of biomes (each tile rolls its own). The walk down is
 meant to take about 7 minutes: the tide takes 10 to go out, so you follow it down, holds for
 5, and takes 10 to come back in, so you race it back. Each zone has a target crossing time

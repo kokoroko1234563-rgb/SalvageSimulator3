@@ -91,13 +91,13 @@ As the tide comes in, the sea flows in from the seaward edge and reaches each cu
 Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 110
 <!-- /floods -->
 <!-- floods Biomes/Planned/JellyfishLagoon@2 -->
-Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 711
+Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 719
 <!-- /floods -->
 <!-- floods Biomes/Planned/JellyfishLagoon@3 -->
-Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 1311
+Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 1327
 <!-- /floods -->
 <!-- floods Biomes/Planned/JellyfishLagoon@4 -->
-Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 1889
+Hollow at x 0, z 90: the sea reaches it when the waterline is below Z 1913
 <!-- /floods -->
 
 ## Shortcuts

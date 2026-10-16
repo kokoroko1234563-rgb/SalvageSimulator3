@@ -199,9 +199,11 @@ end
 local function rockCluster(parent: Instance, center: Vector3, count: number, rng: Random)
 	for _ = 1, count do
 		local diameter = rng:NextNumber(2.5, 6)
-		local offset = Vector3.new(rng:NextNumber(-8, 8), diameter * 0.3, rng:NextNumber(-8, 8))
+		local x, z = center.X + rng:NextNumber(-8, 8), center.Z + rng:NextNumber(-8, 8)
 		local color = if rng:NextNumber() < 0.5 then Z.RockGrey else Z.RockDark
-		WaterObstacles.mark(ball(parent, center + offset, diameter, color, Palette.Material.Rock), "Solid")
+		-- Each rock sits on the ground under it, not at the cluster's middle's height.
+		local at = Vector3.new(x, Beach.groundAt(x, z) + diameter * 0.3, z)
+		WaterObstacles.mark(ball(parent, at, diameter, color, Palette.Material.Rock), "Solid")
 	end
 end
 

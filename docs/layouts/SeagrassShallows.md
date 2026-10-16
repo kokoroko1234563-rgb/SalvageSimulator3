@@ -94,22 +94,22 @@ Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 78
 Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 73
 <!-- /floods -->
 <!-- floods Biomes/Planned/SeagrassShallows@2 -->
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 709
-Channel at x -60, z 104: the sea reaches it when the waterline is below Z 709
-Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 679
-Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 673
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 717
+Channel at x -60, z 104: the sea reaches it when the waterline is below Z 717
+Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 687
+Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 681
 <!-- /floods -->
 <!-- floods Biomes/Planned/SeagrassShallows@3 -->
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 1309
-Channel at x -60, z 104: the sea reaches it when the waterline is below Z 1309
-Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 1279
-Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 1273
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 1325
+Channel at x -60, z 104: the sea reaches it when the waterline is below Z 1325
+Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 1295
+Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 1289
 <!-- /floods -->
 <!-- floods Biomes/Planned/SeagrassShallows@4 -->
-Channel at x -60, z 104: the sea reaches it when the waterline is below Z 1909
-Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 1879
-Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 1873
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 1829
+Channel at x -60, z 104: the sea reaches it when the waterline is below Z 1933
+Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 1903
+Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 1897
+Channel at x -100, z 96: the sea reaches it when the waterline is below Z 1853
 <!-- /floods -->
 
 ## Shortcuts

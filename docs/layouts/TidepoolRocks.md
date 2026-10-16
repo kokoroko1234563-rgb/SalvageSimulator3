@@ -96,28 +96,28 @@ Hollow at x 250, z 56: the sea reaches it when the waterline is below Z 61
 Hollow at x -240, z 50: the sea reaches it when the waterline is below Z 49
 <!-- /floods -->
 <!-- floods Biomes/Planned/TidepoolRocks@2 -->
-Hollow at x 60, z 96: the sea reaches it when the waterline is below Z 691
-Hollow at x 210, z 90: the sea reaches it when the waterline is below Z 689
-Hollow at x -200, z 72: the sea reaches it when the waterline is below Z 675
-Hollow at x 30, z 60: the sea reaches it when the waterline is below Z 665
-Hollow at x 250, z 56: the sea reaches it when the waterline is below Z 661
-Hollow at x -240, z 50: the sea reaches it when the waterline is below Z 649
+Hollow at x 60, z 96: the sea reaches it when the waterline is below Z 699
+Hollow at x 210, z 90: the sea reaches it when the waterline is below Z 697
+Hollow at x -200, z 72: the sea reaches it when the waterline is below Z 683
+Hollow at x 30, z 60: the sea reaches it when the waterline is below Z 673
+Hollow at x 250, z 56: the sea reaches it when the waterline is below Z 669
+Hollow at x -240, z 50: the sea reaches it when the waterline is below Z 657
 <!-- /floods -->
 <!-- floods Biomes/Planned/TidepoolRocks@3 -->
-Hollow at x 60, z 96: the sea reaches it when the waterline is below Z 1291
-Hollow at x 210, z 90: the sea reaches it when the waterline is below Z 1289
-Hollow at x -200, z 72: the sea reaches it when the waterline is below Z 1275
-Hollow at x 30, z 60: the sea reaches it when the waterline is below Z 1265
-Hollow at x 250, z 56: the sea reaches it when the waterline is below Z 1261
-Hollow at x -240, z 50: the sea reaches it when the waterline is below Z 1249
+Hollow at x 60, z 96: the sea reaches it when the waterline is below Z 1307
+Hollow at x 210, z 90: the sea reaches it when the waterline is below Z 1305
+Hollow at x -200, z 72: the sea reaches it when the waterline is below Z 1291
+Hollow at x 30, z 60: the sea reaches it when the waterline is below Z 1281
+Hollow at x 250, z 56: the sea reaches it when the waterline is below Z 1277
+Hollow at x -240, z 50: the sea reaches it when the waterline is below Z 1265
 <!-- /floods -->
 <!-- floods Biomes/Planned/TidepoolRocks@4 -->
-Hollow at x 60, z 96: the sea reaches it when the waterline is below Z 1899
-Hollow at x 210, z 90: the sea reaches it when the waterline is below Z 1889
-Hollow at x -200, z 72: the sea reaches it when the waterline is below Z 1875
-Hollow at x 30, z 60: the sea reaches it when the waterline is below Z 1865
-Hollow at x 250, z 56: the sea reaches it when the waterline is below Z 1861
-Hollow at x -240, z 50: the sea reaches it when the waterline is below Z 1849
+Hollow at x 60, z 96: the sea reaches it when the waterline is below Z 1923
+Hollow at x 210, z 90: the sea reaches it when the waterline is below Z 1913
+Hollow at x -200, z 72: the sea reaches it when the waterline is below Z 1899
+Hollow at x 30, z 60: the sea reaches it when the waterline is below Z 1889
+Hollow at x 250, z 56: the sea reaches it when the waterline is below Z 1885
+Hollow at x -240, z 50: the sea reaches it when the waterline is below Z 1873
 <!-- /floods -->
 
 ## Shortcuts

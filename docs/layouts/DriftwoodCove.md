@@ -91,13 +91,13 @@ As the tide comes in, the sea flows in from the seaward edge and reaches each cu
 Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 129
 <!-- /floods -->
 <!-- floods Biomes/Planned/DriftwoodCove@2 -->
-Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 729
+Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 737
 <!-- /floods -->
 <!-- floods Biomes/Planned/DriftwoodCove@3 -->
-Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 1329
+Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 1345
 <!-- /floods -->
 <!-- floods Biomes/Planned/DriftwoodCove@4 -->
-Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 1929
+Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 1953
 <!-- /floods -->
 
 ## Shortcuts

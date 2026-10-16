@@ -31,8 +31,8 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
 
 <!-- floods Zones/Zone2@2 -->
-Hollow at x 260, z 82: the sea reaches it when the waterline is below Z 691
-Hollow at x -60, z 80: the sea reaches it when the waterline is below Z 689
+Hollow at x 260, z 82: the sea reaches it when the waterline is below Z 699
+Hollow at x -60, z 80: the sea reaches it when the waterline is below Z 697
 <!-- /floods -->
 
 ## Shortcuts

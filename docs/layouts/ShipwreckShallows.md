@@ -88,20 +88,20 @@ Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` 
 As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
 
 <!-- floods Biomes/ShipwreckShallows@1 -->
-Channel at x -60, z 150: the sea reaches it when the waterline is below Z 149
+Channel at x -60, z 150: the sea reaches it when the waterline is below Z 151
 Channel at x -30, z 72: the sea reaches it when the waterline is below Z 94
 <!-- /floods -->
 <!-- floods Biomes/ShipwreckShallows@2 -->
-Channel at x -60, z 150: the sea reaches it when the waterline is below Z 749
-Channel at x -40, z 104: the sea reaches it when the waterline is below Z 682
+Channel at x -60, z 150: the sea reaches it when the waterline is below Z 759
+Channel at x -40, z 104: the sea reaches it when the waterline is below Z 690
 <!-- /floods -->
 <!-- floods Biomes/ShipwreckShallows@3 -->
-Channel at x -90, z 150: the sea reaches it when the waterline is below Z 1349
-Channel at x -120, z 118: the sea reaches it when the waterline is below Z 1344
+Channel at x -90, z 150: the sea reaches it when the waterline is below Z 1367
+Channel at x -120, z 118: the sea reaches it when the waterline is below Z 1360
 <!-- /floods -->
 <!-- floods Biomes/ShipwreckShallows@4 -->
-Channel at x -60, z 150: the sea reaches it when the waterline is below Z 1949
-Channel at x 100, z 130: the sea reaches it when the waterline is below Z 1949
+Channel at x -60, z 150: the sea reaches it when the waterline is below Z 1975
+Channel at x 100, z 130: the sea reaches it when the waterline is below Z 1975
 <!-- /floods -->
 
 ## Shortcuts

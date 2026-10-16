@@ -24,9 +24,12 @@ Config.Admins = {
 -- down, and 10 to come back in, so you race it back with your finds.
 Config.Beach = {
 	Width = 720, -- studs along the shoreline
-	TileLength = 150, -- studs each tile runs out to sea
+	-- Studs each tile runs out to sea: a multiple of the terrain's 4-stud cells, so every tile
+	-- lines up with them and a layout comes out the same on any tile. (Layouts are drawn from
+	-- z 0 to 150; the last 2 studs are part of the flat strip where tiles meet.)
+	TileLength = 152,
 	TilesPerZone = 4,
-	ZoneLength = 600, -- TileLength * TilesPerZone
+	ZoneLength = 608, -- TileLength * TilesPerZone
 	ActiveZones = 6, -- zones 1-6, then the Far Sandbar's channel
 	ShopDepth = 80, -- dry ground behind Z = 0 for the shop and boardwalk
 	Slope = 0.06, -- studs of drop per stud out to sea
@@ -56,7 +59,7 @@ Config.Beach = {
 		WallMinWidth = 12, -- the thinnest a Wall can be: thinner ones get rounded off by the terrain's 4-stud cells
 		RoofMinClearance = 8, -- the lowest a Roof's underside can be over the slope (room to walk)
 		RoofMaxTop = 32, -- the highest a Roof's top can be over the slope
-		RoofMinThickness = 4, -- (one terrain cell: thinner roofs get holes)
+		RoofMinThickness = 6, -- (thinner roofs get holes: the terrain is built in 4-stud cells)
 		MaxDepth = 4, -- the deepest a layout cut can be
 		EyeHeight = 5, -- standing eye height above the ground (for sightlines)
 	},
@@ -64,10 +67,10 @@ Config.Beach = {
 	-- Rock pools: rings of rock that hold water after the sea leaves (a fixed level, Depth
 	-- studs above the ground at the ring's seaward edge). X, Z is the centre.
 	Pools = {
-		{ X = -280, Z = 620, Radius = 9, Depth = 1.4 }, -- just past where zone 1 meets zone 2
-		{ X = 140, Z = 720, Radius = 12, Depth = 1.8 },
-		{ X = -60, Z = 1330, Radius = 10, Depth = 1.6 },
-		{ X = 260, Z = 1870, Radius = 8, Depth = 1.4 },
+		{ X = -280, Z = 628, Radius = 9, Depth = 1.4 }, -- just past where zone 1 meets zone 2
+		{ X = 140, Z = 728, Radius = 12, Depth = 1.8 },
+		{ X = -60, Z = 1346, Radius = 10, Depth = 1.6 },
+		{ X = 260, Z = 1894, Radius = 8, Depth = 1.4 },
 	},
 
 	-- Wading: walk speed and jump at each water depth (studs over the ground), blended
@@ -90,11 +93,11 @@ Config.Beach = {
 	-- only shallow enough to cross around low tide (about 5 minutes per cycle).
 	FarSandbar = {
 		Zone = 7, -- its entry in Config.Zones
-		ChannelStart = 3600, -- ZoneLength * ActiveZones
-		ChannelEnd = 3640,
+		ChannelStart = 3648, -- ZoneLength * ActiveZones
+		ChannelEnd = 3688,
 		ChannelDepth = 8, -- extra depth of the channel below the normal slope
-		DoorZ = 3680, -- the Sunken Bell Tower's door, uncovered for a while around low tide
-		End = 3760,
+		DoorZ = 3728, -- the Sunken Bell Tower's door, uncovered for a while around low tide
+		End = 3808,
 	},
 }
 
@@ -147,7 +150,7 @@ Config.Tide = {
 	InTime = 600,
 	TimeScale = 1, -- 1 = the real 25-minute cycle. Lower it (or use the admin console) to test faster.
 	HighWaterline = 60, -- waterline Z at high tide (inside zone 1)
-	LowWaterline = 3700, -- waterline Z at low tide: the channel to the Far Sandbar is crossable
+	LowWaterline = 3748, -- waterline Z at low tide: the channel to the Far Sandbar is crossable
 
 	-- How the tide goes out and comes back in. Each list is how far out the tide is (0 = high,
 	-- 1 = low) at evenly spaced moments through that phase, joined by a smooth curve. Repeat
