@@ -1,0 +1,85 @@
+
+local FRAME_LATTICE = parse(FRAME)
+
+local function mound(x, z, radius, height)
+	return { Kind = "Mound", At = { x, z }, Radius = radius, Height = height, Rock = true }
+end
+
+local frame = {
+	Name = "Hermit Hollows (zone 4)",
+	Primitives = {
+		-- Beyond the outer wall at x = +-336, two more walls fill the strip out to the cliffs, so
+		-- there's no way round the warren.
+		wall({ { -348, 12 }, { -348, 600 } }),
+		wall({ { -360, 12 }, { -360, 600 } }),
+		wall({ { 348, 12 }, { 348, 600 } }),
+		wall({ { 360, 12 }, { 360, 600 } }),
+		-- (Rock overhead, so they read as the cliffs' own foot.)
+		{ Kind = "Roof", Path = { { -348, 12 }, { -348, 600 } }, Width = 36, Clearance = 20, Thickness = 8 },
+		{ Kind = "Roof", Path = { { 348, 12 }, { 348, 600 } }, Width = 36, Clearance = 20, Thickness = 8 },
+		{ Kind = "Roof", Path = { { -336, 12 }, { 336, 12 } }, Width = 16, Clearance = 20, Thickness = 8 },
+		-- The Brood chamber: boulders round the flat where the secret's entrance goes.
+		mound(-36, 330, 8, 8),
+		mound(8, 282, 8, 8),
+		{ Kind = "Flat", At = { -14, 306 }, Radius = 10 },
+		-- The Antler hall.
+		mound(-170, 54, 8, 9),
+		-- The Throne.
+		mound(14, 452, 10, 12),
+		-- The Pearl court's pool.
+		{ Kind = "Hollow", At = { -154, 488 }, Radius = 10, Depth = 3 },
+		-- The Tide basin, round the rock pool (260, 70): just a boulder in the corner.
+		mound(294, 30, 8, 8),
+	},
+	Loot = {
+		{ At = { 6, 286 }, Radius = 6, Weight = 2 },
+		{ At = { -134, 80 }, Radius = 6, Weight = 2 },
+		{ At = { 42, 474 }, Radius = 6, Weight = 2 },
+		{ At = { -126, 502 }, Radius = 6, Weight = 2 },
+		{ At = { 294, 82 }, Radius = 6, Weight = 2 },
+	},
+	Entrances = { { -14, 306 } },
+	Hazards = {
+		{ Type = "Patrol", Path = { { -40, 306 }, { 12, 306 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -14, 282 }, { -14, 332 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -176, 78 }, { -128, 78 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { 238, 40 }, { 294, 40 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -8, 474 }, { 36, 474 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -182, 502 }, { -126, 502 } }, Count = 1 },
+	},
+}
+append(frame.Primitives, wallsOf(FRAME_LATTICE, WARREN, nil, false))
+
+local function crossingOf(spec)
+	local lattice = parse(spec.Maze)
+	local primitives = wallsOf(lattice, WARREN, FRAME_LATTICE, false)
+	append(primitives, rubbleOf(lattice, WARREN))
+	append(primitives, roofsOf(lattice, WARREN, FRAME_LATTICE))
+	-- The cart ramp follows the corridors: in at the top door, out at the bottom door.
+	local ramp = { { WARREN.cellX(spec.Ramp[1][1]), 0 } }
+	for _, cell in spec.Ramp do
+		table.insert(ramp, point(WARREN, cell))
+	end
+	table.insert(ramp, { WARREN.cellX(spec.Ramp[#spec.Ramp][1]), ZONE_DEPTH })
+	table.insert(primitives, { Kind = "Ramp", Path = ramp, Width = 14 })
+	return {
+		Name = spec.Name,
+		Primitives = primitives,
+		Loot = lootOf(WARREN, spec.Loot),
+		Hazards = patrolsOf(WARREN, spec.Crabs),
+	}
+end
+
+local crossings = {}
+for _, spec in CROSSINGS do
+	table.insert(crossings, crossingOf(spec))
+end
+
+local zone4 = {
+	Name = "Hermit Hollows (zone 4)",
+	Primitives = frame.Primitives,
+	Loot = frame.Loot,
+	Entrances = frame.Entrances,
+	Hazards = frame.Hazards,
+	Crossings = crossings,
+}
