@@ -7,8 +7,9 @@
 	It also writes the maps into the layout notes, between the <!-- map ... --> markers, so the
 	notes can't drift from the layouts.
 
-	Usage (from the repo root): lune run tools/layout_map.luau [docs/layouts | -] [sources...]
-	Without a folder (or with -) it only prints. Name sources ("Zones/Zone5",
+	Usage (from the repo root): lune run tools/layout_map.luau [docs/layouts | -] [sources...] [--maps]
+	Without a folder (or with -) it only prints the measurements; --maps prints the maps too
+	(they're always drawn when writing the notes). Name sources ("Zones/Zone5",
 	"Biomes/HermitHollows") to report only those. Every way a zone can come out is reported:
 	each crossing, each room of each slot; the maps are keyed Source@zone, with /c2 for
 	crossing 2 or /s3r2 for room 2 of slot 3. Each map is 72 columns (10 studs each) by one row
@@ -21,7 +22,17 @@ local process = require("@lune/process")
 
 local Harness = require("./tests/harness")
 
-local outDir = if process.args[1] and process.args[1] ~= "-" then process.args[1] else nil
+-- Arguments: an optional notes folder (or -), then sources; --maps anywhere draws the maps.
+local args, drawMaps = {}, false
+for _, arg in process.args do
+	if arg == "--maps" then
+		drawMaps = true
+	else
+		table.insert(args, arg)
+	end
+end
+local outDir = if args[1] and args[1] ~= "-" then args[1] else nil
+drawMaps = drawMaps or outDir ~= nil
 local h = Harness.new(process.cwd)
 local Beach = h.require("Shared/Beach")
 local Config = h.require("Shared/Config")
@@ -430,8 +441,9 @@ local function report(zone: number, source: string, def, way): string
 	local short = shortcuts(tile)
 	local cross = crossSeconds(tile)
 	local key = source .. "@" .. zone .. tagOf(way.Choice)
-	maps[key] = mapOf(layout, tile)
-	local order = floodOrder(layout, tile)
+	-- The maps and flood orders only when they're wanted (they're the slow, long part).
+	maps[key] = if drawMaps then mapOf(layout, tile) else ""
+	local order = if drawMaps then floodOrder(layout, tile) else {}
 	Layouts.setActive(tile, nil)
 	floods[key] = table.concat(order, "\n")
 	local lines = {
@@ -455,7 +467,7 @@ local function report(zone: number, source: string, def, way): string
 	for _, line in order do
 		table.insert(lines, "  " .. line)
 	end
-	return table.concat(lines, "\n") .. "\n" .. maps[key]
+	return table.concat(lines, "\n") .. (if drawMaps then "\n" .. maps[key] else "")
 end
 
 local function reportAll(zone: number, source: string, def)
@@ -466,8 +478,8 @@ end
 
 -- Only what's asked for, when names are given: "lune run tools/layout_map.luau - Zones/Zone5".
 local only = {}
-for index = 2, #process.args do
-	only[process.args[index]] = true
+for index = 2, #args do
+	only[args[index]] = true
 end
 local function wanted(source: string): boolean
 	return next(only) == nil or only[source] == true

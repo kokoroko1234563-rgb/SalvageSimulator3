@@ -20,7 +20,11 @@ Usage (from the repo root):
   --choice C          the crossing and rooms: "crossing:room,room,..." (one room per slot, in
                       order); default the first of each
   --every             check every way the zone can come out, one run each: each crossing,
-                      then each other room of each slot (as the tests do)
+                      then each other room of each slot (as the tests do); prints --summary
+                      unless --full is given
+  --summary           one line per run (choice, fastest time, problem count), and the full
+                      details only for runs with problems
+  --full              the full details for every run
   --tide Z            a waterline Z to measure the water at (repeatable; default: the zone's top,
                       middle and bottom, and low tide)
   --no-routes         skip the pathfinding (quicker)
@@ -48,6 +52,7 @@ SETTINGS = json.load(open(os.path.join(HERE, "range.json")))
 API = "https://apis.roblox.com"
 
 CA = "/root/.ccr/ca-bundle.crt"
+QUIET = False  # set by --summary: no progress lines
 CONTEXT = ssl.create_default_context(cafile=CA) if os.path.exists(CA) else ssl.create_default_context()
 
 
@@ -66,7 +71,10 @@ def request(method, url, body=None, content_type="application/json"):
 def publish():
     place_file = os.path.join(HERE, "out", "range.rbxl")
     os.makedirs(os.path.dirname(place_file), exist_ok=True)
-    subprocess.run(["rojo", "build", os.path.join(ROOT, "default.project.json"), "-o", place_file], check=True)
+    built = subprocess.run(["rojo", "build", os.path.join(ROOT, "default.project.json"), "-o", place_file],
+                           capture_output=True, text=True)
+    if built.returncode != 0:
+        sys.exit(f"rojo build failed:\n{built.stdout}{built.stderr}")
     url = f"{API}/universes/v1/{SETTINGS['universe']}/places/{SETTINGS['place']}/versions?versionType=Published"
     result = request("POST", url, open(place_file, "rb").read(), "application/octet-stream")
     print(f"published the build as version {result.get('versionNumber')}")
@@ -81,8 +89,10 @@ def run_check(job):
     while task.get("state") in ("QUEUED", "PROCESSING"):
         time.sleep(4)
         task = request("GET", f"{API}/cloud/v2/{task['path']}")
-        print(f"  ... {task.get('state').lower()} ({time.time() - started:.0f}s)", end="\r")
-    print()
+        if not QUIET:
+            print(f"  ... {task.get('state').lower()} ({time.time() - started:.0f}s)", end="\r")
+    if not QUIET:
+        print()
     logs = request("GET", f"{API}/cloud/v2/{task['path']}/logs")
     messages = [m for entry in logs.get("luauExecutionSessionTaskLogs", []) for m in entry.get("messages", [])]
     if task.get("state") != "COMPLETE":
@@ -136,6 +146,8 @@ def main():
     parser.add_argument("--tile", action="append", default=[])
     parser.add_argument("--choice")
     parser.add_argument("--every", action="store_true")
+    parser.add_argument("--summary", action="store_true")
+    parser.add_argument("--full", action="store_true")
     parser.add_argument("--tide", action="append", type=float, default=[])
     parser.add_argument("--no-routes", action="store_true")
     parser.add_argument("--no-publish", action="store_true")
@@ -162,6 +174,9 @@ def main():
 
     # One Test Range run at a time: every run publishes its own build to the one place, so
     # runs from other worktrees wait their turn.
+    global QUIET
+    summary_only = (args.summary or args.every) and not args.full
+    QUIET = summary_only
     found_problems = False
     with open("/tmp/salvage-test-range.lock", "w") as lock:
         try:
@@ -175,15 +190,27 @@ def main():
             label = None
             if isinstance(entry, list):
                 job["choice"], label = entry[0], entry[1] if len(entry) > 1 else entry[0]
-                print(f"\n== {label} ({job['choice']})")
+                if not summary_only:
+                    print(f"\n== {label} ({job['choice']})")
             report, messages = run_check(job)
             suffix = "" if not label else "-" + job["choice"].replace(":", "_").replace(",", "-")
             out = os.path.join(HERE, "out", f"zone{args.zone}{suffix}.json")
             with open(out, "w") as f:
                 json.dump({"report": report, "logs": messages}, f, indent=2)
-            print(summarise(report))
-            print(f"(full report: {os.path.relpath(out, ROOT)})")
-            found_problems = found_problems or bool(report["problems"])
+            problems = report["problems"] or {}
+            if summary_only:
+                crossing = report["measurements"].get("crossing") or {}
+                fastest = crossing.get("fastestSeconds")
+                count = sum(entry["count"] for entry in problems.values())
+                print(f"{job.get('choice') or '1:'}\t{label or ''}\t"
+                      f"{f'{fastest:.0f}s' if fastest else '-'} (target {crossing.get('targetSeconds', '-')}s)\t"
+                      f"{count} problem{'s' if count != 1 else ''}")
+                if problems:
+                    print(summarise(report))
+            else:
+                print(summarise(report))
+                print(f"(full report: {os.path.relpath(out, ROOT)})")
+            found_problems = found_problems or bool(problems)
     sys.exit(1 if found_problems else 0)
 
 

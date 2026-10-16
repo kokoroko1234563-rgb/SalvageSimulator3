@@ -94,8 +94,9 @@ return {
   Claude-Session: https://claude.ai/code/session_01Rzk2jo5zeuLgwEsf1G5YzW
   ```
 - Never write AI model names or model IDs anywhere in the repository.
-- **Only edit the files your assignment lists.** If something else seems wrong or missing (the
-  engine, a test, the config), don't change it. Say so in your report.
+- **Only edit the files your assignment lists** (plus your own generator scripts under
+  `tools/gen/`). If something else seems wrong or missing (the engine, a test, the config),
+  don't change it. Say so in your report.
 - If something blocks you, stop and report it rather than working around it.
 
 ### Read first
@@ -172,24 +173,40 @@ each tide as the sea leaves them dry; Weight raises both the chance and the rari
 ### How to check your work
 
 1. `bash tools/check.sh`: formatting, the data checks and all the Lune tests (about a minute).
-   It must pass. Run `stylua src tools` if formatting fails.
+   It must pass. Run `stylua src tools` if formatting fails. Read only the result:
+   `bash tools/check.sh 2>&1 | grep -A3 "^FAIL\|passed\|All checks\|FAILED"`.
 2. `lune run tools/layout_map.luau - Zones/Zone5` (your layout's source): prints, for every
-   crossing and room, the measurements and **"fastest crossing on foot: about … s (target …)"**
-   and an ASCII map. With `docs/layouts` instead of `-` it also writes the maps into the notes'
+   crossing and room, two lines of measurements, including **"fastest crossing on foot: about
+   … s (target …)"**. Add `--maps` to see the ASCII maps and flood orders (long: only when you
+   need to look). With `docs/layouts` instead of `-` it writes the maps into the notes'
    `<!-- map Zones/Zone5@5 -->` markers (keys: `@5` the first of everything, `@5/c2` crossing 2,
    `@5/s3r2` room 2 of slot 3). It rewrites every note it has a marker for; revert the notes
    that aren't yours.
 3. **The Test Range**, the real engine, once the first two pass:
    ```
-   python3 tools/range/run.py --zone 5 --choice 2:1,1,1   # crossing 2, first rooms
-   python3 tools/range/run.py --zone 5 --every            # every crossing, then every room
+   python3 tools/range/run.py --zone 5 --choice 2:1,1,1   # one variation while you iterate
+   python3 tools/range/run.py --zone 5 --every            # once, at the very end
    ```
    (`--all HermitHollows` for the biome.) It reports things floating or buried or inside rock,
    the terrain, walls and roofs against your layout, patrol routes crossing walls, unreachable
    or one-way loot spots, the fastest crossing walking the real terrain against the target, and
-   how much floods at four tide levels. Each run takes about a minute, **and only one runs at a
-   time across all the agents** (the runner waits its turn), so use `--choice` while working and
-   `--every` once at the end.
+   how much floods at four tide levels. `--every` prints one line per variation (choice, fastest
+   time, problem count) and the details only for variations with problems; `--summary` does the
+   same for a single run. Each run takes about a minute, and only one runs at a time across all
+   the agents (the runner waits its turn).
+
+### Keeping the work cheap (rules)
+
+- **Run the Test Range in the foreground and wait for it.** Never start background tasks,
+  timers, monitors or `sleep` loops to wait for anything. Use `--choice` while iterating and
+  `--every` once at the very end.
+- **Keep outputs short.** Pipe long output through `tail`, `grep` or the summary modes; don't
+  read full reports or whole JSON files. Read only the part of a file you need.
+- **Generator scripts are committed files** in your worktree (e.g. under `tools/gen/`, named for
+  your layout), not scratch files you re-read or re-paste.
+- **Commit after each working step.** If `git commit` or `git push` is refused by a permission
+  check, don't work around it: leave the work uncommitted and say so in your report.
+- **Before you stop**, check that no background tasks of yours are left running.
 
 ### Done when
 
