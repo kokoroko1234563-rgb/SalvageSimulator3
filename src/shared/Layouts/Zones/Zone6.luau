@@ -27,7 +27,7 @@ end
 
 -- Rock overhead, resting on the walls either side of a lane.
 local function roof(path, width)
-	return { Kind = "Roof", Path = path, Width = width or 40, Clearance = 22, Thickness = 8 }
+	return { Kind = "Roof", Path = path, Width = width or 44, Clearance = 22, Thickness = 8 }
 end
 
 -- A pool: low ground that holds the sea from early in the flood.
@@ -56,7 +56,8 @@ local function merge(...)
 end
 
 -- Turns a maze picture into walls and rubble. The picture's top left node is at (x0, z0).
--- Walls run between nodes and stop 6 studs short of them; a round post stands on every node
+-- Walls run between nodes (with a point on each node on the way) and stop 6 studs short of the
+-- ends; a round post stands on every node
 -- a wall touches, so the walls meet exactly (a wall's face is 6 studs off its line) with no
 -- crack where two meet end to end. On the picture's left and right edges the posts also close
 -- the walls against the cliffs (the ground past the beach's sides carries on as it is at
@@ -88,7 +89,12 @@ local function maze(art, x0, z0)
 				while last + 1 < w and string.sub(line, 3 * (last + 1) + 2, 3 * (last + 1) + 2) == char do
 					last += 1
 				end
-				add(char, { { x0 + PITCH * c + 6, z }, { x0 + PITCH * (last + 1) - 6, z } })
+				local path = { { x0 + PITCH * c + 6, z } }
+				for i = c + 1, last do
+					table.insert(path, { x0 + PITCH * i, z })
+				end
+				table.insert(path, { x0 + PITCH * (last + 1) - 6, z })
+				add(char, path)
 				if char == "-" then
 					for i = c, last + 1 do
 						post(i, j)
@@ -110,7 +116,12 @@ local function maze(art, x0, z0)
 				while last + 1 < h and string.sub(art[2 * (last + 1) + 2], 3 * i + 1, 3 * i + 1) == char do
 					last += 1
 				end
-				add(char, { { x, z0 + PITCH * r + 6 }, { x, z0 + PITCH * (last + 1) - 6 } })
+				local path = { { x, z0 + PITCH * r + 6 } }
+				for j = r + 1, last do
+					table.insert(path, { x, z0 + PITCH * j })
+				end
+				table.insert(path, { x, z0 + PITCH * (last + 1) - 6 })
+				add(char, path)
 				if char == "|" then
 					for j = r, last + 1 do
 						post(i, j)
@@ -160,29 +171,8 @@ local FRAME = {
 local frame = {
 	Name = "The Drowned Reach",
 	Primitives = merge(maze(FRAME, X0, Z0), {
-		roof({ { -300, 200 }, { -300, 216 } }, 32),
-		roof({ { -180, 200 }, { -180, 216 } }, 32),
-		roof({ { -100, 200 }, { -100, 216 } }, 32),
-		roof({ { 100, 200 }, { 100, 216 } }, 32),
-		roof({ { 180, 200 }, { 180, 216 } }, 32),
-		roof({ { -220, 360 }, { -220, 376 } }, 32),
-		roof({ { -140, 360 }, { -140, 376 } }, 32),
-		roof({ { -100, 360 }, { -100, 376 } }, 32),
-		roof({ { 20, 360 }, { 20, 376 } }, 32),
-		roof({ { 100, 360 }, { 100, 376 } }, 32),
-		roof({ { 140, 360 }, { 140, 376 } }, 32),
-		roof({ { 260, 360 }, { 260, 376 } }, 32),
-		roof({ { -128, 68 }, { -112, 68 } }, 32),
-		roof({ { -128, 188 }, { -112, 188 } }, 32),
-		roof({ { -128, 308 }, { -112, 308 } }, 32),
-		roof({ { -128, 428 }, { -112, 428 } }, 32),
-		roof({ { -128, 508 }, { -112, 508 } }, 32),
-		roof({ { 112, 108 }, { 128, 108 } }, 32),
-		roof({ { 112, 228 }, { 128, 228 } }, 32),
-		roof({ { 112, 348 }, { 128, 348 } }, 32),
-		roof({ { 112, 468 }, { 128, 468 } }, 32),
-		roof({ { -100, 228 }, { -100, 348 }, { 100, 348 }, { 100, 228 } }, 40),
-		roof({ { -100, 388 }, { -100, 548 }, { 100, 548 }, { 100, 388 } }, 40),
+		roof({ { -100, 228 }, { -100, 348 }, { 100, 348 }, { 100, 228 } }, 48),
+		roof({ { -100, 388 }, { -100, 548 }, { 100, 548 }, { 100, 388 } }, 48),
 	}),
 }
 
@@ -221,14 +211,14 @@ local CROSSING1 = {
 local crossing1 = {
 	Name = "West stair",
 	Primitives = merge(maze(CROSSING1, X0, Z0), {
-		roof({ { 100, 228 }, { 100, 308 } }, 40),
-		roof({ { -220, 388 }, { -220, 508 } }, 40),
-		roof({ { -60, 348 }, { 60, 348 } }, 40),
-		roof({ { -20, 188 }, { 60, 188 } }, 40),
-		roof({ { 100, 428 }, { 100, 508 } }, 40),
-		roof({ { 180, 548 }, { 340, 548 } }, 40),
-		roof({ { -60, 548 }, { 60, 548 } }, 40),
-		roof({ { -60, 388 }, { 60, 388 } }, 40),
+		roof({ { 100, 228 }, { 100, 308 } }, 44),
+		roof({ { -220, 388 }, { -220, 508 } }, 44),
+		roof({ { -60, 348 }, { 60, 348 } }, 44),
+		roof({ { -20, 188 }, { 60, 188 } }, 44),
+		roof({ { 100, 428 }, { 100, 508 } }, 44),
+		roof({ { 180, 548 }, { 340, 548 } }, 44),
+		roof({ { -60, 548 }, { 60, 548 } }, 44),
+		roof({ { -60, 388 }, { 60, 388 } }, 44),
 		lane({ { -340, 268 }, { -340, 348 } }),
 		lane({ { -60, 28 }, { 60, 28 } }),
 		pool(-60, 188),
