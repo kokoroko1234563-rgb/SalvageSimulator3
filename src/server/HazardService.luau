@@ -1,6 +1,6 @@
--- Builds and runs a biome's hazards on a tile, from its data (Biomes.List[id].Hazards, see
--- Hazards.luau). Where they go comes from the tile's layout when it places them, otherwise
--- they're scattered over the tile. Everything is built into the tile's folder, so a hazard
+-- Builds and runs the hazards on a tile (a zone), from data (see Hazards.luau): its biome's,
+-- or the plain zone's own. Where they go comes from the tile's layout when it places them,
+-- otherwise they're scattered over the tile (unless the entry says Scatter = false). Everything is built into the tile's folder, so a hazard
 -- stops when the folder goes (the biome changed). The part each hazard hits with is tagged
 -- Hazards.Tag with its Effect, HitRadius, Push, HitText (and Factor, Active): each player's
 -- client checks itself against those (HazardController).
@@ -13,6 +13,7 @@ local Beach = require(Shared.Beach)
 local Hazards = require(Shared.Hazards)
 local Layouts = require(Shared.Layouts)
 local Palette = require(Shared.Palette)
+local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
 
 local CollisionGroups = require(script.Parent.CollisionGroups)
@@ -50,6 +51,9 @@ local function arm(part: BasePart, settings: { [string]: any })
 	part:SetAttribute("HitText", settings.HitText)
 	if settings.Factor then
 		part:SetAttribute("Factor", settings.Factor)
+	end
+	if settings.Damage then
+		part:SetAttribute("Damage", settings.Damage)
 	end
 	CollectionService:AddTag(part, Hazards.Tag)
 end
@@ -251,7 +255,7 @@ function builders.Pulse(tile, settings, folder)
 	for _, placement in Layouts.hazardPlacements(tile, "Pulse") do
 		table.insert(spots, Vector2.new(placement.At[1], z0 + placement.At[2]))
 	end
-	if #spots == 0 then
+	if #spots == 0 and settings.Scatter then
 		for _ = 1, settings.Count do
 			local x, z = randomSpot(tile)
 			table.insert(spots, Vector2.new(x, z))
@@ -314,7 +318,7 @@ function builders.Slow(tile, settings, folder)
 	for _, placement in Layouts.hazardPlacements(tile, "Slow") do
 		table.insert(patches, { x = placement.At[1], z = z0 + placement.At[2], radius = placement.Radius })
 	end
-	if #patches == 0 then
+	if #patches == 0 and settings.Scatter then
 		for _ = 1, settings.Count do
 			local x, z = randomSpot(tile)
 			table.insert(patches, { x = x, z = z })
@@ -338,11 +342,203 @@ function builders.Slow(tile, settings, folder)
 	end
 end
 
+-- The spots a layout places a kind at, in world X/Z (and each placement), or, with none and
+-- Scatter set, Count random spots.
+local function spotsFor(tile: number, kind: string, settings): { { x: number, z: number, placement: any } }
+	local z0 = Beach.tileRange(tile)
+	local spots = {}
+	for _, placement in Layouts.hazardPlacements(tile, kind) do
+		if placement.At then
+			table.insert(spots, { x = placement.At[1], z = z0 + placement.At[2], placement = placement })
+		end
+	end
+	if #spots == 0 and settings.Scatter then
+		for _ = 1, settings.Count do
+			local x, z = randomSpot(tile)
+			table.insert(spots, { x = x, z = z, placement = {} })
+		end
+	end
+	return spots
+end
+
+-- Sink: sinking sand. A patch of darker, wet sand that slows you; stand still in it and it
+-- swallows you (HazardController).
+function builders.Sink(tile, settings, folder)
+	for _, spot in spotsFor(tile, "Sink", settings) do
+		local radius = spot.placement.Radius or settings.Radius
+		local part = makePart({
+			Name = "SinkingSand",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.2, radius * 2, radius * 2),
+			CFrame = CFrame.new(spot.x, Beach.groundAt(spot.x, spot.z) + 0.06, spot.z)
+				* CFrame.Angles(0, 0, math.pi / 2),
+			Color = settings.Color,
+			Material = Enum.Material.Mud,
+			Reflectance = 0.08, -- a wet sheen: the tell
+		})
+		arm(part, settings)
+		part:SetAttribute("HitRadius", radius)
+		part:SetAttribute("Factor", settings.Factor)
+		part:SetAttribute("SinkTime", settings.SinkTime)
+		part:SetAttribute("MovingShare", settings.MovingShare)
+		part.Parent = folder
+	end
+end
+
+-- Rockfall: under a roof, dust and pebbles trickle down for Warning seconds, then a rock
+-- drops and knocks over anyone under it. Not all in step.
+function builders.Rockfall(tile, settings, folder)
+	local falls = {}
+	for _, spot in spotsFor(tile, "Rockfall", settings) do
+		local ground = Beach.groundAt(spot.x, spot.z)
+		local roofBottom = Beach.roofAt(spot.x, spot.z)
+		local top = roofBottom or ground + 14
+		local target = makePart({
+			Name = "RockfallSpot",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.15, settings.Radius * 1.6, settings.Radius * 1.6),
+			CFrame = CFrame.new(spot.x, ground + 0.05, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = settings.Color,
+			Material = Palette.Material.Rock,
+			Transparency = 0.4, -- a scatter of old rubble on the floor: where rock has fallen before
+		})
+		arm(target, settings)
+		target:SetAttribute("Active", false)
+		target.Parent = folder
+		local rock = makePart({
+			Name = "FallingRock",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(3.4, 3, 3.4),
+			CFrame = CFrame.new(spot.x, top - 1.5, spot.z),
+			Color = settings.Color,
+			Material = Palette.Material.Rock,
+			Transparency = 1,
+		})
+		rock.Parent = folder
+		local dust = Instance.new("ParticleEmitter")
+		dust.Color = ColorSequence.new(settings.Color:Lerp(Color3.new(1, 1, 1), 0.4))
+		dust.Size = NumberSequence.new(0.25, 0.1)
+		dust.Lifetime = NumberRange.new(0.8, 1.2)
+		dust.Rate = 30
+		dust.Speed = NumberRange.new(4, 7)
+		dust.SpreadAngle = Vector2.new(12, 12)
+		dust.EmissionDirection = Enum.NormalId.Bottom
+		dust.Enabled = false
+		dust.Parent = rock
+		table.insert(falls, {
+			target = target,
+			rock = rock,
+			dust = dust,
+			top = top - 1.5,
+			ground = ground + 1.5,
+			x = spot.x,
+			z = spot.z,
+			offset = rng:NextNumber(0, settings.Period),
+		})
+	end
+	table.insert(running, {
+		folder = folder,
+		step = function(now)
+			for _, f in falls do
+				local t = (now + f.offset) % settings.Period
+				local active = t >= settings.Period - settings.Active
+				local warned = not active and t >= settings.Period - settings.Active - settings.Warning
+				if f.target:GetAttribute("Active") ~= active then
+					f.target:SetAttribute("Active", active)
+				end
+				f.dust.Enabled = warned
+				if active then
+					local k = (t - (settings.Period - settings.Active)) / settings.Active
+					f.rock.Transparency = 0
+					f.rock.CFrame = CFrame.new(f.x, f.top + (f.ground - f.top) * math.min(1, k * 1.6), f.z)
+				elseif f.rock.Transparency ~= 1 then
+					f.rock.Transparency = 1
+					f.rock.CFrame = CFrame.new(f.x, f.top, f.z)
+				end
+			end
+		end,
+	})
+end
+
+-- Undertow: while the sea covers a ford or channel, a current along it drags you seaward.
+-- Built as a row of current parts down its Path, each active while the water there is deep
+-- enough, with foam streaming along it to show it.
+function builders.Undertow(tile, settings, folder)
+	local z0 = Beach.tileRange(tile)
+	local currents = {}
+	for _, placement in Layouts.hazardPlacements(tile, "Undertow") do
+		local width = placement.Width or settings.Width
+		local path = placement.Path
+		for i = 1, #path - 1 do
+			local a = Vector3.new(path[i][1], 0, z0 + path[i][2])
+			local b = Vector3.new(path[i + 1][1], 0, z0 + path[i + 1][2])
+			local along = b - a
+			if along.Magnitude < 0.5 then
+				continue
+			end
+			-- Toward the sea: along the path, whichever way runs seaward.
+			local direction = if along.Z >= 0 then along.Unit else -along.Unit
+			local count = math.max(1, math.ceil(along.Magnitude / (width * 0.75)))
+			for k = 0, count - 1 do
+				local at = a:Lerp(b, (k + 0.5) / count)
+				local part = makePart({
+					Name = "Undertow",
+					Size = Vector3.new(width, 0.2, along.Magnitude / count),
+					CFrame = CFrame.lookAt(at, at + direction)
+						+ Vector3.new(0, Beach.groundAt(at.X, at.Z) + 0.3, 0),
+					Transparency = 1,
+				})
+				arm(part, settings)
+				part:SetAttribute("HitRadius", width / 2)
+				part:SetAttribute("Direction", direction)
+				part:SetAttribute("Strength", settings.Strength)
+				part:SetAttribute("Active", false)
+				local foam = Instance.new("ParticleEmitter")
+				foam.Color = ColorSequence.new(settings.Color)
+				foam.Size = NumberSequence.new(0.6, 0.2)
+				foam.Transparency = NumberSequence.new(0.3, 1)
+				foam.Lifetime = NumberRange.new(1, 1.6)
+				foam.Rate = 6
+				foam.Speed = NumberRange.new(settings.Strength * 0.8, settings.Strength)
+				foam.EmissionDirection = Enum.NormalId.Front
+				foam.SpreadAngle = Vector2.new(8, 2)
+				foam.Enabled = false
+				foam.Parent = part
+				part.Parent = folder
+				table.insert(currents, { part = part, foam = foam })
+			end
+		end
+	end
+	if #currents == 0 then
+		return
+	end
+	local since = 1
+	table.insert(running, {
+		folder = folder,
+		step = function(_, dt)
+			since += dt
+			if since < 0.5 then
+				return
+			end
+			since = 0
+			local sea = Tide.sea()
+			for _, c in currents do
+				local active = Beach.seaDepthAt(c.part.CFrame.Position, sea) > settings.MinDepth
+				if c.part:GetAttribute("Active") ~= active then
+					c.part:SetAttribute("Active", active)
+					c.foam.Enabled = active
+				end
+			end
+		end,
+	})
+end
+
 HazardService.Builders = builders
 
--- Builds a biome's hazards on a tile into its folder.
-function HazardService.start(tile: number, biome: any, folder: Instance)
-	for _, entry in biome.Hazards or {} do
+-- Builds a source's hazards on a tile into its folder: a biome's, or a plain zone's
+-- (Config.Zones[i]), anything with a Hazards list.
+function HazardService.start(tile: number, source: any, folder: Instance)
+	for _, entry in source.Hazards or {} do
 		local settings = Hazards.settings(entry)
 		local build = builders[settings.Type]
 		if build then
@@ -351,7 +547,48 @@ function HazardService.start(tile: number, biome: any, folder: Instance)
 	end
 end
 
+local HARM_SLACK = 6 -- studs of lag the server allows on a reported hit
+local HARM_COOLDOWN = 1 -- seconds before the same hazard can harm the same player again
+
 function HazardService.init()
+	-- A client reports its own character hit by a Harm hazard or swallowed by a Sink: the
+	-- server checks it was there (and that the hazard was live) and applies the damage.
+	local lastHarm: { [Player]: { [Instance]: number } } = {}
+	Remotes.get("HazardHarm").OnServerEvent:Connect(function(player: Player, part)
+		if
+			typeof(part) ~= "Instance"
+			or not part:IsA("BasePart")
+			or not CollectionService:HasTag(part, Hazards.Tag)
+		then
+			return
+		end
+		local effect = part:GetAttribute("Effect")
+		if (effect ~= "Harm" and effect ~= "Sink") or part:GetAttribute("Active") == false then
+			return
+		end
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if not humanoid or not root or humanoid.Health <= 0 then
+			return
+		end
+		local offset = root.Position - part.Position
+		local across = Vector3.new(offset.X, 0, offset.Z).Magnitude
+		if across > (part:GetAttribute("HitRadius") or 0) + HARM_SLACK or math.abs(offset.Y) > 10 then
+			return
+		end
+		local now = os.clock()
+		local mine = lastHarm[player] or {}
+		lastHarm[player] = mine
+		if now - (mine[part] or -math.huge) < HARM_COOLDOWN then
+			return
+		end
+		mine[part] = now
+		humanoid:TakeDamage(part:GetAttribute("Damage") or 100)
+	end)
+	game:GetService("Players").PlayerRemoving:Connect(function(player)
+		lastHarm[player] = nil
+	end)
 	RunService.Heartbeat:Connect(function(dt)
 		local now = os.clock()
 		for i = #running, 1, -1 do

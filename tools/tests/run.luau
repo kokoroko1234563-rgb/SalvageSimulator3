@@ -2300,6 +2300,72 @@ test("shapes can be any outline, worn at the edges, and made of their own materi
 	Layouts.setActive(tile, nil)
 end)
 
+test("a plain zone's own dangers go where its layout puts them, and they're deadly", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local Tide = h.require("Shared/Tide")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 6
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "dangers",
+		Primitives = {
+			{
+				Kind = "Roof",
+				Area = { { -40, 100 }, { 40, 100 }, { 40, 140 }, { -40, 140 } },
+				Clearance = 12,
+				Thickness = 6,
+			},
+		},
+		Hazards = {
+			{ Type = "Sink", At = { 100, 200 }, Radius = 10 },
+			{ Type = "Rockfall", At = { 0, 120 } },
+			{ Type = "Undertow", Path = { { -200, 300 }, { -200, 400 } }, Width = 12 },
+		},
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, Config.Zones[tile], folder)
+	local effects = {}
+	for _, part in folder:GetChildren() do
+		local effect = part:GetAttribute("Effect")
+		if effect then
+			effects[effect] = (effects[effect] or 0) + 1
+		end
+	end
+	assert(
+		effects.Sink == 1 and effects.Harm == 1 and (effects.Current or 0) >= 3,
+		"each where it was placed"
+	)
+	for _, entry in Config.Zones[tile].Hazards do
+		local settings = Hazards.settings(entry)
+		if settings.Damage then
+			assert(settings.Damage >= 100, settings.Type .. " kills")
+		end
+	end
+	-- The rock falls in turn; the undertow only runs under the sea.
+	local rockfall
+	for _, part in folder:GetChildren() do
+		if part.Name == "RockfallSpot" then
+			rockfall = part
+		end
+	end
+	local seen = {}
+	for t = 0, 8, 0.25 do
+		HazardService._step(t, 0.6)
+		seen[rockfall:GetAttribute("Active")] = true
+	end
+	assert(seen[true] and seen[false], "rock falls, then doesn't")
+	-- (Without a placement, nothing is scattered for a plain zone.)
+	Layouts.setActive(tile, { Name = "none", Primitives = {} })
+	local empty = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, Config.Zones[tile], empty)
+	assert(#empty:GetChildren() == 0, "a plain zone's dangers aren't scattered")
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
+end)
+
 test("roofs make caves: rock overhead, the floor still the ground", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")

@@ -258,20 +258,27 @@ function BiomeService.set(tile: number, biomeId: string?, choice: any?)
 	if old then
 		old:Destroy()
 	end
-	if biome then
+	-- The plain zone has its own hazards (Config.Zones[i].Hazards), where no biome rolled.
+	local zone = Config.Zones[Beach.zoneOfTile(tile)]
+	local plainHazards = not biome and zone and zone.Hazards and #zone.Hazards > 0
+	if biome or plainHazards then
 		local tileFolder = Instance.new("Folder")
 		tileFolder.Name = "Tile" .. tile
-		local startZ, endZ = Beach.tileRange(tile)
-		local decor = biome.Scenery and decorBuilders[biome.Scenery] or decorBuilders.Mounds
-		decor(tileFolder, biome, startZ, endZ)
-		GroundShift.clearMisfits(tileFolder)
-		if biome.Secret and biome.Entrance then
-			buildEntrance(tileFolder, biome, tile)
+		if biome then
+			local startZ, endZ = Beach.tileRange(tile)
+			local decor = biome.Scenery and decorBuilders[biome.Scenery] or decorBuilders.Mounds
+			decor(tileFolder, biome, startZ, endZ)
+			GroundShift.clearMisfits(tileFolder)
+			if biome.Secret and biome.Entrance then
+				buildEntrance(tileFolder, biome, tile)
+			end
 		end
-		HazardService.start(tile, biome, tileFolder)
+		HazardService.start(tile, biome or zone, tileFolder)
 		tileFolder.Parent = folder
-		for _, callback in setCallbacks do
-			task.spawn(callback, tile, biome, tileFolder)
+		if biome then
+			for _, callback in setCallbacks do
+				task.spawn(callback, tile, biome, tileFolder)
+			end
 		end
 	end
 end

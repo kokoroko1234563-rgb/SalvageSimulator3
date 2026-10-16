@@ -1,6 +1,7 @@
--- Biome hazards: a few generic kinds a biome builds from data (Biomes.List[id].Hazards), each
--- with its own settings. Where they go comes from the tile's layout when it says (a layout's
--- Hazards list, by Type), and otherwise they're scattered over the tile.
+-- Hazards: a few generic kinds built from data, each with its own settings: a biome's
+-- (Biomes.List[id].Hazards), or a plain zone's (Config.Zones[i].Hazards) where no biome rolled.
+-- Where they go comes from the zone's layout (its Hazards list, by Type); without placements, a
+-- biome's are scattered over the zone (Scatter), a plain zone's aren't built.
 --
 --   Roller  something rolls down the tile toward the sea every Period seconds, at Speed (the
 --           Shipwreck Shallows barrels). Placement: Lanes = { x, ... } it can start from.
@@ -10,11 +11,23 @@
 --           (vents, blowholes). Placement: At = {x, z}.
 --   Slow    a patch that slows you to Factor of your speed while you're in it (sea glass,
 --           tangled seagrass). Placement: At = {x, z}, Radius.
+--   Sink    sinking sand: slows you to Factor, and you sink while you're in it: in SinkTime
+--           seconds standing still (several times that if you keep moving), it swallows you
+--           (Damage: 100 kills). Out of it you climb back up. Its tell is darker, wet-looking
+--           sand. Placement: At = {x, z}, Radius.
+--   Rockfall  rock falls from the roof every Period seconds, after Warning seconds of dust and
+--           pebbles trickling down; it Harms whoever it lands on. Placement: At = {x, z}.
+--   Undertow  while the sea covers it (deeper than MinDepth), a current along a ford or
+--           channel drags you toward the sea at Strength studs/s. Placement: Path, Width.
 --
 -- What a hazard does to a player who gets within HitRadius of it is its Effect:
 --   Knockdown  knocked over (you drop what you hold) and thrown Push studs/s away from it.
 --   Drop       what you hold is knocked out of your hands.
 --   Slow       slowed (Slow hazards).
+--   Sink       slowed, and swallowed if you stay in it (Sink hazards).
+--   Current    dragged along (Undertow hazards): into deep water, where you drown.
+--   Harm       Damage taken (100 kills), and thrown Push studs/s away from it.
+-- Dangers are meant to be deadly: a hazard that only slows you is scenery.
 -- The server builds and moves the hazards (HazardService); each player's own client checks its
 -- character against them and applies the effect (HazardController), like the waves.
 
@@ -22,7 +35,7 @@ local Hazards = {}
 
 Hazards.Tag = "Hazard" -- CollectionService tag on the part a hazard hits with
 
-Hazards.Effects = { Knockdown = true, Drop = true, Slow = true }
+Hazards.Effects = { Knockdown = true, Drop = true, Slow = true, Sink = true, Current = true, Harm = true }
 
 -- Each kind's settings and their defaults. A biome's entry overrides any of them.
 Hazards.Types = {
@@ -69,7 +82,49 @@ Hazards.Types = {
 		Push = 0,
 		HitText = "",
 	},
+	Sink = {
+		Count = 3,
+		Radius = 8,
+		Factor = 0.55,
+		SinkTime = 3, -- seconds standing still until it swallows you
+		MovingShare = 0.3, -- how fast you sink while moving, as a share of standing still
+		Damage = 100,
+		Color = Color3.fromRGB(120, 104, 78),
+		Effect = "Sink",
+		HitRadius = 8,
+		Push = 0,
+		HitText = "The sand swallowed you!",
+	},
+	Rockfall = {
+		Count = 3,
+		Period = 7,
+		Warning = 1.6,
+		Active = 0.5,
+		Radius = 4,
+		Damage = 100,
+		Color = Color3.fromRGB(90, 88, 84),
+		Effect = "Harm",
+		HitRadius = 4,
+		Push = 20,
+		HitText = "Crushed by falling rock!",
+	},
+	Undertow = {
+		Count = 2,
+		Width = 12,
+		Strength = 20, -- under KnockdownPush: it drags, it doesn't throw
+		MinDepth = 0.6,
+		Color = Color3.fromRGB(200, 235, 240),
+		Effect = "Current",
+		HitRadius = 6,
+		Push = 0,
+		HitText = "",
+	},
 }
+
+-- Every kind may set Scatter: whether it's scattered over a zone without placements.
+for _, defaults in Hazards.Types do
+	defaults.Scatter = true
+end
 
 -- What a placement in a layout's Hazards list may hold, by kind.
 Hazards.Placement = {
@@ -77,6 +132,9 @@ Hazards.Placement = {
 	Patrol = { Path = true, Count = true },
 	Pulse = { At = true },
 	Slow = { At = true, Radius = true },
+	Sink = { At = true, Radius = true },
+	Rockfall = { At = true },
+	Undertow = { Path = true, Width = true },
 }
 
 -- A biome's hazard entry with every setting filled in from its kind's defaults.

@@ -34,6 +34,7 @@ local EVENTS = {
 	"InventorySync", -- server -> client (snapshot) whenever the inventory changes
 	"TradeSync", -- server -> client (trade state) whenever a trade or invite changes
 	"TraderOpen", -- server -> client (offer) when a player talks to a special trader
+	"HazardHarm", -- client -> server (hazard part) this client's character was hit by a Harm or swallowed by a Sink
 }
 
 local Remotes = {}

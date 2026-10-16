@@ -56,8 +56,10 @@ local function knockDown(character: Model, humanoid: Humanoid, root: BasePart, p
 	end)
 end
 
--- Hazards (HazardController) slow you by this much while you're in them.
+-- Hazards (HazardController) slow you by this much while you're in them, and a current
+-- (an Undertow) drags you along this, studs/s.
 WaveController.hazardSlow = 1
+WaveController.hazardPush = Vector3.zero
 
 -- Knocks this client's character over and throws it along `push` (a hazard hit). Does
 -- nothing while it's already down or just got up. Returns whether it knocked you over.
@@ -107,6 +109,7 @@ function WaveController.init()
 			-- Characters are moved directly: the Humanoid controller would cancel a plain force.
 			local resistance = Stats.wavePush(player)
 			local push = Waves.getPush(root.Position, sea) * Config.Waves.CharacterFactor * resistance
+				+ WaveController.hazardPush
 			if GearEffects.isFrozen(root.Position) then
 				push = Vector3.zero -- the Freeze Wand: still water around you
 			end

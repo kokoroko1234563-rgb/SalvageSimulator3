@@ -58,7 +58,7 @@ local function shrunkRoof(x: number, z: number): (number?, number?, string?)
 			return nil, nil, nil
 		end
 	end
-	return bottom, top
+	return bottom, top, material
 end
 
 -- The area the terrain covers: the whole beach and seabed, a little past the sides.

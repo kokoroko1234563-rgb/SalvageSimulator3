@@ -4,7 +4,11 @@
 --   Knockdown  knocked over (dropping what you hold) and thrown away from the hazard.
 --   Drop       what you hold is knocked out of your hands.
 --   Slow       slowed while you're in it.
--- A Pulse hazard only hits while its Active attribute is set.
+--   Sink       slowed, and sinking while you're in it (fast standing still, slow moving); fully
+--              sunk, the server is told (it kills). You climb back out of it outside.
+--   Current    dragged along its Direction at Strength (into deep water, where you drown).
+--   Harm       the server is told you were hit (it applies the Damage), and you're thrown.
+-- A hazard with an Active attribute only hits while it's set.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -12,6 +16,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Hazards = require(Shared.Hazards)
+local Remotes = require(Shared.Remotes)
 
 local GrabController = require(script.Parent.GrabController)
 local HUD = require(script.Parent.HUD)
@@ -26,6 +31,9 @@ local REACH_Y = 6 -- a hazard this far above or below you can't reach you
 local DROP_COOLDOWN = 1.5 -- seconds before the same hazard can knock something out of your hands again
 
 local lastDrop: { [Instance]: number } = {}
+local lastHarm: { [Instance]: number } = {}
+local sunk = 0 -- seconds of sinking so far (standing-still seconds)
+local warned = false
 
 -- Whether a hazard part reaches a point, and how far away it is across the ground.
 function HazardController.reaches(part: BasePart, position: Vector3): (boolean, number)
@@ -35,16 +43,21 @@ function HazardController.reaches(part: BasePart, position: Vector3): (boolean, 
 	return across <= radius and math.abs(offset.Y) <= REACH_Y, across
 end
 
-local function step()
+local function step(dt: number)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not root then
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not root or not humanoid or humanoid.Health <= 0 then
 		WaveController.hazardSlow = 1
+		WaveController.hazardPush = Vector3.zero
+		sunk, warned = 0, false
 		return
 	end
 	local position = root.Position
 	local now = os.clock()
 	local slow = 1
+	local push = Vector3.zero
+	local sinking: BasePart? = nil
 	for _, part in CollectionService:GetTagged(Hazards.Tag) do
 		if not part:IsA("BasePart") or part:GetAttribute("Active") == false then
 			continue
@@ -56,6 +69,24 @@ local function step()
 		local effect = part:GetAttribute("Effect")
 		if effect == "Slow" then
 			slow = math.min(slow, part:GetAttribute("Factor") or 1)
+		elseif effect == "Sink" then
+			slow = math.min(slow, part:GetAttribute("Factor") or 1)
+			sinking = part
+		elseif effect == "Current" then
+			local current = (part:GetAttribute("Direction") or Vector3.zero)
+				* (part:GetAttribute("Strength") or 0)
+			if current.Magnitude > push.Magnitude then
+				push = current
+			end
+		elseif effect == "Harm" then
+			if now - (lastHarm[part] or -math.huge) > 1 then
+				lastHarm[part] = now
+				Remotes.get("HazardHarm"):FireServer(part)
+				local away = Vector3.new(position.X - part.Position.X, 0, position.Z - part.Position.Z)
+				local direction = if across > 0.1 then away.Unit else root.CFrame.LookVector * -1
+				WaveController.hit(direction * (part:GetAttribute("Push") or 0))
+				HUD.notify(part:GetAttribute("HitText") or "Ouch!")
+			end
 		elseif effect == "Knockdown" then
 			local away = Vector3.new(position.X - part.Position.X, 0, position.Z - part.Position.Z)
 			local direction = if across > 0.1 then away.Unit else root.CFrame.LookVector * -1
@@ -71,12 +102,37 @@ local function step()
 		end
 	end
 	WaveController.hazardSlow = slow
+	WaveController.hazardPush = push
+
+	-- Sinking sand: deeper while you're in it (much slower if you keep moving), back out of
+	-- it once you're clear.
+	if sinking then
+		local velocity = root.AssemblyLinearVelocity
+		local moving = Vector3.new(velocity.X, 0, velocity.Z).Magnitude > 3
+		sunk += dt * (if moving then sinking:GetAttribute("MovingShare") or 0.3 else 1)
+		local limit = sinking:GetAttribute("SinkTime") or 3
+		if sunk >= limit * 0.4 and not warned then
+			warned = true
+			HUD.notify("You're sinking! Keep moving and get out!")
+		end
+		if sunk >= limit then
+			sunk, warned = 0, false
+			Remotes.get("HazardHarm"):FireServer(sinking)
+			HUD.notify(sinking:GetAttribute("HitText") or "The sand swallowed you!")
+		end
+	else
+		sunk = math.max(0, sunk - dt * 2)
+		if sunk == 0 then
+			warned = false
+		end
+	end
 end
 
 function HazardController.init()
 	RunService.Heartbeat:Connect(step)
 	CollectionService:GetInstanceRemovedSignal(Hazards.Tag):Connect(function(part)
 		lastDrop[part] = nil
+		lastHarm[part] = nil
 	end)
 end
 

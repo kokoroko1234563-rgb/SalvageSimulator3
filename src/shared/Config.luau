@@ -107,7 +107,8 @@ Config.Beach = {
 	},
 }
 
--- The zones, from the shop out. CrossTime: about how many seconds the fastest way across the
+-- The zones, from the shop out. Hazards: a plain zone's own dangers (where no biome rolled),
+-- placed by its layout (Hazards.luau). CrossTime: about how many seconds the fastest way across the
 -- zone should take on foot (tools/layout_map.luau measures it from the layouts). Together
 -- they make the walk down about 7 minutes, with wading, waves and wrong turns: the lower
 -- zones are slower, more maze-like ground.
@@ -142,6 +143,12 @@ Config.Zones = {
 		Multiplier = 18,
 		CrossTime = 85,
 		Rarity = { Common = 10, Uncommon = 30, Rare = 38, VeryRare = 22 },
+		-- Its own dangers where no biome rolled (Hazards.luau), where its layout places them.
+		Hazards = {
+			{ Type = "Sink", Scatter = false },
+			{ Type = "Rockfall", Scatter = false },
+			{ Type = "Undertow", Scatter = false },
+		},
 	},
 	{ Name = "The Far Sandbar", Multiplier = 25, Rarity = { Rare = 60, VeryRare = 40 } },
 }

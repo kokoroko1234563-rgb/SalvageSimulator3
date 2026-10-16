@@ -229,6 +229,20 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 	for _, problem in require(script.Parent.Looks).problems() do
 		check(false, "Config.Looks: " .. problem)
 	end
+	-- The plain zones' own hazards.
+	for index, zone in Config.Zones do
+		for hazardIndex, entry in zone.Hazards or {} do
+			for _, problem in Hazards.problems(entry, "Config.Zones[" .. index .. "] hazard " .. hazardIndex) do
+				check(false, problem)
+			end
+			if extra and extra.Hazards and type(entry) == "table" then
+				check(
+					extra.Hazards[entry.Type] ~= nil,
+					"Config.Zones[" .. index .. "]: no hazard builder for " .. tostring(entry.Type)
+				)
+			end
+		end
+	end
 
 	-- Wading
 	local wading = Config.Beach.Wading
