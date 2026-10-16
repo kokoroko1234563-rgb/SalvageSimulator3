@@ -1,141 +1,402 @@
--- Hermit Hollows, zones 4 to 6. See docs/layouts/HermitHollows.md.
+-- Hermit Hollows. Zone 4 is drawn as a whole: a giant hermit crab's warren, a lattice of
+-- rock-walled corridors 16 studs wide, almost all of it roofed. Zones 5 and 6 are still the old
+-- 152-stud layouts, repeated down the zone. See docs/layouts/HermitHollows.md.
+--
+-- Zone 4's warren is a grid of 24 x 21 cells. A cell is a 16 x 16 floor; the walls between
+-- cells are 12 thick, so cells are 28 apart. Node lines (where walls cross) run at
+-- x = -336 + 28 i and z = 12 + 28 j, all on the 4-stud grid, so every wall face lands on 4k + 2.
+-- Mazes are drawn as text: 2 n + 1 lines of 2 m + 1 characters. Nodes sit at even positions
+-- ('+'); between two nodes a wall is '-' (across) or '|' (down), 'r' is a rubble pile in a
+-- doorway (a scramble for players on foot, too steep for a cart), and a blank is a door.
+-- Cells sit at odd positions: 'c' is a chamber and 'S' a side-room slot (both unroofed), '.' a
+-- gap in the roof, and a blank is a roofed corridor.
+local Tiled = require(script.Parent.Parent.Tiled)
+
+local PITCH = 28
+local WALL_HEIGHT = 22
+local ZONE_DEPTH = 608
+
+local function parse(rows)
+	local nodeRows = (#rows - 1) // 2
+	local nodeCols = (#rows[1] - 1) // 2
+	local lattice = { cols = nodeCols, rows = nodeRows, H = {}, V = {}, cell = {} }
+	for j = 0, nodeRows do
+		local line = rows[2 * j + 1]
+		lattice.H[j] = {}
+		for c = 0, nodeCols - 1 do
+			lattice.H[j][c] = string.sub(line, 2 * c + 2, 2 * c + 2)
+		end
+	end
+	for r = 0, nodeRows - 1 do
+		local line = rows[2 * r + 2]
+		lattice.V[r] = {}
+		lattice.cell[r] = {}
+		for i = 0, nodeCols do
+			lattice.V[r][i] = string.sub(line, 2 * i + 1, 2 * i + 1)
+		end
+		for c = 0, nodeCols - 1 do
+			lattice.cell[r][c] = string.sub(line, 2 * c + 2, 2 * c + 2)
+		end
+	end
+	return lattice
+end
+
+-- The warren's coordinates, or a side room's (origin 0, 0).
+local function gridOf(ox, oz)
+	return {
+		nodeX = function(i)
+			return ox + PITCH * i
+		end,
+		nodeZ = function(j)
+			return oz + PITCH * j
+		end,
+		cellX = function(c)
+			return ox + 14 + PITCH * c
+		end,
+		cellZ = function(r)
+			return oz + 14 + PITCH * r
+		end,
+	}
+end
+
+local WARREN = gridOf(-336, 12)
+
 local function wall(path)
-	return { Kind = "Wall", Path = path, Height = 22, Width = 12 }
+	return { Kind = "Wall", Path = path, Height = WALL_HEIGHT, Width = 12 }
 end
 
-local function roof(path, width)
-	return { Kind = "Roof", Path = path, Width = width, Clearance = 20, Thickness = 8 }
+-- The walls of a maze that the `base` maze doesn't already have. With `inner`, the maze's own
+-- border is left to whoever drew it (a room's border is the frame's, with its door).
+local function wallsOf(lattice, grid, base, inner)
+	local list = {}
+	local function has(l, kind, a, b)
+		return l ~= nil and l[kind][a][b] == (if kind == "H" then "-" else "|")
+	end
+	for j = 0, lattice.rows do
+		if not (inner and (j == 0 or j == lattice.rows)) then
+			local start = nil
+			for c = 0, lattice.cols do
+				local here = c < lattice.cols and has(lattice, "H", j, c) and not has(base, "H", j, c)
+				if here and not start then
+					start = c
+				elseif not here and start then
+					table.insert(
+						list,
+						wall({ { grid.nodeX(start), grid.nodeZ(j) }, { grid.nodeX(c), grid.nodeZ(j) } })
+					)
+					start = nil
+				end
+			end
+		end
+	end
+	for i = 0, lattice.cols do
+		if not (inner and (i == 0 or i == lattice.cols)) then
+			local start = nil
+			for r = 0, lattice.rows do
+				local here = r < lattice.rows and has(lattice, "V", r, i) and not has(base, "V", r, i)
+				if here and not start then
+					start = r
+				elseif not here and start then
+					table.insert(
+						list,
+						wall({ { grid.nodeX(i), grid.nodeZ(start) }, { grid.nodeX(i), grid.nodeZ(r) } })
+					)
+					start = nil
+				end
+			end
+		end
+	end
+	return list
 end
 
-local layout = {
+-- Rubble in the doorways: a pile of sand across each 'r'.
+local function rubbleOf(lattice, grid)
+	local list = {}
+	local function pile(x1, z1, x2, z2)
+		table.insert(list, { Kind = "Ridge", Path = { { x1, z1 }, { x2, z2 } }, Height = 4.2, Width = 24 })
+	end
+	for j = 0, lattice.rows do
+		for c = 0, lattice.cols - 1 do
+			if lattice.H[j][c] == "r" then
+				pile(grid.nodeX(c), grid.nodeZ(j), grid.nodeX(c + 1), grid.nodeZ(j))
+			end
+		end
+	end
+	for r = 0, lattice.rows - 1 do
+		for i = 0, lattice.cols do
+			if lattice.V[r][i] == "r" then
+				pile(grid.nodeX(i), grid.nodeZ(r), grid.nodeX(i), grid.nodeZ(r + 1))
+			end
+		end
+	end
+	return list
+end
+
+-- Roofs over every corridor cell: a slab resting on the walls, row by row. A cell stays open
+-- where `lattice` or `frame` marks it (a chamber, a slot, a gap in the roof).
+local function roofsOf(lattice, grid, frame)
+	local list = {}
+	for r = 0, lattice.rows - 1 do
+		local start = nil
+		for c = 0, lattice.cols do
+			local roofed = c < lattice.cols
+				and lattice.cell[r][c] == " "
+				and (frame == nil or frame.cell[r][c] == " ")
+			if roofed and not start then
+				start = c
+			elseif not roofed and start then
+				local z = grid.cellZ(r)
+				local path = if start == c - 1
+					then { { grid.cellX(start), z } }
+					else { { grid.cellX(start), z }, { grid.cellX(c - 1), z } }
+				table.insert(list, { Kind = "Roof", Path = path, Width = 28, Clearance = 20, Thickness = 8 })
+				start = nil
+			end
+		end
+	end
+	return list
+end
+
+local function point(grid, cell)
+	return { grid.cellX(cell[1]), grid.cellZ(cell[2]) }
+end
+
+local function patrolsOf(grid, crabs)
+	local list = {}
+	for _, cells in crabs do
+		local path = {}
+		for _, cell in cells do
+			table.insert(path, point(grid, cell))
+		end
+		table.insert(list, { Type = "Patrol", Path = path, Count = 1 })
+	end
+	return list
+end
+
+local function lootOf(grid, spots)
+	local list = {}
+	for _, spot in spots do
+		local at = point(grid, spot)
+		table.insert(list, { At = at, Radius = 6, Weight = spot[3] })
+	end
+	return list
+end
+
+local function append(into, from)
+	for _, item in from do
+		table.insert(into, item)
+	end
+end
+
+local FRAME = {
+	"+-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+ +-+-+-+-+ +-+-+",
+	"|                                       |c c c| |",
+	"+ + + + + +-+ +-+ + + + + + + + + + + + + + + + +",
+	"|         |c c c                         c c c| |",
+	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
+	"|          c c c|                       |c c c  |",
+	"+-+-+-+ + + +-+ + + + + + + + + + + + + + +-+ + +",
+	"|S S S|                                         |",
+	"+ + + + + + + + + + + + + + + + + + + + + +-+-+-+",
+	"|S S S                                    |S S S|",
+	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
+	"|S S S|                                    S S S|",
+	"+-+-+-+ + + + + + + + + + + + + + + + + + + + + +",
+	"|                                         |S S S|",
+	"+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+",
+	"|                                               |",
+	"+-+-+-+-+ + + + + + + + + + + + + + + + +-+-+-+-+",
+	"|S S S S|                               |S S S S|",
+	"+ + + + + + + + + + +-+ +-+ + + + + + + + + + + +",
+	"|S S S S            |c c c               S S S S|",
+	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
+	"|S S S S|            c c c|             |S S S S|",
+	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
+	"|S S S S|           |c c c              |S S S S|",
+	"+-+-+-+-+ + + + + + + +-+ + + + + + + + +-+-+-+-+",
+	"|                                               |",
+	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
+	"|                                               |",
+	"+-+-+-+ +-+-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+ +-+-+",
+	"|                                               |",
+	"+ + + + + + + + + + + +-+ +-+ + + + + + + + + + +",
+	"|                     |c c c                    |",
+	"+-+-+-+ + +-+ +-+ + + + + + + + + + + + + +-+-+-+",
+	"|S S S|   |c c c       c c c|             |S S S|",
+	"+ + + + + + + + + + + + +-+ +-+ +-+ + + + + + + +",
+	"|S S S     c c c|           |S S S|       |S S S|",
+	"+ + + + + + +-+ + + + + + + + + + + + + + + + + +",
+	"|S S S|                     |S S S|        S S S|",
+	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
+	"|S S S|                     |S S S|       |S S S|",
+	"+-+-+-+ + + + + + + + + + + +-+-+-+ + + + +-+-+-+",
+	"|                                               |",
+	"+-+-+ +-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+ +-+-+ +-+",
+}
+
+local CROSSINGS = {
+	{
+		Name = "Basin run",
+		Maze = {
+			"+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ +-+-+",
+			"| | |       | |                 |.      |c c c| |",
+			"+ + + +-+-+-+ +-+-+-+ +-+ +-+ + +-+-+-+ + + + + +",
+			"|   |   | |c c c|     |   |   |   |      c c c| |",
+			"+ +-+-+ + + + + + + + + + + +-+-+ + +-+ + + + + +",
+			"|       | |c c c| | | |   |   | | | | | |c c c| |",
+			"+-+-+-+ + + +-+ + + + + + +-+ + +-+ + +-+-+-+-+ +",
+			"|S S S| | |   |   | | | | |       | |           |",
+			"+ + + + + + +-+-+-+ + +-+ + + +-+ + + + +-+-+-+-+",
+			"|S S S  |         | | |   | |   | | |     |S S S|",
+			"+ + + + +-+-+ +-+ + + +-+ + +-+ +-+ + +-+ + + + +",
+			"|S S S|     | | |   |   | | | |   |     |  S S S|",
+			"+-+-+-+ +-+ +-+ +-+-+ +-+-+ + +-+ +-+-+ + + + + +",
+			"|       |     |       |         |       | |S S S|",
+			"+-+ +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ +-+-+-+-+",
+			"|           |             |       |   |         |",
+			"+-+-+-+-+ +-+ +-+-+-+-+ + + +-+-+ +-+ + +-+-+-+-+",
+			"|S S S S|     | |.      | | | | |       |S S S S|",
+			"+ + + + +-+ +-+ + + +-+-+-+-+ + +-+ +r+-+ + + + +",
+			"|S S S S      | |   |c c c  | | | |      S S S S|",
+			"+ + + + +-+-+-+ + +-+ + + +-+ + + +-+-+ + + + + +",
+			"|S S S S|   | |   | |c c c|           | |S S S S|",
+			"+ + + + + + + +-+ + + + + +-+-+ +-+-+ + + + + + +",
+			"|S S S S| |         |c c c         .    |S S S S|",
+			"+-+-+-+-+ +-+-+-+ +-+ +-+ +-+-+ +-+-+ +-+-+-+-+-+",
+			"| |       |.  | |       |     | |   |     |  .| |",
+			"+ + + +-+-+ +-+ +-+-+-+-+ +-+-+ + + +-+-+-+ +-+ +",
+			"|   | |         |             |   |             |",
+			"+-+-+-+ +-+-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+ +-+-+",
+			"|     |     |   |     |   |   |     |       |   |",
+			"+-+ + +-+-+ + +-+ +-+ +-+ +-+ +-+-+ + + +-+-+-+ +",
+			"|   |     |     | |   |c c c| |     | | |       |",
+			"+-+-+-+ + +-+ +-+ +-+-+ + + + +-+-+-+ +-+ +-+-+-+",
+			"|S S S| | |c c c    |  c c c|       |  .  |S S S|",
+			"+ + + + + + + + +-+-+ +-+-+ +-+ +-+ +-+-+ + + + +",
+			"|S S S  | |c c c|     |     |S S S|   |   |S S S|",
+			"+ + + + + +-+-+ + +-+-+-+ + + + + +-+-+ +-+ + + +",
+			"|S S S| |     |   | |     | |S S S|   |    S S S|",
+			"+ + + +-+ +-+ + +-+ +-+ +-+ + + + +-+ +-+ + + + +",
+			"|S S S|     | | |   | | |   |S S S| | |   |S S S|",
+			"+-+-+-+ + + + + + +-+ +-+ +-+-+-+-+ + + +-+-+-+-+",
+			"|       | |           |               |         |",
+			"+-+-+-+-+-+-+ +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+",
+		},
+		Ramp = {
+			{ 21, 0 },
+			{ 20, 0 },
+			{ 20, 1 },
+			{ 17, 1 },
+			{ 17, 5 },
+			{ 19, 5 },
+			{ 19, 8 },
+			{ 17, 8 },
+			{ 17, 9 },
+			{ 19, 9 },
+			{ 19, 11 },
+			{ 12, 11 },
+			{ 12, 13 },
+			{ 8, 13 },
+			{ 8, 16 },
+			{ 7, 16 },
+			{ 7, 20 },
+			{ 6, 20 },
+		},
+		Loot = { { 5, 0, 3 }, { 0, 0, 3 }, { 6, 6, 3 }, { 23, 20, 3 }, { 0, 6, 3 }, { 22, 14, 3 } },
+		Crabs = {
+			{ { 15, 12 }, { 15, 11 }, { 15, 10 }, { 15, 9 } },
+			{ { 19, 2 }, { 19, 1 }, { 19, 0 } },
+			{ { 7, 18 }, { 8, 18 } },
+			{ { 19, 7 }, { 20, 7 }, { 21, 7 } },
+			{ { 12, 12 }, { 13, 12 }, { 14, 12 } },
+			{ { 18, 10 }, { 18, 11 }, { 18, 12 } },
+			{ { 18, 5 }, { 18, 4 }, { 18, 3 } },
+			{ { 8, 14 }, { 9, 14 }, { 10, 14 } },
+			{ { 12, 13 }, { 11, 13 }, { 10, 13 }, { 9, 13 } },
+			{ { 17, 1 }, { 17, 2 }, { 17, 3 }, { 17, 4 } },
+		},
+	},
+}
+
+local FRAME_LATTICE = parse(FRAME)
+
+local function mound(x, z, radius, height)
+	return { Kind = "Mound", At = { x, z }, Radius = radius, Height = height, Rock = true }
+end
+
+local frame = {
 	Name = "Hermit Hollows (zone 4)",
 	Primitives = {
-		-- Cart ramps
-		{
-			Kind = "Ramp",
-			Path = {
-				{ -200, 0 },
-				{ -200, 34 },
-				{ -124, 34 },
-				{ -124, 62 },
-				{ -200, 62 },
-				{ -200, 90 },
-				{ -124, 90 },
-				{ -124, 118 },
-				{ -200, 118 },
-				{ -200, 150 },
-			},
-			Width = 14,
-		},
-		{
-			Kind = "Ramp",
-			Path = {
-				{ 180, 0 },
-				{ 180, 34 },
-				{ 104, 34 },
-				{ 104, 62 },
-				{ 180, 62 },
-				{ 180, 90 },
-				{ 104, 90 },
-				{ 104, 118 },
-				{ 180, 118 },
-				{ 180, 150 },
-			},
-			Width = 14,
-		},
-		-- Row walls and dividers
-		wall({ { -360, 20 }, { -214, 20 } }),
-		wall({ { -186, 20 }, { 46, 20 } }),
-		wall({ { 74, 20 }, { 166, 20 } }),
-		wall({ { 194, 20 }, { 280, 20 }, { 360, 20 } }),
-		wall({ { -360, 48 }, { -304, 48 } }),
-		wall({ { -276, 48 }, { -138, 48 } }),
-		wall({ { -110, 48 }, { -34, 48 } }),
-		wall({ { -6, 48 }, { 90, 48 } }),
-		wall({ { 118, 48 }, { 226, 48 } }),
-		wall({ { 306, 48 }, { 360, 48 } }),
-		wall({ { -360, 76 }, { -334, 76 } }),
-		wall({ { -306, 76 }, { -214, 76 } }),
-		wall({ { -186, 76 }, { -66, 76 } }),
-		wall({ { 16, 76 }, { 166, 76 } }),
-		wall({ { 194, 76 }, { 226, 76 } }),
-		wall({ { 306, 76 }, { 360, 76 } }),
-		wall({ { -360, 104 }, { -304, 104 } }),
-		wall({ { -276, 104 }, { -138, 104 } }),
-		wall({ { -110, 104 }, { 22, 104 } }),
-		wall({ { 74, 104 }, { 90, 104 } }),
-		wall({ { 118, 104 }, { 248, 104 } }),
-		wall({ { 276, 104 }, { 360, 104 } }),
-		wall({ { -360, 132 }, { -214, 132 } }),
-		wall({ { -186, 132 }, { -34, 132 } }),
-		wall({ { -6, 132 }, { 166, 132 } }),
-		wall({ { 194, 132 }, { 360, 132 } }),
-		wall({ { -250, 48 }, { -250, 76 }, { -250, 104 }, { -250, 132 } }),
-		wall({ { -70, 20 }, { -70, 48 }, { -70, 76 } }),
-		wall({ { -70, 104 }, { -70, 132 } }),
-		wall({ { 90, 20 }, { 90, 48 } }),
-		wall({ { 90, 76 }, { 90, 104 }, { 90, 132 } }),
-		wall({ { 232, 20 }, { 232, 48 }, { 232, 76 } }),
-		wall({ { 232, 104 }, { 232, 132 } }),
-		wall({ { 300, 20 }, { 300, 48 }, { 300, 76 }, { 300, 104 } }),
-		-- Foot scrambles
-		{ Kind = "Ridge", Path = { { 28, 104 }, { 64, 104 } }, Height = 5, Width = 20 },
-		-- Roofs
-		roof({ { -366, 34 }, { 232, 34 } }, 28),
-		roof({ { 300, 34 }, { 366, 34 } }, 28),
-		roof({ { -366, 62 }, { -60, 62 } }, 28),
-		roof({ { 10, 62 }, { 232, 62 } }, 28),
-		roof({ { 300, 62 }, { 366, 62 } }, 28),
-		roof({ { -366, 90 }, { -60, 90 } }, 28),
-		roof({ { 10, 90 }, { 232, 90 } }, 28),
-		roof({ { 300, 90 }, { 366, 90 } }, 28),
-		roof({ { -366, 118 }, { 366, 118 } }, 28),
-		roof({ { -200, 17 }, { -200, 23 } }, 20),
-		roof({ { 60, 17 }, { 60, 23 } }, 20),
-		roof({ { 180, 17 }, { 180, 23 } }, 20),
-		roof({ { -124, 45 }, { -124, 51 } }, 20),
-		roof({ { -290, 45 }, { -290, 51 } }, 20),
-		roof({ { -20, 45 }, { -20, 51 } }, 20),
-		roof({ { 104, 45 }, { 104, 51 } }, 20),
-		roof({ { -200, 73 }, { -200, 79 } }, 20),
-		roof({ { -320, 73 }, { -320, 79 } }, 20),
-		roof({ { 180, 73 }, { 180, 79 } }, 20),
-		roof({ { -124, 101 }, { -124, 107 } }, 20),
-		roof({ { -290, 101 }, { -290, 107 } }, 20),
-		roof({ { 60, 101 }, { 60, 107 } }, 20),
-		roof({ { 104, 101 }, { 104, 107 } }, 20),
-		roof({ { 262, 101 }, { 262, 107 } }, 20),
-		roof({ { -200, 129 }, { -200, 135 } }, 20),
-		roof({ { -20, 129 }, { -20, 135 } }, 20),
-		roof({ { 180, 129 }, { 180, 135 } }, 20),
-		-- Chambers
-		{ Kind = "Mound", At = { -52, 92 }, Radius = 8, Height = 6, Rock = true },
-		{ Kind = "Mound", At = { 6, 92 }, Radius = 8, Height = 6, Rock = true },
-		{ Kind = "Mound", At = { 292, 60 }, Radius = 8, Height = 6, Rock = true },
-		{ Kind = "Mound", At = { 276, 34 }, Radius = 8, Height = 5, Rock = true },
-		{ Kind = "Flat", At = { -25, 76 }, Radius = 12 },
+		-- Beyond the outer wall at x = +-336, two more walls fill the strip out to the cliffs, so
+		-- there's no way round the warren.
+		wall({ { -348, 12 }, { -348, 600 } }),
+		wall({ { -360, 12 }, { -360, 600 } }),
+		wall({ { 348, 12 }, { 348, 600 } }),
+		wall({ { 360, 12 }, { 360, 600 } }),
+		-- The Brood chamber: boulders round the flat where the secret's entrance goes.
+		mound(-36, 330, 8, 8),
+		mound(8, 282, 8, 8),
+		{ Kind = "Flat", At = { -14, 306 }, Radius = 10 },
+		-- The Antler hall.
+		mound(-170, 54, 8, 9),
+		-- The Throne.
+		mound(14, 452, 10, 12),
+		-- The Pearl court's pool.
+		{ Kind = "Hollow", At = { -154, 488 }, Radius = 10, Depth = 3 },
+		-- The Tide basin, round the rock pool (260, 70): just a boulder in the corner.
+		mound(294, 30, 8, 8),
 	},
 	Loot = {
-		{ At = { -332, 118 }, Radius = 6, Weight = 5 },
-		{ At = { -268, 90 }, Radius = 6, Weight = 3 },
-		{ At = { -332, 62 }, Radius = 6, Weight = 3 },
-		{ At = { -236, 90 }, Radius = 6, Weight = 1 },
-		{ At = { -54, 34 }, Radius = 6, Weight = 2 },
-		{ At = { 80, 34 }, Radius = 6, Weight = 2 },
-		{ At = { 215, 90 }, Radius = 6, Weight = 3 },
-		{ At = { 288, 88 }, Radius = 6, Weight = 3 },
-		{ At = { 322, 118 }, Radius = 6, Weight = 5 },
-		{ At = { 270, 118 }, Radius = 6, Weight = 3 },
+		{ At = { 6, 286 }, Radius = 6, Weight = 2 },
+		{ At = { -134, 80 }, Radius = 6, Weight = 2 },
+		{ At = { 42, 474 }, Radius = 6, Weight = 2 },
+		{ At = { -126, 502 }, Radius = 6, Weight = 2 },
+		{ At = { 294, 82 }, Radius = 6, Weight = 2 },
 	},
-	Entrances = { { -25, 76 } },
+	Entrances = { { -14, 306 } },
 	Hazards = {
-		{ Type = "Patrol", Path = { { -190, 62 }, { -134, 62 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -190, 90 }, { -134, 90 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -190, 118 }, { -134, 118 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { 170, 34 }, { 114, 34 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { 170, 90 }, { 114, 90 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -60, 62 }, { 40, 62 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -40, 306 }, { 12, 306 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -14, 282 }, { -14, 332 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -176, 78 }, { -128, 78 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { 238, 40 }, { 294, 40 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -8, 474 }, { 36, 474 } }, Count = 1 },
+		{ Type = "Patrol", Path = { { -182, 502 }, { -126, 502 } }, Count = 1 },
 	},
+}
+append(frame.Primitives, wallsOf(FRAME_LATTICE, WARREN, nil, false))
+
+local function crossingOf(spec)
+	local lattice = parse(spec.Maze)
+	local primitives = wallsOf(lattice, WARREN, FRAME_LATTICE, false)
+	append(primitives, rubbleOf(lattice, WARREN))
+	append(primitives, roofsOf(lattice, WARREN, FRAME_LATTICE))
+	-- The cart ramp follows the corridors: in at the top door, out at the bottom door.
+	local ramp = { { WARREN.cellX(spec.Ramp[1][1]), 0 } }
+	for _, cell in spec.Ramp do
+		table.insert(ramp, point(WARREN, cell))
+	end
+	table.insert(ramp, { WARREN.cellX(spec.Ramp[#spec.Ramp][1]), ZONE_DEPTH })
+	table.insert(primitives, { Kind = "Ramp", Path = ramp, Width = 14 })
+	return {
+		Name = spec.Name,
+		Primitives = primitives,
+		Loot = lootOf(WARREN, spec.Loot),
+		Hazards = patrolsOf(WARREN, spec.Crabs),
+	}
+end
+
+local crossings = {}
+for _, spec in CROSSINGS do
+	table.insert(crossings, crossingOf(spec))
+end
+
+local zone4 = {
+	Name = "Hermit Hollows (zone 4)",
+	Primitives = frame.Primitives,
+	Loot = frame.Loot,
+	Entrances = frame.Entrances,
+	Hazards = frame.Hazards,
+	Crossings = crossings,
 }
 
 -- Zones 5 and 6 share one frame with zone 4: five walls across the tile (z 20, 48, 76, 104
@@ -428,5 +689,8 @@ local zone6 = {
 	},
 }
 
--- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
-return require(script.Parent.Parent.Tiled)({ [4] = layout, [5] = zone5, [6] = zone6 })
+return {
+	[4] = zone4,
+	[5] = Tiled(zone5),
+	[6] = Tiled(zone6),
+}
