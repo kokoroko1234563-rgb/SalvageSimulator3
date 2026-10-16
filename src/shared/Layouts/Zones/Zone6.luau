@@ -1,137 +1,1407 @@
--- Zone 6, The Drowned Reach (base layout): the deepest, slowest ground, a maze of tall rock
--- walls in three cells. Each outer cell holds a cart ramp that winds through three long
--- galleries, out to the cliffs and back. The middle cell is a tight maze of sunken lanes, the
--- quick way on foot, shut to carts by rubble. The ends of the galleries the ramps don't use
--- are dead ends, and the roofed ones by the cliffs hold the best finds. See
--- docs/layouts/Zone6.md.
+-- Zone 6, The Drowned Reach: the deepest, slowest ground on the beach, drawn as one 720 x 608
+-- piece. A maze of tall rock walls on a 40-stud grid (28-wide lanes between walls 12 wide and
+-- 24 high), cut into nine wards by four long walls with gates, and walled across its top and
+-- bottom edges. The frame is always there: the long walls and their gate candidates, the shells
+-- of seven side rooms, the roofed galleries round the two halls. Each tide one of five
+-- crossings is rolled: it shuts the gates it doesn't want, draws every other wall of the maze
+-- (a tree, so there is one way through, and dead ends everywhere), roofs some of its straights,
+-- digs some low lanes and pools, and winds a cart ramp along the way through. A few doorways
+-- are choked with rubble instead of walled: players scramble over them to cut a bend, carts
+-- can't. Each side room's pick fills its shell. See docs/layouts/Zone6.md.
 --
--- The ramps clear and blend the ground 15 studs either side of their centre lines, so the
--- walls beside a ramp keep about that far from it: the galleries' walls are 44 apart.
+-- The mazes are drawn as pictures (see `maze`): '+' is a grid node, '--' a wall between two
+-- lanes, '==' or '!' rubble, and a blank an opening. Row by row, a line of nodes, then a line
+-- of cells.
+
+local PITCH = 40 -- grid: lane centres 40 apart
+local X0, Z0 = -360, 12 -- the first node of the picture, in zone coordinates
+
 local function wall(path)
 	return { Kind = "Wall", Path = path, Height = 24, Width = 12 }
 end
 
--- Rock overhead, resting on the walls either side.
-local function roof(path, width)
-	return { Kind = "Roof", Path = path, Width = width, Clearance = 22, Thickness = 8 }
-end
-
--- A pile of rubble filling a gap in a wall: a scramble on foot, too steep for a cart.
+-- A pile of rubble filling a doorway: a scramble on foot, too steep for a cart.
 local function rubble(path)
 	return { Kind = "Ridge", Path = path, Height = 4, Width = 20 }
 end
 
--- A sunken lane floor: low ground that floods early.
-local function sunk(path)
+-- Rock overhead, resting on the walls either side of a lane.
+local function roof(path, width)
+	return { Kind = "Roof", Path = path, Width = width or 52, Clearance = 22, Thickness = 8 }
+end
+
+-- A pool: low ground that holds the sea from early in the flood.
+local function pool(x, z, radius)
+	return { Kind = "Hollow", At = { x, z }, Radius = radius or 12, Depth = 3 }
+end
+
+-- A sunk lane: floods before the ground round it.
+local function lane(path)
 	return { Kind = "Channel", Path = path, Depth = 2, Width = 12 }
 end
 
-local tileLayout = {
-	Name = "The Drowned Reach (base)",
-	Primitives = {
-		-- The west ramp cell (x -360 to -80): galleries at z 32, 74 and 116. The ramp comes
-		-- down at x -200, runs east to -104, back west the whole gallery to -330 by the
-		-- cliff, then east again to -200 and out.
-		wall({ { -360, 12 }, { -222, 12 } }),
-		wall({ { -178, 12 }, { -166, 12 } }),
-		wall({ { -138, 12 }, { -80, 12 } }),
-		wall({ { -360, 52 }, { -126, 52 } }),
-		wall({ { -310, 96 }, { -80, 96 } }),
-		wall({ { -360, 136 }, { -222, 136 } }),
-		wall({ { -178, 136 }, { -80, 136 } }),
-		wall({ { -80, 12 }, { -80, 136 } }),
+-- Rock over one lane cell of a side room.
+local function cellRoof(x, z)
+	return { Kind = "Roof", At = { x, z }, Radius = 26, Clearance = 22, Thickness = 8 }
+end
 
-		-- The east ramp cell (x 60 to 360), the same the other way round: down at x 180, west
-		-- to 84, east to 310, west to 180 and out.
-		wall({ { 60, 12 }, { 118, 12 } }),
-		wall({ { 146, 12 }, { 154, 12 } }),
-		wall({ { 202, 12 }, { 360, 12 } }),
-		wall({ { 106, 52 }, { 360, 52 } }),
-		wall({ { 60, 96 }, { 290, 96 } }),
-		wall({ { 60, 136 }, { 158, 136 } }),
-		wall({ { 202, 136 }, { 360, 136 } }),
-		wall({ { 60, 12 }, { 60, 136 } }),
+-- A boulder.
+local function boulder(x, z, radius, height)
+	return { Kind = "Mound", At = { x, z }, Radius = radius, Height = height, Rock = true }
+end
 
-		-- Rubble in a gap into each ramp cell's first gallery: a short cut on foot.
-		rubble({ { -166, 12 }, { -138, 12 } }),
-		rubble({ { 118, 12 }, { 146, 12 } }),
+local function loot(x, z, weight)
+	return { At = { x, z }, Radius = 6, Weight = weight }
+end
 
-		-- The middle cell (x -74 to 54): five walls 28 apart, with gaps that swap sides
-		-- (x -60, then 32), so every lane is walked end to end. Its first and fourth gaps are
-		-- choked with rubble, so no cart gets in.
-		wall({ { -46, 20 }, { 60, 20 } }),
-		wall({ { -80, 48 }, { 18, 48 } }),
-		wall({ { 46, 48 }, { 60, 48 } }),
-		wall({ { -46, 76 }, { 60, 76 } }),
-		wall({ { -80, 104 }, { 18, 104 } }),
-		wall({ { 46, 104 }, { 60, 104 } }),
-		wall({ { -46, 132 }, { 60, 132 } }),
-		rubble({ { -74, 20 }, { -46, 20 } }),
-		rubble({ { 18, 104 }, { 46, 104 } }),
-		-- Its lanes are sunk two studs: the low ground floods first.
-		sunk({ { -68, 34 }, { 48, 34 } }),
-		sunk({ { -68, 62 }, { 48, 62 } }),
-		sunk({ { -68, 90 }, { 48, 90 } }),
-		sunk({ { -68, 118 }, { 48, 118 } }),
+-- Joins lists of shapes into one.
+local function merge(...)
+	local all = {}
+	for _, list in { ... } do
+		for _, item in list do
+			table.insert(all, item)
+		end
+	end
+	return all
+end
 
-		-- The drowned pool, in the west cell's dead-end gallery.
-		{ Kind = "Hollow", At = { -300, 32 }, Radius = 10, Depth = 3 },
+-- Turns a maze picture into walls and rubble. The picture's top left node is at (x0, z0).
+-- Walls run between nodes (with a point on each node on the way) and stop 6 studs short of the
+-- ends; a round post stands on every node
+-- a wall touches, so the walls meet exactly (a wall's face is 6 studs off its line) with no
+-- crack where two meet end to end. On the picture's left and right edges the posts also close
+-- the walls against the cliffs (the ground past the beach's sides carries on as it is at
+-- x = +-360, so a wall must be full height there). `edgeL` and `edgeR` say the picture's left
+-- or right edge is the beach's side: the walls that reach it run right out to it, which also
+-- stretches their invisible barriers on to the cliffs.
+local function maze(art, x0, z0, edgeL, edgeR)
+	local list = {}
+	local h = (#art - 1) // 2
+	local _, nodes = string.gsub(art[1], "%+", "")
+	local w = nodes - 1
+	local posts = {}
+	local function post(i, j)
+		local key = i * 1000 + j
+		if not posts[key] then
+			posts[key] = true
+			table.insert(list, wall({ { x0 + PITCH * i, z0 + PITCH * j } }))
+		end
+	end
+	local function add(char, path)
+		table.insert(list, if char == "-" or char == "|" then wall(path) else rubble(path))
+	end
+	for j = 0, h do
+		local line = art[2 * j + 1]
+		local z = z0 + PITCH * j
+		local c = 0
+		while c < w do
+			local char = string.sub(line, 3 * c + 2, 3 * c + 2)
+			if char == "-" or char == "=" then
+				local last = c
+				while last + 1 < w and string.sub(line, 3 * (last + 1) + 2, 3 * (last + 1) + 2) == char do
+					last += 1
+				end
+				local path = { { x0 + PITCH * c + (if c == 0 and edgeL then 0 else 6), z } }
+				for i = c + 1, last do
+					table.insert(path, { x0 + PITCH * i, z })
+				end
+				table.insert(
+					path,
+					{ x0 + PITCH * (last + 1) - (if last + 1 == w and edgeR then 0 else 6), z }
+				)
+				add(char, path)
+				if char == "-" then
+					for i = c, last + 1 do
+						post(i, j)
+					end
+				end
+				c = last + 1
+			else
+				c += 1
+			end
+		end
+	end
+	for i = 0, w do
+		local x = x0 + PITCH * i
+		local r = 0
+		while r < h do
+			local char = string.sub(art[2 * r + 2], 3 * i + 1, 3 * i + 1)
+			if char == "|" or char == "!" then
+				local last = r
+				while last + 1 < h and string.sub(art[2 * (last + 1) + 2], 3 * i + 1, 3 * i + 1) == char do
+					last += 1
+				end
+				local path = { { x, z0 + PITCH * r + 6 } }
+				for j = r + 1, last do
+					table.insert(path, { x, z0 + PITCH * j })
+				end
+				table.insert(path, { x, z0 + PITCH * (last + 1) - 6 })
+				add(char, path)
+				if char == "|" then
+					for j = r, last + 1 do
+						post(i, j)
+					end
+				end
+				r = last + 1
+			else
+				r += 1
+			end
+		end
+	end
+	return list
+end
 
-		-- Roofs: the ramp cells' long middle galleries, their dead-end galleries by the cliffs,
-		-- and the middle cell's two inner lanes.
-		roof({ { -364, 74 }, { -80, 74 } }, 44),
-		roof({ { 60, 74 }, { 364, 74 } }, 44),
-		roof({ { -364, 32 }, { -224, 32 } }, 40),
-		roof({ { 224, 32 }, { 364, 32 } }, 40),
-		roof({ { -80, 62 }, { 60, 62 } }, 28),
-		roof({ { -80, 90 }, { 60, 90 } }, 28),
+local FRAME = {
+	"+--+--+  +--+--+--+  +--+--+  +--+--+  +--+--+  +--+--+",
+	"                  |                 |                  ",
+	"+--+--+--+  +  +  +  +  +--+--+--+  +  +  +  +  +  +  +",
+	"         |              |        |  |                  ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                  |              |                     ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"         |        |     |        |  |                  ",
+	"+--+--+--+  +  +  +  +  +--+--+--+  +  +  +  +  +  +  +",
+	"                                    |                  ",
+	"+--+  +--+--+  +--+  +--+--+--+--+  +--+  +--+--+--+--+",
+	"                  |  |           |           |         ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                  |  |           |  |                  ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                     |           |  |        |         ",
+	"+  +  +  +  +  +  +  +--+  +--+--+  +  +  +  +--+--+--+",
+	"                  |                                    ",
+	"+--+--+--+  +--+  +  +--+--+  +--+  +  +--+--+  +--+--+",
+	"         |        |                 |                  ",
+	"+  +  +  +  +  +  +  +--+--+  +--+  +  +  +  +--+  +--+",
+	"                     |           |  |        |         ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"         |        |  |           |           |         ",
+	"+--+--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                     |           |  |        |         ",
+	"+  +  +  +  +  +  +  +--+--+--+--+  +  +  +  +--+--+--+",
+	"                  |                                    ",
+	"+--+  +--+--+  +--+--+  +--+--+  +--+--+  +--+--+  +--+",
+}
 
-		-- Cart ramps.
-		{
-			Kind = "Ramp",
-			Path = {
-				{ -200, 0 },
-				{ -200, 32 },
-				{ -104, 32 },
-				{ -104, 74 },
-				{ -330, 74 },
-				{ -330, 116 },
-				{ -200, 116 },
-				{ -200, 150 },
-			},
-			Width = 14,
-		},
-		{
-			Kind = "Ramp",
-			Path = {
-				{ 180, 0 },
-				{ 180, 32 },
-				{ 84, 32 },
-				{ 84, 74 },
-				{ 310, 74 },
-				{ 310, 116 },
-				{ 180, 116 },
-				{ 180, 150 },
-			},
-			Width = 14,
-		},
-	},
+local frame = {
+	Name = "The Drowned Reach",
+	Primitives = merge(maze(FRAME, X0, Z0, true, true), {
+		roof({ { -100, 232 }, { -100, 352 }, { 100, 352 }, { 100, 232 } }, 52),
+		roof({ { -100, 392 }, { -100, 552 }, { 100, 552 }, { 100, 392 } }, 52),
+		pool(-60, 352),
+		pool(60, 352),
+		pool(-100, 272),
+		pool(100, 272),
+		pool(-60, 552),
+		pool(60, 552),
+		pool(-100, 472),
+		pool(100, 472),
+	}),
 	Loot = {
-		-- The roofed dead-end galleries by the cliffs: the best finds at their far ends.
-		{ At = { -342, 32 }, Radius = 6, Weight = 5 },
-		{ At = { -300, 32 }, Radius = 8, Weight = 3 },
-		{ At = { 342, 32 }, Radius = 6, Weight = 5 },
-		{ At = { 270, 32 }, Radius = 6, Weight = 3 },
-		-- The open dead-end galleries at the ramp cells' inner sides.
-		{ At = { -120, 116 }, Radius = 6, Weight = 2 },
-		{ At = { 100, 116 }, Radius = 6, Weight = 2 },
-		-- The middle cell's dead-end pockets.
-		{ At = { 47, 34 }, Radius = 5, Weight = 1 },
-		{ At = { 47, 62 }, Radius = 5, Weight = 2 },
-		{ At = { 47, 90 }, Radius = 5, Weight = 2 },
-		{ At = { 47, 118 }, Radius = 5, Weight = 1 },
+		loot(-340, 32, 1),
+		loot(340, 32, 1),
+		loot(-220, 192, 2),
+		loot(220, 192, 2),
+		loot(-340, 352, 2),
+		loot(-100, 272, 2),
+		loot(100, 272, 2),
+		loot(-140, 392, 2),
+		loot(140, 392, 2),
+		loot(-340, 552, 2),
+		loot(340, 552, 2),
+		loot(-20, 552, 3),
 	},
 }
 
--- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
-return require(script.Parent.Parent.Tiled)(tileLayout)
+local CROSSING1 = {
+	"+  +  +  +  +  +  +--+  +  +--+  +  +--+  +  +--+  +  +",
+	"                                          |     |      ",
+	"+  +  +  +--+--+  +  +--+  +  +  +  +  +--+  +  +  +  +",
+	"               |  |  |                       |     |   ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +--+--+--+--+--+  +",
+	"            |  |     |                                 ",
+	"+  +  +  +  +--+  +  +  +  +  +  +  +--+--+--+--+--+  +",
+	"                                             |         ",
+	"+  +  +  +  +--+  +--+--+  +  +  +  +  +--+--+  +--+--+",
+	"            |     |                                    ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"   |  |     |                       |  |               ",
+	"+  +  +  +  +--+  +  +  +  +  +  +  +  +--+  +  +  +  +",
+	"      !  |  |                                          ",
+	"+--+  +  +  +  +--+  +  +  +  +  +  +  +--+--+  +  +  +",
+	"      !  |  |  |                          |            ",
+	"+  +--+  +  +  +  +--+  +  +  +  +  +--+  +  +  +  +  +",
+	"         |  !  |                 |  |     |            ",
+	"+  +  +  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +",
+	"            |                                          ",
+	"+  +  +  +  +  +--+  +  +  +  +  +--+--+--+  +  +  +  +",
+	"               |  |                    |               ",
+	"+  +  +  +--+--+  +  +  +  +  +  +  +  +  +--+  +  +  +",
+	"               |                       |               ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +  +",
+	"      |     |                                          ",
+	"+  +--+  +--+--+  +--+  +  +  +  +  +--+--+--+  +  +  +",
+	"         |                                             ",
+	"+  +  +  +  +--+  +  +  +  +  +--+  +  +--+  +  +  +  +",
+}
+
+local crossing1 = {
+	Name = "West stair",
+	Primitives = merge(maze(CROSSING1, X0, Z0, true, true), {
+		roof({ { -60, 192 }, { 60, 192 } }, 52),
+		roof({ { 100, 232 }, { 100, 352 } }, 52),
+		roof({ { -60, 32 }, { 60, 32 } }, 52),
+		roof({ { -20, 552 }, { 60, 552 } }, 52),
+		roof({ { 140, 552 }, { 260, 552 } }, 52),
+		roof({ { -100, 352 }, { -20, 352 } }, 52),
+		roof({ { 140, 112 }, { 300, 112 } }, 52),
+		lane({ { -220, 552 }, { -180, 552 } }),
+		lane({ { -100, 232 }, { -100, 272 } }),
+		lane({ { 300, 352 }, { 340, 352 } }),
+		lane({ { -340, 32 }, { -300, 32 } }),
+		lane({ { 180, 152 }, { 220, 152 } }),
+		pool(140, 72),
+		pool(-260, 312),
+		pool(-60, 152),
+		pool(-140, 232),
+		pool(-340, 32),
+		pool(-300, 272),
+		pool(-180, 512),
+		pool(300, 352),
+		{
+			Kind = "Ramp",
+			Path = {
+				{ -260, 0 },
+				{ -260, 32 },
+				{ -140, 32 },
+				{ -140, 152 },
+				{ -220, 152 },
+				{ -220, 192 },
+				{ -300, 192 },
+				{ -300, 312 },
+				{ -340, 312 },
+				{ -340, 352 },
+				{ -260, 352 },
+				{ -260, 232 },
+				{ -220, 232 },
+				{ -220, 432 },
+				{ -180, 432 },
+				{ -180, 392 },
+				{ -140, 392 },
+				{ -140, 312 },
+				{ -100, 312 },
+				{ -100, 192 },
+				{ 100, 192 },
+				{ 100, 392 },
+				{ -100, 392 },
+				{ -100, 512 },
+				{ -180, 512 },
+				{ -180, 472 },
+				{ -220, 472 },
+				{ -220, 512 },
+				{ -260, 512 },
+				{ -260, 552 },
+				{ -300, 552 },
+				{ -300, 604 },
+			},
+			Width = 14,
+		},
+	}),
+	Loot = {
+		loot(340, 552, 5),
+		loot(-100, 552, 4),
+		loot(100, 432, 3),
+		loot(140, 432, 3),
+		loot(220, 312, 2),
+		loot(340, 352, 2),
+	},
+}
+
+local CROSSING2 = {
+	"+  +  +--+  +  +  +--+  +  +--+  +  +--+  +  +  +  +  +",
+	"            |        |                          |      ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +--+  +--+  +  +",
+	"               |                       |  |  |     |   ",
+	"+  +  +  +  +--+--+  +  +  +  +  +  +  +  +  +  +--+  +",
+	"               |     |                 |     |     |   ",
+	"+  +  +  +--+  +  +--+  +  +  +  +--+--+  +--+  +  +  +",
+	"            |                          |  |     |  |   ",
+	"+  +  +  +  +--+  +  +--+  +  +  +  +  +  +--+--+  +  +",
+	"                  |                                |   ",
+	"+  +  +  +  +--+  +--+  +  +  +  +  +  +  +  +  +  +  +",
+	"      |                                |               ",
+	"+  +--+  +  +--+--+  +  +  +  +  +--+  +--+  +  +  +  +",
+	"      |  |  |                          |               ",
+	"+--+  +--+  +  +  +  +  +  +  +  +  +  +--+--+  +  +  +",
+	"   |     |     |                                       ",
+	"+  +--+  +--+--+  +--+  +  +  +  +  +--+--+  +  +  +  +",
+	"                                    |        |         ",
+	"+  +  +  +--+  +  +  +  +  +--+  +  +  +  +  +  +  +  +",
+	"               |     |                 |               ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +",
+	"            |  |  |                    |               ",
+	"+  +  +  +--+  +  +  +  +  +  +  +  +  +--+  +  +  +  +",
+	"               |                    !                  ",
+	"+  +  +  +  +--+  +  +  +  +  +  +  +--+  +  +  +  +  +",
+	"            |     |                    |  |            ",
+	"+  +--+--+--+  +--+  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                                 |        |            ",
+	"+  +--+  +  +--+  +  +--+  +  +  +  +  +--+  +  +--+  +",
+}
+
+local crossing2 = {
+	Name = "Hall gallery",
+	Primitives = merge(maze(CROSSING2, X0, Z0, true, true), {
+		roof({ { -60, 552 }, { 20, 552 } }, 52),
+		roof({ { -60, 192 }, { 60, 192 } }, 52),
+		roof({ { -20, 32 }, { 60, 32 } }, 52),
+		roof({ { -60, 352 }, { 60, 352 } }, 52),
+		roof({ { -100, 392 }, { -100, 512 } }, 52),
+		roof({ { 260, 552 }, { 340, 552 } }, 52),
+		roof({ { -60, 392 }, { 60, 392 } }, 52),
+		roof({ { -340, 32 }, { -260, 32 } }, 52),
+		roof({ { 340, 72 }, { 340, 192 } }, 52),
+		roof({ { -300, 552 }, { -220, 552 } }, 52),
+		roof({ { -140, 392 }, { -140, 472 } }, 52),
+		lane({ { 140, 392 }, { 140, 432 } }),
+		lane({ { -100, 232 }, { -100, 272 } }),
+		lane({ { 220, 192 }, { 260, 192 } }),
+		lane({ { 300, 352 }, { 340, 352 } }),
+		lane({ { -220, 352 }, { -180, 352 } }),
+		pool(-340, 552),
+		pool(140, 232),
+		pool(260, 32),
+		pool(180, 312),
+		pool(220, 72),
+		pool(220, 32),
+		pool(-100, 312),
+		pool(-180, 192),
+		{
+			Kind = "Ramp",
+			Path = {
+				{ 260, 0 },
+				{ 260, 32 },
+				{ 140, 32 },
+				{ 140, 112 },
+				{ 100, 112 },
+				{ 100, 32 },
+				{ -60, 32 },
+				{ -60, 152 },
+				{ -100, 152 },
+				{ -100, 192 },
+				{ 100, 192 },
+				{ 100, 232 },
+				{ 140, 232 },
+				{ 140, 312 },
+				{ 220, 312 },
+				{ 220, 352 },
+				{ 140, 352 },
+				{ 140, 472 },
+				{ 180, 472 },
+				{ 180, 552 },
+				{ 100, 552 },
+				{ 100, 352 },
+				{ -100, 352 },
+				{ -100, 552 },
+				{ 60, 552 },
+				{ 60, 604 },
+			},
+			Width = 14,
+		},
+	}),
+	Loot = {
+		loot(-220, 432, 5),
+		loot(-140, 232, 4),
+		loot(-260, 272, 3),
+		loot(-140, 552, 3),
+		loot(-100, 232, 2),
+		loot(-340, 312, 2),
+	},
+}
+
+local CROSSING3 = {
+	"+  +  +--+  +  +  +--+  +  +--+  +  +--+  +  +  +  +  +",
+	"                                             |     |   ",
+	"+  +  +  +  +--+  +--+  +  +  +  +  +  +--+--+==+  +  +",
+	"            |                          |        |  |   ",
+	"+  +  +  +  +  +--+--+  +  +  +  +  +  +  +--+  +  +  +",
+	"            |        |                 |  |     |  |   ",
+	"+  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +==+  +  +",
+	"               |                       |  |  |         ",
+	"+  +  +  +--+--+  +--+--+  +  +  +--+  +  +  +--+  +  +",
+	"                  |                    |  !        |   ",
+	"+  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"   |                                                   ",
+	"+  +  +--+--+  +--+  +  +  +  +  +--+--+--+  +  +  +  +",
+	"      |     |                             |            ",
+	"+  +--+  +  +--+  +  +  +  +  +  +  +  +--+  +  +  +  +",
+	"      |  |  |  |                                       ",
+	"+--+  +  +  +  +--+  +  +  +  +  +  +--+  +--+  +  +  +",
+	"         |  |                    |     |               ",
+	"+  +  +  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +",
+	"            |                    |        |            ",
+	"+  +  +  +  +--+  +  +  +  +  +  +  +--+  +  +  +  +  +",
+	"                  |                       |            ",
+	"+  +  +  +--+--+  +  +  +  +  +  +  +  +--+--+  +  +  +",
+	"            |                       |                  ",
+	"+  +  +  +  +  +--+  +  +  +  +  +  +  +--+  +  +  +  +",
+	"   |           |  |                    |  |            ",
+	"+  +  +--+--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                                    |     |            ",
+	"+  +--+  +  +--+  +  +--+  +  +--+  +  +--+  +  +  +  +",
+}
+
+local crossing3 = {
+	Name = "East switchbacks",
+	Primitives = merge(maze(CROSSING3, X0, Z0, true, true), {
+		roof({ { -100, 432 }, { -100, 512 } }, 52),
+		roof({ { -60, 192 }, { 60, 192 } }, 52),
+		roof({ { 100, 392 }, { 100, 512 } }, 52),
+		roof({ { -60, 552 }, { 60, 552 } }, 52),
+		roof({ { -340, 32 }, { -260, 32 } }, 52),
+		roof({ { -20, 32 }, { 60, 32 } }, 52),
+		roof({ { -220, 312 }, { -220, 392 } }, 52),
+		roof({ { -260, 552 }, { -180, 552 } }, 52),
+		roof({ { 340, 32 }, { 340, 112 } }, 52),
+		roof({ { -260, 192 }, { -180, 192 } }, 52),
+		lane({ { -60, 392 }, { -20, 392 } }),
+		lane({ { 100, 272 }, { 100, 312 } }),
+		lane({ { -100, 232 }, { -100, 272 } }),
+		lane({ { -260, 232 }, { -220, 232 } }),
+		lane({ { 180, 112 }, { 180, 152 } }),
+		pool(-140, 112),
+		pool(220, 352),
+		pool(300, 392),
+		pool(-140, 192),
+		pool(-180, 272),
+		pool(-100, 552),
+		pool(260, 32),
+		pool(140, 272),
+		{
+			Kind = "Ramp",
+			Path = {
+				{ 260, 0 },
+				{ 260, 32 },
+				{ 300, 32 },
+				{ 300, 192 },
+				{ 220, 192 },
+				{ 220, 112 },
+				{ 260, 112 },
+				{ 260, 72 },
+				{ 180, 72 },
+				{ 180, 232 },
+				{ 100, 232 },
+				{ 100, 192 },
+				{ -100, 192 },
+				{ -100, 352 },
+				{ 20, 352 },
+				{ 20, 392 },
+				{ -100, 392 },
+				{ -100, 552 },
+				{ 100, 552 },
+				{ 100, 352 },
+				{ 140, 352 },
+				{ 140, 392 },
+				{ 180, 392 },
+				{ 180, 432 },
+				{ 140, 432 },
+				{ 140, 472 },
+				{ 220, 472 },
+				{ 220, 552 },
+				{ 300, 552 },
+				{ 300, 604 },
+			},
+			Width = 14,
+		},
+	}),
+	Loot = {
+		loot(-140, 512, 5),
+		loot(220, 32, 4),
+		loot(-340, 512, 3),
+		loot(140, 192, 3),
+		loot(100, 152, 2),
+		loot(-220, 472, 2),
+	},
+}
+
+local CROSSING4 = {
+	"+  +  +  +  +  +  +--+  +  +--+  +  +--+  +  +--+  +  +",
+	"            |                                |         ",
+	"+  +  +  +  +  +--+  +--+  +  +  +  +--+  +  +  +--+  +",
+	"            |        |                    |     |  |   ",
+	"+  +  +  +  +  +  +--+  +  +  +  +  +  +  +--+--+  +  +",
+	"               |                       |  |     |      ",
+	"+  +  +  +--+--+  +  +  +  +  +  +--+  +  +  +  +  +--+",
+	"               |     |                 |  |  |  |  |   ",
+	"+  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                  |  |                 |  |  |         ",
+	"+  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"   |     |                                |            ",
+	"+  +--+  +  +--+  +  +  +  +  +  +--+--+--+  +  +  +  +",
+	"   |     |  |  |                                       ",
+	"+  +  +--+  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +",
+	"   |     |  |  |                       |               ",
+	"+  +--+  +  +  +  +--+  +  +  +  +  +--+  +  +  +  +  +",
+	"         |  !              |           |  |            ",
+	"+  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +  +  +  +",
+	"            !                 |           |            ",
+	"+  +  +  +  +--+--+  +  +  +  +  +  +--+  +  +  +  +  +",
+	"                                       |  |            ",
+	"+  +  +  +--+==+--+--+  +  +  +  +  +  +  +  +  +  +  +",
+	"                                                       ",
+	"+  +  +  +  +  +--+  +  +  +  +  +  +--+  +  +  +  +  +",
+	"            |  |                       |  |            ",
+	"+  +--+--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"            |                          |  |            ",
+	"+  +  +  +  +--+  +  +  +  +  +--+  +  +  +  +  +--+  +",
+}
+
+local crossing4 = {
+	Name = "Long cross",
+	Primitives = merge(maze(CROSSING4, X0, Z0, true, true), {
+		roof({ { 180, 112 }, { 180, 192 } }, 52),
+		roof({ { -60, 32 }, { 60, 32 } }, 52),
+		roof({ { -20, 192 }, { 60, 192 } }, 52),
+		roof({ { -100, 152 }, { -100, 272 } }, 52),
+		roof({ { -340, 232 }, { -340, 312 } }, 52),
+		roof({ { -20, 552 }, { 60, 552 } }, 52),
+		roof({ { 260, 552 }, { 340, 552 } }, 52),
+		lane({ { 220, 152 }, { 220, 192 } }),
+		lane({ { 300, 352 }, { 340, 352 } }),
+		lane({ { -60, 392 }, { -20, 392 } }),
+		lane({ { -340, 32 }, { -300, 32 } }),
+		lane({ { 300, 392 }, { 340, 392 } }),
+		pool(-100, 112),
+		pool(-180, 432),
+		pool(100, 72),
+		pool(-140, 432),
+		pool(100, 232),
+		pool(-180, 512),
+		pool(-20, 352),
+		pool(-300, 192),
+		{
+			Kind = "Ramp",
+			Path = {
+				{ -260, 0 },
+				{ -260, 32 },
+				{ -220, 32 },
+				{ -220, 112 },
+				{ -180, 112 },
+				{ -180, 72 },
+				{ -100, 72 },
+				{ -100, 32 },
+				{ 100, 32 },
+				{ 100, 112 },
+				{ 140, 112 },
+				{ 140, 72 },
+				{ 180, 72 },
+				{ 180, 232 },
+				{ 100, 232 },
+				{ 100, 192 },
+				{ -60, 192 },
+				{ -60, 112 },
+				{ -100, 112 },
+				{ -100, 312 },
+				{ -140, 312 },
+				{ -140, 232 },
+				{ -220, 232 },
+				{ -220, 432 },
+				{ -100, 432 },
+				{ -100, 392 },
+				{ 20, 392 },
+				{ 20, 352 },
+				{ 140, 352 },
+				{ 140, 392 },
+				{ 180, 392 },
+				{ 180, 552 },
+				{ 180, 604 },
+			},
+			Width = 14,
+		},
+	}),
+	Loot = {
+		loot(-220, 552, 5),
+		loot(-340, 232, 4),
+		loot(220, 192, 3),
+		loot(-140, 472, 3),
+		loot(340, 152, 2),
+		loot(-100, 472, 2),
+	},
+}
+
+local CROSSING5 = {
+	"+  +  +--+  +  +  +--+  +  +--+  +  +--+  +  +  +  +  +",
+	"                                             |  |      ",
+	"+  +  +  +--+--+  +  +--+  +  +  +  +  +--+--+  +  +  +",
+	"                     |                       |  |  |   ",
+	"+  +  +  +  +--+  +--+  +  +  +  +  +--+--+  +  +  +  +",
+	"            |  |                          |        |   ",
+	"+  +  +  +  +  +  +  +  +  +  +  +--+--+  +--+  +--+  +",
+	"            |        |                 |     |  |      ",
+	"+  +  +  +  +--+  +--+  +  +  +  +  +  +--+  +  +  +--+",
+	"               |                          |     |      ",
+	"+  +--+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"   |           |                       |               ",
+	"+  +  +--+--+--+  +  +  +  +  +  +--+  +--+  +  +  +  +",
+	"   |  |                                   |            ",
+	"+  +  +  +  +--+--+--+  +  +  +  +  +--+  +  +  +  +  +",
+	"         |  |                             |            ",
+	"+  +  +--+--+  +--+  +  +  +  +  +  +  +--+  +  +  +  +",
+	"   |        |        !                 |               ",
+	"+  +  +  +  +  +  +  +  +  +--+  +--+  +  +  +  +  +  +",
+	"               |                       |               ",
+	"+  +  +  +  +  +  +--+  +  +  +  +  +  +--+  +  +  +  +",
+	"            |  !                                       ",
+	"+  +  +  +--+  +  +  +  +  +  +  +  +--+--+  +  +  +  +",
+	"               |                    |     |            ",
+	"+  +  +  +  +--+  +  +  +  +  +  +  +  +--+  +  +  +  +",
+	"         |     |  |                    |               ",
+	"+  +--+  +  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +",
+	"      |     |                 |     |                  ",
+	"+  +--+  +  +--+  +  +--+  +  +  +  +  +--+  +  +--+  +",
+}
+
+local crossing5 = {
+	Name = "Backtrack",
+	Primitives = merge(maze(CROSSING5, X0, Z0, true, true), {
+		roof({ { 100, 432 }, { 100, 512 } }, 52),
+		roof({ { -60, 32 }, { 60, 32 } }, 52),
+		roof({ { -60, 392 }, { 60, 392 } }, 52),
+		roof({ { -60, 552 }, { 20, 552 } }, 52),
+		roof({ { -60, 352 }, { 60, 352 } }, 52),
+		roof({ { -340, 192 }, { -260, 192 } }, 52),
+		roof({ { 220, 552 }, { 340, 552 } }, 52),
+		roof({ { -20, 192 }, { 60, 192 } }, 52),
+		roof({ { -340, 32 }, { -180, 32 } }, 52),
+		lane({ { -100, 232 }, { -100, 272 } }),
+		lane({ { -140, 472 }, { -140, 512 } }),
+		lane({ { 300, 392 }, { 340, 392 } }),
+		lane({ { -340, 232 }, { -340, 272 } }),
+		lane({ { -100, 472 }, { -100, 512 } }),
+		pool(-220, 552),
+		pool(-60, 192),
+		pool(180, 312),
+		pool(260, 392),
+		pool(-300, 312),
+		pool(-180, 512),
+		pool(220, 272),
+		pool(100, 312),
+		{
+			Kind = "Ramp",
+			Path = {
+				{ 260, 0 },
+				{ 260, 32 },
+				{ 260, 192 },
+				{ 220, 192 },
+				{ 220, 152 },
+				{ 180, 152 },
+				{ 180, 112 },
+				{ 100, 112 },
+				{ 100, 32 },
+				{ -100, 32 },
+				{ -100, 72 },
+				{ -220, 72 },
+				{ -220, 192 },
+				{ -180, 192 },
+				{ -180, 232 },
+				{ -300, 232 },
+				{ -300, 352 },
+				{ -220, 352 },
+				{ -220, 392 },
+				{ -180, 392 },
+				{ -180, 472 },
+				{ -220, 472 },
+				{ -220, 512 },
+				{ -180, 512 },
+				{ -180, 552 },
+				{ -140, 552 },
+				{ -140, 352 },
+				{ -180, 352 },
+				{ -180, 312 },
+				{ -100, 312 },
+				{ -100, 392 },
+				{ 100, 392 },
+				{ 100, 552 },
+				{ 60, 552 },
+				{ 60, 604 },
+			},
+			Width = 14,
+		},
+	}),
+	Loot = {
+		loot(140, 152, 5),
+		loot(180, 472, 4),
+		loot(340, 552, 3),
+		loot(180, 352, 3),
+		loot(340, 352, 2),
+		loot(340, 392, 2),
+	},
+}
+
+frame.Crossings = { crossing1, crossing2, crossing3, crossing4, crossing5 }
+
+local SLOT1ROOM1 = {
+	"+  +  +  +",
+	"          ",
+	"+  +--+--+",
+	"   |      ",
+	"+  +  +--+",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT1ROOM2 = {
+	"+  +  +  +",
+	"   |      ",
+	"+  +  +  +",
+	"   |  |   ",
+	"+  +  +--+",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT1ROOM3 = {
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT2ROOM1 = {
+	"+  +  +  +",
+	"          ",
+	"+  +--+  +",
+	"   |  |   ",
+	"+  +--+  +",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT2ROOM2 = {
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT2ROOM3 = {
+	"+  +  +  +",
+	"          ",
+	"+--+  +  +",
+	"   |  |   ",
+	"+  +  +  +",
+	"      |   ",
+	"+  +  +  +",
+}
+
+local SLOT3ROOM1 = {
+	"+  +  +  +",
+	"          ",
+	"+  +--+  +",
+	"   |      ",
+	"+--+  +--+",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT3ROOM2 = {
+	"+  +  +  +",
+	"          ",
+	"+--+--+  +",
+	"          ",
+	"+--+--+  +",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT3ROOM3 = {
+	"+  +  +  +",
+	"          ",
+	"+  +--+  +",
+	"   |  |   ",
+	"+  +--+  +",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT4ROOM1 = {
+	"+  +  +  +  +",
+	"             ",
+	"+  +--+--+  +",
+	"      |      ",
+	"+  +  +  +--+",
+	"   |  |      ",
+	"+  +  +  +  +",
+}
+
+local SLOT4ROOM2 = {
+	"+  +  +  +  +",
+	"             ",
+	"+  +  +  +  +",
+	"             ",
+	"+  +  +  +  +",
+	"             ",
+	"+  +  +  +  +",
+}
+
+local SLOT4ROOM3 = {
+	"+  +  +  +  +",
+	"             ",
+	"+  +--+--+  +",
+	"   |  |  |   ",
+	"+  +--+--+  +",
+	"             ",
+	"+  +  +  +  +",
+}
+
+local SLOT4ROOM4 = {
+	"+  +  +  +  +",
+	"      |      ",
+	"+  +  +  +  +",
+	"   |     |   ",
+	"+  +--+--+  +",
+	"      |      ",
+	"+  +  +  +  +",
+}
+
+local SLOT5ROOM1 = {
+	"+  +  +  +",
+	"          ",
+	"+  +--+  +",
+	"   |  |   ",
+	"+  +--+  +",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT5ROOM2 = {
+	"+  +  +  +",
+	"   |      ",
+	"+  +  +  +",
+	"      |   ",
+	"+  +--+--+",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT5ROOM3 = {
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT6ROOM1 = {
+	"+  +  +  +  +",
+	"   |     |   ",
+	"+  +  +--+  +",
+	"   |         ",
+	"+  +--+--+  +",
+	"             ",
+	"+  +  +  +  +",
+}
+
+local SLOT6ROOM2 = {
+	"+  +  +  +  +",
+	"      |  |   ",
+	"+  +  +  +  +",
+	"   |     |   ",
+	"+  +--+--+  +",
+	"             ",
+	"+  +  +  +  +",
+}
+
+local SLOT6ROOM3 = {
+	"+  +  +  +  +",
+	"             ",
+	"+  +  +  +  +",
+	"             ",
+	"+  +  +  +  +",
+	"             ",
+	"+  +  +  +  +",
+}
+
+local SLOT6ROOM4 = {
+	"+  +  +  +  +",
+	"             ",
+	"+  +--+--+  +",
+	"   |  |  |   ",
+	"+  +--+--+  +",
+	"             ",
+	"+  +  +  +  +",
+}
+
+local SLOT7ROOM1 = {
+	"+  +  +  +",
+	"   |      ",
+	"+  +--+  +",
+	"      |   ",
+	"+  +  +  +",
+	"   |      ",
+	"+  +  +  +",
+}
+
+local SLOT7ROOM2 = {
+	"+  +  +  +",
+	"   |  |   ",
+	"+  +  +  +",
+	"   |      ",
+	"+  +--+  +",
+	"          ",
+	"+  +  +  +",
+}
+
+local SLOT7ROOM3 = {
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+	"          ",
+	"+  +  +  +",
+}
+
+frame.Slots = {
+	{
+		Name = "West cave",
+		At = { -360, 52 },
+		Size = { 120, 120 },
+		Rooms = {
+			{
+				Name = "Dead-end cave",
+				Primitives = merge(maze(SLOT1ROOM1, 0, 0, true, false), {
+					cellRoof(20, 20),
+					cellRoof(20, 60),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(60, 60),
+					cellRoof(60, 100),
+					cellRoof(100, 20),
+					cellRoof(100, 100),
+				}),
+				Loot = {
+					loot(100, 20, 6),
+					loot(60, 20, 3),
+					loot(20, 20, 2),
+					loot(20, 100, 1),
+				},
+			},
+			{
+				Name = "Drowned pool",
+				Primitives = merge(maze(SLOT1ROOM2, 0, 0, true, false), {
+					cellRoof(20, 60),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					pool(60, 60, 13),
+					pool(100, 20, 13),
+					pool(20, 20, 13),
+				}),
+				Loot = {
+					loot(20, 20, 6),
+					loot(60, 60, 3),
+				},
+			},
+			{
+				Name = "Boulder scramble",
+				Primitives = merge(maze(SLOT1ROOM3, 0, 0, true, false), {
+					boulder(24, 63, 11, 10),
+				}),
+				Loot = {
+					loot(20, 20, 6),
+					loot(60, 100, 3),
+					loot(60, 20, 2),
+				},
+			},
+		},
+	},
+	{
+		Name = "Gatehouse yard",
+		At = { -40, 52 },
+		Size = { 120, 120 },
+		Rooms = {
+			{
+				Name = "Tunnel loop",
+				Primitives = merge(maze(SLOT2ROOM1, 0, 0, false, false), {
+					cellRoof(20, 20),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(60, 100),
+					cellRoof(100, 20),
+					cellRoof(100, 60),
+					cellRoof(100, 100),
+				}),
+				Loot = {
+					loot(100, 60, 6),
+					loot(100, 100, 3),
+					loot(60, 100, 2),
+				},
+			},
+			{
+				Name = "Boulder yard",
+				Primitives = merge(maze(SLOT2ROOM2, 0, 0, false, false), {
+					boulder(65, 22, 12, 9),
+					boulder(101, 98, 13, 10),
+				}),
+				Loot = {
+					loot(100, 20, 6),
+					loot(100, 60, 3),
+					loot(60, 100, 2),
+				},
+			},
+			{
+				Name = "Gatehouse cellar",
+				Primitives = merge(maze(SLOT2ROOM3, 0, 0, false, false), {
+					cellRoof(20, 20),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(60, 60),
+					cellRoof(60, 100),
+					cellRoof(100, 20),
+					cellRoof(100, 60),
+					cellRoof(100, 100),
+				}),
+				Loot = {
+					loot(100, 100, 6),
+					loot(100, 60, 3),
+					loot(20, 20, 2),
+					loot(60, 20, 1),
+				},
+			},
+		},
+	},
+	{
+		Name = "East cellar",
+		At = { 240, 212 },
+		Size = { 120, 120 },
+		Rooms = {
+			{
+				Name = "Dead-end cellar",
+				Primitives = merge(maze(SLOT3ROOM1, 0, 0, false, true), {
+					cellRoof(20, 20),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(60, 60),
+					cellRoof(60, 100),
+					cellRoof(100, 20),
+					cellRoof(100, 60),
+					cellRoof(100, 100),
+				}),
+				Loot = {
+					loot(20, 100, 6),
+					loot(100, 100, 3),
+					loot(60, 100, 2),
+					loot(100, 60, 1),
+				},
+			},
+			{
+				Name = "Flooded cellar",
+				Primitives = merge(maze(SLOT3ROOM2, 0, 0, false, true), {
+					cellRoof(20, 20),
+					cellRoof(60, 100),
+					cellRoof(100, 20),
+					pool(20, 100, 13),
+					pool(60, 20, 13),
+					pool(100, 100, 13),
+				}),
+				Loot = {
+					loot(20, 100, 6),
+					loot(60, 20, 3),
+					loot(20, 20, 4),
+				},
+			},
+			{
+				Name = "Tunnel loop",
+				Primitives = merge(maze(SLOT3ROOM3, 0, 0, false, true), {
+					cellRoof(20, 20),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(60, 100),
+					cellRoof(100, 20),
+					cellRoof(100, 60),
+					cellRoof(100, 100),
+				}),
+				Loot = {
+					loot(100, 60, 6),
+					loot(100, 100, 3),
+					loot(60, 100, 2),
+				},
+			},
+		},
+	},
+	{
+		Name = "Drowned hall",
+		At = { -80, 212 },
+		Size = { 160, 120 },
+		Rooms = {
+			{
+				Name = "Flooded hall",
+				Primitives = merge(maze(SLOT4ROOM1, 0, 0, false, false), {
+					cellRoof(20, 20),
+					cellRoof(20, 60),
+					cellRoof(20, 100),
+					pool(100, 20, 13),
+					pool(140, 60, 13),
+					pool(60, 60, 13),
+					pool(100, 100, 13),
+				}),
+				Loot = {
+					loot(100, 100, 6),
+					loot(140, 60, 3),
+					loot(140, 100, 4),
+				},
+			},
+			{
+				Name = "Collapsed hall",
+				Primitives = merge(maze(SLOT4ROOM2, 0, 0, false, false), {
+					boulder(22, 22, 13, 8),
+					boulder(57, 22, 13, 10),
+					boulder(141, 96, 11, 10),
+				}),
+				Loot = {
+					loot(140, 20, 6),
+					loot(100, 20, 3),
+					loot(100, 60, 2),
+				},
+			},
+			{
+				Name = "Pillar gallery",
+				Primitives = merge(maze(SLOT4ROOM3, 0, 0, false, false), {
+					cellRoof(20, 20),
+					cellRoof(20, 60),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(100, 20),
+					cellRoof(100, 100),
+					cellRoof(140, 20),
+					cellRoof(140, 60),
+					cellRoof(140, 100),
+				}),
+				Loot = {
+					loot(100, 20, 6),
+					loot(140, 20, 3),
+					loot(20, 60, 2),
+				},
+			},
+			{
+				Name = "Dead-end vault",
+				Primitives = merge(maze(SLOT4ROOM4, 0, 0, false, false), {
+					cellRoof(20, 20),
+					cellRoof(20, 60),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(60, 60),
+					cellRoof(100, 20),
+					cellRoof(100, 60),
+					cellRoof(100, 100),
+					cellRoof(140, 20),
+					cellRoof(140, 60),
+					cellRoof(140, 100),
+				}),
+				Loot = {
+					loot(100, 100, 6),
+					loot(140, 100, 3),
+					loot(140, 60, 2),
+					loot(100, 20, 1),
+				},
+			},
+		},
+	},
+	{
+		Name = "Low west vault",
+		At = { -360, 372 },
+		Size = { 120, 120 },
+		Rooms = {
+			{
+				Name = "Tunnel loop",
+				Primitives = merge(maze(SLOT5ROOM1, 0, 0, true, false), {
+					cellRoof(20, 20),
+					cellRoof(20, 60),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(60, 100),
+					cellRoof(100, 20),
+					cellRoof(100, 100),
+				}),
+				Loot = {
+					loot(20, 60, 6),
+					loot(20, 100, 3),
+					loot(60, 100, 2),
+				},
+			},
+			{
+				Name = "Dead-end cave",
+				Primitives = merge(maze(SLOT5ROOM2, 0, 0, true, false), {
+					cellRoof(20, 20),
+					cellRoof(20, 60),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(60, 60),
+					cellRoof(60, 100),
+					cellRoof(100, 20),
+					cellRoof(100, 100),
+				}),
+				Loot = {
+					loot(100, 100, 6),
+					loot(60, 100, 3),
+					loot(20, 20, 2),
+					loot(20, 60, 1),
+				},
+			},
+			{
+				Name = "Boulder scramble",
+				Primitives = merge(maze(SLOT5ROOM3, 0, 0, true, false), {
+					boulder(24, 23, 11, 9),
+					boulder(16, 60, 13, 9),
+				}),
+				Loot = {
+					loot(20, 100, 6),
+					loot(60, 20, 3),
+					loot(60, 100, 2),
+				},
+			},
+		},
+	},
+	{
+		Name = "Sea vault",
+		At = { -80, 412 },
+		Size = { 160, 120 },
+		Rooms = {
+			{
+				Name = "Dead-end vault",
+				Primitives = merge(maze(SLOT6ROOM1, 0, 0, false, false), {
+					cellRoof(20, 20),
+					cellRoof(20, 60),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(60, 60),
+					cellRoof(60, 100),
+					cellRoof(100, 60),
+					cellRoof(100, 100),
+					cellRoof(140, 20),
+					cellRoof(140, 60),
+					cellRoof(140, 100),
+				}),
+				Loot = {
+					loot(20, 20, 6),
+					loot(20, 60, 3),
+					loot(20, 100, 2),
+					loot(100, 100, 1),
+				},
+			},
+			{
+				Name = "Flooded vault",
+				Primitives = merge(maze(SLOT6ROOM2, 0, 0, false, false), {
+					cellRoof(20, 60),
+					cellRoof(60, 60),
+					cellRoof(60, 100),
+					pool(140, 20, 13),
+					pool(20, 20, 13),
+					pool(60, 20, 13),
+					pool(20, 100, 13),
+				}),
+				Loot = {
+					loot(140, 20, 6),
+					loot(20, 100, 3),
+				},
+			},
+			{
+				Name = "Collapsed vault",
+				Primitives = merge(maze(SLOT6ROOM3, 0, 0, false, false), {
+					boulder(18, 16, 12, 10),
+					boulder(15, 64, 12, 10),
+					boulder(140, 59, 11, 10),
+					boulder(141, 95, 11, 8),
+				}),
+				Loot = {
+					loot(20, 100, 6),
+					loot(60, 100, 3),
+					loot(60, 60, 2),
+				},
+			},
+			{
+				Name = "Tunnel loop",
+				Primitives = merge(maze(SLOT6ROOM4, 0, 0, false, false), {
+					cellRoof(20, 20),
+					cellRoof(20, 60),
+					cellRoof(20, 100),
+					cellRoof(60, 20),
+					cellRoof(60, 100),
+					cellRoof(100, 100),
+					cellRoof(140, 20),
+					cellRoof(140, 60),
+					cellRoof(140, 100),
+				}),
+				Loot = {
+					loot(60, 100, 6),
+					loot(100, 100, 3),
+					loot(20, 20, 2),
+				},
+			},
+		},
+	},
+	{
+		Name = "East deeps",
+		At = { 240, 412 },
+		Size = { 120, 120 },
+		Rooms = {
+			{
+				Name = "Flooded pocket",
+				Primitives = merge(maze(SLOT7ROOM1, 0, 0, false, true), {
+					cellRoof(20, 20),
+					cellRoof(20, 100),
+					cellRoof(100, 60),
+					pool(20, 60, 13),
+					pool(60, 60, 13),
+					pool(60, 100, 13),
+				}),
+				Loot = {
+					loot(20, 60, 6),
+					loot(60, 60, 3),
+					loot(20, 20, 4),
+				},
+			},
+			{
+				Name = "Dead-end cave",
+				Primitives = merge(maze(SLOT7ROOM2, 0, 0, false, true), {
+					cellRoof(20, 20),
+					cellRoof(20, 60),
+					cellRoof(20, 100),
+					cellRoof(60, 60),
+					cellRoof(60, 100),
+					cellRoof(100, 20),
+					cellRoof(100, 60),
+					cellRoof(100, 100),
+				}),
+				Loot = {
+					loot(20, 20, 6),
+					loot(20, 60, 3),
+					loot(20, 100, 2),
+					loot(100, 20, 1),
+				},
+			},
+			{
+				Name = "Boulder scramble",
+				Primitives = merge(maze(SLOT7ROOM3, 0, 0, false, true), {
+					boulder(61, 100, 13, 10),
+					boulder(104, 95, 13, 9),
+				}),
+				Loot = {
+					loot(20, 100, 6),
+					loot(100, 60, 3),
+					loot(20, 60, 2),
+				},
+			},
+		},
+	},
+}
+
+return frame
