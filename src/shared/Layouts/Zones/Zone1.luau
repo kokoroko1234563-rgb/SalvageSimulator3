@@ -1,7 +1,7 @@
 -- Zone 1, Open Shore (base layout): the tutorial. Low ground the eye can read from the top:
 -- a few shallow banks, all of them near the seaward edge, so the zone stays open. Two ramps
 -- let a cart through, and the banks are the foot shortcuts. See design notes in docs/layouts.
-return {
+local tileLayout = {
 	Name = "Open Shore (base)",
 	Primitives = {
 		-- A bank across the seaward end: carts take the ramps, players walk over it.
@@ -20,3 +20,6 @@ return {
 		{ Kind = "Ramp", Path = { { 180, 0 }, { 215, 60 }, { 205, 110 }, { 180, 150 } }, Width = 16 },
 	},
 }
+
+-- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
+return require(script.Parent.Parent.Tiled)(tileLayout)

@@ -3,7 +3,7 @@
 -- you have to keep sidling in one direction; the pattern repeats every 240 studs. One gap in
 -- the middle wall is a short roofed tunnel. U-shaped pockets between the walls hold the best
 -- loot, and the low ground floods first.
-return {
+local tileLayout = {
 	Name = "Outer Shore (base)",
 	Primitives = {
 		-- First wall (gaps at x -300, -60 and 180).
@@ -92,3 +92,6 @@ return {
 		{ At = { 0, 10 }, Radius = 6, Weight = 1 },
 	},
 }
+
+-- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
+return require(script.Parent.Parent.Tiled)(tileLayout)

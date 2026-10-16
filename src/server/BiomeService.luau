@@ -229,20 +229,32 @@ function BiomeService.get(tile: number): string?
 	return Workspace:GetAttribute(Biomes.attributeFor(tile))
 end
 
--- Sets (or clears, with nil) a tile's biome and rebuilds its decor and entrance.
-function BiomeService.set(tile: number, biomeId: string?)
+-- Sets (or clears, with nil) a tile's biome and rebuilds its decor and entrance. A tile is a
+-- whole zone. `choice` picks its layout's crossing and rooms (Layouts.encode's text, or a
+-- Choice); without one, they're rolled.
+function BiomeService.set(tile: number, biomeId: string?, choice: any?)
 	local biome = biomeId and Biomes.List[biomeId]
 	local wasLayout = Layouts.active(tile)
 	local wasOwnGround = Looks.hasOwnGround(Biomes.activeIn(tile))
 	local settle = GroundShift.capture(tile)
 	Workspace:SetAttribute(Biomes.attributeFor(tile), if biome then biome.Id else nil)
+	local def = Layouts.activeDef(tile)
+	local text = nil
+	if def then
+		local picked = if type(choice) == "string"
+			then Layouts.decode(def, choice)
+			elseif type(choice) == "table" then choice
+			else Layouts.roll(def, rng)
+		text = Layouts.encode(picked)
+	end
+	Workspace:SetAttribute(Layouts.attributeFor(tile), text)
 	if Layouts.active(tile) ~= wasLayout or wasOwnGround or Looks.hasOwnGround(biome) then
 		-- The biome brings its own ground (its shape or its materials): rebuild the tile's
 		-- terrain and keep things on it.
 		TerrainBuilder.buildTile(tile)
 		settle()
 	end
-	local old = folder:FindFirstChild("Tile" .. tile)
+	local old = folder and folder:FindFirstChild("Tile" .. tile)
 	if old then
 		old:Destroy()
 	end

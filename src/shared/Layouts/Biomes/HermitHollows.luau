@@ -428,4 +428,5 @@ local zone6 = {
 	},
 }
 
-return { [4] = layout, [5] = zone5, [6] = zone6 }
+-- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
+return require(script.Parent.Parent.Tiled)({ [4] = layout, [5] = zone5, [6] = zone6 })

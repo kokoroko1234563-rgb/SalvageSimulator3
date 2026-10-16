@@ -80,6 +80,7 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 	local ny = (hi.Y - lo.Y) / VOXEL
 	local nz = (z1 - z0) / VOXEL
 	local materials, occupancy = table.create(nx), table.create(nx)
+	local materialAt = Looks.terrainReader()
 	for ix = 1, nx do
 		local x = lo.X + (ix - 0.5) * VOXEL
 		local mx, ox = table.create(ny), table.create(ny)
@@ -91,7 +92,7 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 			local z = z0 + (iz - 0.5) * VOXEL
 			local height, rock = shrunkShape(x, z)
 			local h = Beach.groundY(z) + height - DRAWN_BIGGER
-			local floorMaterial, rockMaterial = Looks.terrainAt(x, z)
+			local floorMaterial, rockMaterial = materialAt(x, z)
 			local material = if rock then rockMaterial else floorMaterial
 			local roofBottom, roofTop = shrunkRoof(x, z)
 			for iy = 1, ny do

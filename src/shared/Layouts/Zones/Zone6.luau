@@ -26,7 +26,7 @@ local function sunk(path)
 	return { Kind = "Channel", Path = path, Depth = 2, Width = 12 }
 end
 
-return {
+local tileLayout = {
 	Name = "The Drowned Reach (base)",
 	Primitives = {
 		-- The west ramp cell (x -360 to -80): galleries at z 32, 74 and 116. The ramp comes
@@ -132,3 +132,6 @@ return {
 		{ At = { 47, 118 }, Radius = 5, Weight = 1 },
 	},
 }
+
+-- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
+return require(script.Parent.Parent.Tiled)(tileLayout)

@@ -7,9 +7,12 @@
 	It also writes the maps into the layout notes, between the <!-- map ... --> markers, so the
 	notes can't drift from the layouts.
 
-	Usage (from the repo root): lune run tools/layout_map.luau [docs/layouts]
-	Without a folder it only prints. Each map is 72 columns (10 studs each) by 15 rows (10 studs
-	each), top edge first. Legend: # rock, ^ raised sand, . flat, ~ floods at mid-tide,
+	Usage (from the repo root): lune run tools/layout_map.luau [docs/layouts | -] [sources...]
+	Without a folder (or with -) it only prints. Name sources ("Zones/Zone5",
+	"Biomes/HermitHollows") to report only those. Every way a zone can come out is reported:
+	each crossing, each room of each slot; the maps are keyed Source@zone, with /c2 for
+	crossing 2 or /s3r2 for room 2 of slot 3. Each map is 72 columns (10 studs each) by one row
+	per 10 studs of the zone, top edge first. Legend: # rock, ^ raised sand, . flat, ~ floods at mid-tide,
 	= cart ramp, o entrance flat, R under a roof, ' ' open sand.
 ]]
 
@@ -18,7 +21,7 @@ local process = require("@lune/process")
 
 local Harness = require("./tests/harness")
 
-local outDir = process.args[1]
+local outDir = if process.args[1] and process.args[1] ~= "-" then process.args[1] else nil
 local h = Harness.new(process.cwd)
 local Beach = h.require("Shared/Beach")
 local Config = h.require("Shared/Config")
@@ -217,7 +220,7 @@ end
 
 -- Maps -------------------------------------------------------------------------------------
 
-local COLS, ROWS = 72, 15
+local COLS, ROWS = 72, math.floor(Config.Beach.TileLength / 10)
 
 -- The character for one cell of a zone's map, from the layout's own primitives first.
 local function cellChar(layout, zone: number, x: number, lz: number, mid: number): string
@@ -276,90 +279,94 @@ end
 
 -- Flood order ----------------------------------------------------------------------------
 
--- The ground on a grid of 2-stud cells around a tile (from a little up the beach of it to
--- well out past it, with the tile set to `layout`), so the sea can be flowed through it.
+-- The ground on a grid of 2-stud cells over a zone and a little either side, with the zone's
+-- layout as it is now (set it first).
 local FLOOD_STEP = 2
-local FLOOD_X0, FLOOD_COLS, FLOOD_ROWS = -360, 361, 171 -- X -360..360, Z 340 studs from FLOOD_Z0
-local FLOOD_Z0 = 0
+local FLOOD_X0, FLOOD_COLS = -360, 361 -- X -360..360
 
-local function floodGrid(zone: number?, layout): { number }
-	local grid = {}
-	if zone then
-		Layouts.setActive(zone, layout)
-		FLOOD_Z0 = Beach.tileRange(zone) - 40
-	end
-	for j = 0, FLOOD_ROWS - 1 do
+-- For every cell of the grid, the lowest sea level at which the sea reaches it, flowing in
+-- from the seaward edge through lower ground only (a cut walled off by higher ground stays
+-- dry until the sea tops the wall): a priority flood, lowest spill first.
+local function spillLevels(zone: number): ({ number }, number, number)
+	local z0, z1 = Beach.tileRange(zone)
+	local zStart = z0 - 40
+	local rows = math.floor((z1 + 40 - zStart) / FLOOD_STEP) + 1
+	local ground = {}
+	for j = 0, rows - 1 do
 		for i = 0, FLOOD_COLS - 1 do
-			grid[j * FLOOD_COLS + i + 1] =
-				Beach.groundAt(FLOOD_X0 + i * FLOOD_STEP, FLOOD_Z0 + j * FLOOD_STEP)
+			ground[j * FLOOD_COLS + i + 1] =
+				Beach.groundAt(FLOOD_X0 + i * FLOOD_STEP, zStart + j * FLOOD_STEP)
 		end
 	end
-	if zone then
-		Layouts.setActive(zone, nil)
-	end
-	return grid
-end
-
--- Whether the sea, at a waterline Z, flows in from the seaward edge to a point (through cells
--- below the sea surface only). A cut that is walled off by higher ground stays dry.
-local function reachedBySea(grid: { number }, waterline: number, i: number, j: number): boolean
-	local level = Beach.waterY(waterline)
-	local seen, queue, head = {}, {}, 1
-	local function at(a: number, b: number): number
-		return (b * FLOOD_COLS) + a + 1
-	end
-	for a = 0, FLOOD_COLS - 1 do
-		local k = at(a, FLOOD_ROWS - 1)
-		if grid[k] < level then
-			seen[k] = true
-			table.insert(queue, { a, FLOOD_ROWS - 1 })
+	-- A binary heap of { level, cell }.
+	local heap = {}
+	local function push(level: number, cell: number)
+		table.insert(heap, { level, cell })
+		local k = #heap
+		while k > 1 do
+			local parent = k // 2
+			if heap[parent][1] <= heap[k][1] then
+				break
+			end
+			heap[parent], heap[k] = heap[k], heap[parent]
+			k = parent
 		end
 	end
-	local target = at(i, j)
-	while head <= #queue do
-		local a, b = queue[head][1], queue[head][2]
-		head += 1
-		if seen[target] then
-			return true
+	local function pop(): { number }
+		local top = heap[1]
+		local last = table.remove(heap)
+		if #heap > 0 then
+			heap[1] = last
+			local k = 1
+			while true do
+				local a, b, smallest = k * 2, k * 2 + 1, k
+				if a <= #heap and heap[a][1] < heap[smallest][1] then
+					smallest = a
+				end
+				if b <= #heap and heap[b][1] < heap[smallest][1] then
+					smallest = b
+				end
+				if smallest == k then
+					break
+				end
+				heap[smallest], heap[k] = heap[k], heap[smallest]
+				k = smallest
+			end
 		end
+		return top
+	end
+	local spill = {}
+	for i = 0, FLOOD_COLS - 1 do
+		local cell = (rows - 1) * FLOOD_COLS + i + 1
+		spill[cell] = ground[cell]
+		push(ground[cell], cell)
+	end
+	while #heap > 0 do
+		local entry = pop()
+		local level, cell = entry[1], entry[2]
+		if level > spill[cell] then
+			continue
+		end
+		local i, j = (cell - 1) % FLOOD_COLS, (cell - 1) // FLOOD_COLS
 		for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
-			local na, nb = a + d[1], b + d[2]
-			if na >= 0 and na < FLOOD_COLS and nb >= 0 and nb < FLOOD_ROWS then
-				local k = at(na, nb)
-				if not seen[k] and grid[k] < level then
-					seen[k] = true
-					table.insert(queue, { na, nb })
+			local ni, nj = i + d[1], j + d[2]
+			if ni >= 0 and ni < FLOOD_COLS and nj >= 0 and nj < rows then
+				local n = nj * FLOOD_COLS + ni + 1
+				local reach = math.max(level, ground[n])
+				if spill[n] == nil or reach < spill[n] then
+					spill[n] = reach
+					push(reach, n)
 				end
 			end
 		end
 	end
-	return seen[target] == true
-end
-
--- The highest waterline Z at which the sea reaches a cut's floor, by bisection (reaching is
--- monotonic: a lower tide floods more). Nil if the sea never reaches it.
-local function floodLine(grid: { number }, x: number, z: number): number?
-	local i = math.floor((x - FLOOD_X0) / FLOOD_STEP + 0.5)
-	local j = math.floor((z - FLOOD_Z0) / FLOOD_STEP + 0.5)
-	local lo, hi = math.floor(FLOOD_Z0 - 300), math.floor(FLOOD_Z0 + 450)
-	if not reachedBySea(grid, lo, i, j) then
-		return nil
-	end
-	while hi - lo > 1 do
-		local mid = (lo + hi) // 2
-		if reachedBySea(grid, mid, i, j) then
-			lo = mid
-		else
-			hi = mid
-		end
-	end
-	return lo
+	return spill, zStart, rows
 end
 
 -- The cuts of a zone's layout, seaward first, with the waterline at which the sea reaches each.
 local function floodOrder(layout, zone: number): { string }
 	local z0 = Beach.tileRange(zone)
-	local grid = floodGrid(zone, layout)
+	local spill, zStart = spillLevels(zone)
 	local lines = {}
 	for _, p in layout.Primitives do
 		if p.Kind == "Channel" or p.Kind == "Hollow" then
@@ -370,13 +377,17 @@ local function floodOrder(layout, zone: number): { string }
 					point = q
 				end
 			end
-			local line = floodLine(grid, point[1], z0 + point[2])
+			local i = math.floor((point[1] - FLOOD_X0) / FLOOD_STEP + 0.5)
+			local j = math.floor((z0 + point[2] - zStart) / FLOOD_STEP + 0.5)
+			local level = spill[j * FLOOD_COLS + i + 1]
+			-- The sea is above `level` while the waterline is below -level / Slope.
+			local line = if level then math.floor(-level / Config.Beach.Slope) else nil
 			local text = string.format(
 				"%s at x %d, z %d: the sea reaches it when the waterline is below Z %s",
 				p.Kind,
 				point[1],
 				point[2],
-				tostring(line and math.floor(line) or "never")
+				tostring(line or "never")
 			)
 			table.insert(lines, { line = line or -1, text = text })
 		end
@@ -395,68 +406,95 @@ end
 
 local maps = {}
 local floods = {}
+local out = {}
 
--- Each zone's layouts are measured on the zone's own first tile, where the tide meets them.
-local function report(zone: number, source: string, layout): string
-	local tile = (zone - 1) * Config.Beach.TilesPerZone + 1
-	Layouts.setActive(tile, layout)
+-- A short tag for a choice, for map keys: "" for the first of everything, "/c2" for
+-- crossing 2, "/s3r2" for room 2 in slot 3.
+local function tagOf(choice): string
+	local tag = if choice.Crossing ~= 1 then "/c" .. choice.Crossing else ""
+	for index, room in choice.Rooms do
+		if room ~= 1 then
+			tag ..= "/s" .. index .. "r" .. room
+		end
+	end
+	return tag
+end
+
+-- Reports one way a zone's definition comes out, on the zone's own tile (a tile is a zone).
+local function report(zone: number, source: string, def, way): string
+	local tile = zone
+	Layouts.setActive(tile, def, nil, way.Choice)
+	local layout = Layouts.active(tile)
 	local hidden = hiddenShare(tile)
 	local high, low = extremes(tile)
 	local short = shortcuts(tile)
 	local cross = crossSeconds(tile)
-	Layouts.setActive(tile, nil)
-	maps[source .. "@" .. zone] = mapOf(layout, tile)
+	local key = source .. "@" .. zone .. tagOf(way.Choice)
+	maps[key] = mapOf(layout, tile)
 	local order = floodOrder(layout, tile)
-	floods[source .. "@" .. zone] = table.concat(order, "\n")
+	Layouts.setActive(tile, nil)
+	floods[key] = table.concat(order, "\n")
 	local lines = {
 		string.format(
-			"Zone %d %s: hidden from the top %d%%, highest %.1f, deepest cut %.1f, shortcut starts %d of 5",
+			"Zone %d %s%s [%s]: hidden from the top %d%%, highest %.1f, deepest cut %.1f, shortcut starts %d of 5",
 			zone,
 			source,
+			if way.Label ~= "" then " " .. way.Label else "",
+			key,
 			math.floor(hidden * 100 + 0.5),
 			high,
 			low,
 			short
 		),
-		-- A zone is TilesPerZone tiles of this layout (when no biome rolls there).
 		string.format(
-			"  fastest crossing on foot: %s s per tile, about %s s for the zone (target %d s)",
-			if cross then string.format("%.1f", cross) else "no way across",
-			if cross then string.format("%.0f", cross * Config.Beach.TilesPerZone) else "-",
+			"  fastest crossing on foot: about %s s (target %d s)",
+			if cross then string.format("%.0f", cross) else "no way across",
 			Config.Zones[zone].CrossTime
 		),
 	}
 	for _, line in order do
 		table.insert(lines, "  " .. line)
 	end
-	return table.concat(lines, "\n") .. "\n" .. maps[source .. "@" .. zone]
+	return table.concat(lines, "\n") .. "\n" .. maps[key]
 end
 
-local out = {}
-for zone = 1, Config.Beach.ActiveZones do
-	-- (Zones without a layout of their own use the one above them: nothing new to report.)
-	local own = Layouts.all()
-	local hasOwn = false
-	for _, entry in own do
-		if entry.Source == "Zones/Zone" .. zone then
-			hasOwn = true
-		end
+local function reportAll(zone: number, source: string, def)
+	for _, way in Layouts.options(def) do
+		table.insert(out, report(zone, source, def, way))
 	end
-	if hasOwn then
-		table.insert(out, report(zone, "Zones/Zone" .. zone, Layouts.base(zone)))
+end
+
+-- Only what's asked for, when names are given: "lune run tools/layout_map.luau - Zones/Zone5".
+local only = {}
+for index = 2, #process.args do
+	only[process.args[index]] = true
+end
+local function wanted(source: string): boolean
+	return next(only) == nil or only[source] == true
+end
+
+for zone = 1, Config.Beach.ActiveZones do
+	-- (Zones without a definition of their own use the one above them: nothing new to report.)
+	local base = Layouts.base(zone)
+	if base and base ~= Layouts.base(zone - 1) and wanted("Zones/Zone" .. zone) then
+		reportAll(zone, "Zones/Zone" .. zone, base)
 	end
 	for id in Biomes.List do
-		local layout = Layouts.forBiome(id, zone)
-		if layout then
-			table.insert(out, report(zone, "Biomes/" .. id, layout))
+		local def = Layouts.forBiome(id, zone)
+		if def and (zone == 1 or def ~= Layouts.forBiome(id, zone - 1)) and wanted("Biomes/" .. id) then
+			reportAll(zone, "Biomes/" .. id, def)
 		end
 	end
 end
 for id in Biomes.Planned do
 	for zone = 1, Config.Beach.ActiveZones do
-		local layout = Layouts.forPlanned(id, zone)
-		if layout then
-			table.insert(out, report(zone, "Biomes/Planned/" .. id, layout))
+		local def = Layouts.forPlanned(id, zone)
+		if
+			def
+			and (zone == 1 or def ~= Layouts.forPlanned(id, zone - 1))
+			and wanted("Biomes/Planned/" .. id)
+		then
+			reportAll(zone, "Biomes/Planned/" .. id, def)
 		end
 	end
 end

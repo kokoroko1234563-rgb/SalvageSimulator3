@@ -26,7 +26,7 @@ local function concat(...)
 	return out
 end
 
-return {
+local tileLayout = {
 	[1] = {
 		Name = "Shipwreck Shallows (zone 1)",
 		Primitives = concat(entrances(30), ramps(), {
@@ -131,3 +131,6 @@ return {
 		}),
 	},
 }
+
+-- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
+return require(script.Parent.Parent.Tiled)(tileLayout)

@@ -25,7 +25,7 @@ local function sill(x, z)
 	return { Kind = "Ridge", Path = { { x - 12, z }, { x + 12, z } }, Height = 3.5, Width = 16 }
 end
 
-return {
+local tileLayout = {
 	Name = "The Shoals (base)",
 	Primitives = {
 		-- First bar (z 28): dry gaps at x -200 and 180 (the ramps), fords at -120 and 120.
@@ -120,3 +120,6 @@ return {
 		{ At = { 330, 40 }, Radius = 6, Weight = 1 },
 	},
 }
+
+-- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
+return require(script.Parent.Parent.Tiled)(tileLayout)

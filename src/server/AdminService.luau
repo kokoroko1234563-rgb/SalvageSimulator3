@@ -15,6 +15,7 @@ local Traders = require(Shared.Traders)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
+local Layouts = require(Shared.Layouts)
 local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
 local DayCycle = require(Shared.DayCycle)
@@ -617,37 +618,66 @@ command("kick", "kick <player> [reason]", "Kick a player", function(caller, args
 	end) or lines
 end)
 
-command("biomes", "biomes", "Show each tile's biome and the biomes that exist", function()
-	local lines = {}
-	for zone = 1, Config.Beach.ActiveZones do
-		local tiles = {}
-		for tile = (zone - 1) * Config.Beach.TilesPerZone + 1, zone * Config.Beach.TilesPerZone do
-			local biome = Biomes.activeIn(tile)
-			table.insert(tiles, string.format("%d %s", tile, if biome then biome.Name else "-"))
+command(
+	"biomes",
+	"biomes",
+	"Show each zone's biome, crossing and rooms, and the biomes that exist",
+	function()
+		local lines = {}
+		for zone = 1, Beach.ActiveTiles do
+			local biome = Biomes.activeIn(zone)
+			local def = Layouts.activeDef(zone)
+			local crossings, slots = if def then Layouts.shape(def) else 1, {}
+			table.insert(
+				lines,
+				string.format(
+					"Zone %d: %s, layout %s (%d crossings, %d room slots)",
+					zone,
+					if biome then biome.Name else "no biome",
+					Workspace:GetAttribute(Layouts.attributeFor(zone)) or "-",
+					crossings,
+					#slots
+				)
+			)
 		end
-		table.insert(lines, string.format("Zone %d: %s", zone, table.concat(tiles, ", ")))
+		local biomeIds = {}
+		for id in Biomes.List do
+			table.insert(biomeIds, id)
+		end
+		table.sort(biomeIds)
+		table.insert(lines, "Biomes: " .. table.concat(biomeIds, ", "))
+		return lines
 	end
-	local biomeIds = {}
-	for id in Biomes.List do
-		table.insert(biomeIds, id)
+)
+
+-- The zones a command names: a number, or all.
+local function zonesNamed(which: string): { number }?
+	local zones = {}
+	if which == "all" then
+		for zone = 1, Beach.ActiveTiles do
+			table.insert(zones, zone)
+		end
+		return zones
 	end
-	table.sort(biomeIds)
-	table.insert(lines, "Biomes: " .. table.concat(biomeIds, ", "))
-	return lines
-end)
+	local zone = tonumber(which)
+	if not zone or zone < 1 or zone > Beach.ActiveTiles then
+		return nil
+	end
+	return { math.floor(zone) }
+end
 
 command(
 	"biome",
-	"biome <tile|all> <biome|none|reroll>",
-	"Set a tile's biome (tiles are numbered from the shop: biomes lists them), e.g. biome 2 sandcastle, biome all none, biome all reroll",
+	"biome <zone|all> <biome|none|reroll>",
+	"Set a zone's biome (a biome takes the whole zone), e.g. biome 4 hermit, biome all none, biome all reroll",
 	function(_, args)
 		local which, choice = (args[1] or ""):lower(), (args[2] or ""):lower()
 		if which == "" or choice == "" then
-			return { "Usage: biome <tile|all> <biome|none|reroll>" }
+			return { "Usage: biome <zone|all> <biome|none|reroll>" }
 		end
 		if choice == "reroll" then
 			BiomeService.reroll()
-			return { "Rerolled every tile. Type biomes to see the result." }
+			return { "Rerolled every zone. Type biomes to see the result." }
 		end
 		local biomeId: string? = nil
 		if choice ~= "none" then
@@ -657,28 +687,47 @@ command(
 			end
 			biomeId = biome.Id
 		end
-		local tiles = {}
-		if which == "all" then
-			for tile = 1, Beach.ActiveTiles do
-				table.insert(tiles, tile)
-			end
-		else
-			local tile = tonumber(which)
-			if not tile or tile < 1 or tile > Beach.ActiveTiles then
-				return { "Tile must be 1-" .. Beach.ActiveTiles .. " or all" }
-			end
-			table.insert(tiles, math.floor(tile))
+		local zones = zonesNamed(which)
+		if not zones then
+			return { "Zone must be 1-" .. Beach.ActiveTiles .. " or all" }
 		end
-		for _, tile in tiles do
-			BiomeService.set(tile, biomeId)
+		for _, zone in zones do
+			BiomeService.set(zone, biomeId)
 		end
 		return {
 			string.format(
-				"Tile %s is now %s (until the next tide cycle rerolls it)",
+				"Zone %s is now %s (until the next tide rerolls it)",
 				which,
 				if biomeId then Biomes.List[biomeId].Name else "no biome"
 			),
 		}
+	end
+)
+
+command(
+	"crossing",
+	"crossing <zone|all> <n|reroll> [rooms]",
+	"Pick a zone's crossing (and its rooms, one number per slot), e.g. crossing 4 2, crossing 5 1 2,1,3, crossing all reroll",
+	function(_, args)
+		local which, pick, rooms = (args[1] or ""):lower(), (args[2] or ""):lower(), args[3] or ""
+		local zones = zonesNamed(which)
+		if not zones or pick == "" then
+			return { "Usage: crossing <zone|all> <n|reroll> [rooms]" }
+		end
+		local lines = {}
+		for _, zone in zones do
+			local biome = Biomes.activeIn(zone)
+			BiomeService.set(zone, biome and biome.Id, if pick == "reroll" then nil else pick .. ":" .. rooms)
+			table.insert(
+				lines,
+				string.format(
+					"Zone %d: layout %s",
+					zone,
+					Workspace:GetAttribute(Layouts.attributeFor(zone)) or "-"
+				)
+			)
+		end
+		return lines
 	end
 )
 

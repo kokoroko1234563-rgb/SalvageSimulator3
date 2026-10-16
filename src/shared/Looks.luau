@@ -46,10 +46,8 @@ local function zoneLook(z: number): Look
 	return cfg.Zones[zone] or cfg.Zones[0]
 end
 
--- The look at a point (Z), unblended: the zone's, with the tile's biome laid over it.
-function Looks.pointAt(z: number): Look
-	local look = zoneLook(z)
-	local biome = Biomes.activeIn(Beach.tileAt(z))
+-- The look in a zone with a biome (or none) over it.
+local function lookWith(look: Look, biome: any): Look
 	if biome and biome.Look then
 		local over = biome.Look
 		local mix = over.Mix or 0.6
@@ -67,6 +65,11 @@ function Looks.pointAt(z: number): Look
 		return merged
 	end
 	return look
+end
+
+-- The look at a point (Z), unblended: the zone's, with the tile's biome laid over it.
+function Looks.pointAt(z: number): Look
+	return lookWith(zoneLook(z), Biomes.activeIn(Beach.tileAt(z)))
 end
 
 -- The look at a point (Z), blended over Blend studs across zone and tile edges.
@@ -106,20 +109,38 @@ end
 
 -- The terrain materials at a point: its floor and its rock. Across Blend studs where looks
 -- meet, cells take one look's or the other's, scattered.
-local function ownGround(tile: number?): boolean
-	return Looks.hasOwnGround(Biomes.activeIn(tile))
+-- A function giving the terrain materials at a point (x, z): its floor and its rock. Across
+-- Blend studs where looks meet, cells take one look's or the other's, scattered. A biome's
+-- own ground stops at its tile's edges, so a tile's terrain only ever depends on its own
+-- biome (rebuilding the tile is enough when its biome changes). The biomes are read once,
+-- when it's made: make one for each piece of terrain written.
+function Looks.terrainReader(): (x: number, z: number) -> (Enum.Material, Enum.Material)
+	local biomes, own = {}, {}
+	for tile = 1, Beach.ActiveTiles do
+		biomes[tile] = Biomes.activeIn(tile) or false
+		own[tile] = Looks.hasOwnGround(biomes[tile] or nil)
+	end
+	local materials: { [Look]: { Enum.Material } } = {}
+	return function(x: number, z: number)
+		local at = z + (scatter(x, z) - 0.5) * cfg.Blend
+		local tile, other = Beach.tileAt(z), Beach.tileAt(at)
+		if tile ~= other and ((tile and own[tile]) or (other and own[other])) then
+			at = z
+		end
+		local atTile = Beach.tileAt(at)
+		local look = lookWith(zoneLook(at), atTile and biomes[atTile] or nil)
+		local pair = materials[look]
+		if not pair then
+			pair = { (Enum.Material :: any)[look.Floor], (Enum.Material :: any)[look.Rock] }
+			materials[look] = pair
+		end
+		return pair[1], pair[2]
+	end
 end
 
--- (A biome's own ground stops at its tile's edges, so a tile's terrain only ever depends on
--- its own biome: rebuilding the tile is enough when its biome changes.)
+-- The terrain materials at a point (see Looks.terrainReader).
 function Looks.terrainAt(x: number, z: number): (Enum.Material, Enum.Material)
-	local at = z + (scatter(x, z) - 0.5) * cfg.Blend
-	local tile, other = Beach.tileAt(z), Beach.tileAt(at)
-	if tile ~= other and (ownGround(tile) or ownGround(other)) then
-		at = z
-	end
-	local look = Looks.pointAt(at)
-	return (Enum.Material :: any)[look.Floor], (Enum.Material :: any)[look.Rock]
+	return Looks.terrainReader()(x, z)
 end
 
 -- Whether a biome brings its own ground (terrain materials).

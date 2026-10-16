@@ -10,13 +10,17 @@ creatures walking through walls, and whether Roblox's own pathfinding gets acros
 
 Usage (from the repo root):
   python3 tools/range/run.py --zone 4 --all HermitHollows
-  python3 tools/range/run.py --zone 5 --tile 17=Biomes/Planned/TidepoolRocks --tide 2400 --tide 3000
+  python3 tools/range/run.py --zone 5 --choice 2:1,3
+  python3 tools/range/run.py --zone 6 --every
   python3 tools/range/run.py --zone 1 --no-routes --no-publish
 
   --zone N            the zone to check (1 to Config.Beach.ActiveZones)
-  --all SPEC          every tile of the zone: "Base", a biome id, or a layout path under
+  --all SPEC          what the zone is: "Base" (default), a biome id, or a layout path under
                       src/shared/Layouts ("Zones/Zone5", "Biomes/Planned/CoralGarden")
-  --tile T=SPEC       one tile (tiles are numbered from the shop, 4 to a zone)
+  --choice C          the crossing and rooms: "crossing:room,room,..." (one room per slot, in
+                      order); default the first of each
+  --every             check every way the zone can come out, one run each: each crossing,
+                      then each other room of each slot (as the tests do)
   --tide Z            a waterline Z to measure the water at (repeatable; default: the zone's top,
                       middle and bottom, and low tide)
   --no-routes         skip the pathfinding (quicker)
@@ -89,7 +93,7 @@ def run_check(job):
 
 def summarise(report):
     m = report["measurements"]
-    lines = [f"Zone {report['job']['zone']}: tiles {m.get('tiles')}"]
+    lines = [f"Zone {report['job']['zone']}: {m.get('tiles')}, crossing and rooms {m.get('choice')}"]
     lines.append(f"  built in {m.get('buildSeconds', 0):.1f}s, checked {m.get('propsChecked')} props, "
                  f"{m.get('creatures')} creatures, {m.get('spotsChecked', 0)} loot/entrance spots")
     offset = m.get("terrainOffset", {})
@@ -130,6 +134,8 @@ def main():
     parser.add_argument("--zone", type=int, required=True)
     parser.add_argument("--all")
     parser.add_argument("--tile", action="append", default=[])
+    parser.add_argument("--choice")
+    parser.add_argument("--every", action="store_true")
     parser.add_argument("--tide", action="append", type=float, default=[])
     parser.add_argument("--no-routes", action="store_true")
     parser.add_argument("--no-publish", action="store_true")
@@ -142,9 +148,21 @@ def main():
         job["tiles"] = dict(entry.split("=", 1) for entry in args.tile)
     if args.tide:
         job["tides"] = args.tide
+    if args.choice:
+        job["choice"] = args.choice
 
     # One Test Range run at a time: every run publishes its own build to the one place, so
     # runs from other worktrees wait their turn.
+    choices = [args.choice]
+    if args.every:
+        listing = subprocess.run(
+            ["lune", "run", os.path.join(ROOT, "tools", "range", "options.luau"), str(args.zone), args.all or "Base"],
+            cwd=ROOT, check=True, capture_output=True, text=True).stdout
+        choices = [line.split("\t") for line in listing.strip().splitlines()]
+
+    # One Test Range run at a time: every run publishes its own build to the one place, so
+    # runs from other worktrees wait their turn.
+    found_problems = False
     with open("/tmp/salvage-test-range.lock", "w") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -153,13 +171,20 @@ def main():
             fcntl.flock(lock, fcntl.LOCK_EX)
         if not args.no_publish:
             publish()
-        report, messages = run_check(job)
-    out = os.path.join(HERE, "out", f"zone{args.zone}.json")
-    with open(out, "w") as f:
-        json.dump({"report": report, "logs": messages}, f, indent=2)
-    print(summarise(report))
-    print(f"(full report: {os.path.relpath(out, ROOT)})")
-    sys.exit(1 if report["problems"] else 0)
+        for entry in choices:
+            label = None
+            if isinstance(entry, list):
+                job["choice"], label = entry[0], entry[1] if len(entry) > 1 else entry[0]
+                print(f"\n== {label} ({job['choice']})")
+            report, messages = run_check(job)
+            suffix = "" if not label else "-" + job["choice"].replace(":", "_").replace(",", "-")
+            out = os.path.join(HERE, "out", f"zone{args.zone}{suffix}.json")
+            with open(out, "w") as f:
+                json.dump({"report": report, "logs": messages}, f, indent=2)
+            print(summarise(report))
+            print(f"(full report: {os.path.relpath(out, ROOT)})")
+            found_problems = found_problems or bool(report["problems"])
+    sys.exit(1 if found_problems else 0)
 
 
 if __name__ == "__main__":

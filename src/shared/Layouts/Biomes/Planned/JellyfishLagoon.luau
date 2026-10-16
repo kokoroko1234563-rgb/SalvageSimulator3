@@ -126,4 +126,5 @@ local function build(zone: number)
 	}
 end
 
-return { build(1), build(2), build(3), build(4) }
+-- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
+return require(script.Parent.Parent.Parent.Tiled)({ build(1), build(2), build(3), build(4) })

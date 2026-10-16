@@ -1,6 +1,6 @@
 -- Zone 2, Dunes (base layout): a dune line that hides most of the zone's lower half from the top,
 -- broken only where the ramps and the pier let the eye through. Heights stay at 5 studs or less.
-return {
+local tileLayout = {
 	Name = "Dunes (base)",
 	Primitives = {
 		-- The main dune: tall enough that the eye (5 studs up) can't see past it.
@@ -36,3 +36,6 @@ return {
 		{ Kind = "Flat", At = { 40, 148 }, Radius = 9 },
 	},
 }
+
+-- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
+return require(script.Parent.Parent.Tiled)(tileLayout)

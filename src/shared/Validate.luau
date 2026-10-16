@@ -214,7 +214,14 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		)
 	end
 	check(terrain.CartSlope < terrain.FootSlope, "carts can't climb steeper than players walk")
+	local checkedDefs = {}
 	for _, entry in Layouts.all(true) do
+		if not checkedDefs[entry.Def] then
+			checkedDefs[entry.Def] = true
+			for _, problem in Layouts.defProblems(entry.Def, "Layouts/" .. entry.Source) do
+				check(false, problem)
+			end
+		end
 		for _, problem in Layouts.problems(entry.Layout) do
 			check(false, "Layouts/" .. entry.Source .. ": " .. problem)
 		end

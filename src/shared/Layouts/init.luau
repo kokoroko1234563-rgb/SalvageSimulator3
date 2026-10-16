@@ -41,6 +41,8 @@
 -- sets), so the server and every client agree on the ground. Layouts.setActive overrides
 -- that, for tools/tests.
 
+local Workspace = game:GetService("Workspace")
+
 local Biomes = require(script.Parent.Biomes)
 local Config = require(script.Parent.Config)
 local Hazards = require(script.Parent.Hazards)
@@ -75,7 +77,23 @@ Layouts.Kinds = {
 
 local CELL = 16 -- the lookup grid: each cell lists the primitives that reach it
 
--- Loading -----------------------------------------------------------------------------------
+-- Zone definitions: a frame, crossings and room slots ------------------------------------------
+--
+-- A zone's (or a biome's) module returns a definition: a layout (the frame: its Primitives,
+-- Loot, Entrances and Hazards, the part that's always there) with two optional parts that
+-- change each tide:
+--   Crossings = { layout, ... }   the ways through the zone: one is picked each tide, and its
+--                                 shapes and placements are added to the frame's
+--   Slots = { { Name, At = {x, z}, Size = {w, d}, Rooms = { layout, ... } }, ... }
+--                                 side rooms: each tide every slot picks one of its Rooms. A
+--                                 room is drawn in the slot's own coordinates (x from 0 to w,
+--                                 z from 0 to d; At is the slot's corner nearest the shop at
+--                                 the lowest x) and moved into place.
+-- The pick is a Choice: { Crossing = i, Rooms = { j, ... } } (one room index per slot). The
+-- server rolls one for every zone each tide and stores it on a Workspace attribute
+-- ("TileLayoutN", see Layouts.encode), so the server and every client build the same ground.
+
+export type Choice = { Crossing: number, Rooms: { number } }
 
 local function loadFolder(folder: Instance?): { [string]: any }
 	local found = {}
@@ -89,7 +107,7 @@ local function loadFolder(folder: Instance?): { [string]: any }
 	return found
 end
 
-local loaded: { base: { [number]: Layout }, biomes: { [string]: any }, planned: { [string]: any } }? = nil
+local loaded: { base: { [number]: any }, biomes: { [string]: any }, planned: { [string]: any } }? = nil
 
 local function data()
 	if not loaded then
@@ -111,13 +129,13 @@ local function data()
 	return loaded :: any
 end
 
--- Whether a module's value is one layout or a table of them indexed by zone.
+-- Whether a module's value is one definition or a table of them indexed by zone.
 -- With `fallback`, a zone without its own takes the nearest above it (as the game does).
-local function pick(value: any, zone: number, fallback: boolean?): Layout?
+local function pick(value: any, zone: number, fallback: boolean?): any
 	if type(value) ~= "table" then
 		return nil
 	end
-	if value.Primitives then
+	if value.Primitives or value.Crossings or value.Slots then
 		return value
 	end
 	if fallback then
@@ -130,8 +148,8 @@ local function pick(value: any, zone: number, fallback: boolean?): Layout?
 	return value[zone]
 end
 
--- The base layout of a zone (nil: flat). A zone without its own uses the nearest above it.
-function Layouts.base(zone: number): Layout?
+-- The base definition of a zone (nil: flat). A zone without its own uses the nearest above it.
+function Layouts.base(zone: number): any
 	local base = data().base
 	for index = zone, 1, -1 do
 		if base[index] then
@@ -146,24 +164,188 @@ local function zoneOfTile(tile: number): number
 	return math.ceil(tile / Config.Beach.TilesPerZone)
 end
 
--- A biome's layout in a zone (nil: it has none and the base layout stays).
-function Layouts.forBiome(biomeId: string, zone: number): Layout?
+-- A biome's definition in a zone (nil: it has none and the base stays).
+function Layouts.forBiome(biomeId: string, zone: number): any
 	return pick(data().biomes[biomeId], zone, true)
 end
 
--- A planned biome's draft layout in a zone.
-function Layouts.forPlanned(biomeId: string, zone: number): Layout?
+-- A planned biome's draft in a zone.
+function Layouts.forPlanned(biomeId: string, zone: number): any
 	return pick(data().planned[biomeId], zone, true)
 end
 
--- Every layout, for tools/tests: { Source, Zone, Layout } per zone it can appear in.
-function Layouts.all(includePlanned: boolean?): { { Source: string, Zone: number, Layout: Layout } }
+-- How many crossings a definition has, and how many rooms each of its slots has.
+function Layouts.shape(def: any): (number, { number })
+	local rooms = {}
+	for index, slot in def.Slots or {} do
+		rooms[index] = math.max(1, #(slot.Rooms or {}))
+	end
+	return math.max(1, #(def.Crossings or {})), rooms
+end
+
+-- A choice's text form (the Workspace attribute), and back. "2:1,3" is crossing 2, room 1 in
+-- the first slot and room 3 in the second.
+function Layouts.encode(choice: Choice): string
+	local rooms = {}
+	for index, room in choice.Rooms do
+		rooms[index] = tostring(room)
+	end
+	return choice.Crossing .. ":" .. table.concat(rooms, ",")
+end
+
+-- Reads a choice for a definition: missing or out-of-range picks fall back to the first.
+function Layouts.decode(def: any, text: string?): Choice
+	local crossings, slots = Layouts.shape(def)
+	local choice: Choice = { Crossing = 1, Rooms = {} }
+	local crossing, rooms = string.match(text or "", "^(%d+):?(.*)$")
+	local n = tonumber(crossing)
+	if n and n >= 1 and n <= crossings then
+		choice.Crossing = n
+	end
+	local picks = string.split(rooms or "", ",")
+	for index, count in slots do
+		local room = tonumber(picks[index])
+		choice.Rooms[index] = if room and room >= 1 and room <= count then room else 1
+	end
+	return choice
+end
+
+-- A random choice for a definition.
+function Layouts.roll(def: any, rng: Random): Choice
+	local crossings, slots = Layouts.shape(def)
+	local choice: Choice = { Crossing = rng:NextInteger(1, crossings), Rooms = {} }
+	for index, count in slots do
+		choice.Rooms[index] = rng:NextInteger(1, count)
+	end
+	return choice
+end
+
+local function moved(value: any, dx: number, dz: number): any
+	if type(value) ~= "table" then
+		return value
+	end
+	if #value == 2 and type(value[1]) == "number" and type(value[2]) == "number" then
+		return { value[1] + dx, value[2] + dz }
+	end
+	local copy = {}
+	for key, item in value do
+		copy[key] = if key == "Size" then item else moved(item, dx, dz)
+	end
+	return copy
+end
+
+local PLACEMENTS = { "Primitives", "Loot", "Entrances", "Hazards" }
+local composedCache: { [any]: { [string]: Layout } } = setmetatable({}, { __mode = "k" }) :: any
+
+-- The layout a definition makes with a choice: the frame, the chosen crossing and each
+-- slot's chosen room, as one layout (the same table each time for the same choice).
+function Layouts.compose(def: any, choice: Choice?): Layout
+	if not def.Crossings and not def.Slots then
+		return def -- a plain layout
+	end
+	local pickChoice = choice or Layouts.decode(def, nil)
+	local key = Layouts.encode(pickChoice)
+	local cache = composedCache[def]
+	if not cache then
+		cache = {}
+		composedCache[def] = cache
+	end
+	if cache[key] then
+		return cache[key]
+	end
+	local layout: any = { Name = def.Name, FadeEvery = def.FadeEvery }
+	for _, field in PLACEMENTS do
+		layout[field] = {}
+	end
+	local function add(part: any, dx: number, dz: number)
+		for _, field in PLACEMENTS do
+			for _, item in part[field] or {} do
+				table.insert(layout[field], if dx == 0 and dz == 0 then item else moved(item, dx, dz))
+			end
+		end
+	end
+	add(def, 0, 0)
+	if def.Crossings and def.Crossings[pickChoice.Crossing] then
+		add(def.Crossings[pickChoice.Crossing], 0, 0)
+	end
+	for index, slot in def.Slots or {} do
+		local room = slot.Rooms and slot.Rooms[pickChoice.Rooms[index] or 1]
+		if room then
+			add(room, slot.At[1], slot.At[2])
+		end
+	end
+	for _, field in { "Loot", "Entrances", "Hazards" } do
+		if #layout[field] == 0 then
+			layout[field] = nil
+		end
+	end
+	cache[key] = layout
+	return layout
+end
+
+-- Every way a definition can come out that tools/tests should check: each crossing (with
+-- every slot's first room), then each other room of each slot (with the first crossing).
+-- Every room joins the frame, not a crossing, so checking each on its own covers every mix.
+function Layouts.options(def: any): { { Label: string, Choice: Choice } }
+	local crossings, slots = Layouts.shape(def)
+	local function first(): Choice
+		local rooms = {}
+		for index in slots do
+			rooms[index] = 1
+		end
+		return { Crossing = 1, Rooms = rooms }
+	end
+	local list = {}
+	for crossing = 1, crossings do
+		local choice = first()
+		choice.Crossing = crossing
+		local name = def.Crossings and def.Crossings[crossing] and def.Crossings[crossing].Name
+		table.insert(list, {
+			Label = if crossings > 1
+				then "crossing " .. crossing .. (if name then " (" .. name .. ")" else "")
+				else "",
+			Choice = choice,
+		})
+	end
+	for index, count in slots do
+		for room = 2, count do
+			local choice = first()
+			choice.Rooms[index] = room
+			local slot = def.Slots[index]
+			local name = slot.Rooms[room].Name
+			table.insert(list, {
+				Label = "slot " .. (slot.Name or index) .. " room " .. room .. (if name
+					then " (" .. name .. ")"
+					else ""),
+				Choice = choice,
+			})
+		end
+	end
+	return list
+end
+
+-- Every layout, for tools/tests: { Source, Zone, Layout, Def, Choice } for each way each
+-- definition can come out (Layouts.options) in each zone it can appear in.
+function Layouts.all(
+	includePlanned: boolean?
+): { { Source: string, Zone: number, Layout: Layout, Def: any, Choice: Choice } }
 	local list = {}
 	local zones = Config.Beach.ActiveZones
+	local function addOptions(source: string, zone: number, def: any)
+		for _, option in Layouts.options(def) do
+			table.insert(list, {
+				Source = source .. (if option.Label ~= "" then " " .. option.Label else ""),
+				Zone = zone,
+				Layout = Layouts.compose(def, option.Choice),
+				Def = def,
+				Choice = option.Choice,
+			})
+		end
+	end
 	for zone = 1, zones do
 		local base = data().base[zone]
 		if base then
-			table.insert(list, { Source = "Zones/Zone" .. zone, Zone = zone, Layout = base })
+			addOptions("Zones/Zone" .. zone, zone, base)
 		end
 	end
 	local function addAll(set, prefix)
@@ -174,9 +356,9 @@ function Layouts.all(includePlanned: boolean?): { { Source: string, Zone: number
 		table.sort(ids)
 		for _, id in ids do
 			for zone = 1, zones do
-				local layout = pick(set[id], zone)
-				if layout then
-					table.insert(list, { Source = prefix .. id, Zone = zone, Layout = layout })
+				local def = pick(set[id], zone)
+				if def then
+					addOptions(prefix .. id, zone, def)
 				end
 			end
 		end
@@ -190,39 +372,89 @@ end
 
 -- Which layout is active ------------------------------------------------------------------
 
-local overrides: { [number]: Layout | false } = {}
+local overrides: { [number]: { def: any, choice: Choice? } | false } = {}
 
--- For tools/tests: force a tile's layout. Pass a layout, a biome id, "Base" for the base
--- layout, false for flat ground, or nil to go back to following the tile's biome. Names are
--- looked up for the tile's own zone, or for `zone` when given (to try any zone's layouts on
--- any tile: they only meet their neighbours at the shared ramp anchors).
-function Layouts.setActive(tile: number, layout: Layout | string | boolean | nil, zone: number?)
-	local forZone = zone or zoneOfTile(tile)
-	if layout == nil then
-		overrides[tile] = nil
-	elseif layout == false then
-		overrides[tile] = false
-	elseif layout == "Base" then
-		overrides[tile] = Layouts.base(forZone) or false
-	elseif type(layout) == "string" then
-		overrides[tile] = Layouts.forBiome(layout, forZone)
-			or Layouts.forPlanned(layout, forZone)
-			or Layouts.base(forZone)
-			or false
-	else
-		overrides[tile] = layout :: Layout
-	end
+-- The Workspace attribute holding a tile's choice.
+function Layouts.attributeFor(tile: number): string
+	return "TileLayout" .. tile
 end
 
--- The layout shaping a tile right now (nil: flat).
-function Layouts.active(tile: number): Layout?
+-- The definition shaping a tile right now (nil: flat), from its biome or its zone.
+function Layouts.activeDef(tile: number): any
 	local forced = overrides[tile]
 	if forced ~= nil then
-		return forced or nil
+		return forced and forced.def or nil
 	end
 	local zone = zoneOfTile(tile)
 	local biome = Biomes.activeIn(tile)
 	return (biome and Layouts.forBiome(biome.Id, zone)) or Layouts.base(zone)
+end
+
+-- For tools/tests: force a tile's layout. Pass a layout or definition, a biome id, "Base" for
+-- the zone's own, false for flat ground, or nil to go back to following the tile's biome and
+-- rolled choice. Names are looked up for the tile's own zone, or for `zone` when given (to
+-- try any zone's layouts on any tile). `choice` picks the crossing and rooms (default: the
+-- first of each).
+function Layouts.setActive(tile: number, layout: any, zone: number?, choice: Choice?)
+	local forZone = zone or zoneOfTile(tile)
+	local def
+	if layout == nil then
+		overrides[tile] = nil
+		return
+	elseif layout == false then
+		overrides[tile] = false
+		return
+	elseif layout == "Base" then
+		def = Layouts.base(forZone)
+	elseif type(layout) == "string" then
+		def = Layouts.forBiome(layout, forZone)
+			or Layouts.forPlanned(layout, forZone)
+			or Layouts.base(forZone)
+	else
+		def = layout
+	end
+	overrides[tile] = if def then { def = def, choice = choice } else false
+end
+
+-- The choice in force on a tile (its rolled one, or the one forced by setActive).
+function Layouts.activeChoice(tile: number): Choice?
+	local def = Layouts.activeDef(tile)
+	if not def then
+		return nil
+	end
+	local forced = overrides[tile]
+	if forced and forced.choice then
+		return Layouts.decode(def, Layouts.encode(forced.choice))
+	elseif forced then
+		return Layouts.decode(def, nil)
+	end
+	return Layouts.decode(def, Workspace:GetAttribute(Layouts.attributeFor(tile)))
+end
+
+-- The layout shaping a tile right now (nil: flat). Asked for at every point of the ground,
+-- so it's kept until the tile's definition or its choice changes.
+local activeCache: { [number]: { def: any, text: any, forced: any, layout: Layout } } = {}
+
+function Layouts.active(tile: number): Layout?
+	local def = Layouts.activeDef(tile)
+	if not def then
+		return nil
+	end
+	local forced = overrides[tile]
+	local text = if forced then nil else Workspace:GetAttribute(Layouts.attributeFor(tile))
+	local cached = activeCache[tile]
+	if cached and cached.def == def and cached.text == text and cached.forced == forced then
+		return cached.layout
+	end
+	local layout = Layouts.compose(def, Layouts.activeChoice(tile))
+	activeCache[tile] = { def = def, text = text, forced = forced, layout = layout }
+	return layout
+end
+
+-- Old layouts repeated down a zone fade out at each old tile edge (Layouts/Tiled).
+function Layouts.fadeEvery(tile: number): number?
+	local layout = Layouts.active(tile)
+	return layout and (layout :: any).FadeEvery
 end
 
 -- Compiling -----------------------------------------------------------------------------------
@@ -521,6 +753,7 @@ function Layouts.problems(layout: any): { string }
 			and key ~= "Loot"
 			and key ~= "Entrances"
 			and key ~= "Hazards"
+			and key ~= "FadeEvery"
 		then
 			add(layout.Name .. ": unknown field " .. tostring(key))
 		end
@@ -646,10 +879,88 @@ function Layouts.problems(layout: any): { string }
 	return problems
 end
 
+-- What's wrong with a zone's definition itself (its crossings and slots), as messages. Each
+-- way it can come out is a layout, checked with Layouts.problems.
+function Layouts.defProblems(def: any, where: string): { string }
+	local problems = {}
+	local function add(message: string)
+		table.insert(problems, where .. ": " .. message)
+	end
+	if type(def) ~= "table" or type(def.Name) ~= "string" then
+		add("needs a Name")
+		return problems
+	end
+	for key in def do
+		if
+			not table.find(
+				{ "Name", "Primitives", "Loot", "Entrances", "Hazards", "Crossings", "Slots", "FadeEvery" },
+				key
+			)
+		then
+			add("unknown field " .. tostring(key))
+		end
+	end
+	if def.Crossings ~= nil and (type(def.Crossings) ~= "table" or #def.Crossings == 0) then
+		add("Crossings must be a list of layouts")
+	end
+	for index, crossing in def.Crossings or {} do
+		if type(crossing) ~= "table" or type(crossing.Primitives) ~= "table" then
+			add("crossing " .. index .. " needs Primitives")
+		end
+	end
+	for index, slot in def.Slots or {} do
+		local name = "slot " .. tostring(slot.Name or index)
+		if not isPoint(slot.At) or not isPoint(slot.Size) or slot.Size[1] <= 0 or slot.Size[2] <= 0 then
+			add(name .. ": needs At = {x, z} and Size = {w, d}")
+			continue
+		end
+		if type(slot.Rooms) ~= "table" or #slot.Rooms == 0 then
+			add(name .. ": needs Rooms")
+			continue
+		end
+		local w, d = slot.Size[1], slot.Size[2]
+		for roomIndex, room in slot.Rooms do
+			local roomName = name .. " room " .. roomIndex
+			if type(room) ~= "table" or type(room.Primitives) ~= "table" then
+				add(roomName .. ": needs Primitives")
+				continue
+			end
+			-- Everything in a room stays inside its slot (shapes by their middle lines).
+			local function inside(point: any): boolean
+				return point[1] >= 0 and point[1] <= w and point[2] >= 0 and point[2] <= d
+			end
+			for _, field in PLACEMENTS do
+				for itemIndex, item in room[field] or {} do
+					local points = {}
+					if isPoint(item) then
+						table.insert(points, item)
+					end
+					if type(item) == "table" and isPoint(item.At) then
+						table.insert(points, item.At)
+					end
+					if type(item) == "table" and type(item.Path) == "table" then
+						for _, point in item.Path do
+							table.insert(points, point)
+						end
+					end
+					for _, point in points do
+						if isPoint(point) and not inside(point) then
+							add(roomName .. " " .. field .. " " .. itemIndex .. ": outside its slot")
+							break
+						end
+					end
+				end
+			end
+		end
+	end
+	return problems
+end
+
 -- For tools/tests.
 function Layouts._reset()
 	loaded = nil
 	overrides = {}
+	activeCache = {}
 end
 
 return Layouts

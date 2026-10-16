@@ -42,8 +42,9 @@ function Beach.zoneRange(index: number): (number, number)
 	return (index - 1) * beach.ZoneLength, index * beach.ZoneLength
 end
 
--- Tiles: each zone is TilesPerZone tiles deep. A tile is the unit of the ground's layouts and
--- of biomes. Tiles are numbered from 1 at the shop end to ActiveTiles.
+-- Tiles: each zone is TilesPerZone tiles deep (one: a tile is a whole zone). A tile is the unit
+-- of the ground's layouts and of biomes. Tiles are numbered from 1 at the shop end to
+-- ActiveTiles.
 Beach.ActiveTiles = beach.ActiveZones * beach.TilesPerZone
 
 -- Tile index for a Z position (nil outside zones 1 to ActiveZones).
@@ -97,6 +98,11 @@ function Beach.shapeAt(x: number, z: number): (number, boolean)
 	end
 	local fade = math.clamp((Beach.HalfWidth + shape.CliffReach - math.abs(x)) / shape.EdgeFade, 0, 1)
 		* math.clamp(math.min(z - z0, z1 - z) / shape.ZoneFade, 0, 1)
+	local every = Layouts.fadeEvery(tile)
+	if every then
+		local local_ = (z - z0) % every
+		fade *= math.clamp(math.min(local_, every - local_) / shape.ZoneFade, 0, 1)
+	end
 	for _, pool in Beach.Pools or {} do
 		local d = math.sqrt((x - pool.X) ^ 2 + (z - pool.Z) ^ 2)
 		fade *= math.clamp((d - pool.Radius) / 8, 0, 1)

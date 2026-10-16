@@ -15,8 +15,15 @@ local roblox = h.roblox
 local failures = 0
 local passed = 0
 
+local SLOW = 5 -- seconds: a test slower than this says so
+
 local function test(name: string, fn: () -> ())
+	local started = os.clock()
 	local ok, err = pcall(fn)
+	local took = os.clock() - started
+	if took > SLOW then
+		print(string.format("SLOW  %s (%.0fs)", name, took))
+	end
 	if ok then
 		passed += 1
 	else
@@ -410,8 +417,7 @@ test("water stops at solid things, passes under decks, and shelters behind rocks
 	local Layouts = h.require("Shared/Layouts")
 	WaterObstacles._clear()
 	-- On open sand: no layout shapes in the way.
-	Layouts.setActive(2, false)
-	Layouts.setActive(3, false)
+	Layouts.setActive(1, false)
 	local function part(shape, size, cf, kind)
 		local p = Harness.wrap(roblox.Instance.new("Part"))
 		p.Shape = roblox.Enum.PartType[shape]
@@ -441,8 +447,7 @@ test("water stops at solid things, passes under decks, and shelters behind rocks
 	assert(WaterObstacles.sheltered(-100, sea - 10, Beach.waterY(line)), "behind the boulder is sheltered")
 	assert(not WaterObstacles.sheltered(-100, sea + 10, Beach.waterY(line)), "seaward of it is not")
 	WaterObstacles._clear()
-	Layouts.setActive(2, nil)
-	Layouts.setActive(3, nil)
+	Layouts.setActive(1, nil)
 end)
 
 test("every layout is well formed", function()
@@ -611,7 +616,7 @@ test("the terrain voxels follow the ground", function()
 	local TerrainBuilder = h.require("Server/TerrainBuilder")
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
-	Layouts.setActive(3, false) -- on the plain slope
+	Layouts.setActive(1, false) -- on the plain slope
 	local lo = roblox.Vector3.new(0, -40, 0)
 	local hi = roblox.Vector3.new(8, 12, 0)
 	local z0, z1 = 440, 448
@@ -628,7 +633,7 @@ test("the terrain voxels follow the ground", function()
 		"voxels reach the ground height " .. h .. ", got " .. (lo.Y + filled)
 	)
 	assert(materials[1][1][1] ~= roblox.Enum.Material.Air, "the bottom is solid")
-	Layouts.setActive(3, nil)
+	Layouts.setActive(1, nil)
 end)
 
 test("waves run up and slide back", function()
@@ -1179,8 +1184,9 @@ local function poolsOnZone(Beach, zone: number)
 end
 local LAYOUT_COLS = 84 -- grid columns either side of X = 0 (336 studs)
 local LAYOUT_UNITS = 6 -- zones tested, one tile each (Config.Beach.ActiveZones)
-local LAYOUT_END = LAYOUT_UNITS * 152 - 8 -- the seaward end of the last tested tile
-local LAYOUT_ROWS = { -1, LAYOUT_UNITS * 152 / LAYOUT_GRID - 1 } -- z = -4 (the shop side) onward
+local LAYOUT_LENGTH = 608 -- Config.Beach.TileLength: a tile is a zone
+local LAYOUT_END = LAYOUT_UNITS * LAYOUT_LENGTH - 8 -- the seaward end of the last zone
+local LAYOUT_ROWS = { -1, LAYOUT_UNITS * LAYOUT_LENGTH / LAYOUT_GRID - 1 } -- z = -4 (the shop side) onward
 local layoutGridCache = nil
 
 local function layoutKey(ix: number, iz: number): number
@@ -1214,17 +1220,28 @@ local function layoutGrid()
 		end
 		grid.options[zone] = {}
 		for _, name in names do
-			Layouts.setActive(zone, name, zone)
-			local heights = {}
-			for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
-				if grid.zoneOfRow[iz] == zone then
-					for ix = -LAYOUT_COLS, LAYOUT_COLS do
-						heights[layoutKey(ix, iz)] = Beach.groundAt(ix * LAYOUT_GRID, iz * LAYOUT_GRID)
+			-- Each way the zone can come out: each crossing, each room of each slot.
+			local def = if name == "Base" then Layouts.base(zone) else Layouts.forBiome(name, zone)
+			for _, way in Layouts.options(def) do
+				Layouts.setActive(zone, name, zone, way.Choice)
+				local heights = {}
+				for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
+					if grid.zoneOfRow[iz] == zone then
+						for ix = -LAYOUT_COLS, LAYOUT_COLS do
+							heights[layoutKey(ix, iz)] = Beach.groundAt(ix * LAYOUT_GRID, iz * LAYOUT_GRID)
+						end
 					end
 				end
+				table.insert(grid.options[zone], {
+					name = name .. (if way.Label ~= "" then " " .. way.Label else ""),
+					id = name,
+					biome = if name ~= "Base" then name else nil,
+					choice = way.Choice,
+					heights = heights,
+					every = Layouts.fadeEvery(zone),
+				})
+				Layouts.setActive(zone, nil)
 			end
-			table.insert(grid.options[zone], { name = name, heights = heights })
-			Layouts.setActive(zone, nil)
 		end
 	end
 	layoutGridCache = grid
@@ -1289,6 +1306,43 @@ local function layoutFlood(grid, choice, slope: number)
 	return seen
 end
 
+-- Whether a route can cross one zone's option from its top row to its bottom row, starting
+-- anywhere along the top (the zones meet along a flat strip, so that's enough to join up).
+local function layoutCrossesZone(grid, zone: number, option, slope: number): boolean
+	local rows = {}
+	for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
+		if grid.zoneOfRow[iz] == zone then
+			table.insert(rows, iz)
+		end
+	end
+	local top, bottom = rows[1], rows[#rows]
+	local seen, queue, head = {}, {}, 1
+	for ix = -LAYOUT_COLS, LAYOUT_COLS do
+		seen[layoutKey(ix, top)] = true
+		table.insert(queue, { ix, top })
+	end
+	while head <= #queue do
+		local ix, iz = queue[head][1], queue[head][2]
+		head += 1
+		if iz == bottom then
+			return true
+		end
+		local y = option.heights[layoutKey(ix, iz)]
+		for _, step in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local nx, nz = ix + step[1], iz + step[2]
+			local k = layoutKey(nx, nz)
+			if math.abs(nx) <= LAYOUT_COLS and nz >= top and nz <= bottom and not seen[k] then
+				local ny = option.heights[k]
+				if ny and math.abs(ny - y) <= slope * LAYOUT_GRID then
+					seen[k] = true
+					table.insert(queue, { nx, nz })
+				end
+			end
+		end
+	end
+	return false
+end
+
 -- Whether a flood reaches a point (x, z) of the beach, within one grid cell.
 local function layoutReaches(seen, x: number, z: number): boolean
 	local ix, iz = math.floor(x / LAYOUT_GRID + 0.5), math.floor(z / LAYOUT_GRID + 0.5)
@@ -1311,6 +1365,10 @@ local function layoutRoute(grid, zone: number, option, startIx: number, slope: n
 		end
 	end
 	local top, bottom = rows[1], rows[#rows]
+	if option.every then
+		-- A layout drawn for the old 152-stud tiles repeats down the zone: cross one repeat.
+		bottom = math.min(bottom, top + math.floor(option.every / LAYOUT_GRID) - 2)
+	end
 	local dist = { [layoutKey(startIx, top)] = 0 }
 	local queue, head = { { startIx, top } }, 1
 	while head <= #queue do
@@ -1341,6 +1399,11 @@ local function layoutHidden(zone: number): number
 	local Beach = h.require("Shared/Beach")
 	local Config = h.require("Shared/Config")
 	local z0, z1 = Beach.tileRange(zone)
+	-- A layout drawn for the old 152-stud tiles repeats down the zone: judge one repeat.
+	local every = h.require("Shared/Layouts").fadeEvery(zone)
+	if every then
+		z1 = z0 + every
+	end
 	local eye = Config.Beach.Terrain.EyeHeight
 	local eyes = {}
 	for _, x in { -320, -240, -160, -80, 0, 80, 160, 240, 320 } do
@@ -1467,7 +1530,7 @@ test("a player on foot can reach every biome's entrance spot in every zone it ro
 		local seen = nil
 		for zone = 1, Config.Beach.ActiveZones do
 			local option = grid.options[zone][choice[zone]]
-			local biome = Biomes.List[option.name]
+			local biome = option.biome and Biomes.List[option.biome]
 			if biome then
 				seen = seen or layoutFlood(grid, choice, Config.Beach.Terrain.FootSlope)
 				local zStart = Beach.tileRange(zone)
@@ -1515,7 +1578,7 @@ test("zone 1 is readable from the top, and zones 2 to 4 hide their lower half", 
 	local problems = {}
 	for zone = 1, Config.Beach.ActiveZones do
 		for _, option in grid.options[zone] do
-			Layouts.setActive(zone, option.name, zone)
+			Layouts.setActive(zone, option.id, zone, option.choice)
 			local hidden = layoutHidden(zone)
 			Layouts.setActive(zone, nil)
 			if zone == 1 and hidden > 0.2 then
@@ -1586,7 +1649,7 @@ test("the pier's path and every entrance spot are clear of shapes", function()
 	local problems = {}
 	for zone = 1, 4 do
 		for _, option in grid.options[zone] do
-			Layouts.setActive(zone, option.name, zone)
+			Layouts.setActive(zone, option.id, zone, option.choice)
 			local zStart = Beach.tileRange(zone)
 			if zone == 2 then
 				-- The pier runs along x = 40 over the first two tiles of zone 2: the whole way
@@ -1598,7 +1661,7 @@ test("the pier's path and every entrance spot are clear of shapes", function()
 					end
 				end
 			end
-			local biome = Biomes.List[option.name]
+			local biome = option.biome and Biomes.List[option.biome]
 			if biome then
 				for _, x in biome.EntranceSpots or {} do
 					if Beach.feature(x, zStart + 30) ~= 0 then
@@ -1669,12 +1732,15 @@ test("each planned draft reaches the sea, has shortcuts, and keeps the sightline
 	local cfg = Config.Beach.Terrain
 	local grid = layoutGrid()
 	local problems = {}
+	local checkedDrafts = {} -- a zone without its own draft uses the one above: check it once
 	for zone = 1, Config.Beach.ActiveZones do
 		for id in Biomes.Planned do
-			if Layouts.forPlanned(id, zone) then
+			local def = Layouts.forPlanned(id, zone)
+			if def and not checkedDrafts[def] then
+				checkedDrafts[def] = true
 				-- This zone takes the draft; every other zone keeps its base layout.
 				Layouts.setActive(zone, id, zone)
-				local option = { name = id, heights = {} }
+				local option = { name = id, heights = {}, every = Layouts.fadeEvery(zone) }
 				for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
 					if grid.zoneOfRow[iz] == zone then
 						for ix = -LAYOUT_COLS, LAYOUT_COLS do
@@ -1686,17 +1752,12 @@ test("each planned draft reaches the sea, has shortcuts, and keeps the sightline
 				local hidden = layoutHidden(zone)
 				Layouts.setActive(zone, nil)
 				local label = id .. " (zone " .. zone .. ")"
-				local byZone = { options = {}, zoneOfRow = grid.zoneOfRow, shop = grid.shop }
-				local choice = {}
-				for other = 1, Config.Beach.ActiveZones do
-					byZone.options[other] = if other == zone then { option } else { grid.options[other][1] }
-					choice[other] = 1
+				local byZone = { zoneOfRow = grid.zoneOfRow }
+				if not layoutCrossesZone(byZone, zone, option, cfg.CartSlope) then
+					table.insert(problems, label .. ": a cart can't cross it")
 				end
-				if not layoutReaches(layoutFlood(byZone, choice, cfg.CartSlope), 0, LAYOUT_END) then
-					table.insert(problems, label .. ": a cart can't reach the sea")
-				end
-				if not layoutReaches(layoutFlood(byZone, choice, cfg.FootSlope), 0, LAYOUT_END) then
-					table.insert(problems, label .. ": a player on foot can't reach the sea")
+				if not layoutCrossesZone(byZone, zone, option, cfg.FootSlope) then
+					table.insert(problems, label .. ": a player on foot can't cross it")
 				end
 				local count = 0
 				for _, x in { -300, -150, 0, 150, 300 } do
@@ -1817,7 +1878,7 @@ test("walls get an invisible barrier inside them, open where a ramp cuts through
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
 	local WallBarriers = h.require("Server/WallBarriers")
-	local tile = 14
+	local tile = 4
 	local z0 = Beach.tileRange(tile)
 	Layouts.setActive(tile, {
 		Name = "walled",
@@ -1849,7 +1910,7 @@ test("scenery only stands on level ground, not across walls or under roofs", fun
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
 	local GroundShift = h.require("Server/GroundShift")
-	local tile = 14
+	local tile = 4
 	local z0 = Beach.tileRange(tile)
 	local function prop(x: number, z: number): Part
 		local part = Harness.wrap(roblox.Instance.new("Part"))
@@ -1886,7 +1947,7 @@ test("the tide leaves finds at the layouts' loot spots, once each tide", functio
 	local Layouts = h.require("Shared/Layouts")
 	local Tide = h.require("Shared/Tide")
 	local ItemService = h.require("Server/ItemService")
-	local tile = 14
+	local tile = 4
 	local z0 = Beach.tileRange(tile)
 	Layouts.setActive(tile, {
 		Name = "spotted",
@@ -1963,11 +2024,92 @@ test("each zone looks its own, darker and foggier all the way down, and biomes o
 	workspace:SetAttribute(Biomes.attributeFor(deepTile :: number), nil)
 end)
 
+test("a zone is a frame, one of its crossings and a room in each slot, rolled each tide", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local BiomeService = h.require("Server/BiomeService")
+	local wall = function(z)
+		return { Kind = "Wall", Path = { { -300, z }, { 300, z } }, Height = 16, Width = 12 }
+	end
+	local def = {
+		Name = "test zone",
+		Primitives = { wall(100) },
+		Loot = { { At = { 0, 50 }, Radius = 6 } },
+		Crossings = {
+			{ Name = "left", Primitives = { { Kind = "Flat", At = { -200, 100 }, Radius = 12 } } },
+			{ Name = "right", Primitives = { { Kind = "Flat", At = { 200, 100 }, Radius = 12 } } },
+		},
+		Slots = {
+			{
+				Name = "pocket",
+				At = { 100, 300 },
+				Size = { 80, 60 },
+				Rooms = {
+					{ Name = "empty", Primitives = {} },
+					{
+						Name = "boulder",
+						Primitives = {
+							{ Kind = "Mound", At = { 40, 30 }, Radius = 10, Height = 6, Rock = true },
+						},
+						Loot = { { At = { 10, 10 }, Radius = 4, Weight = 3 } },
+					},
+				},
+			},
+		},
+	}
+	assert(#Layouts.defProblems(def, "test") == 0, table.concat(Layouts.defProblems(def, "test"), "; "))
+	local crossings, slots = Layouts.shape(def)
+	assert(crossings == 2 and #slots == 1 and slots[1] == 2, "two crossings, one slot of two rooms")
+	assert(Layouts.encode({ Crossing = 2, Rooms = { 1 } }) == "2:1", "a choice as text")
+	local decoded = Layouts.decode(def, "2:2")
+	assert(decoded.Crossing == 2 and decoded.Rooms[1] == 2, "and back")
+	local clamped = Layouts.decode(def, "9:7")
+	assert(clamped.Crossing == 1 and clamped.Rooms[1] == 1, "out of range falls back to the first")
+
+	local composed = Layouts.compose(def, { Crossing = 2, Rooms = { 2 } })
+	assert(
+		composed == Layouts.compose(def, { Crossing = 2, Rooms = { 2 } }),
+		"the same choice, the same layout"
+	)
+	assert(#composed.Primitives == 3, "frame, crossing and room")
+	local mound = composed.Primitives[3]
+	assert(mound.At[1] == 140 and mound.At[2] == 330, "the room is moved into its slot")
+	assert(#composed.Loot == 2 and composed.Loot[2].At[1] == 110, "with its loot")
+	assert(#Layouts.problems(composed) == 0, "a well formed layout")
+	assert(#Layouts.options(def) == 3, "two crossings, then the other room")
+
+	local bad = table.clone(def)
+	bad.Slots =
+		{ { Name = "x", At = { 0, 0 }, Size = { 20, 20 }, Rooms = { { Primitives = { wall(30) } } } } }
+	assert(#Layouts.defProblems(bad, "bad") > 0, "a room reaching out of its slot is a problem")
+
+	-- On a tile: following its rolled choice.
+	local tile = 4
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, def, nil, { Crossing = 1, Rooms = { 1 } })
+	assert(Beach.feature(-200, z0 + 100) == 0 and Beach.feature(200, z0 + 100) > 10, "the left way is open")
+	Layouts.setActive(tile, def, nil, { Crossing = 2, Rooms = { 2 } })
+	assert(Beach.feature(200, z0 + 100) == 0 and Beach.feature(-200, z0 + 100) > 10, "then the right way")
+	assert(Beach.feature(140, z0 + 330) > 5, "and the boulder room")
+	Layouts.setActive(tile, nil)
+
+	-- The server rolls a choice with each biome.
+	BiomeService.set(tile, nil)
+	local text = h.game.Workspace:GetAttribute(Layouts.attributeFor(tile))
+	assert(type(text) == "string" and string.match(text, "^%d+:"), "a rolled choice, got " .. tostring(text))
+	BiomeService.set(tile, nil, "1:")
+	assert(
+		h.game.Workspace:GetAttribute(Layouts.attributeFor(tile))
+			== Layouts.encode(Layouts.decode(Layouts.activeDef(tile), "1:")),
+		"or a given one"
+	)
+end)
+
 test("roofs make caves: rock overhead, the floor still the ground", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
 	local TerrainBuilder = h.require("Server/TerrainBuilder")
-	local tile = 15
+	local tile = 4
 	local z0 = Beach.tileRange(tile)
 	Layouts.setActive(tile, {
 		Name = "tunnel",
@@ -2091,7 +2233,7 @@ test("layouts place loot, entrances and hazards", function()
 		},
 	}
 	assert(#Layouts.problems(layout) == 0, table.concat(Layouts.problems(layout), "; "))
-	local tile = 7
+	local tile = 2
 	local z0 = Beach.tileRange(tile)
 	Layouts.setActive(tile, layout)
 	local loot = Layouts.lootSpots(tile, z0)

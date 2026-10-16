@@ -4,9 +4,10 @@
 	builds it: real terrain, real props and biomes, real raycasts and real pathfinding.
 
 	run.py puts the job in front of this script as JOB_JSON:
-	  { zone = 4, tiles = { ["13"] = "HermitHollows", ... }, tides = { 1800, 2100 }, routes = true }
-	A tile's entry is "Base", a biome id, or a layout module path under Layouts
-	("Biomes/Planned/TidepoolRocks", "Zones/Zone5"); tiles of the zone not named keep "Base".
+	  { zone = 4, all = "HermitHollows", choice = "2:1,3", tides = { 1800, 2100 }, routes = true }
+	`all` is "Base", a biome id, or a layout module path under Layouts
+	("Biomes/Planned/TidepoolRocks", "Zones/Zone5"). `choice` picks the crossing and rooms
+	(Layouts.encode: "crossing:room,room,..."; default the first of each). A tile is a zone.
 
 	It returns a report (JSON): problems (things that are wrong) and measurements.
 ]]
@@ -55,10 +56,10 @@ local function findLayout(path: string): any
 		assert(node, "no layout module at Layouts/" .. path)
 	end
 	local value = require(node :: ModuleScript)
-	if value.Primitives then
+	if value.Primitives or value.Crossings or value.Slots then
 		return value
 	end
-	-- A table of layouts by zone: the nearest at or above this zone.
+	-- A table of definitions by zone: the nearest at or above this zone.
 	for index = zone, 1, -1 do
 		if value[index] then
 			return value[index]
@@ -72,23 +73,26 @@ require(Server.BeachBuilder).build()
 local HazardService = require(Server.HazardService)
 local BiomeService = require(Server.BiomeService)
 BiomeService.init(function() end, function() end)
--- Everything plain, then this zone's tiles as asked.
+-- Everything plain (first crossing and rooms), then this zone as asked.
 for tile = 1, Beach.ActiveTiles do
-	BiomeService.set(tile, nil)
+	BiomeService.set(tile, nil, "1:")
 end
 local TerrainBuilder = require(Server.TerrainBuilder)
 local tileSpecs = {}
 for tile = firstTile, firstTile + perZone - 1 do
 	local spec = (JOB.tiles and JOB.tiles[tostring(tile)]) or JOB.all or "Base"
 	tileSpecs[tostring(tile)] = spec
+	local choice = JOB.choice or "1:"
 	if spec == "Base" then
-		continue
+		BiomeService.set(tile, nil, choice)
 	elseif require(Shared.Biomes).List[spec] then
-		BiomeService.set(tile, spec)
+		BiomeService.set(tile, spec, choice)
 	else
-		Layouts.setActive(tile, findLayout(spec))
+		local def = findLayout(spec)
+		Layouts.setActive(tile, def, nil, Layouts.decode(def, choice))
 		TerrainBuilder.buildTile(tile)
 	end
+	report.measurements.choice = Layouts.encode(Layouts.activeChoice(tile) or { Crossing = 1, Rooms = {} })
 end
 report.measurements.tiles = tileSpecs
 task.wait(3) -- terrain collision catches up with the voxels

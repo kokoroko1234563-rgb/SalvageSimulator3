@@ -25,10 +25,10 @@ Config.Admins = {
 Config.Beach = {
 	Width = 720, -- studs along the shoreline
 	-- Studs each tile runs out to sea: a multiple of the terrain's 4-stud cells, so every tile
-	-- lines up with them and a layout comes out the same on any tile. (Layouts are drawn from
-	-- z 0 to 150; the last 2 studs are part of the flat strip where tiles meet.)
-	TileLength = 152,
-	TilesPerZone = 4,
+	-- lines up with them. A tile is a whole zone: the unit of the ground's layouts and of
+	-- biomes (a biome takes the whole zone).
+	TileLength = 608,
+	TilesPerZone = 1,
 	ZoneLength = 608, -- TileLength * TilesPerZone
 	ActiveZones = 6, -- zones 1-6, then the Far Sandbar's channel
 	ShopDepth = 80, -- dry ground behind Z = 0 for the shop and boardwalk

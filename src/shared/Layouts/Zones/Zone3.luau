@@ -1,6 +1,6 @@
 -- Zone 3, Banks (base layout): a bank across the zone with gaps for the fords. The fords are cut
 -- below the sand, so they flood as the waterline comes in, the seaward ones first.
-return {
+local tileLayout = {
 	Name = "Banks (base)",
 	Primitives = {
 		{
@@ -30,3 +30,6 @@ return {
 		{ Kind = "Flat", At = { 40, 70 }, Radius = 9 },
 	},
 }
+
+-- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
+return require(script.Parent.Parent.Tiled)(tileLayout)
