@@ -84,17 +84,17 @@ end
 -- there) and around rock pools.
 local shape = beach.Terrain
 
-function Beach.shapeAt(x: number, z: number): (number, boolean)
+function Beach.shapeAt(x: number, z: number): (number, boolean, string?)
 	local tile = Beach.tileAt(z)
 	if not tile then
-		return 0, false
+		return 0, false, nil
 	end
 	local z0, z1 = Beach.tileRange(tile)
 	-- Past the sides, the shape at the edge carries on out to the cliffs.
 	local edgeX = math.clamp(x, -Beach.HalfWidth, Beach.HalfWidth)
-	local height, rock = Layouts.shapeAt(tile, edgeX, z - z0)
+	local height, rock, material = Layouts.shapeAt(tile, edgeX, z - z0)
 	if height == 0 then
-		return 0, false
+		return 0, false, nil
 	end
 	local fade = math.clamp((Beach.HalfWidth + shape.CliffReach - math.abs(x)) / shape.EdgeFade, 0, 1)
 		* math.clamp(math.min(z - z0, z1 - z) / shape.ZoneFade, 0, 1)
@@ -108,7 +108,16 @@ function Beach.shapeAt(x: number, z: number): (number, boolean)
 		fade *= math.clamp((d - pool.Radius) / 8, 0, 1)
 	end
 	fade = fade * fade * (3 - 2 * fade)
-	return height * fade, rock and height * fade > shape.RockMin
+	return height * fade, rock and height * fade > shape.RockMin, material
+end
+
+-- The ground material a layout paints at a point (a Paint, see Layouts), or nil.
+function Beach.paintAt(x: number, z: number): string?
+	local tile = Beach.tileAt(z)
+	if not tile then
+		return nil
+	end
+	return Layouts.paintAt(tile, x, z - Beach.tileRange(tile))
 end
 
 function Beach.feature(x: number, z: number): number
@@ -122,18 +131,18 @@ end
 
 -- The roof over a point (a cave or tunnel in the tile's layout): the world height of its
 -- underside and its top, or nil where it's open to the sky.
-function Beach.roofAt(x: number, z: number): (number?, number?)
+function Beach.roofAt(x: number, z: number): (number?, number?, string?)
 	local tile = Beach.tileAt(z)
 	if not tile then
-		return nil, nil
+		return nil, nil, nil
 	end
 	local z0 = Beach.tileRange(tile)
-	local bottom, top = Layouts.roofAt(tile, x, z - z0)
+	local bottom, top, material = Layouts.roofAt(tile, x, z - z0)
 	if not bottom then
-		return nil, nil
+		return nil, nil, nil
 	end
 	local slope = Beach.groundY(z)
-	return slope + bottom, slope + (top :: number)
+	return slope + bottom, slope + (top :: number), material
 end
 
 -- Where a downward ray looking for the ground under `position` should start: `above` studs

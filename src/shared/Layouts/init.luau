@@ -26,6 +26,14 @@
 --   Hollow  { At = {x, z}, Radius, Depth }                  a round dip (a pool)
 --   Ramp    { Path = {{x, z}, ...}, Width }                 a cart route: the bare slope
 --   Flat    { At = {x, z}, Radius }                         clears the shape to the slope
+--   Paint   { Path + Width | At + Radius | Area, Material } the ground's material only (mud,
+--                                                           shingle, weed), no shape
+-- Any outline: Wall, Ridge, Roof, Hollow, Flat and Paint can take an Area instead: a polygon,
+-- { {x, z}, {x, z}, {x, z}, ... } (a Ridge or Hollow slopes in over Width, default 8 studs).
+-- Worn edges: Rough = studs (up to Config.Beach.Terrain.MaxRough) makes a shape's edge wobble
+-- in and out, so it looks eroded rather than drawn; its middle stays as it is.
+-- Materials: Material = a terrain material from Config.Looks.Materials ("Basalt", "Mud") makes
+-- a shape (or a Roof, or a cut's floor) of that instead of the zone's own (see Looks).
 -- Raised shapes take the highest, cuts the lowest, and the two add. Ramps and Flats apply
 -- last and blend into the ground around them over Config.Beach.Terrain.Blend studs. Rock
 -- shapes have steeper faces and are built from rock. Beach.feature adds the fades at the
@@ -64,16 +72,59 @@ export type Primitive = {
 }
 export type Layout = { Name: string, Primitives: { Primitive } }
 
+-- Each kind's fields: true = required, false = optional. Shapes that can be an Area (a
+-- polygon) take it instead of their Path or At (checked in Layouts.problems).
 Layouts.Kinds = {
-	Ridge = { Path = true, Height = true, Width = true, Rock = false },
-	Wall = { Path = true, Height = true, Width = true },
-	Roof = { Path = false, Width = false, At = false, Radius = false, Clearance = true, Thickness = true },
-	Mound = { At = true, Radius = true, Height = true, Rock = false },
-	Channel = { Path = true, Depth = true, Width = true },
-	Hollow = { At = true, Radius = true, Depth = true },
+	Ridge = {
+		Path = false,
+		Area = false,
+		Height = true,
+		Width = false,
+		Rock = false,
+		Rough = false,
+		Material = false,
+	},
+	Wall = { Path = false, Area = false, Height = true, Width = false, Rough = false, Material = false },
+	Roof = {
+		Path = false,
+		Width = false,
+		At = false,
+		Radius = false,
+		Area = false,
+		Clearance = true,
+		Thickness = true,
+		Rough = false,
+		Material = false,
+	},
+	Mound = { At = true, Radius = true, Height = true, Rock = false, Rough = false, Material = false },
+	Channel = { Path = true, Depth = true, Width = true, Rough = false, Material = false },
+	Hollow = { At = false, Radius = false, Area = false, Depth = true, Rough = false, Material = false },
 	Ramp = { Path = true, Width = true },
-	Flat = { At = true, Radius = true },
+	Flat = { At = false, Radius = false, Area = false, Rough = false },
+	Paint = {
+		Path = false,
+		Width = false,
+		At = false,
+		Radius = false,
+		Area = false,
+		Material = true,
+		Rough = false,
+	},
 }
+
+-- Which shapes each kind can take: a Path (with Width), an At (with Radius), or an Area.
+local SHAPES = {
+	Ridge = { Path = true, Area = true },
+	Wall = { Path = true, Area = true },
+	Roof = { Path = true, At = true, Area = true },
+	Mound = { At = true },
+	Channel = { Path = true },
+	Hollow = { At = true, Area = true },
+	Ramp = { Path = true },
+	Flat = { At = true, Area = true },
+	Paint = { Path = true, At = true, Area = true },
+}
+local AREA_EDGE = 8 -- studs over which an Area ridge or hollow slopes in from its edge
 
 local CELL = 16 -- the lookup grid: each cell lists the primitives that reach it
 
@@ -464,9 +515,11 @@ type Compiled = {
 	cuts: { any },
 	masks: { any },
 	roofs: { any },
-	cells: { [number]: { raised: { any }, cuts: { any }, masks: { any }, roofs: { any } } },
+	paints: { any },
+	cells: { [number]: { raised: { any }, cuts: { any }, masks: { any }, roofs: { any }, paints: { any } } },
 	count: number,
 	roofCount: number,
+	paintCount: number,
 }
 
 local compiled: { [Layout]: Compiled } = setmetatable({}, { __mode = "k" }) :: any
@@ -492,12 +545,30 @@ local function compile(layout: Layout): Compiled
 	if result then
 		return result
 	end
-	local c: Compiled =
-		{ raised = {}, cuts = {}, masks = {}, roofs = {}, cells = {}, count = 0, roofCount = 0 }
+	local c: Compiled = {
+		raised = {},
+		cuts = {},
+		masks = {},
+		roofs = {},
+		paints = {},
+		cells = {},
+		count = 0,
+		roofCount = 0,
+		paintCount = 0,
+	}
 	for _, p in layout.Primitives do
-		local entry: any = { kind = p.Kind, rock = p.Rock == true }
+		local entry: any =
+			{ kind = p.Kind, rock = p.Rock == true, rough = p.Rough or 0, material = p.Material }
 		local reach: number
-		if p.Path then
+		if p.Area then
+			-- A polygon: its edges as segments; the edge distance is signed (see edgeOf).
+			local path = table.clone(p.Area)
+			table.insert(path, p.Area[1])
+			entry.segments = segmentsOf(path)
+			entry.polygon = p.Area
+			entry.half = 0
+			entry.band = if p.Kind == "Ridge" or p.Kind == "Hollow" then p.Width or AREA_EDGE else 0
+		elseif p.Path then
 			entry.segments = segmentsOf(p.Path)
 			entry.half = (p.Width or 0) / 2
 		else
@@ -505,6 +576,7 @@ local function compile(layout: Layout): Compiled
 			entry.segments = { { at[1], at[2], at[1], at[2] } }
 			entry.half = p.Radius or 0
 		end
+		entry.band = entry.band or entry.half
 		local list
 		if p.Kind == "Roof" then
 			entry.clearance = p.Clearance or 0
@@ -526,11 +598,15 @@ local function compile(layout: Layout): Compiled
 			entry.amount = p.Depth or 0
 			reach = entry.half
 			list = c.cuts
+		elseif p.Kind == "Paint" then
+			reach = entry.half
+			list = c.paints
 		else
 			reach = entry.half + cfg.Blend
 			list = c.masks
 		end
-		if list and entry.half > 0 then
+		reach += entry.rough
+		if list and (entry.half > 0 or entry.polygon) then
 			table.insert(list, entry)
 			local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
 			for _, s in entry.segments do
@@ -543,13 +619,14 @@ local function compile(layout: Layout): Compiled
 				then "raised"
 				elseif list == c.cuts then "cuts"
 				elseif list == c.roofs then "roofs"
+				elseif list == c.paints then "paints"
 				else "masks"
 			for cx = math.floor((minX - reach) / CELL), math.floor((maxX + reach) / CELL) do
 				for cz = math.floor((minZ - reach) / CELL), math.floor((maxZ + reach) / CELL) do
 					local key = cellKey(cx, cz)
 					local cell = c.cells[key]
 					if not cell then
-						cell = { raised = {}, cuts = {}, masks = {}, roofs = {} }
+						cell = { raised = {}, cuts = {}, masks = {}, roofs = {}, paints = {} }
 						c.cells[key] = cell
 					end
 					table.insert(cell[bucket], entry)
@@ -557,6 +634,8 @@ local function compile(layout: Layout): Compiled
 			end
 			if list == c.roofs then
 				c.roofCount += 1 -- a roof isn't ground: the floor under it is
+			elseif list == c.paints then
+				c.paintCount += 1 -- paint only changes what the ground is made of
 			else
 				c.count += 1
 			end
@@ -588,6 +667,52 @@ end
 -- A smooth bank: 1 at the centre, 0 at the edge. Rock has a flatter top and steeper faces.
 -- A wall's sides go from its foot to its full height over this many studs (the terrain's own
 -- cells soften that a little), far steeper than anyone can climb.
+-- Whether (x, z) is inside a polygon (even-odd rule).
+local function insidePolygon(points: { Point }, x: number, z: number): boolean
+	local inside = false
+	local j = #points
+	for i = 1, #points do
+		local a, b = points[i], points[j]
+		if (a[2] > z) ~= (b[2] > z) and x < (b[1] - a[1]) * (z - a[2]) / (b[2] - a[2]) + a[1] then
+			inside = not inside
+		end
+		j = i
+	end
+	return inside
+end
+
+-- Smooth noise from -1 to 1 over the ground, the same everywhere the game runs: wobbles a
+-- Rough shape's edge so it looks worn rather than drawn.
+local ROUGH_SCALE = 9 -- studs between the wobbles' peaks, roughly
+local function hash(ix: number, iz: number): number
+	local h = math.sin(ix * 127.1 + iz * 311.7) * 43758.5453
+	return (h - math.floor(h)) * 2 - 1
+end
+local function noise(x: number, z: number): number
+	local function layer(scale: number): number
+		local fx, fz = x / scale, z / scale
+		local ix, iz = math.floor(fx), math.floor(fz)
+		local tx, tz = fx - ix, fz - iz
+		tx, tz = tx * tx * (3 - 2 * tx), tz * tz * (3 - 2 * tz)
+		local a = hash(ix, iz) + (hash(ix + 1, iz) - hash(ix, iz)) * tx
+		local b = hash(ix, iz + 1) + (hash(ix + 1, iz + 1) - hash(ix, iz + 1)) * tx
+		return a + (b - a) * tz
+	end
+	return layer(ROUGH_SCALE) * 0.7 + layer(ROUGH_SCALE / 2.7) * 0.3
+end
+
+-- How far (x, z) is outside a primitive's edge: negative inside it. For a Path or At shape,
+-- the distance from its middle less its half width; for an Area, the distance to its
+-- outline, negative inside. A Rough shape's edge wobbles in and out by up to Rough studs.
+local function edgeOf(p: any, x: number, z: number): number
+	local d = distance(p.segments, x, z)
+	local e = if p.polygon then (if insidePolygon(p.polygon, x, z) then -d else d) else d - p.half
+	if p.rough > 0 then
+		e += p.rough * noise(x, z)
+	end
+	return e
+end
+
 local WALL_EDGE = 1.5
 
 local function profile(t: number, rock: boolean): number
@@ -607,47 +732,78 @@ local function smoothstep(t: number): number
 	return t * t * (3 - 2 * t)
 end
 
--- A layout's shape at (x, local z): the height above the slope, and whether it's rock.
-function Layouts.evaluate(layout: Layout, x: number, z: number): (number, boolean)
+-- A layout's shape at (x, local z): the height above the slope, whether it's rock, and the
+-- material the shape asks for there (nil: the zone's own, see Looks).
+function Layouts.evaluate(layout: Layout, x: number, z: number): (number, boolean, string?)
 	local c = compile(layout)
 	local cell = c.cells[cellKey(math.floor(x / CELL), math.floor(z / CELL))]
 	if not cell then
-		return 0, false
+		return 0, false, nil
 	end
-	local up, rock = 0, false
+	local up, rock, upMaterial = 0, false, nil
 	for _, p in cell.raised do
-		local d = distance(p.segments, x, z)
+		local e = edgeOf(p, x, z)
 		local v = if p.wall
-			then p.amount * math.clamp((p.half - d) / WALL_EDGE, 0, 1)
-			else p.amount * profile(d / p.half, p.rock)
+			then p.amount * math.clamp(-e / WALL_EDGE, 0, 1)
+			else p.amount * profile((e + p.band) / p.band, p.rock)
 		if v > up then
-			up, rock = v, p.rock
+			up, rock, upMaterial = v, p.rock, p.material
 		end
 	end
-	local down = 0
+	local down, downMaterial = 0, nil
 	for _, p in cell.cuts do
-		local v = p.amount * profile(distance(p.segments, x, z) / p.half, false)
+		local v = p.amount * profile((edgeOf(p, x, z) + p.band) / p.band, false)
 		if v > down then
-			down = v
+			down, downMaterial = v, p.material
 		end
 	end
 	local mask = 1
 	for _, p in cell.masks do
-		local k = smoothstep((distance(p.segments, x, z) - p.half) / cfg.Blend)
+		local k = smoothstep(edgeOf(p, x, z) / cfg.Blend)
 		if k < mask then
 			mask = k
 		end
 	end
-	return (up - down) * mask, rock and up * mask > cfg.RockMin
+	local height = (up - down) * mask
+	local material = if up * mask > 0.5 and up >= down
+		then upMaterial
+		elseif down * mask > 0.5 then downMaterial
+		else nil
+	return height, rock and up * mask > cfg.RockMin, material
+end
+
+-- The ground material a layout paints at (x, local z), or nil: the last Paint covering it.
+function Layouts.paintIn(layout: Layout, x: number, z: number): string?
+	local c = compile(layout)
+	if c.paintCount == 0 then
+		return nil
+	end
+	local cell = c.cells[cellKey(math.floor(x / CELL), math.floor(z / CELL))]
+	if not cell then
+		return nil
+	end
+	local material = nil
+	for _, p in cell.paints do
+		if edgeOf(p, x, z) <= 0 then
+			material = p.material
+		end
+	end
+	return material
 end
 
 -- The active layout's shape on a tile at (x, local z).
-function Layouts.shapeAt(tile: number, x: number, z: number): (number, boolean)
+function Layouts.shapeAt(tile: number, x: number, z: number): (number, boolean, string?)
 	local layout = Layouts.active(tile)
 	if not layout then
-		return 0, false
+		return 0, false, nil
 	end
 	return Layouts.evaluate(layout, x, z)
+end
+
+-- The ground material the active layout paints on a tile at (x, local z), or nil.
+function Layouts.paintAt(tile: number, x: number, z: number): string?
+	local layout = Layouts.active(tile)
+	return layout and Layouts.paintIn(layout, x, z)
 end
 
 -- Whether a tile has any shape right now.
@@ -657,30 +813,31 @@ function Layouts.isShaped(tile: number): boolean
 end
 
 -- A layout's roof over (x, local z): its underside and top, in studs over the slope, or nil.
-function Layouts.roofIn(layout: Layout, x: number, z: number): (number?, number?)
+function Layouts.roofIn(layout: Layout, x: number, z: number): (number?, number?, string?)
 	local c = compile(layout)
 	if c.roofCount == 0 then
-		return nil, nil
+		return nil, nil, nil
 	end
 	local cell = c.cells[cellKey(math.floor(x / CELL), math.floor(z / CELL))]
 	if not cell then
-		return nil, nil
+		return nil, nil, nil
 	end
-	local bottom, top = nil, nil
+	local bottom, top, material = nil, nil, nil
 	for _, p in cell.roofs do
-		if distance(p.segments, x, z) <= p.half then
+		if edgeOf(p, x, z) <= 0 then
 			bottom = if bottom then math.min(bottom, p.clearance) else p.clearance
 			top = if top then math.max(top, p.clearance + p.thickness) else p.clearance + p.thickness
+			material = material or p.material
 		end
 	end
-	return bottom, top
+	return bottom, top, material
 end
 
 -- The active roof on a tile at (x, local z).
-function Layouts.roofAt(tile: number, x: number, z: number): (number?, number?)
+function Layouts.roofAt(tile: number, x: number, z: number): (number?, number?, string?)
 	local layout = Layouts.active(tile)
 	if not layout then
-		return nil, nil
+		return nil, nil, nil
 	end
 	return Layouts.roofIn(layout, x, z)
 end
@@ -834,6 +991,22 @@ function Layouts.problems(layout: any): { string }
 				if type(value) ~= "boolean" then
 					add(where .. ": Rock is true or false")
 				end
+			elseif key == "Area" then
+				local ok = type(value) == "table" and #value >= 3
+				for _, point in (if ok then value else {}) do
+					ok = ok and isPoint(point)
+				end
+				if not ok then
+					add(where .. ": Area is a list of at least three {x, z} points")
+				end
+			elseif key == "Material" then
+				if type(value) ~= "string" or not Config.Looks.Materials[value] then
+					add(where .. ": Material " .. tostring(value) .. " isn't in Config.Looks.Materials")
+				end
+			elseif key == "Rough" then
+				if type(value) ~= "number" or value < 0 or value > cfg.MaxRough then
+					add(where .. ": Rough is 0 to Config.Beach.Terrain.MaxRough studs")
+				end
 			elseif type(value) ~= "number" or value <= 0 then
 				add(where .. ": " .. key .. " must be a positive number")
 			end
@@ -843,12 +1016,29 @@ function Layouts.problems(layout: any): { string }
 				add(where .. " (" .. p.Kind .. "): needs " .. key)
 			end
 		end
-		if p.Kind == "Roof" then
-			local path = p.Path ~= nil and p.Width ~= nil and p.At == nil and p.Radius == nil
-			local area = p.At ~= nil and p.Radius ~= nil and p.Path == nil and p.Width == nil
-			if not path and not area then
-				add(where .. " (Roof): needs either Path and Width, or At and Radius")
+		-- Its shape: exactly one of a Path (with Width, where the kind needs one), an At (with
+		-- Radius) or an Area.
+		local shapes = SHAPES[p.Kind]
+		local given = {}
+		for _, shape in { "Path", "At", "Area" } do
+			if p[shape] ~= nil then
+				table.insert(given, shape)
 			end
+		end
+		if #given ~= 1 or not shapes[given[1]] then
+			local allowed = {}
+			for _, shape in { "Path", "At", "Area" } do
+				if shapes[shape] then
+					table.insert(allowed, shape)
+				end
+			end
+			add(where .. " (" .. p.Kind .. "): needs one of " .. table.concat(allowed, ", "))
+		elseif given[1] == "Path" and p.Width == nil then
+			add(where .. " (" .. p.Kind .. "): a Path needs a Width")
+		elseif given[1] == "At" and p.Radius == nil then
+			add(where .. " (" .. p.Kind .. "): an At needs a Radius")
+		end
+		if p.Kind == "Roof" then
 			if type(p.Thickness) == "number" and p.Thickness < cfg.RoofMinThickness then
 				add(where .. ": a Roof must be at least Config.Beach.Terrain.RoofMinThickness thick")
 			end

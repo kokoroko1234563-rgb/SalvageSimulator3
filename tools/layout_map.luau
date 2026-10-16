@@ -382,7 +382,12 @@ local function floodOrder(layout, zone: number): { string }
 	for _, p in layout.Primitives do
 		if p.Kind == "Channel" or p.Kind == "Hollow" then
 			-- A channel floods from its seaward end, so test the point furthest out.
-			local point = if p.Path then p.Path[1] else p.At
+			local point = if p.Path then p.Path[1] elseif p.At then p.At else p.Area[1]
+			for _, q in p.Area or {} do
+				if q[2] > point[2] then
+					point = q
+				end
+			end
 			for _, q in p.Path or {} do
 				if q[2] > point[2] then
 					point = q

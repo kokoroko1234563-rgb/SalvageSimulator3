@@ -36,26 +36,26 @@ local AROUND = { { DRAWN_BIGGER, 0 }, { -DRAWN_BIGGER, 0 }, { 0, DRAWN_BIGGER },
 
 -- The layout's shape at (x, z) with the solid shrunk sideways by DRAWN_BIGGER (the lowest it
 -- is within that distance: walls get narrower, channels wider), and whether it's rock.
-local function shrunkShape(x: number, z: number): (number, boolean)
-	local height, rock = Beach.shapeAt(x, z)
+local function shrunkShape(x: number, z: number): (number, boolean, string?)
+	local height, rock, material = Beach.shapeAt(x, z)
 	for _, offset in AROUND do
 		local h = Beach.shapeAt(x + offset[1], z + offset[2])
 		if h < height then
 			height = h
 		end
 	end
-	return height, rock
+	return height, rock, material
 end
 
 -- The roof over (x, z), shrunk sideways the same way: only where there's roof all round.
-local function shrunkRoof(x: number, z: number): (number?, number?)
-	local bottom, top = Beach.roofAt(x, z)
+local function shrunkRoof(x: number, z: number): (number?, number?, string?)
+	local bottom, top, material = Beach.roofAt(x, z)
 	if not bottom then
-		return nil, nil
+		return nil, nil, nil
 	end
 	for _, offset in AROUND do
 		if not Beach.roofAt(x + offset[1], z + offset[2]) then
-			return nil, nil
+			return nil, nil, nil
 		end
 	end
 	return bottom, top
@@ -90,11 +90,18 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 		end
 		for iz = 1, nz do
 			local z = z0 + (iz - 0.5) * VOXEL
-			local height, rock = shrunkShape(x, z)
+			local height, rock, shapeMaterial = shrunkShape(x, z)
 			local h = Beach.groundY(z) + height - DRAWN_BIGGER
 			local floorMaterial, rockMaterial = materialAt(x, z)
-			local material = if rock then rockMaterial else floorMaterial
-			local roofBottom, roofTop = shrunkRoof(x, z)
+			-- A shape's own material, else a Paint's on the ground, else the zone's (Looks).
+			local paint = Beach.paintAt(x, z)
+			local material = if shapeMaterial
+				then (Enum.Material :: any)[shapeMaterial]
+				elseif rock then rockMaterial
+				elseif paint then (Enum.Material :: any)[paint]
+				else floorMaterial
+			local roofBottom, roofTop, roofMaterial = shrunkRoof(x, z)
+			local roofRock = if roofMaterial then (Enum.Material :: any)[roofMaterial] else rockMaterial
 			for iy = 1, ny do
 				local bottom = lo.Y + (iy - 1) * VOXEL
 				local fill = math.clamp((h - bottom) / VOXEL, 0, 1)
@@ -108,7 +115,7 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 						- math.max(roofBottom + DRAWN_BIGGER, bottom)
 					local roof = math.clamp(overlap / VOXEL, 0, 1)
 					if roof > ox[iy][iz] then
-						mx[iy][iz] = rockMaterial
+						mx[iy][iz] = roofRock
 						ox[iy][iz] = roof
 					end
 				end

@@ -62,6 +62,7 @@ Config.Beach = {
 		MaxHeight = 12, -- the tallest a layout shape can be (but a Wall)
 		WallMaxHeight = 24, -- the tallest a Wall can be: well over a jump (about 7 studs)
 		WallMinWidth = 12, -- the thinnest a Wall can be: thinner ones get rounded off by the terrain's 4-stud cells
+		MaxRough = 8, -- the most a Rough shape's edge may wobble in or out (studs)
 		RoofMinClearance = 8, -- the lowest a Roof's underside can be over the slope (room to walk)
 		RoofMaxTop = 32, -- the highest a Roof's top can be over the slope
 		RoofMinThickness = 6, -- (thinner roofs get holes: the terrain is built in 4-stud cells)

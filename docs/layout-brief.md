@@ -122,6 +122,16 @@ return {
 | `Hollow` | `At`, `Radius`, `Depth` | a round dip, a pool |
 | `Ramp` | `Path`, `Width` | the cart route: bare slope, cleared through everything |
 | `Flat` | `At`, `Radius` | cleared back to bare slope, through everything |
+| `Paint` | a shape, `Material` | the ground's material only (mud, shingle, weed), no shape |
+
+- **Any outline:** `Wall`, `Ridge`, `Roof`, `Hollow`, `Flat` and `Paint` can take an
+  `Area = { {x, z}, {x, z}, {x, z}, ... }` (a polygon) instead of a Path or At. Use it for rock
+  masses, rectangular roofs that sit exactly on their walls, irregular chambers.
+- **Worn edges:** `Rough = 4` makes a shape's edge wobble in and out by up to 4 studs (at
+  most 8) so it looks eroded, not drawn; its middle stays put.
+- **Materials:** `Material = "Basalt"` makes a shape (a roof, a cut's floor, a Paint) of that
+  terrain material instead of the zone's own. The choices and their colours are in
+  `Config.Looks.Materials`.
 
 Placements: `Loot = { { At = {x, z}, Radius = 6, Weight = 1 }, ... }` (finds settle there once
 each tide as the sea leaves them dry; Weight raises both the chance and the rarity),

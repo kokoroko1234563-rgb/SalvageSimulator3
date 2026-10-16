@@ -17,6 +17,8 @@ local STEP = 2 -- studs between the points along a wall that are checked
 local INSET = 2 -- studs narrower than the wall on each side
 local ABOVE = 9 -- studs above the wall's top (a jump reaches about 7)
 local STANDING = 0.6 -- a stretch of wall counts while it stands this share of its height
+local AREA_IN = 4 -- studs inside an Area wall's edge its slabs run
+local AREA_THICKNESS = 4
 
 local function folderFor(tile: number): Folder
 	local root = Workspace:FindFirstChild("WallBarriers")
@@ -48,10 +50,45 @@ function WallBarriers.slabsFor(tile: number): { { cframe: CFrame, size: Vector3 
 		if p.Kind ~= "Wall" then
 			continue
 		end
-		local thickness = math.max(p.Width - 2 * INSET, 2)
-		for i = 1, #p.Path - 1 do
-			local a = Vector3.new(p.Path[i][1], 0, z0 + p.Path[i][2])
-			local b = Vector3.new(p.Path[i + 1][1], 0, z0 + p.Path[i + 1][2])
+		-- The lines the slabs run along: a Path wall's middle line; an Area wall's edges, moved
+		-- in by AREA_IN (a slab down each side, inside the rock).
+		local runs = {}
+		if p.Area then
+			local area = p.Area
+			local cx, cz = 0, 0
+			for _, point in area do
+				cx += point[1] / #area
+				cz += point[2] / #area
+			end
+			for i = 1, #area do
+				local a, b = area[i], area[i % #area + 1]
+				local along = Vector3.new(b[1] - a[1], 0, b[2] - a[2])
+				if along.Magnitude < 0.1 then
+					continue
+				end
+				local normal = Vector3.new(-along.Z, 0, along.X).Unit
+				local middle = Vector3.new((a[1] + b[1]) / 2, 0, (a[2] + b[2]) / 2)
+				if (Vector3.new(cx, 0, cz) - middle):Dot(normal) < 0 then
+					normal = -normal
+				end
+				local inset = normal * AREA_IN
+				table.insert(runs, {
+					Vector3.new(a[1], 0, z0 + a[2]) + inset,
+					Vector3.new(b[1], 0, z0 + b[2]) + inset,
+					AREA_THICKNESS,
+				})
+			end
+		else
+			for i = 1, #p.Path - 1 do
+				table.insert(runs, {
+					Vector3.new(p.Path[i][1], 0, z0 + p.Path[i][2]),
+					Vector3.new(p.Path[i + 1][1], 0, z0 + p.Path[i + 1][2]),
+					math.max(p.Width - 2 * INSET, 2),
+				})
+			end
+		end
+		for _, run in runs do
+			local a, b, thickness = run[1], run[2], run[3]
 			-- A wall that reaches the beach's side carries on into the cliff (Beach.shapeAt), and
 			-- so does its barrier.
 			local reach = Beach.HalfWidth - 0.5

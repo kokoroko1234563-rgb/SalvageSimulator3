@@ -2219,6 +2219,87 @@ test("the review place says where you are: zone, crossing, slot and room", funct
 	Layouts.setActive(tile, nil)
 end)
 
+test("shapes can be any outline, worn at the edges, and made of their own materials", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local WallBarriers = h.require("Server/WallBarriers")
+	local tile = 4
+	local z0 = Beach.tileRange(tile)
+	local layout = {
+		Name = "outlines",
+		Primitives = {
+			-- An L-shaped block of basalt.
+			{
+				Kind = "Wall",
+				Area = {
+					{ -200, 100 },
+					{ -100, 100 },
+					{ -100, 140 },
+					{ -160, 140 },
+					{ -160, 220 },
+					{ -200, 220 },
+				},
+				Height = 20,
+				Material = "Basalt",
+			},
+			-- A worn wall.
+			{ Kind = "Wall", Path = { { 50, 300 }, { 250, 300 } }, Width = 16, Height = 18, Rough = 4 },
+			-- A rectangular roof, and a patch of mud.
+			{
+				Kind = "Roof",
+				Area = { { 100, 400 }, { 200, 400 }, { 200, 460 }, { 100, 460 } },
+				Clearance = 10,
+				Thickness = 6,
+				Material = "Slate",
+			},
+			{ Kind = "Paint", Area = { { -50, 400 }, { 50, 400 }, { 0, 480 } }, Material = "Mud", Rough = 3 },
+		},
+	}
+	local problems = Layouts.problems(layout)
+	assert(#problems == 0, table.concat(problems, "; "))
+	Layouts.setActive(tile, layout)
+	local height, rock, material = Beach.shapeAt(-180, z0 + 200)
+	assert(
+		math.abs(height - 20) < 0.01 and rock and material == "Basalt",
+		"inside the L: full height, basalt"
+	)
+	assert(Beach.feature(-130, z0 + 200) == 0, "outside the L's corner: open ground")
+	-- The worn wall stands full height down its middle, but its edge wanders.
+	local edges = {}
+	for x = 60, 240, 6 do
+		assert(math.abs(Beach.feature(x, z0 + 300) - 18) < 0.01, "full height down the middle")
+		for dz = 0, 14, 0.5 do
+			if Beach.feature(x, z0 + 300 + dz) < 9 then
+				edges[dz] = true
+				break
+			end
+		end
+	end
+	local count = 0
+	for _ in edges do
+		count += 1
+	end
+	assert(count >= 3, "a worn edge isn't a straight line")
+	local bottom, top, roofMaterial = Beach.roofAt(150, z0 + 430)
+	assert(bottom and top and roofMaterial == "Slate", "a rectangular roof, of slate")
+	assert(Beach.roofAt(205, z0 + 430) == nil, "with square sides")
+	assert(
+		Beach.paintAt(0, z0 + 420) == "Mud" and Beach.feature(0, z0 + 420) == 0,
+		"mud painted on flat ground"
+	)
+	assert(Beach.paintAt(0, z0 + 300) == nil, "and nowhere else")
+	assert(#WallBarriers.slabsFor(tile) > 2, "barriers inside the outlined wall too")
+	local bad = {
+		Name = "bad",
+		Primitives = {
+			{ Kind = "Paint", At = { 0, 0 }, Radius = 5, Material = "Lava" },
+			{ Kind = "Wall", Height = 10, Area = { { 0, 0 }, { 1, 1 } } },
+		},
+	}
+	assert(#Layouts.problems(bad) >= 2, "unknown materials and two-point areas are problems")
+	Layouts.setActive(tile, nil)
+end)
+
 test("roofs make caves: rock overhead, the floor still the ground", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")

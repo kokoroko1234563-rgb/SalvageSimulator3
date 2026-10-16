@@ -223,8 +223,8 @@ do
 		local layout = Layouts.active(tile)
 		local z0 = Beach.tileRange(tile)
 		for _, p in (layout and layout.Primitives) or {} do
-			if p.Kind ~= "Wall" then
-				continue
+			if p.Kind ~= "Wall" or not p.Path then
+				continue -- (an Area wall has no single width to measure)
 			end
 			for i = 1, #p.Path - 1 do
 				for _, t in { 0.3, 0.7 } do
