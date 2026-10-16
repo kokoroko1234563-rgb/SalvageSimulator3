@@ -27,8 +27,8 @@ local GroundShift = {}
 -- scenery on the beach.
 local SKIP = { Shop = true, RockPools = true, MapEdge = true, BiomeShowcase = true }
 
-local LEVEL = 1.2 -- studs a prop's footprint may rise or fall from its middle and still stand
-local MARGIN = 2 -- studs past a prop's footprint that are checked too
+local LEVEL = 1 -- studs a prop's footprint may rise or fall from its middle and still stand
+local MARGIN = 4 -- studs past a prop's footprint that are checked too (a terrain cell)
 
 type Record = { target: Instance, x: number, z: number, before: number, player: boolean? }
 
