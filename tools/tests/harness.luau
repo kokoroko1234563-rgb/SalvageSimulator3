@@ -39,7 +39,10 @@ local stubs = {
 		-- Lune has no world, so a model's position is only read back, never moved.
 		PivotTo = function() end,
 		GetPivot = function()
-			return CFrame.new()
+			return roblox.CFrame.new()
+		end,
+		GetBoundingBox = function()
+			return roblox.CFrame.new(), roblox.Vector3.zero
 		end,
 	},
 	Workspace = {
@@ -174,7 +177,16 @@ function Harness.wrap(real)
 			end
 			if type(value) == "function" then
 				return function(_, ...)
-					return Harness.wrap(value(real, unwrapAll(...)))
+					local result = value(real, unwrapAll(...))
+					-- Lists of instances (GetChildren, GetDescendants) come back wrapped too.
+					if type(result) == "table" and not realOf[result] and typeof(result[1]) == "Instance" then
+						local list = table.create(#result)
+						for i, item in result do
+							list[i] = Harness.wrap(item)
+						end
+						return list
+					end
+					return Harness.wrap(result)
 				end
 			end
 			return Harness.wrap(value)

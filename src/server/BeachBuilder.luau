@@ -19,6 +19,7 @@ local MapParts = require(script.Parent.MapParts)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local BiomeModels = require(script.Parent.BiomeModels)
 local Cosmetics = require(script.Parent.Cosmetics)
+local GroundShift = require(script.Parent.GroundShift)
 local MapEdge = require(script.Parent.MapEdge)
 local ZoneProps = require(script.Parent.ZoneProps)
 
@@ -429,6 +430,8 @@ function BeachBuilder.build(): Folder
 	BiomeModels.showcase(map)
 	MapEdge.build(map)
 	Cosmetics.build(map)
+	-- The scenery was placed for open sand; put away what lands on the layouts' walls and caves.
+	GroundShift.tidy(map)
 
 	map.Parent = Workspace
 	return map

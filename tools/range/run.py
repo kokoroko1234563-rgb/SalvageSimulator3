@@ -115,7 +115,7 @@ def summarise(report):
         lines.append(f"  waterline z {tide['waterline']:.0f}: {tide['underWater'] * 100:.0f}% under water, "
                      f"{tide['tooDeep'] * 100:.0f}% too deep to stand"
                      + (f", {flooded * 100:.0f}% of tunnels flooded" if flooded is not None else ""))
-    problems = report["problems"]
+    problems = report["problems"] or {}  # an empty table comes back as []
     if not problems:
         lines.append("  no problems found")
     for kind, entry in problems.items():

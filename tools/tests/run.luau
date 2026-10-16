@@ -1845,6 +1845,41 @@ test("walls get an invisible barrier inside them, open where a ramp cuts through
 	WallBarriers.build(tile)
 end)
 
+test("scenery only stands on level ground, not across walls or under roofs", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local GroundShift = h.require("Server/GroundShift")
+	local tile = 14
+	local z0 = Beach.tileRange(tile)
+	local function prop(x: number, z: number): Part
+		local part = Harness.wrap(roblox.Instance.new("Part"))
+		part.Size = roblox.Vector3.new(4, 2, 4)
+		part.CFrame = roblox.CFrame.new(x, Beach.groundAt(x, z0 + z), z0 + z)
+		return part
+	end
+	Layouts.setActive(tile, false)
+	local scenery = Harness.wrap(roblox.Instance.new("Folder"))
+	local onEdge, open = prop(-60, 68), prop(-60, 20)
+	onEdge.Parent, open.Parent = scenery, scenery
+	Layouts.setActive(tile, {
+		Name = "walled",
+		Primitives = {
+			{ Kind = "Wall", Path = { { -150, 75 }, { 150, 75 } }, Height = 18, Width = 14 },
+			{ Kind = "Roof", At = { 100, 30 }, Radius = 20, Clearance = 10, Thickness = 6 },
+		},
+	})
+	assert(not GroundShift.fits(onEdge), "a prop across a wall's edge doesn't fit")
+	assert(GroundShift.fits(prop(-60, 75)), "one on its flat top does")
+	assert(not GroundShift.fits(prop(100, 30)), "nor one under a roof")
+	assert(GroundShift.fits(open), "a prop on open sand does")
+	assert(GroundShift.tidy(scenery) == 1, "tidy puts away the one across the wall")
+	assert(onEdge.Parent ~= scenery and open.Parent == scenery, "and leaves the other")
+	assert(GroundShift._away()[onEdge] == scenery, "remembering where it came from")
+	GroundShift.clearMisfits(scenery)
+	assert(open.Parent == scenery, "clearMisfits keeps what fits")
+	Layouts.setActive(tile, nil)
+end)
+
 test("roofs make caves: rock overhead, the floor still the ground", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")

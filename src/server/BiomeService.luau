@@ -249,6 +249,7 @@ function BiomeService.set(tile: number, biomeId: string?)
 		local startZ, endZ = Beach.tileRange(tile)
 		local decor = biome.Scenery and decorBuilders[biome.Scenery] or decorBuilders.Mounds
 		decor(tileFolder, biome, startZ, endZ)
+		GroundShift.clearMisfits(tileFolder)
 		if biome.Secret and biome.Entrance then
 			buildEntrance(tileFolder, biome, tile)
 		end
