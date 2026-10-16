@@ -1,137 +1,284 @@
--- Zone 6, The Drowned Reach (base layout): the deepest, slowest ground, a maze of tall rock
--- walls in three cells. Each outer cell holds a cart ramp that winds through three long
--- galleries, out to the cliffs and back. The middle cell is a tight maze of sunken lanes, the
--- quick way on foot, shut to carts by rubble. The ends of the galleries the ramps don't use
--- are dead ends, and the roofed ones by the cliffs hold the best finds. See
--- docs/layouts/Zone6.md.
+-- Zone 6, The Drowned Reach: the deepest, slowest ground on the beach, drawn as one 720 x 608
+-- piece. A maze of tall rock walls on a 40-stud grid (28-wide lanes between walls 12 wide and
+-- 24 high), cut into nine wards by four long walls with gates, and walled across its top and
+-- bottom edges. The frame is always there: the long walls and their gate candidates, the shells
+-- of seven side rooms, the roofed galleries round the two halls. Each tide one of five
+-- crossings is rolled: it shuts the gates it doesn't want, draws every other wall of the maze
+-- (a tree, so there is one way through, and dead ends everywhere), roofs some of its straights,
+-- digs some low lanes and pools, and winds a cart ramp along the way through. A few doorways
+-- are choked with rubble instead of walled: players scramble over them to cut a bend, carts
+-- can't. Each side room's pick fills its shell. See docs/layouts/Zone6.md.
 --
--- The ramps clear and blend the ground 15 studs either side of their centre lines, so the
--- walls beside a ramp keep about that far from it: the galleries' walls are 44 apart.
+-- The mazes are drawn as pictures (see `maze`): '+' is a grid node, '--' a wall between two
+-- lanes, '==' or '!' rubble, and a blank an opening. Row by row, a line of nodes, then a line
+-- of cells.
+
+local PITCH = 40 -- grid: lane centres 40 apart
+local X0, Z0 = -360, 8 -- the first node of the picture, in zone coordinates
+
 local function wall(path)
 	return { Kind = "Wall", Path = path, Height = 24, Width = 12 }
 end
 
--- Rock overhead, resting on the walls either side.
-local function roof(path, width)
-	return { Kind = "Roof", Path = path, Width = width, Clearance = 22, Thickness = 8 }
-end
-
--- A pile of rubble filling a gap in a wall: a scramble on foot, too steep for a cart.
+-- A pile of rubble filling a doorway: a scramble on foot, too steep for a cart.
 local function rubble(path)
 	return { Kind = "Ridge", Path = path, Height = 4, Width = 20 }
 end
 
--- A sunken lane floor: low ground that floods early.
-local function sunk(path)
+-- Rock overhead, resting on the walls either side of a lane.
+local function roof(path, width)
+	return { Kind = "Roof", Path = path, Width = width or 40, Clearance = 22, Thickness = 8 }
+end
+
+-- A pool: low ground that holds the sea from early in the flood.
+local function pool(x, z, radius)
+	return { Kind = "Hollow", At = { x, z }, Radius = radius or 12, Depth = 3 }
+end
+
+-- A sunk lane: floods before the ground round it.
+local function lane(path)
 	return { Kind = "Channel", Path = path, Depth = 2, Width = 12 }
 end
 
-local tileLayout = {
-	Name = "The Drowned Reach (base)",
-	Primitives = {
-		-- The west ramp cell (x -360 to -80): galleries at z 32, 74 and 116. The ramp comes
-		-- down at x -200, runs east to -104, back west the whole gallery to -330 by the
-		-- cliff, then east again to -200 and out.
-		wall({ { -360, 12 }, { -222, 12 } }),
-		wall({ { -178, 12 }, { -166, 12 } }),
-		wall({ { -138, 12 }, { -80, 12 } }),
-		wall({ { -360, 52 }, { -126, 52 } }),
-		wall({ { -310, 96 }, { -80, 96 } }),
-		wall({ { -360, 136 }, { -222, 136 } }),
-		wall({ { -178, 136 }, { -80, 136 } }),
-		wall({ { -80, 12 }, { -80, 136 } }),
+local function loot(x, z, weight)
+	return { At = { x, z }, Radius = 6, Weight = weight }
+end
 
-		-- The east ramp cell (x 60 to 360), the same the other way round: down at x 180, west
-		-- to 84, east to 310, west to 180 and out.
-		wall({ { 60, 12 }, { 118, 12 } }),
-		wall({ { 146, 12 }, { 154, 12 } }),
-		wall({ { 202, 12 }, { 360, 12 } }),
-		wall({ { 106, 52 }, { 360, 52 } }),
-		wall({ { 60, 96 }, { 290, 96 } }),
-		wall({ { 60, 136 }, { 158, 136 } }),
-		wall({ { 202, 136 }, { 360, 136 } }),
-		wall({ { 60, 12 }, { 60, 136 } }),
+-- Joins lists of shapes into one.
+local function merge(...)
+	local all = {}
+	for _, list in { ... } do
+		for _, item in list do
+			table.insert(all, item)
+		end
+	end
+	return all
+end
 
-		-- Rubble in a gap into each ramp cell's first gallery: a short cut on foot.
-		rubble({ { -166, 12 }, { -138, 12 } }),
-		rubble({ { 118, 12 }, { 146, 12 } }),
+-- Turns a maze picture into walls and rubble. The picture's top left node is at (x0, z0).
+-- Walls run between nodes and stop 6 studs short of them; a round post stands on every node
+-- a wall touches, so the walls meet exactly (a wall's face is 6 studs off its line) with no
+-- crack where two meet end to end. On the picture's left and right edges the posts also close
+-- the walls against the cliffs (the ground past the beach's sides carries on as it is at
+-- x = +-360, so a wall must be full height there).
+local function maze(art, x0, z0)
+	local list = {}
+	local h = (#art - 1) // 2
+	local _, nodes = string.gsub(art[1], "%+", "")
+	local w = nodes - 1
+	local posts = {}
+	local function post(i, j)
+		local key = i * 1000 + j
+		if not posts[key] then
+			posts[key] = true
+			table.insert(list, wall({ { x0 + PITCH * i, z0 + PITCH * j } }))
+		end
+	end
+	local function add(char, path)
+		table.insert(list, if char == "-" or char == "|" then wall(path) else rubble(path))
+	end
+	for j = 0, h do
+		local line = art[2 * j + 1]
+		local z = z0 + PITCH * j
+		local c = 0
+		while c < w do
+			local char = string.sub(line, 3 * c + 2, 3 * c + 2)
+			if char == "-" or char == "=" then
+				local last = c
+				while last + 1 < w and string.sub(line, 3 * (last + 1) + 2, 3 * (last + 1) + 2) == char do
+					last += 1
+				end
+				add(char, { { x0 + PITCH * c + 6, z }, { x0 + PITCH * (last + 1) - 6, z } })
+				if char == "-" then
+					for i = c, last + 1 do
+						post(i, j)
+					end
+				end
+				c = last + 1
+			else
+				c += 1
+			end
+		end
+	end
+	for i = 0, w do
+		local x = x0 + PITCH * i
+		local r = 0
+		while r < h do
+			local char = string.sub(art[2 * r + 2], 3 * i + 1, 3 * i + 1)
+			if char == "|" or char == "!" then
+				local last = r
+				while last + 1 < h and string.sub(art[2 * (last + 1) + 2], 3 * i + 1, 3 * i + 1) == char do
+					last += 1
+				end
+				add(char, { { x, z0 + PITCH * r + 6 }, { x, z0 + PITCH * (last + 1) - 6 } })
+				if char == "|" then
+					for j = r, last + 1 do
+						post(i, j)
+					end
+				end
+				r = last + 1
+			else
+				r += 1
+			end
+		end
+	end
+	return list
+end
 
-		-- The middle cell (x -74 to 54): five walls 28 apart, with gaps that swap sides
-		-- (x -60, then 32), so every lane is walked end to end. Its first and fourth gaps are
-		-- choked with rubble, so no cart gets in.
-		wall({ { -46, 20 }, { 60, 20 } }),
-		wall({ { -80, 48 }, { 18, 48 } }),
-		wall({ { 46, 48 }, { 60, 48 } }),
-		wall({ { -46, 76 }, { 60, 76 } }),
-		wall({ { -80, 104 }, { 18, 104 } }),
-		wall({ { 46, 104 }, { 60, 104 } }),
-		wall({ { -46, 132 }, { 60, 132 } }),
-		rubble({ { -74, 20 }, { -46, 20 } }),
-		rubble({ { 18, 104 }, { 46, 104 } }),
-		-- Its lanes are sunk two studs: the low ground floods first.
-		sunk({ { -68, 34 }, { 48, 34 } }),
-		sunk({ { -68, 62 }, { 48, 62 } }),
-		sunk({ { -68, 90 }, { 48, 90 } }),
-		sunk({ { -68, 118 }, { 48, 118 } }),
+local FRAME = {
+	"+--+--+  +--+--+--+  +--+--+  +--+--+  +--+--+  +--+--+",
+	"                  |                 |                  ",
+	"+--+--+--+  +  +  +  +  +--+--+--+  +  +  +  +  +  +  +",
+	"         |              |        |  |                  ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                  |              |                     ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"         |        |     |        |  |                  ",
+	"+--+--+--+  +  +  +  +  +--+--+--+  +  +  +  +  +  +  +",
+	"                                    |                  ",
+	"+--+  +--+--+  +--+  +--+--+--+--+  +--+  +--+--+--+--+",
+	"                  |  |           |           |         ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                  |  |           |  |                  ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                     |           |  |        |         ",
+	"+  +  +  +  +  +  +  +--+  +--+--+  +  +  +  +--+--+--+",
+	"                  |                                    ",
+	"+--+--+--+  +--+  +  +--+--+  +--+  +  +--+--+  +--+--+",
+	"         |        |                 |                  ",
+	"+  +  +  +  +  +  +  +--+--+  +--+  +  +  +  +--+  +--+",
+	"                     |           |  |        |         ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"         |        |  |           |           |         ",
+	"+--+--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"                     |           |  |        |         ",
+	"+  +  +  +  +  +  +  +--+--+--+--+  +  +  +  +--+--+--+",
+	"                  |                                    ",
+	"+--+  +--+--+  +--+--+  +--+--+  +--+--+  +--+--+  +--+",
+}
 
-		-- The drowned pool, in the west cell's dead-end gallery.
-		{ Kind = "Hollow", At = { -300, 32 }, Radius = 10, Depth = 3 },
+local frame = {
+	Name = "The Drowned Reach",
+	Primitives = merge(maze(FRAME, X0, Z0), {
+		roof({ { -300, 200 }, { -300, 216 } }, 32),
+		roof({ { -180, 200 }, { -180, 216 } }, 32),
+		roof({ { -100, 200 }, { -100, 216 } }, 32),
+		roof({ { 100, 200 }, { 100, 216 } }, 32),
+		roof({ { 180, 200 }, { 180, 216 } }, 32),
+		roof({ { -220, 360 }, { -220, 376 } }, 32),
+		roof({ { -140, 360 }, { -140, 376 } }, 32),
+		roof({ { -100, 360 }, { -100, 376 } }, 32),
+		roof({ { 20, 360 }, { 20, 376 } }, 32),
+		roof({ { 100, 360 }, { 100, 376 } }, 32),
+		roof({ { 140, 360 }, { 140, 376 } }, 32),
+		roof({ { 260, 360 }, { 260, 376 } }, 32),
+		roof({ { -128, 68 }, { -112, 68 } }, 32),
+		roof({ { -128, 188 }, { -112, 188 } }, 32),
+		roof({ { -128, 308 }, { -112, 308 } }, 32),
+		roof({ { -128, 428 }, { -112, 428 } }, 32),
+		roof({ { -128, 508 }, { -112, 508 } }, 32),
+		roof({ { 112, 108 }, { 128, 108 } }, 32),
+		roof({ { 112, 228 }, { 128, 228 } }, 32),
+		roof({ { 112, 348 }, { 128, 348 } }, 32),
+		roof({ { 112, 468 }, { 128, 468 } }, 32),
+		roof({ { -100, 228 }, { -100, 348 }, { 100, 348 }, { 100, 228 } }, 40),
+		roof({ { -100, 388 }, { -100, 548 }, { 100, 548 }, { 100, 388 } }, 40),
+	}),
+}
 
-		-- Roofs: the ramp cells' long middle galleries, their dead-end galleries by the cliffs,
-		-- and the middle cell's two inner lanes.
-		roof({ { -364, 74 }, { -80, 74 } }, 44),
-		roof({ { 60, 74 }, { 364, 74 } }, 44),
-		roof({ { -364, 32 }, { -224, 32 } }, 40),
-		roof({ { 224, 32 }, { 364, 32 } }, 40),
-		roof({ { -80, 62 }, { 60, 62 } }, 28),
-		roof({ { -80, 90 }, { 60, 90 } }, 28),
+local CROSSING1 = {
+	"+  +  +  +  +  +  +--+  +  +--+  +  +--+  +  +--+  +  +",
+	"                                          |            ",
+	"+  +  +  +--+  +--+  +--+  +  +  +  +  +  +--+--+  +  +",
+	"            |     |                    |        |  |   ",
+	"+  +  +  +  +--+  +--+--+  +  +  +  +  +--+--+  +  +  +",
+	"            |                             |     |  |   ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +--+  +--+",
+	"               |     |                 |  |     |      ",
+	"+  +  +  +--+--+  +  +  +  +  +  +--+  +  +--+  +--+  +",
+	"               |     !                 |  |            ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"         |  |                       |                  ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +  +  +",
+	"   |  |     |  |                          |            ",
+	"+  +  +--+  +  +--+--+  +  +  +  +  +  +--+  +  +  +  +",
+	"   |  |     |  |                       |  |            ",
+	"+  +  +--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"   |        |                          |               ",
+	"+  +  +  +  +  +--+--+  +  +--+  +--+--+  +  +  +  +  +",
+	"            |                             |            ",
+	"+  +  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +  +",
+	"            |     |                    |               ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +--+--+  +  +  +",
+	"            |  |                    |                  ",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +--+--+  +  +  +  +",
+	"         |  |  |                                       ",
+	"+  +--+--+  +  +--+  +  +  +  +  +  +  +--+--+  +  +  +",
+	"            |                    |                     ",
+	"+  +  +  +  +--+  +  +--+  +  +--+  +  +--+  +  +--+  +",
+}
 
-		-- Cart ramps.
+local crossing1 = {
+	Name = "West stair",
+	Primitives = merge(maze(CROSSING1, X0, Z0), {
+		roof({ { 100, 228 }, { 100, 308 } }, 40),
+		roof({ { -220, 388 }, { -220, 508 } }, 40),
+		roof({ { -60, 348 }, { 60, 348 } }, 40),
+		roof({ { -20, 188 }, { 60, 188 } }, 40),
+		roof({ { 100, 428 }, { 100, 508 } }, 40),
+		roof({ { 180, 548 }, { 340, 548 } }, 40),
+		roof({ { -60, 548 }, { 60, 548 } }, 40),
+		roof({ { -60, 388 }, { 60, 388 } }, 40),
+		lane({ { -340, 268 }, { -340, 348 } }),
+		lane({ { -60, 28 }, { 60, 28 } }),
+		pool(-60, 188),
+		pool(100, 28),
+		pool(-180, 468),
+		pool(-340, 228),
+		pool(-180, 388),
+		pool(-300, 188),
 		{
 			Kind = "Ramp",
 			Path = {
-				{ -200, 0 },
-				{ -200, 32 },
-				{ -104, 32 },
-				{ -104, 74 },
-				{ -330, 74 },
-				{ -330, 116 },
-				{ -200, 116 },
-				{ -200, 150 },
+				{ -260, 0 },
+				{ -260, 28 },
+				{ -180, 28 },
+				{ -180, 68 },
+				{ -140, 68 },
+				{ -140, 188 },
+				{ -100, 188 },
+				{ -100, 108 },
+				{ -60, 108 },
+				{ -60, 188 },
+				{ 100, 188 },
+				{ 100, 348 },
+				{ -100, 348 },
+				{ -100, 308 },
+				{ -140, 308 },
+				{ -140, 348 },
+				{ -180, 348 },
+				{ -180, 188 },
+				{ -300, 188 },
+				{ -300, 348 },
+				{ -220, 348 },
+				{ -220, 548 },
+				{ -300, 548 },
+				{ -300, 604 },
 			},
 			Width = 14,
 		},
-		{
-			Kind = "Ramp",
-			Path = {
-				{ 180, 0 },
-				{ 180, 32 },
-				{ 84, 32 },
-				{ 84, 74 },
-				{ 310, 74 },
-				{ 310, 116 },
-				{ 180, 116 },
-				{ 180, 150 },
-			},
-			Width = 14,
-		},
-	},
+	}),
 	Loot = {
-		-- The roofed dead-end galleries by the cliffs: the best finds at their far ends.
-		{ At = { -342, 32 }, Radius = 6, Weight = 5 },
-		{ At = { -300, 32 }, Radius = 8, Weight = 3 },
-		{ At = { 342, 32 }, Radius = 6, Weight = 5 },
-		{ At = { 270, 32 }, Radius = 6, Weight = 3 },
-		-- The open dead-end galleries at the ramp cells' inner sides.
-		{ At = { -120, 116 }, Radius = 6, Weight = 2 },
-		{ At = { 100, 116 }, Radius = 6, Weight = 2 },
-		-- The middle cell's dead-end pockets.
-		{ At = { 47, 34 }, Radius = 5, Weight = 1 },
-		{ At = { 47, 62 }, Radius = 5, Weight = 2 },
-		{ At = { 47, 90 }, Radius = 5, Weight = 2 },
-		{ At = { 47, 118 }, Radius = 5, Weight = 1 },
+		loot(-140, 548, 5),
+		loot(-140, 388, 5),
+		loot(60, 548, 5),
+		loot(340, 108, 5),
+		loot(340, 548, 5),
+		loot(220, 28, 5),
+		loot(220, 188, 5),
 	},
 }
 
--- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
-return require(script.Parent.Parent.Tiled)(tileLayout)
+frame.Crossings = { crossing1 }
+
+return frame
