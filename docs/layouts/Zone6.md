@@ -1,60 +1,100 @@
-# Zone 6: The Drowned Reach (base)
+# Zone 6: The Drowned Reach
 
-The deepest, slowest ground on the beach: a maze of tall rock walls (24 high, 12 wide) in three cells, divided by walls that run down the beach at x -80 and x 60. Each outer cell holds a cart ramp that winds through three long galleries, out to the cliffs and back. The middle cell is a tight maze of sunken lanes: the quick way on foot, but shut to carts by rubble. Every gallery end the ramps don't use is a dead end, and the roofed ones by the cliffs hold the best finds.
+The deepest, slowest ground on the beach, drawn as one 720 x 608 piece. A maze of tall rock walls (24 high, 12 wide) on a 40-stud grid: lanes 28 wide between the walls, a roof over many of the straights, low ground everywhere. Four long walls cut the Reach into nine wards, and each tide the sea rolls one of five **crossings** (which gates stay open, which walls fill the wards, where the tunnels and the cart ramp go) and one room for each of seven **side slots**. Every crossing is a single winding route with dead ends hung all along it: nothing is a straight line, and from the top you see nothing at all.
+
+The maze is built from pictures in `Zone6.luau`: a text grid where `+` is a node, `--` or `|` a wall, `==` or `!` rubble, and a blank an opening. A post stands on every node a wall touches, so walls that meet end to end leave no crack (a crack one stud wide is a way through for a player, and the Test Range found one).
 
 ## Maps
 
-Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` raised sand, `.` flat, `~` floods at mid-tide, `=` cart ramp, `o` entrance flat, `R` under a roof.
+Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` raised sand, `.` flat, `~` floods at mid-tide, `=` cart ramp, `o` entrance flat, `R` under a roof. The whole Reach lies below the mid-tide line, so almost all of it shows as `~`; the walls and roofs are what the maps are for. The first crossing with the first room of every slot:
 
 <!-- map Zones/Zone6@6 -->
 ```text
-~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~
-RRRRRRRRRRRRRRR==~##~~#######~~#################~~##~==~#RRRRRRRRRRRRRRR
-RRRRRRRRRRRRRRR===========~##~~############~===========~~RRRRRRRRRRRRRRR
-RRRRRRRRRRRRRRR===========~##~~~~~~~~~~~~##~===========~RRRRRRRRRRRRRRRR
-RRRRRRRRRRRRRRR~~~~~~~~~~=~###########~~###~=~~~~~~~~~~~~RRRRRRRRRRRRRRR
-RRRRRRRRRRRRRRRRRRRRRRRRR=RRRRRRRRRRRRRRRRRR=RRRRRRRRRRRRRRRRRRRRRRRRRRR
-RRRRRRRRRRRRRRRRRRRRRRRRR=RRRRRRRRRRRRRRRRRR=RRRRRRRRRRRRRRRRRRRRRRRRRRR
-RR========================RRRRRRRRRRRRRRRRRR========================RRRR
-RR==RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==RRRR
-RR==RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR==RRRR
-~~==~~~~~~~~~~~~~~~~~~~~~~~###########~~###~~~~~~~~~~~~~~~~~~~~~~~==~~~~
-~~===============~~~~~~~~~~##~~~~~~~~~~~~##~~~~~~~~~~===============~~~~
-~~~~~~~~~~~~~~~==~~~~~~~~~~##~~~~~~~~~~~~##~~~~~~~~~~==~~~~~~~~~~~~~~~~~
-##############~==~###########~~#####################~==~################
-~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~
 ```
 <!-- /map -->
 
-## What a player meets
+Crossing 2 (Hall gallery):
 
-- **The ramp cells** (x -360 to -80 and 60 to 360). Each has three galleries, at z 32, 74 and 116, 28 wide between walls 44 apart (so the ramps' cleared edges never cut into the walls). The west ramp comes in at x -200, runs east to x -104, drops through a gap into the middle gallery, runs the whole of it west to x -330 under the cliff, drops into the third gallery and comes back east to x -200 and out. The east ramp is its mirror: in at x 180, west to 84, east to 310, west to 180. The middle galleries are roofed: about 230 studs of tunnel each, the landmark of the zone.
-- **The middle cell** (x -74 to 54): five walls 28 apart make four 16-wide lanes. Their gaps swap sides (x -60, then x 32), so every lane is walked from end to end. The lanes are sunk 2 studs, and the two inner ones are roofed. Its first gap (x -60, top wall) and fourth (x 32) are choked with rubble.
-- **Rubble.** Four piles of sand rubble, 4 high: the two in the middle cell, and one in the top wall of each ramp cell (x -152 and x 132), a short cut into the first gallery. Players climb them; carts can't.
-- **Dead ends.** The first galleries run on past the ramps' start to the cliffs, roofed: the west one holds a drowned pool (a hollow 3 deep at x -300) and the best finds at its far end (weight 5), and so does the east one. The third galleries run on past the ramps' exit to the middle cell's wall (weight 2). Each middle-cell lane ends in a short pocket behind its gap (weights 1 to 2).
-- **Loot:** 10 spots, weights 1 to 5; the deeper and further from the way through, the higher.
+<!-- map Zones/Zone6@6/c2 -->
+```text
+```
+<!-- /map -->
+
+Crossing 3 (East switchbacks):
+
+<!-- map Zones/Zone6@6/c3 -->
+```text
+```
+<!-- /map -->
+
+Crossing 4 (Long cross):
+
+<!-- map Zones/Zone6@6/c4 -->
+```text
+```
+<!-- /map -->
+
+Crossing 5 (Backtrack):
+
+<!-- map Zones/Zone6@6/c5 -->
+```text
+```
+<!-- /map -->
+
+## The frame
+
+Always there, whichever crossing and rooms roll:
+
+- **The top and bottom walls** (z 8 and z 568), with five gate candidates each (top at x -260, -100, 20, 140 and 260; bottom at x -300, -180, -60, 60, 180 and 300). A crossing opens the ones it uses and plugs the rest. The strips above and below them (z 0 to 2, z 574 to 608) are bare sand; a player comes down on the top one from zone 5 and sidles along it to a gate.
+- **The Long Walls**: two walls the full depth of the Reach at x -120 and x 120, and two the full width at z 208 and z 368. They cut the Reach into nine wards (north-west, gate, north-east; west, hall, east; south-west, sea, south-east), 240 by 200 studs each, and carry between them 25 gate candidates (5 or 6 on each wall).
+- **The seven side slots**, each a shell of wall with one door, with a room inside it (below).
+- **The Hall Gallery** (a roofed U, 28 wide and about 320 long, round the west, south and east sides of the Drowned Hall, in the middle ward) and **the Sea Gallery** (the same round the Sea Vault, in the sea ward). They run through whichever crossing rolls, and their pools make them the lowest ground in the middle of the Reach.
+- **Eight pools** (3 deep) along the two galleries, and a dozen small finds scattered over the wards (Weight 1 to 3).
+
+## The five crossings
+
+Each shuts the gates it doesn't use, draws every other wall of the maze, roofs a dozen straights, sinks a few lanes and pools, and winds a cart ramp (14 wide) along its way through. Each also has two false doors at the top and two at the bottom that lead only into the same long way, and two or three rubble doorways (4 high, 20 wide): a scramble on foot that cuts a bend, too steep for a cart. All five are 63 to 65 lanes long by cart and 53 on foot.
+
+1. **West stair.** In at the north-west gate (x -260), down the west ward, through the south-west ward and back up under the gate ward and hall ward, then down the sea ward: out at the south-west corner (x -300).
+2. **Hall gallery.** In at the north-east (x 260), through the gate ward and round the Drowned Hall by its Gallery, down the east side and back through the sea ward: out at x 60.
+3. **East switchbacks.** In at x 260 and down the east ward; the ramp climbs back through the gate ward and hall ward before the sea ward and the south-east: out at x 300.
+4. **Long cross.** In at x -260 and across the Reach, west to east, to leave by the south-east ward at x 180 after a loop through the sea ward.
+5. **Backtrack.** In at x 260, west along the top, down the whole west side, then back east through the hall ward and the sea ward: out at x 60.
+
+## The side slots
+
+Seven slots, each with a door onto the frame, rolled each tide. The first room of each is the deepest cave, a dead end with the best find (Weight 6) at its end; the others differ in kind.
+
+| Slot | Where | Size | Rooms |
+|---|---|---|---|
+| West cave | x -360, z 48 (cliff) | 120 x 120 | Dead-end cave, Drowned pool, Boulder scramble |
+| Gatehouse yard | x -40, z 48 | 120 x 120 | Tunnel loop, Boulder yard, Gatehouse cellar |
+| East cellar | x 240, z 208 (cliff) | 120 x 120 | Dead-end cellar, Flooded cellar, Tunnel loop |
+| Drowned hall | x -80, z 208 | 160 x 120 | Flooded hall, Collapsed hall, Pillar gallery, Dead-end vault |
+| Low west vault | x -360, z 368 (cliff) | 120 x 120 | Tunnel loop, Dead-end cave, Boulder scramble |
+| Sea vault | x -80, z 408 | 160 x 120 | Dead-end vault, Flooded vault, Collapsed vault, Tunnel loop |
+| East deeps | x 240, z 408 (cliff) | 120 x 120 | Flooded pocket, Dead-end cave, Boulder scramble |
+
+- **Caves, cellars and vaults**: a roofed winding dead end, the best find (Weight 6) at its far end, lesser ones on the way.
+- **Flooded rooms**: a third of the cells are pools (3 deep), the best find in the deepest.
+- **Boulder scrambles and collapsed halls**: no walls, a field of rock boulders (8 to 10 high) with the finds between them; there is room to go round, but not to see.
+- **Tunnel loops and the pillar gallery**: a roofed ring of lanes round a solid block, the best find opposite the door.
 
 ## Shortcuts
 
-The middle cell is foot-only (its rubble shuts carts out) and is the fastest way through. A cart starting at x 0 has to go all the way to a ramp at x -200 or 180 first. From x -150 and x 150 the rubble gaps into the ramp cells' first galleries save players the trip to the ramp's gate. The map tool counts 3 of 5 starts faster on foot.
+The rubble doorways are foot-only; the cart ramp has to take the long way round. The map tool counts 5 of 5 starts faster on foot.
 
 ## Flood order
 
-Low ground everywhere: this is the last zone before the sandbar, so the sea leaves it last and comes back to it first. The middle cell's sunken lanes are its lowest ground and flood first: the seaward lane as soon as the sea reaches the tile, then (once the pool in the west dead-end gallery has filled) the other three together, as the water tops the rubble. Then the galleries go under with the slope. Under the roofs it is the same: at mid-zone (waterline Z 3344) the Test Range finds 39% of the zone and 44% of its tunnels under water, and at the zone's top (Z 3040) 86% and 91%. The middle cell is the quick way back up, and the first to be cut off.
+SEE BELOW
 
 <!-- floods Zones/Zone6@6 -->
-Channel at x -68, z 118: the sea reaches it when the waterline is below Z 3163
-Hollow at x -300, z 32: the sea reaches it when the waterline is below Z 3081
-Channel at x -68, z 90: the sea reaches it when the waterline is below Z 3077
-Channel at x -68, z 62: the sea reaches it when the waterline is below Z 3077
-Channel at x -68, z 34: the sea reaches it when the waterline is below Z 3077
 <!-- /floods -->
 
 ## What a player sees from the top
 
-Nothing past the first wall: the map tool puts 99% of the lower half out of sight.
+Nothing past the first wall: the map tool puts 100% of the lower half out of sight.
 
 ## Measured times
 
-- Map tool: 22.8 s per tile, about 91 s for the zone (target 85 s); 3 of 5 shortcut starts. The fastest tile is the middle cell; the ramp cells on foot through their rubble take about 23 s, and by the ramps alone about 25 s.
-- Test Range (walking the real terrain): fastest way down 82 s, and 82 s back up (target 85 s). From each start: x -280 93 s, x -200 89 s, x -100 84 s, x 0 85 s, x 100 90 s, x 180 93 s, x 280 98 s. The fastest route runs straight down the middle cell. Roblox's own pathfinder finds 40 s because it jumps and climbs over the walls; that is not a walking route.
+TBD
