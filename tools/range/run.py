@@ -96,9 +96,20 @@ def summarise(report):
     lines.append(f"  terrain vs layout: {offset.get('average', 0):.2f} studs on average, worst {offset.get('worst', 0):.2f}")
     crossing = m.get("crossing")
     if crossing:
-        fastest = crossing.get("fastestSeconds")
-        lines.append(f"  fastest way across on foot: {fastest:.0f}s (target {crossing.get('targetSeconds')}s)"
-                     if fastest else "  no way across on foot")
+        fastest, back = crossing.get("fastestSeconds"), crossing.get("backSeconds")
+        lines.append(f"  fastest way down on foot: {fastest:.0f}s (target {crossing.get('targetSeconds')}s)"
+                     if fastest else "  no way down on foot")
+        lines.append(f"  fastest way back up: {back:.0f}s" if back else "  no way back up")
+        starts = ", ".join(f"x {s['from']}: {s['seconds']:.0f}s" if s.get("seconds") else f"x {s['from']}: none"
+                           for s in crossing.get("perStart", []))
+        lines.append(f"  down from each start: {starts}")
+        route = crossing.get("route") or []
+        if route:
+            lines.append(f"  fastest way down turns at: {' '.join(route[:40])}{' ...' if len(route) > 40 else ''}")
+        if crossing.get("pathfinderSeconds"):
+            lines.append(f"  (Roblox's pathfinder: {crossing['pathfinderSeconds']:.0f}s)")
+    for note in report.get("notes", []):
+        lines.append(f"  note: {note}")
     for tide in m.get("tides", []):
         flooded = tide.get("tunnelsFlooded")
         lines.append(f"  waterline z {tide['waterline']:.0f}: {tide['underWater'] * 100:.0f}% under water, "

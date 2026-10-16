@@ -520,6 +520,156 @@ local function standAt(x: number, z: number): Vector3
 	return Vector3.new(x, Beach.groundAt(x, z) + 3, z)
 end
 
+-- Walking the real terrain ----------------------------------------------------------------------
+-- Roblox's pathfinder doesn't know the game's climbing limit: it jumps and climbs over rock walls.
+-- So the main measure walks a 4-stud grid over the real terrain surface instead: a step may climb
+-- at most FootSlope (or a small step up), may drop any height, and never crosses a wall's
+-- barrier. It measures the fastest way down the zone and the fastest way back up.
+
+local GRID = 4
+local STEP_UP = 1.5 -- a small step up a player takes whatever the slope
+
+type Walk = { cells: { [number]: number }, xs: number, zs: number, x0: number, z0: number }
+
+local function buildWalk(): Walk
+	local x0 = -(Beach.HalfWidth + 12)
+	local z0 = zStart - 8
+	local xs = math.floor((2 * (Beach.HalfWidth + 12)) / GRID) + 1
+	local zs = math.floor((zEnd + 8 - z0) / GRID) + 1
+	local slabs = {}
+	for tile = firstTile - 1, firstTile + perZone do
+		if tile >= 1 and tile <= Beach.ActiveTiles then
+			for _, slab in require(Server.WallBarriers).slabsFor(tile) do
+				table.insert(slabs, slab)
+			end
+		end
+	end
+	local cells = {}
+	for j = 0, zs - 1 do
+		for i = 0, xs - 1 do
+			local x, z = x0 + i * GRID, z0 + j * GRID
+			local blocked = false
+			for _, slab in slabs do
+				local p = slab.cframe:PointToObjectSpace(Vector3.new(x, slab.cframe.Position.Y, z))
+				if math.abs(p.X) <= slab.size.X / 2 + 1 and math.abs(p.Z) <= slab.size.Z / 2 + 1 then
+					blocked = true
+					break
+				end
+			end
+			if not blocked then
+				local y = surfaceAt(x, z)
+				if y then
+					cells[j * xs + i] = y
+				end
+			end
+		end
+	end
+	return { cells = cells, xs = xs, zs = zs, x0 = x0, z0 = z0 }
+end
+
+local NEIGHBOURS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } }
+
+-- Seconds at walking speed from the start cells to every cell (Dijkstra).
+local function walkFrom(walk: Walk, starts: { number }, from: { [number]: number }?): { [number]: number }
+	local best: { [number]: number } = {}
+	local heap: { { number } } = {}
+	local function push(cost: number, cell: number)
+		table.insert(heap, { cost, cell })
+		local i = #heap
+		while i > 1 do
+			local parent = i // 2
+			if heap[parent][1] <= heap[i][1] then
+				break
+			end
+			heap[parent], heap[i] = heap[i], heap[parent]
+			i = parent
+		end
+	end
+	local function pop(): { number }
+		local top = heap[1]
+		local last = table.remove(heap)
+		if #heap > 0 then
+			heap[1] = last :: { number }
+			local i = 1
+			while true do
+				local l, r, smallest = 2 * i, 2 * i + 1, i
+				if l <= #heap and heap[l][1] < heap[smallest][1] then
+					smallest = l
+				end
+				if r <= #heap and heap[r][1] < heap[smallest][1] then
+					smallest = r
+				end
+				if smallest == i then
+					break
+				end
+				heap[smallest], heap[i] = heap[i], heap[smallest]
+				i = smallest
+			end
+		end
+		return top
+	end
+	for _, cell in starts do
+		if walk.cells[cell] then
+			best[cell] = 0
+			push(0, cell)
+		end
+	end
+	while #heap > 0 do
+		local entry = pop()
+		local cost, cell = entry[1], entry[2]
+		if cost > (best[cell] or math.huge) then
+			continue
+		end
+		local i, j = cell % walk.xs, cell // walk.xs
+		local y = walk.cells[cell]
+		for _, d in NEIGHBOURS do
+			local ni, nj = i + d[1], j + d[2]
+			if ni >= 0 and ni < walk.xs and nj >= 0 and nj < walk.zs then
+				local next = nj * walk.xs + ni
+				local ny = walk.cells[next]
+				if ny then
+					local across = GRID * math.sqrt(d[1] * d[1] + d[2] * d[2])
+					local climb = ny - y
+					if climb <= footSlope * across or climb <= STEP_UP then
+						local nextCost = cost + math.sqrt(across * across + climb * climb) / WALK
+						if nextCost < (best[next] or math.huge) then
+							best[next] = nextCost
+							if from then
+								from[next] = cell
+							end
+							push(nextCost, next)
+						end
+					end
+				end
+			end
+		end
+	end
+	return best
+end
+
+local function rowCells(walk: Walk, z: number): { number }
+	local j = math.floor((z - walk.z0) / GRID + 0.5)
+	local list = {}
+	for i = 0, walk.xs - 1 do
+		table.insert(list, j * walk.xs + i)
+	end
+	return list
+end
+
+local function cellAt(walk: Walk, x: number, z: number): number
+	local i = math.floor((x - walk.x0) / GRID + 0.5)
+	local j = math.floor((z - walk.z0) / GRID + 0.5)
+	return j * walk.xs + i
+end
+
+local function fastestTo(times: { [number]: number }, cells: { number }): number?
+	local fastest = math.huge
+	for _, cell in cells do
+		fastest = math.min(fastest, times[cell] or math.huge)
+	end
+	return if fastest < math.huge then fastest else nil
+end
+
 if JOB.routes ~= false then
 	local crossings = {}
 	local fastest = math.huge
@@ -556,9 +706,63 @@ if JOB.routes ~= false then
 		end
 	end
 	local target = Config.Zones[zone] and Config.Zones[zone].CrossTime
+	-- The main measure: walking the real terrain (see above).
+	local walk = buildWalk()
+	local topRow, bottomRow = rowCells(walk, zStart + 2), rowCells(walk, zEnd - 2)
+	local cameFrom = {}
+	local down = walkFrom(walk, topRow, cameFrom)
+	-- The fastest way down, as a list of points where it turns (for finding where it gets through).
+	local route = {}
+	do
+		local bestCell, bestTime = nil, math.huge
+		for _, cell in bottomRow do
+			if (down[cell] or math.huge) < bestTime then
+				bestCell, bestTime = cell, down[cell]
+			end
+		end
+		local cell = bestCell
+		local lastDir = nil
+		while cell do
+			local previous = cameFrom[cell]
+			local dir = if previous then cell - previous else nil
+			if dir ~= lastDir then
+				local x, z = walk.x0 + (cell % walk.xs) * GRID, walk.z0 + (cell // walk.xs) * GRID
+				table.insert(route, 1, string.format("(%d, %d)", x, z))
+				lastDir = dir
+			end
+			cell = previous
+		end
+	end
+	local up = walkFrom(walk, bottomRow)
+	local walkStarts = {}
+	for _, x in JOB.starts or { -280, -200, -100, 0, 100, 180, 280 } do
+		local fromStart = walkFrom(walk, { cellAt(walk, x, zStart + 2) })
+		table.insert(walkStarts, { from = x, seconds = fastestTo(fromStart, bottomRow) })
+	end
+	local walkDown, walkUp = fastestTo(down, bottomRow), fastestTo(up, topRow)
+	if not walkDown then
+		problem("no way across", string.format("walking the terrain, there's no way down zone %d", zone))
+	end
+	if not walkUp then
+		problem("no way back", string.format("walking the terrain, there's no way back up zone %d", zone))
+	end
+	if walkDown and fastest < walkDown * 0.85 then
+		table.insert(
+			report.notes,
+			string.format(
+				"Roblox's pathfinder found a way across in %.0f s, much quicker than walking the terrain (%.0f s): it climbs or jumps where players can't",
+				fastest,
+				walkDown
+			)
+		)
+	end
 	report.measurements.crossing = {
-		fastestSeconds = if fastest < math.huge then fastest else nil,
-		perStart = crossings,
+		fastestSeconds = walkDown,
+		backSeconds = walkUp,
+		perStart = walkStarts,
+		route = route,
+		pathfinderSeconds = if fastest < math.huge then fastest else nil,
+		pathfinderPerStart = crossings,
 		targetSeconds = target,
 		-- Each tile of the zone is crossed in turn: the zone takes about the tile times added.
 	}
@@ -574,16 +778,22 @@ if JOB.routes ~= false then
 		end
 	end
 	for _, spot in spots do
-		local result = route(standAt(0, zStart + 3), standAt(spot.x, spot.z))
-		if result.status ~= "Success" then
+		-- Reached walking down from the top, and can you walk back up from it?
+		local cell = cellAt(walk, spot.x, spot.z)
+		local near = { cell, cell + 1, cell - 1, cell + walk.xs, cell - walk.xs }
+		if not fastestTo(down, near) then
 			problem(
 				"unreachable spot",
+				string.format("%s spot at x %.0f, z %.0f can't be reached on foot", spot.kind, spot.x, spot.z)
+			)
+		elseif not fastestTo(walkFrom(walk, near), topRow) then
+			problem(
+				"one-way spot",
 				string.format(
-					"%s spot at x %.0f, z %.0f can't be reached on foot (%s)",
+					"%s spot at x %.0f, z %.0f: you can drop in but not walk back out",
 					spot.kind,
 					spot.x,
-					spot.z,
-					result.status
+					spot.z
 				)
 			)
 		end
