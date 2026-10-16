@@ -1,3 +1,8 @@
+-- Gear lights: a worn accessory with a Light (the Headlamp, Glow Pearl, Lantern of Clear
+-- Sight, Ember Lantern) lights its wearer from the head, and a held tool with a Light (the
+-- Lantern) from the hand. Every client draws everyone's: each light rides on a local, invisible
+-- carrier moved onto the head or hand every frame, so it always follows the player.
+--
 -- Gear effects that only matter to the wearer, so they run on their own client:
 --   * (The Lantern of Clear Sight's longer sight is in MistController, which owns the haze.)
 --   * Prism Lens (RevealRare): rare and unlock items nearby shine through anything.
@@ -149,6 +154,90 @@ local function updateFreezeButton()
 	end
 end
 
+-- Gear lights ------------------------------------------------------------------------------
+
+local lightFolder: Folder? = nil
+local carriers: { [Player]: { [string]: { part: BasePart, light: PointLight } } } = {}
+
+-- The lights a player should carry: { slot = { spec, part to follow } }.
+local function lightsOf(other: Player): { [string]: { spec: any, target: BasePart } }
+	local wanted = {}
+	local character = other.Character
+	if not character then
+		return wanted
+	end
+	local worn = Gear.getAccessory(other:GetAttribute("Accessory"))
+	local head = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+	if worn and worn.Light and head and head:IsA("BasePart") then
+		wanted.Accessory = { spec = worn.Light, target = head }
+	end
+	local tool = Gear.findTool(other:GetAttribute("Tool"))
+	if tool and tool.Light then
+		-- The held model's glowing part, or the hand while it's being put on.
+		local held = character:FindFirstChild("HeldTool")
+		local handle = held and held:FindFirstChild("Handle")
+		local glass = handle and handle:FindFirstChild("Glass")
+		local hand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+		local target = glass or hand
+		if target and target:IsA("BasePart") then
+			wanted.Tool = { spec = tool.Light, target = target }
+		end
+	end
+	return wanted
+end
+
+local function updateLights()
+	if not lightFolder then
+		local folder = Instance.new("Folder")
+		folder.Name = "GearLights"
+		folder.Parent = Workspace
+		lightFolder = folder
+	end
+	for _, other in Players:GetPlayers() do
+		local have = carriers[other] or {}
+		carriers[other] = have
+		local wanted = lightsOf(other)
+		for slot, entry in have do
+			if not wanted[slot] then
+				entry.part:Destroy()
+				have[slot] = nil
+			end
+		end
+		for slot, want in wanted do
+			local entry = have[slot]
+			if not entry then
+				local part = Instance.new("Part")
+				part.Name = other.Name .. slot .. "Light"
+				part.Anchored = true
+				part.CanCollide = false
+				part.CanQuery = false
+				part.CanTouch = false
+				part.CastShadow = false
+				part.Transparency = 1
+				part.Size = Vector3.new(0.2, 0.2, 0.2)
+				local light = Instance.new("PointLight")
+				light.Shadows = false
+				light.Parent = part
+				part.Parent = lightFolder
+				entry = { part = part, light = light }
+				have[slot] = entry
+			end
+			entry.light.Color = want.spec.Color
+			entry.light.Range = want.spec.Range
+			entry.light.Brightness = want.spec.Brightness
+			entry.part.CFrame = want.target.CFrame
+		end
+	end
+	for other, have in carriers do
+		if other.Parent == nil then
+			for _, entry in have do
+				entry.part:Destroy()
+			end
+			carriers[other] = nil
+		end
+	end
+end
+
 function GearEffects.init()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "GearEffects"
@@ -175,6 +264,8 @@ function GearEffects.init()
 			freeze()
 		end
 	end)
+
+	RunService.RenderStepped:Connect(updateLights)
 
 	local elapsed = 0
 	RunService.Heartbeat:Connect(function(dt)

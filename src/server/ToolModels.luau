@@ -71,7 +71,6 @@ end
 
 builders.Lantern = function(handle)
 	-- A storm lantern hanging from the hand by its bail: iron cap and base, glowing glass.
-	local tool = Gear.getTool("Lantern")
 	bar(handle, "Bail", point(-0.25, 0, -0.1), point(0.25, 0, -0.1), 0.08, T.LanternIron, Metal)
 	piece(
 		handle,
@@ -82,7 +81,7 @@ builders.Lantern = function(handle)
 		T.LanternIron,
 		Metal
 	)
-	local glass = piece(
+	piece(
 		handle,
 		"Glass",
 		Cylinder,
@@ -100,12 +99,7 @@ builders.Lantern = function(handle)
 		T.LanternIron,
 		Metal
 	)
-	local light = Instance.new("PointLight")
-	light.Color = tool.Light.Color
-	light.Range = tool.Light.Range
-	light.Brightness = tool.Light.Brightness
-	light.Shadows = false
-	light.Parent = glass
+	-- (Its light is drawn by each client on the Glass, GearEffects, so it follows the hand.)
 end
 
 builders.BeachRake = function(handle)
