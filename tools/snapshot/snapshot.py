@@ -133,16 +133,28 @@ def main():
                 if len(outline) >= 3:
                     draw.polygon(outline, fill=rgb + (alpha,), outline=shade(rgb, 0.6) + (alpha,))
     else:
+        # The terrain's skyline first: for each column of the grid, its highest point
+        # anywhere along the region, in that point's colour.
+        rows = [[cell.split(" ") for cell in row.split(";")] for row in data["terrain"]]
+        step = data["step"]
+        skyline = []
+        for i in range(len(rows[0]) if rows else 0):
+            top = max(rows, key=lambda r: float(r[i][0]))[i]
+            skyline.append((float(top[0]), hex_rgb(top[1])))
         # Front: x across, y up; a band of y from the lowest part. Sea: the same from the other
         # side, looking back at the shore, so x runs the other way and the nearest parts are
         # the ones farthest out.
         sea = args.view == "sea"
         px = (lambda x: (x1 - x) * s) if sea else (lambda x: (x - x0) * s)
-        ys = [c[1] for p in parts for c in corners(p)] or [0, 10]
+        ys = [c[1] for p in parts for c in corners(p)] + [h for h, _ in skyline] or [0, 10]
         y0, y1 = min(ys) - 2, max(ys) + 2
         w, h = int((x1 - x0) * s), int((y1 - y0) * s)
         image = Image.new("RGB", (w, h), (205, 225, 235))
         draw = ImageDraw.Draw(image, "RGBA")
+        for i, (top, rgb) in enumerate(skyline):
+            xa = x0 + i * step
+            ax, bx = sorted((px(xa), px(xa + step)))
+            draw.rectangle([ax, (y1 - top) * s, bx, h], fill=shade(rgb, 0.8))
         for part in sorted(parts, key=lambda p: p["c"][2] if sea else -p["c"][2]):
             pts = corners(part)
             if not (z0 - 10 <= part["c"][2] <= z1 + 10):
