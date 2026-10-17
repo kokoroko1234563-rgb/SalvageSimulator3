@@ -74,4 +74,16 @@ print(serde.encode("json", {
 	entrances = layout.Entrances or {},
 	slots = slots,
 	hazards = layout.Hazards or {},
+	decor = layout.Decor or {},
+	wards = (function()
+		local Decor = h.require("Shared/Decor")
+		local list = {}
+		for _, entry in layout.Decor or {} do
+			local kind = Decor.Kinds[entry.Kind]
+			if kind and kind.Ward and entry.At then
+				table.insert(list, { at = entry.At, radius = kind.Ward * (entry.Scale or 1) })
+			end
+		end
+		return list
+	end)(),
 }))

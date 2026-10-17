@@ -5,8 +5,10 @@ Usage: python3 tools/layout_render.py <zone> [Base|biome id] [choice] [-o out.pn
 
 Sand is shaded by height (darker = lower: cuts and pools), rock walls are dark grey, roofs a
 blue tint over what's under them, cart ramps orange. Loot spots are yellow circles (bigger =
-higher Weight), entrances green squares, patrol routes red lines, and the side-room slots
-cyan outlines with their names.
+higher Weight), entrances green squares, the side-room slots cyan outlines with their names.
+Hazards: patrols red, sinking sand brown circles, rockfall white crosses, undertow cyan lines,
+the Gloom purple (its path, and its reach as a haze); wards' light pale yellow; decor green
+dots.
 """
 
 import argparse
@@ -61,10 +63,35 @@ def main():
         a, b = px((sx, sz)), px((sx + w, sz + d))
         draw.rectangle([a, b], outline=(60, 230, 255), width=2)
         draw.text((a[0] + 3, a[1] + 2), f"{slot['name']}: {slot['room']}", fill=(160, 245, 255))
+    colors = {"Patrol": (255, 60, 60), "Sink": (120, 70, 20), "Rockfall": (255, 255, 255),
+              "Undertow": (40, 220, 255), "Gloom": (170, 60, 255)}
     for hazard in data["hazards"]:
+        color = colors.get(hazard.get("Type"), (255, 60, 60))
         path = hazard.get("Path")
         if path and len(path) > 1:
-            draw.line([px(p) for p in path], fill=(255, 60, 60), width=2)
+            draw.line([px(p) for p in path], fill=color + (230,), width=3 if hazard.get("Type") != "Gloom" else 5)
+        if hazard.get("At"):
+            cx, cy = px(hazard["At"])
+            r = (hazard.get("Radius") or 4) * SCALE
+            if hazard.get("Type") == "Rockfall":
+                draw.line([cx - r, cy - r, cx + r, cy + r], fill=color, width=3)
+                draw.line([cx - r, cy + r, cx + r, cy - r], fill=color, width=3)
+            else:
+                draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=color, width=3)
+        if hazard.get("Type") == "Gloom":
+            for point in (path or [hazard.get("At")]):
+                if point:
+                    cx, cy = px(point)
+                    r = (hazard.get("Radius") or 22) * SCALE
+                    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(60, 0, 90, 50))
+    for ward in data.get("wards", []):
+        cx, cy = px(ward["at"])
+        r = ward["radius"] * SCALE
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 240, 120, 60), outline=(255, 240, 120))
+    for entry in data.get("decor", []):
+        for point in ([entry["At"]] if entry.get("At") else (entry.get("Area") or entry.get("Path") or [])):
+            cx, cy = px(point)
+            draw.rectangle([cx - 2, cy - 2, cx + 2, cy + 2], fill=(40, 160, 70))
     for spot in data["loot"]:
         cx, cy = px(spot["At"])
         r = (3 + 2 * spot.get("Weight", 1)) * SCALE / 2
