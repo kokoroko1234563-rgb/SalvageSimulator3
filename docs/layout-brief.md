@@ -295,3 +295,86 @@ you couldn't do or think the engine needs.
   corridors (the Test Range reports routes that cross walls). About 16 to 24 crabs in the zone,
   on routes that cross the way through, so they have to be timed.
 - **Entrance:** one `Entrances` spot in the frame, in a chamber, kept flat, for its secret.
+
+---
+
+## Round 4: zone 6 as the role model
+
+Zone 6, The Drowned Reach, is being finished to the standard every other zone will copy:
+its structure fixed, its dangers placed, and its ground decorated. Assignment G below.
+
+### Dangers are deadly (the rule)
+
+A danger that only slows you is scenery. The plain zones' own dangers (`Config.Zones[i].Hazards`,
+placed by the layout's `Hazards` list, see `src/shared/Hazards.luau`) kill, or come close:
+
+| Type | Placement | What it does | Its tell |
+|---|---|---|---|
+| `Sink` | `At`, `Radius` | sinking sand: you sink while in it (fast standing still, slowly moving); fully sunk, you die | darker, wet-looking sand |
+| `Rockfall` | `At` (under a roof) | a rock falls every few seconds and kills whoever it lands on | dust and pebbles trickle down first; old rubble on the floor |
+| `Undertow` | `Path`, `Width` | while the sea covers a ford or channel, a current drags you seaward into deep water (you drown) | foam streaming along it |
+| `Gloom` | `Path` (it drifts back and forth) or `At`, `Radius` | zone 6's own: a living darkness. Inside it your dread rises; full, it takes you. Slower with a light; it drains outside it and within a ward's light. It swells once the tide turns | an inky fog; your light gutters |
+
+**Fair, not random:** a regular who knows the zone must be able to avoid every danger.
+Each has its tell, sits where it can be learned (the same spot in the frame, or the same spot
+in its crossing or room), and never blocks the only way through without a safe moment (a
+rockfall's rhythm, a ward to wait in, a way round).
+
+### Decor (the decorating pass)
+
+A layout's `Decor` list places props (`src/shared/Decor.luau` lists the kinds):
+`{ Kind = "Kelp", At = {x, z} }`, or `Count` of them over an `Area` or along a `Path`, with
+optional `Scale` and `Yaw`. Props stand on open ground (Barnacles may cling to rock), never
+collide, and come out the same every time. **Wards:** `GlowShells`, `GlowWeed` and
+`LanternPost` give off light and the Gloom can't reach within their ward radius (9, 12, 18
+studs): they're the safe spots in the Gloom's galleries, and a trail of them is a way through.
+
+The ground itself is decorated with the shape tools: `Rough` (worn edges), `Material` (a
+shape's own terrain material) and `Paint` (the ground's material in an area: mud, shingle,
+weed) and any outline with `Area`.
+
+### Looking at your work
+
+- `python3 tools/layout_render.py 6 Base 2:1,1,1,1,1,1,1 -o out.png` draws one way the zone
+  comes out from above: walls, roofs, ramps, loot, slots, every hazard, the wards' light and the
+  decor. **Look at it** (open the PNG) after each step.
+- `python3 tools/snapshot/snapshot.py top -360 3040 360 3648 --zone 6=Base:1: -o out.png` draws
+  the built game from the engine's own parts (slower: a minute).
+
+### G. Zone 6, The Drowned Reach, finished (`src/shared/Layouts/Zones/Zone6.luau`)
+
+- **Files:** `Zones/Zone6.luau`, `docs/layouts/Zone6.md`, and any generator scripts you write
+  under `tools/gen/zone6/` (commit them).
+- **Keep:** the maze itself (its walls, its five crossings' routes and times, the slots). It
+  plays well; this round is about its flaws and its dressing, not a redraw.
+- **Fix the structure:**
+  1. **Roofs fit their walls.** Replace the rounded `Path` roofs with `Area` rectangles (or
+     polygons) that sit exactly on the walls under them: no roof overhanging an open lane, no
+     rounded ends sticking into corridors, no roof floating over a junction.
+  2. **Less roof, with light.** At most about 40% of the zone under a roof. Break the long
+     galleries with gaps of open sky (light shafts). The side rooms mostly open to the sky.
+  3. **Rooms that differ.** The seven slots' rooms all look alike (a roofed box with a few
+     walls). Make each slot's rooms differ in shape and kind.
+  4. **No bars at the ends.** The top and bottom walls run nearly the full width with gates:
+     break them up so the zone's edges aren't a "find the gap" wall.
+  5. **Loot at real dead ends**, the best deepest in.
+- **Tells:** each crossing's way in (the first stretch from the top edge) gets its own
+  landmark (a big piece of decor or a shape: a wreck, a lantern post, an arch of bones), so a
+  regular knows which crossing rolled before committing. Each room's door gets one too.
+- **Dangers:** place the zone's kit, deadly and fair (see the rule above):
+  - sinking sand in a few lanes (not on the cart ramps);
+  - rockfall in some roofed passages;
+  - undertow in the channels and fords;
+  - **two or three Glooms** drifting along the galleries, with wards (lantern posts, glowing
+    weed and shells) placed as safe spots and as a lit trail through.
+  - Every crossing must stay crossable; the Gloom may make a route slow and frightening, not
+    impossible.
+- **Decorate:** a drowned, long-sunk feel. Wreck ribs, bones, kelp, chains and an anchor,
+  barnacles on the walls, dead coral, timbers; `Rough` edges on the walls (2 to 3 studs) to
+  break the grid; `Material`s (Basalt, Slate, Limestone) and `Paint` (Mud, Limestone) for
+  variety in the ground. Enough to make every lane look like somewhere, not clutter.
+- **Check:** `bash tools/check.sh`, the map tool's times (each crossing within 15% of 85 s,
+  as now), `layout_render.py` for each crossing (look at them), and the Test Range `--every`
+  once at the end, clean.
+- **Report:** what you changed, the times, a render of the first crossing, anything you
+  couldn't do.
