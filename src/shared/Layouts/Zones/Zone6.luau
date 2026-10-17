@@ -152,7 +152,7 @@ local function maze(art, x0, z0, edgeL, edgeR)
 end
 
 local FRAME = {
-	"+--+--+  +--+--+--+  +--+--+  +--+--+  +--+--+  +--+--+",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
 	"                  |                 |                  ",
 	"+--+--+--+  +  +  +  +  +--+--+--+  +  +  +  +  +  +  +",
 	"         |              |        |  |                  ",
@@ -180,14 +180,14 @@ local FRAME = {
 	"                     |           |  |        |         ",
 	"+  +  +  +  +  +  +  +--+--+--+--+  +  +  +  +--+--+--+",
 	"                  |                                    ",
-	"+--+  +--+--+  +--+--+  +--+--+  +--+--+  +--+--+  +--+",
+	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
 }
 
 local frame = {
 	Name = "The Drowned Reach",
 	Primitives = merge(maze(FRAME, X0, Z0, true, true), {
-		roof({ { -100, 232 }, { -100, 352 }, { 100, 352 }, { 100, 232 } }, 52),
-		roof({ { -100, 392 }, { -100, 552 }, { 100, 552 }, { 100, 392 } }, 52),
+		roof({ { -100, 232 }, { -100, 352 }, { 100, 352 }, { 100, 232 } }),
+		roof({ { -100, 392 }, { -100, 552 }, { 100, 552 }, { 100, 392 } }),
 		pool(-60, 352),
 		pool(60, 352),
 		pool(-100, 272),
@@ -214,9 +214,9 @@ local frame = {
 }
 
 local CROSSING1 = {
-	"+  +  +  +  +  +  +--+  +  +--+  +  +--+  +  +--+  +  +",
-	"                                          |     |      ",
-	"+  +  +  +--+--+  +  +--+  +  +  +  +  +--+  +  +  +  +",
+	"+--+--+  +--+  +--+--+--+  +--+--+--+  +  +--+--+--+--+",
+	"            |              |           |  |     |      ",
+	"+  +  +  +--+--+  +  +--+  +  +  +  +--+--+  +  +  +  +",
 	"               |  |  |                       |     |   ",
 	"+  +  +  +  +  +  +  +  +  +  +  +  +--+--+--+--+--+  +",
 	"            |  |     |                                 ",
@@ -242,19 +242,19 @@ local CROSSING1 = {
 	"      |     |                                          ",
 	"+  +--+  +--+--+  +--+  +  +  +  +  +--+--+--+  +  +  +",
 	"         |                                             ",
-	"+  +  +  +  +--+  +  +  +  +  +--+  +  +--+  +  +  +  +",
+	"+--+  +--+  +--+--+--+  +--+--+--+--+  +--+--+--+  +--+",
 }
 
 local crossing1 = {
 	Name = "West stair",
 	Primitives = merge(maze(CROSSING1, X0, Z0, true, true), {
-		roof({ { -60, 192 }, { 60, 192 } }, 52),
-		roof({ { 100, 232 }, { 100, 352 } }, 52),
-		roof({ { -60, 32 }, { 60, 32 } }, 52),
-		roof({ { -20, 552 }, { 60, 552 } }, 52),
-		roof({ { 140, 552 }, { 260, 552 } }, 52),
-		roof({ { -100, 352 }, { -20, 352 } }, 52),
-		roof({ { 140, 112 }, { 300, 112 } }, 52),
+		roof({ { -60, 192 }, { 60, 192 } }),
+		roof({ { 100, 232 }, { 100, 352 } }),
+		roof({ { -60, 32 }, { 60, 32 } }),
+		roof({ { -20, 552 }, { 60, 552 } }),
+		roof({ { 140, 552 }, { 260, 552 } }),
+		roof({ { -100, 352 }, { -20, 352 } }),
+		roof({ { 140, 112 }, { 300, 112 } }),
 		lane({ { -220, 552 }, { -180, 552 } }),
 		lane({ { -100, 232 }, { -100, 272 } }),
 		lane({ { 300, 352 }, { 340, 352 } }),
@@ -318,9 +318,9 @@ local crossing1 = {
 }
 
 local CROSSING2 = {
-	"+  +  +--+  +  +  +--+  +  +--+  +  +--+  +  +  +  +  +",
-	"            |        |                          |      ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +--+  +--+  +  +",
+	"+  +  +--+--+--+--+  +--+--+--+--+--+  +  +--+  +--+--+",
+	"   |  |     |        |                 |  |     |      ",
+	"+  +  +  +  +  +  +--+  +  +  +  +  +  +--+  +--+  +  +",
 	"               |                       |  |  |     |   ",
 	"+  +  +  +  +--+--+  +  +  +  +  +  +  +  +  +  +--+  +",
 	"               |     |                 |     |     |   ",
@@ -346,23 +346,23 @@ local CROSSING2 = {
 	"            |     |                    |  |            ",
 	"+  +--+--+--+  +--+  +  +  +  +  +  +  +  +  +  +  +  +",
 	"                                 |        |            ",
-	"+  +--+  +  +--+  +  +--+  +  +  +  +  +--+  +  +--+  +",
+	"+--+--+--+--+--+--+--+  +--+--+  +--+--+--+--+--+--+--+",
 }
 
 local crossing2 = {
 	Name = "Hall gallery",
 	Primitives = merge(maze(CROSSING2, X0, Z0, true, true), {
-		roof({ { -60, 552 }, { 20, 552 } }, 52),
-		roof({ { -60, 192 }, { 60, 192 } }, 52),
-		roof({ { -20, 32 }, { 60, 32 } }, 52),
-		roof({ { -60, 352 }, { 60, 352 } }, 52),
-		roof({ { -100, 392 }, { -100, 512 } }, 52),
-		roof({ { 260, 552 }, { 340, 552 } }, 52),
-		roof({ { -60, 392 }, { 60, 392 } }, 52),
-		roof({ { -340, 32 }, { -260, 32 } }, 52),
-		roof({ { 340, 72 }, { 340, 192 } }, 52),
-		roof({ { -300, 552 }, { -220, 552 } }, 52),
-		roof({ { -140, 392 }, { -140, 472 } }, 52),
+		roof({ { -60, 552 }, { 20, 552 } }),
+		roof({ { -60, 192 }, { 60, 192 } }),
+		roof({ { -20, 32 }, { 60, 32 } }),
+		roof({ { -60, 352 }, { 60, 352 } }),
+		roof({ { -100, 392 }, { -100, 512 } }),
+		roof({ { 260, 552 }, { 340, 552 } }),
+		roof({ { -60, 392 }, { 60, 392 } }),
+		roof({ { -340, 32 }, { -260, 32 } }),
+		roof({ { 340, 72 }, { 340, 192 } }),
+		roof({ { -300, 552 }, { -220, 552 } }),
+		roof({ { -140, 392 }, { -140, 472 } }),
 		lane({ { 140, 392 }, { 140, 432 } }),
 		lane({ { -100, 232 }, { -100, 272 } }),
 		lane({ { 220, 192 }, { 260, 192 } }),
@@ -420,9 +420,9 @@ local crossing2 = {
 }
 
 local CROSSING3 = {
-	"+  +  +--+  +  +  +--+  +  +--+  +  +--+  +  +  +  +  +",
-	"                                             |     |   ",
-	"+  +  +  +  +--+  +--+  +  +  +  +  +  +--+--+==+  +  +",
+	"+  +  +--+--+--+--+  +--+--+  +--+--+  +  +  +  +--+--+",
+	"   |  |              |     |           |  |  |     |   ",
+	"+  +  +  +  +--+  +--+  +  +  +  +  +--+--+--+==+  +  +",
 	"            |                          |        |  |   ",
 	"+  +  +  +  +  +--+--+  +  +  +  +  +  +  +--+  +  +  +",
 	"            |        |                 |  |     |  |   ",
@@ -448,22 +448,22 @@ local CROSSING3 = {
 	"   |           |  |                    |  |            ",
 	"+  +  +--+--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
 	"                                    |     |            ",
-	"+  +--+  +  +--+  +  +--+  +  +--+  +  +--+  +  +  +  +",
+	"+--+--+--+--+  +  +--+--+--+--+--+--+  +--+--+  +  +--+",
 }
 
 local crossing3 = {
 	Name = "East switchbacks",
 	Primitives = merge(maze(CROSSING3, X0, Z0, true, true), {
-		roof({ { -100, 432 }, { -100, 512 } }, 52),
-		roof({ { -60, 192 }, { 60, 192 } }, 52),
-		roof({ { 100, 392 }, { 100, 512 } }, 52),
-		roof({ { -60, 552 }, { 60, 552 } }, 52),
-		roof({ { -340, 32 }, { -260, 32 } }, 52),
-		roof({ { -20, 32 }, { 60, 32 } }, 52),
-		roof({ { -220, 312 }, { -220, 392 } }, 52),
-		roof({ { -260, 552 }, { -180, 552 } }, 52),
-		roof({ { 340, 32 }, { 340, 112 } }, 52),
-		roof({ { -260, 192 }, { -180, 192 } }, 52),
+		roof({ { -100, 432 }, { -100, 512 } }),
+		roof({ { -60, 192 }, { 60, 192 } }),
+		roof({ { 100, 392 }, { 100, 512 } }),
+		roof({ { -60, 552 }, { 60, 552 } }),
+		roof({ { -340, 32 }, { -260, 32 } }),
+		roof({ { -20, 32 }, { 60, 32 } }),
+		roof({ { -220, 312 }, { -220, 392 } }),
+		roof({ { -260, 552 }, { -180, 552 } }),
+		roof({ { 340, 32 }, { 340, 112 } }),
+		roof({ { -260, 192 }, { -180, 192 } }),
 		lane({ { -60, 392 }, { -20, 392 } }),
 		lane({ { 100, 272 }, { 100, 312 } }),
 		lane({ { -100, 232 }, { -100, 272 } }),
@@ -525,9 +525,9 @@ local crossing3 = {
 }
 
 local CROSSING4 = {
-	"+  +  +  +  +  +  +--+  +  +--+  +  +--+  +  +--+  +  +",
-	"            |                                |         ",
-	"+  +  +  +  +  +--+  +--+  +  +  +  +--+  +  +  +--+  +",
+	"+--+--+  +--+--+  +--+--+--+--+--+--+  +--+--+  +--+--+",
+	"            |  |                       |     |         ",
+	"+  +  +  +  +  +--+  +--+  +  +  +  +--+  +  +--+--+  +",
 	"            |        |                    |     |  |   ",
 	"+  +  +  +  +  +  +--+  +  +  +  +  +  +  +--+--+  +  +",
 	"               |                       |  |     |      ",
@@ -551,21 +551,21 @@ local CROSSING4 = {
 	"                                                       ",
 	"+  +  +  +  +  +--+  +  +  +  +  +  +--+  +  +  +  +  +",
 	"            |  |                       |  |            ",
-	"+  +--+--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
+	"+  +--+--+--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
 	"            |                          |  |            ",
-	"+  +  +  +  +--+  +  +  +  +  +--+  +  +  +  +  +--+  +",
+	"+--+  +--+--+  +--+--+  +--+--+  +--+--+  +--+--+--+--+",
 }
 
 local crossing4 = {
 	Name = "Long cross",
 	Primitives = merge(maze(CROSSING4, X0, Z0, true, true), {
-		roof({ { 180, 112 }, { 180, 192 } }, 52),
-		roof({ { -60, 32 }, { 60, 32 } }, 52),
-		roof({ { -20, 192 }, { 60, 192 } }, 52),
-		roof({ { -100, 152 }, { -100, 272 } }, 52),
-		roof({ { -340, 232 }, { -340, 312 } }, 52),
-		roof({ { -20, 552 }, { 60, 552 } }, 52),
-		roof({ { 260, 552 }, { 340, 552 } }, 52),
+		roof({ { 180, 112 }, { 180, 192 } }),
+		roof({ { -60, 32 }, { 60, 32 } }),
+		roof({ { -20, 192 }, { 60, 192 } }),
+		roof({ { -100, 152 }, { -100, 272 } }),
+		roof({ { -340, 232 }, { -340, 312 } }),
+		roof({ { -20, 552 }, { 60, 552 } }),
+		roof({ { 260, 552 }, { 340, 552 } }),
 		lane({ { 220, 152 }, { 220, 192 } }),
 		lane({ { 300, 352 }, { 340, 352 } }),
 		lane({ { -60, 392 }, { -20, 392 } }),
@@ -630,9 +630,9 @@ local crossing4 = {
 }
 
 local CROSSING5 = {
-	"+  +  +--+  +  +  +--+  +  +--+  +  +--+  +  +  +  +  +",
-	"                                             |  |      ",
-	"+  +  +  +--+--+  +  +--+  +  +  +  +  +--+--+  +  +  +",
+	"+  +  +  +  +  +  +--+--+--+--+--+--+  +  +  +  +--+--+",
+	"   |  |  |  |  |                       |  |  |  |      ",
+	"+  +  +  +--+--+--+  +--+  +  +  +  +--+--+--+  +  +  +",
 	"                     |                       |  |  |   ",
 	"+  +  +  +  +--+  +--+  +  +  +  +  +--+--+  +  +  +  +",
 	"            |  |                          |        |   ",
@@ -658,21 +658,21 @@ local CROSSING5 = {
 	"         |     |  |                    |               ",
 	"+  +--+  +  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +",
 	"      |     |                 |     |                  ",
-	"+  +--+  +  +--+  +  +--+  +  +  +  +  +--+  +  +--+  +",
+	"+--+--+--+--+--+--+--+--+--+--+  +  +--+--+--+--+--+--+",
 }
 
 local crossing5 = {
 	Name = "Backtrack",
 	Primitives = merge(maze(CROSSING5, X0, Z0, true, true), {
-		roof({ { 100, 432 }, { 100, 512 } }, 52),
-		roof({ { -60, 32 }, { 60, 32 } }, 52),
-		roof({ { -60, 392 }, { 60, 392 } }, 52),
-		roof({ { -60, 552 }, { 20, 552 } }, 52),
-		roof({ { -60, 352 }, { 60, 352 } }, 52),
-		roof({ { -340, 192 }, { -260, 192 } }, 52),
-		roof({ { 220, 552 }, { 340, 552 } }, 52),
-		roof({ { -20, 192 }, { 60, 192 } }, 52),
-		roof({ { -340, 32 }, { -180, 32 } }, 52),
+		roof({ { 100, 432 }, { 100, 512 } }),
+		roof({ { -60, 32 }, { 60, 32 } }),
+		roof({ { -60, 392 }, { 60, 392 } }),
+		roof({ { -60, 552 }, { 20, 552 } }),
+		roof({ { -60, 352 }, { 60, 352 } }),
+		roof({ { -340, 192 }, { -260, 192 } }),
+		roof({ { 220, 552 }, { 340, 552 } }),
+		roof({ { -20, 192 }, { 60, 192 } }),
+		roof({ { -340, 32 }, { -180, 32 } }),
 		lane({ { -100, 232 }, { -100, 272 } }),
 		lane({ { -140, 472 }, { -140, 512 } }),
 		lane({ { 300, 392 }, { 340, 392 } }),
@@ -978,6 +978,7 @@ frame.Slots = {
 		Rooms = {
 			{
 				Name = "Dead-end cave",
+				Art = SLOT1ROOM1,
 				Primitives = merge(maze(SLOT1ROOM1, 0, 0, true, false), {
 					cellRoof(20, 20),
 					cellRoof(20, 60),
@@ -997,6 +998,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Drowned pool",
+				Art = SLOT1ROOM2,
 				Primitives = merge(maze(SLOT1ROOM2, 0, 0, true, false), {
 					cellRoof(20, 60),
 					cellRoof(20, 100),
@@ -1012,6 +1014,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Boulder scramble",
+				Art = SLOT1ROOM3,
 				Primitives = merge(maze(SLOT1ROOM3, 0, 0, true, false), {
 					boulder(24, 63, 11, 10),
 				}),
@@ -1030,6 +1033,7 @@ frame.Slots = {
 		Rooms = {
 			{
 				Name = "Tunnel loop",
+				Art = SLOT2ROOM1,
 				Primitives = merge(maze(SLOT2ROOM1, 0, 0, false, false), {
 					cellRoof(20, 20),
 					cellRoof(20, 100),
@@ -1047,6 +1051,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Boulder yard",
+				Art = SLOT2ROOM2,
 				Primitives = merge(maze(SLOT2ROOM2, 0, 0, false, false), {
 					boulder(65, 22, 12, 9),
 					boulder(101, 98, 13, 10),
@@ -1059,6 +1064,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Gatehouse cellar",
+				Art = SLOT2ROOM3,
 				Primitives = merge(maze(SLOT2ROOM3, 0, 0, false, false), {
 					cellRoof(20, 20),
 					cellRoof(20, 100),
@@ -1085,6 +1091,7 @@ frame.Slots = {
 		Rooms = {
 			{
 				Name = "Dead-end cellar",
+				Art = SLOT3ROOM1,
 				Primitives = merge(maze(SLOT3ROOM1, 0, 0, false, true), {
 					cellRoof(20, 20),
 					cellRoof(20, 100),
@@ -1104,6 +1111,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Flooded cellar",
+				Art = SLOT3ROOM2,
 				Primitives = merge(maze(SLOT3ROOM2, 0, 0, false, true), {
 					cellRoof(20, 20),
 					cellRoof(60, 100),
@@ -1120,6 +1128,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Tunnel loop",
+				Art = SLOT3ROOM3,
 				Primitives = merge(maze(SLOT3ROOM3, 0, 0, false, true), {
 					cellRoof(20, 20),
 					cellRoof(20, 100),
@@ -1144,6 +1153,7 @@ frame.Slots = {
 		Rooms = {
 			{
 				Name = "Flooded hall",
+				Art = SLOT4ROOM1,
 				Primitives = merge(maze(SLOT4ROOM1, 0, 0, false, false), {
 					cellRoof(20, 20),
 					cellRoof(20, 60),
@@ -1161,6 +1171,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Collapsed hall",
+				Art = SLOT4ROOM2,
 				Primitives = merge(maze(SLOT4ROOM2, 0, 0, false, false), {
 					boulder(22, 22, 13, 8),
 					boulder(57, 22, 13, 10),
@@ -1174,6 +1185,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Pillar gallery",
+				Art = SLOT4ROOM3,
 				Primitives = merge(maze(SLOT4ROOM3, 0, 0, false, false), {
 					cellRoof(20, 20),
 					cellRoof(20, 60),
@@ -1193,6 +1205,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Dead-end vault",
+				Art = SLOT4ROOM4,
 				Primitives = merge(maze(SLOT4ROOM4, 0, 0, false, false), {
 					cellRoof(20, 20),
 					cellRoof(20, 60),
@@ -1222,6 +1235,7 @@ frame.Slots = {
 		Rooms = {
 			{
 				Name = "Tunnel loop",
+				Art = SLOT5ROOM1,
 				Primitives = merge(maze(SLOT5ROOM1, 0, 0, true, false), {
 					cellRoof(20, 20),
 					cellRoof(20, 60),
@@ -1239,6 +1253,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Dead-end cave",
+				Art = SLOT5ROOM2,
 				Primitives = merge(maze(SLOT5ROOM2, 0, 0, true, false), {
 					cellRoof(20, 20),
 					cellRoof(20, 60),
@@ -1258,6 +1273,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Boulder scramble",
+				Art = SLOT5ROOM3,
 				Primitives = merge(maze(SLOT5ROOM3, 0, 0, true, false), {
 					boulder(24, 23, 11, 9),
 					boulder(16, 60, 13, 9),
@@ -1277,6 +1293,7 @@ frame.Slots = {
 		Rooms = {
 			{
 				Name = "Dead-end vault",
+				Art = SLOT6ROOM1,
 				Primitives = merge(maze(SLOT6ROOM1, 0, 0, false, false), {
 					cellRoof(20, 20),
 					cellRoof(20, 60),
@@ -1299,6 +1316,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Flooded vault",
+				Art = SLOT6ROOM2,
 				Primitives = merge(maze(SLOT6ROOM2, 0, 0, false, false), {
 					cellRoof(20, 60),
 					cellRoof(60, 60),
@@ -1315,6 +1333,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Collapsed vault",
+				Art = SLOT6ROOM3,
 				Primitives = merge(maze(SLOT6ROOM3, 0, 0, false, false), {
 					boulder(18, 16, 12, 10),
 					boulder(15, 64, 12, 10),
@@ -1329,6 +1348,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Tunnel loop",
+				Art = SLOT6ROOM4,
 				Primitives = merge(maze(SLOT6ROOM4, 0, 0, false, false), {
 					cellRoof(20, 20),
 					cellRoof(20, 60),
@@ -1355,6 +1375,7 @@ frame.Slots = {
 		Rooms = {
 			{
 				Name = "Flooded pocket",
+				Art = SLOT7ROOM1,
 				Primitives = merge(maze(SLOT7ROOM1, 0, 0, false, true), {
 					cellRoof(20, 20),
 					cellRoof(20, 100),
@@ -1371,6 +1392,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Dead-end cave",
+				Art = SLOT7ROOM2,
 				Primitives = merge(maze(SLOT7ROOM2, 0, 0, false, true), {
 					cellRoof(20, 20),
 					cellRoof(20, 60),
@@ -1390,6 +1412,7 @@ frame.Slots = {
 			},
 			{
 				Name = "Boulder scramble",
+				Art = SLOT7ROOM3,
 				Primitives = merge(maze(SLOT7ROOM3, 0, 0, false, true), {
 					boulder(61, 100, 13, 10),
 					boulder(104, 95, 13, 9),
@@ -1403,5 +1426,146 @@ frame.Slots = {
 		},
 	},
 }
+
+-- Fitting the roofs -----------------------------------------------------------------------------
+--
+-- A roof is drawn as `roof(path)`: the lane cells along the path. Here each one becomes exact
+-- rectangles whose edges lie on the grid lines, on the walls under them: a cell is roofed only
+-- if at least two of its sides are walls (a bend, a straight, a dead end: never an open
+-- junction), and a long run is broken by light shafts (every third cell stays open to the sky).
+
+-- The walls of some pictures, as sets: h[j * 100 + i] a wall on node row j between node columns i
+-- and i + 1; v[i * 100 + j] one on node column i between node rows j and j + 1.
+local function wallSets(arts)
+	local h, v = {}, {}
+	for _, item in arts do
+		local art, i0, j0 = item[1], item[2], item[3]
+		local rows = (#art - 1) // 2
+		local cols = (#art[1] + 2) // 3 - 1
+		for j = 0, rows do
+			for c = 0, cols - 1 do
+				if string.sub(art[2 * j + 1], 3 * c + 2, 3 * c + 2) == "-" then
+					h[(j0 + j) * 100 + i0 + c] = true
+				end
+			end
+		end
+		for r = 0, rows - 1 do
+			for i = 0, cols do
+				if string.sub(art[2 * r + 2], 3 * i + 1, 3 * i + 1) == "|" then
+					v[(i0 + i) * 100 + j0 + r] = true
+				end
+			end
+		end
+	end
+	return h, v
+end
+
+local COLS, ROWS = 18, 14
+
+-- Replaces the roof markers in `list` with Area roofs. `arts` are the pictures whose walls hold
+-- the roof up ({ picture, node column, node row } each); the list's own coordinates start at
+-- (ox, oz) in the zone.
+local function fit(list, arts, ox, oz)
+	local h, v = wallSets(arts)
+	local function supported(c, r)
+		local n = 0
+		n += if h[r * 100 + c] then 1 else 0
+		n += if h[(r + 1) * 100 + c] then 1 else 0
+		n += if c == 0 or v[c * 100 + r] then 1 else 0
+		n += if c == COLS - 1 or v[(c + 1) * 100 + r] then 1 else 0
+		return n >= 2
+	end
+	local roofed = {}
+	local out = {}
+	for _, item in list do
+		if item.Kind ~= "RoofRun" then
+			table.insert(out, item)
+			continue
+		end
+		local run = {}
+		local function cell(x, z)
+			local c = math.floor((ox + x - X0) / PITCH)
+			local r = math.floor((oz + z - Z0) / PITCH)
+			local last = run[#run]
+			if not last or last[1] ~= c or last[2] ~= r then
+				table.insert(run, { c, r })
+			end
+		end
+		local path = item.Path
+		cell(path[1][1], path[1][2])
+		for k = 2, #path do
+			local a, b = path[k - 1], path[k]
+			local steps = math.max(math.abs(b[1] - a[1]), math.abs(b[2] - a[2])) // PITCH
+			for s = 1, steps do
+				cell(a[1] + (b[1] - a[1]) * s // steps, a[2] + (b[2] - a[2]) * s // steps)
+			end
+		end
+		for k, c in run do
+			local shaft = if #run == 3 then k == 2 else (#run > 3 and k % 3 == 0)
+			if
+				not shaft
+				and c[1] >= 0
+				and c[1] < COLS
+				and c[2] >= 0
+				and c[2] < ROWS
+				and supported(c[1], c[2])
+			then
+				roofed[c[2] * 100 + c[1]] = true
+			end
+		end
+	end
+	-- Rows of roofed cells, joined down into rectangles of equal width.
+	local open = {}
+	for r = 0, ROWS do
+		local now = {}
+		local c = 0
+		while c < COLS do
+			if roofed[r * 100 + c] then
+				local last = c
+				while last + 1 < COLS and roofed[r * 100 + last + 1] do
+					last += 1
+				end
+				now[c * 100 + last] = true
+				c = last + 1
+			else
+				c += 1
+			end
+		end
+		for key, first in open do
+			if not now[key] then
+				local c0, c1 = key // 100, key % 100
+				local x0, x1 = X0 + PITCH * c0 - ox, X0 + PITCH * (c1 + 1) - ox
+				local z0, z1 = Z0 + PITCH * first - oz, Z0 + PITCH * r - oz
+				table.insert(out, {
+					Kind = "Roof",
+					Area = { { x0, z0 }, { x1, z0 }, { x1, z1 }, { x0, z1 } },
+					Clearance = 22,
+					Thickness = 8,
+				})
+				open[key] = nil
+			end
+		end
+		for key in now do
+			if not open[key] then
+				open[key] = r
+			end
+		end
+	end
+	return out
+end
+
+frame.Primitives = fit(frame.Primitives, { { FRAME, 0, 0 } }, 0, 0)
+for index, crossing in frame.Crossings do
+	local art = ({ CROSSING1, CROSSING2, CROSSING3, CROSSING4, CROSSING5 })[index]
+	crossing.Primitives = fit(crossing.Primitives, { { FRAME, 0, 0 }, { art, 0, 0 } }, 0, 0)
+end
+for _, slot in frame.Slots do
+	local i0, j0 = (slot.At[1] - X0) // PITCH, (slot.At[2] - Z0) // PITCH
+	for _, room in slot.Rooms do
+		room.Primitives =
+			fit(room.Primitives, { { FRAME, 0, 0 }, { room.Art, i0, j0 } }, slot.At[1], slot.At[2])
+		room.Art = nil
+	end
+end
 
 return frame
