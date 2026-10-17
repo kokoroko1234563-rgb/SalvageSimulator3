@@ -1,10 +1,14 @@
 -- The edge of the map: a rocky coast instead of a flat grey wall. On each side the cove is closed by
--- a headland made of staggered cliff terraces, capped with moss and bushes and palms, with boulders
--- at its foot and sea stacks standing off its end. The cliff is tall by the shop and sinks into the
--- sea as it runs out, the way a real headland does.
+-- a headland of terrain rock, two staggered terraces with grass on the lower one and bushes and
+-- palms on it, boulders at its foot and sea stacks standing off its end. The rock is each zone's
+-- own (Config.Looks), and the cliff is tall by the shop and sinks into the sea as it runs out,
+-- the way a real headland does. Behind the dunes, green hills with palm groves close the view.
 --
--- What keeps players inside is a plain invisible barrier (built in BeachBuilder); everything here
--- is scenery and doesn't collide. Behind the dunes, a fringe of dune grass softens the back edge.
+-- It is all built outside the area TerrainBuilder writes (TerrainBuilder.bounds), so rebuilding
+-- a tile never cuts into it. What keeps players inside is a plain invisible barrier (built in
+-- BeachBuilder); the palms and bushes here are scenery and don't collide.
+
+local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Palette = require(Shared.Palette)
@@ -13,21 +17,19 @@ local Beach = require(Shared.Beach)
 
 local BeachDressing = require(script.Parent.BeachDressing)
 local MapParts = require(script.Parent.MapParts)
+local TerrainBuilder = require(script.Parent.TerrainBuilder)
 
 local MapEdge = {}
 
-local Z = Palette.Zone
 local C = Palette.Cosmetic
-local W = Palette.World
 local M = Palette.Material
-local add = MapParts.scenery
 
-local ROCKS = { Z.RockGrey, Z.RockDark, W.Rock, C.Stone }
 local MOSS = { C.Moss, C.Olive, C.Green }
 
-local STEP = 22 -- how far along Z each cliff section runs
+local STEP = 18 -- how far along Z each cliff section runs
 local START_Z = -130 -- the cliff starts behind the dunes
 local TOP_HEIGHT = 46 -- how tall the headland is at its tallest
+local HILLS_DEPTH = 260 -- how far back the hills behind the dunes run
 
 local function pick<T>(list: { T }, rng: Random): T
 	return list[rng:NextInteger(1, #list)]
@@ -39,80 +41,83 @@ local function topAt(z: number, seaEnd: number): number
 	return TOP_HEIGHT - (TOP_HEIGHT + 2) * t ^ 0.9
 end
 
--- One headland, on `side` (-1 or 1) of the cove.
-local function headland(folder: Folder, side: number, rng: Random)
-	local half = Beach.HalfWidth
+-- The zone's rock at a given Z (the shop's behind the shoreline).
+local function rockAt(z: number): Enum.Material
+	local zone = Config.Looks.Zones[Beach.tileAt(z) or 0] or Config.Looks.Zones[0]
+	return (Enum.Material :: any)[zone.Rock]
+end
+
+-- One headland, on `side` (-1 or 1) of the cove. `inner` is where the terrain may start.
+local function headland(terrain: Terrain, folder: Folder, side: number, inner: number, rng: Random)
 	local seaEnd = Beach.Depth + Config.Beach.SeaExtent
 	local z = START_Z
 	local index = 0
 	while z < seaEnd do
 		index += 1
 		local top = topAt(z, seaEnd)
-		local floorY = Beach.groundY(z) - 8
+		local floorY = Beach.groundY(z) - 10
+		local rock = rockAt(z)
+		local mid = z + STEP / 2
 
-		-- Two terraces: a lower one at the front and a higher one behind it.
+		-- A straight backing right against the beach's terrain, so no gap shows between them.
+		terrain:FillBlock(
+			CFrame.new(side * (inner + 6), (top - 8 + floorY) / 2, mid),
+			Vector3.new(12, math.max(top - 8 - floorY, 8), STEP),
+			rock
+		)
+		-- Two terraces: a lower one at the front and a higher one behind it, each section
+		-- turned a little so the face wanders.
 		for layer = 1, 2 do
-			-- Each section overlaps the next by a few studs. Nudge its position and width so no
-			-- two sections' faces are ever in the same plane, or they flicker where they overlap.
-			local width = (if layer == 1 then 22 else 34) + rng:NextNumber(0, 2)
-			local inner = half + 14 + (if layer == 1 then 0 else 22) + rng:NextNumber(-1.5, 1.5)
+			local width = (if layer == 1 then 26 else 40) + rng:NextNumber(0, 6)
+			local x0 = inner + (if layer == 1 then rng:NextNumber(3, 7) else 22)
 			local heightTop = if layer == 1 then top - rng:NextNumber(0, 7) else top + rng:NextNumber(3, 12)
-			local height = heightTop - floorY
-			local x = side * (inner + width / 2)
-			add(folder, {
-				Name = "Cliff",
-				Size = Vector3.new(width, height, STEP + 4),
-				CFrame = CFrame.new(x, (heightTop + floorY) / 2, z + STEP / 2),
-				Color = pick(ROCKS, rng),
-				Material = M.Rock,
-			})
-			if layer == 1 then
-				-- A mossy cap on the front terrace.
-				add(folder, {
-					Name = "Moss",
-					Size = Vector3.new(width + 1, 1.2, STEP + 2),
-					CFrame = CFrame.new(x, heightTop + 0.4, z + STEP / 2),
-					Color = pick(MOSS, rng),
-					Material = M.Grass,
-				})
-				if heightTop > 4 then
-					for _ = 1, 3 do
-						local d = rng:NextNumber(4, 7)
-						MapParts.ball(
-							folder,
-							Vector3.new(
-								x + rng:NextNumber(-8, 8),
-								heightTop + d * 0.35,
-								z + rng:NextNumber(0, STEP)
-							),
-							d,
-							pick(MOSS, rng),
-							M.Grass
-						)
-					end
-					if index % 2 == 0 then
-						local px = x + rng:NextNumber(-6, 6)
-						BeachDressing.palm(
-							folder,
-							Vector3.new(px, heightTop + 0.6, z + STEP / 2),
-							rng:NextNumber(12, 18),
-							rng
-						)
-					end
+			local x = side * (x0 + width / 2)
+			local turn = CFrame.Angles(rng:NextNumber(-0.05, 0.05), rng:NextNumber(-0.2, 0.2), 0)
+			terrain:FillBlock(
+				CFrame.new(x, (heightTop + floorY) / 2, mid) * turn,
+				Vector3.new(width, heightTop - floorY, STEP + 8),
+				rock
+			)
+			if layer == 1 and heightTop > 4 then
+				-- Grass on the front terrace, and bushes and now and then a palm on it.
+				terrain:FillBlock(
+					CFrame.new(x + side * 2, heightTop + 0.5, mid) * turn,
+					Vector3.new(width - 6, 3, STEP + 2),
+					Enum.Material.Grass
+				)
+				for _ = 1, 2 do
+					local d = rng:NextNumber(4, 7)
+					MapParts.ball(
+						folder,
+						Vector3.new(
+							x + rng:NextNumber(-6, 6),
+							heightTop + 2 + d * 0.3,
+							z + rng:NextNumber(0, STEP)
+						),
+						d,
+						pick(MOSS, rng),
+						M.Grass
+					)
+				end
+				if index % 2 == 0 then
+					BeachDressing.palm(
+						folder,
+						Vector3.new(x + rng:NextNumber(-6, 6), heightTop + 2, mid),
+						rng:NextNumber(12, 18),
+						rng
+					)
 				end
 			end
 		end
 
-		-- Boulders at the foot, where the cliff meets the beach and the sea.
-		for _ = 1, 3 do
-			local d = rng:NextNumber(10, 18)
+		-- Boulders at the foot, half sunk in the cliff.
+		for _ = 1, 2 do
+			local r = rng:NextNumber(4, 8)
 			local bz = z + rng:NextNumber(0, STEP)
-			MapParts.ball(
-				folder,
-				Vector3.new(side * (half + 10 + rng:NextNumber(0, 8)), Beach.groundY(bz) + d * 0.3, bz),
-				d,
-				pick(ROCKS, rng),
-				M.Rock
+			terrain:FillBall(
+				Vector3.new(side * (inner + r + rng:NextNumber(0, 3)), Beach.groundY(bz) + r * 0.2, bz),
+				r,
+				rock
 			)
 		end
 		z += STEP
@@ -120,64 +125,109 @@ local function headland(folder: Folder, side: number, rng: Random)
 end
 
 -- Tall rock pillars standing in the sea off the end of each headland.
-local function seaStacks(folder: Folder, side: number, rng: Random)
+local function seaStacks(terrain: Terrain, side: number, inner: number, rng: Random)
 	local half = Beach.HalfWidth
 	local seaEnd = Beach.Depth + Config.Beach.SeaExtent
 	for _ = 1, 10 do
 		local z = rng:NextNumber(250, seaEnd - 40)
-		local x = side * (half + rng:NextNumber(60, 200))
+		local radius = rng:NextNumber(5, 8)
+		local x = side * math.max(inner + radius, half + rng:NextNumber(60, 200))
 		local bottom = Beach.groundY(z) - 6
 		local top = -3 + rng:NextNumber(8, 26)
-		local diameter = rng:NextNumber(10, 16)
-		local color = pick(ROCKS, rng)
+		local rock = rockAt(z)
 		local lower = (top - bottom) * 0.7
-		MapParts.column(folder, Vector3.new(x, bottom, z), lower, diameter, color, M.Rock)
-		MapParts.column(
-			folder,
-			Vector3.new(x, bottom + lower, z),
+		terrain:FillCylinder(CFrame.new(x, bottom + lower / 2, z), lower, radius, rock)
+		terrain:FillCylinder(
+			CFrame.new(x + rng:NextNumber(-1, 1), bottom + lower + (top - bottom - lower) / 2, z),
 			top - bottom - lower,
-			diameter * 0.65,
-			color,
-			M.Rock
+			radius * 0.65,
+			rock
 		)
+		terrain:FillBall(Vector3.new(x, top, z), radius * 0.6, rock)
 	end
 end
 
--- A fringe of dune grass and bushes along the back of the beach, behind the dunes.
-local function backFringe(folder: Folder, rng: Random)
-	local half = Beach.HalfWidth
-	for _ = 1, 40 do
-		local x = rng:NextNumber(-half + 10, half - 10)
-		local z = rng:NextNumber(-124, -84)
-		local color = pick(MOSS, rng)
-		for _ = 1, 5 do
-			local h = rng:NextNumber(2, 4)
-			add(folder, {
-				Name = "Grass",
-				Size = Vector3.new(0.25, h, 0.06),
-				CFrame = CFrame.new(
-					x + rng:NextNumber(-0.6, 0.6),
-					4 + h / 2 - 0.5,
-					z + rng:NextNumber(-0.6, 0.6)
-				) * CFrame.Angles(
-					rng:NextNumber(-0.25, 0.25),
-					rng:NextNumber() * math.pi,
-					rng:NextNumber(-0.25, 0.25)
-				),
-				Color = color,
-				Material = M.Grass,
-			})
+-- Behind the dunes: a strip of sand, then rolling green hills with palm groves on them.
+local function hills(terrain: Terrain, folder: Folder, back: number, outer: number, rng: Random)
+	local depth = HILLS_DEPTH
+	local sand = 16
+	terrain:FillBlock(
+		CFrame.new(0, -6, back - sand / 2),
+		Vector3.new(outer * 2, 12, sand),
+		Enum.Material.Sand
+	)
+	terrain:FillBlock(
+		CFrame.new(0, -6, back - sand - (depth - sand) / 2),
+		Vector3.new(outer * 2, 12, depth - sand),
+		Enum.Material.Grass
+	)
+	local tops = {}
+	for _ = 1, 54 do
+		local r = rng:NextNumber(22, 46)
+		local x = rng:NextNumber(-outer, outer)
+		-- Low mounds near the front, growing taller further back.
+		local z = back - sand - rng:NextNumber(r * 0.4, depth - r)
+		local height = 2 + (back - z) * rng:NextNumber(0.06, 0.14)
+		terrain:FillBall(Vector3.new(x, height - r, z), r, Enum.Material.Grass)
+		table.insert(tops, Vector3.new(x, height, z))
+	end
+	-- Palm groves on a few of the hilltops, and bushes round them.
+	for index, at in tops do
+		if index % 3 == 0 then
+			for _ = 1, rng:NextInteger(3, 6) do
+				local a = rng:NextNumber() * math.pi * 2
+				local d = rng:NextNumber(2, 14)
+				local base = at + Vector3.new(math.cos(a) * d, -1 - d * 0.15, math.sin(a) * d)
+				BeachDressing.palm(folder, base, rng:NextNumber(14, 22), rng)
+			end
+		end
+		for _ = 1, 3 do
+			local a = rng:NextNumber() * math.pi * 2
+			local d = rng:NextNumber(6, 18)
+			local size = rng:NextNumber(5, 9)
+			MapParts.ball(
+				folder,
+				at + Vector3.new(math.cos(a) * d, -0.5 - d * 0.18, math.sin(a) * d),
+				size,
+				pick(MOSS, rng),
+				M.Grass
+			)
 		end
 	end
-	for _ = 1, 24 do
+end
+
+-- Dune grass along the back of the beach, in clumps along the dunes' crest with open sand
+-- between them.
+local function backFringe(folder: Folder, rng: Random)
+	local half = Beach.HalfWidth
+	for _ = 1, 16 do
+		local cx = rng:NextNumber(-half + 20, half - 20)
+		local cz = rng:NextNumber(-120, -96)
+		local color = pick(MOSS, rng)
+		for _ = 1, rng:NextInteger(4, 8) do
+			local x = cx + rng:NextNumber(-7, 7)
+			local z = cz + rng:NextNumber(-5, 5)
+			for _ = 1, 5 do
+				local h = rng:NextNumber(2, 4)
+				MapParts.scenery(folder, {
+					Name = "Grass",
+					Size = Vector3.new(0.25, h, 0.06),
+					CFrame = CFrame.new(
+						x + rng:NextNumber(-0.6, 0.6),
+						4 + h / 2 - 0.5,
+						z + rng:NextNumber(-0.6, 0.6)
+					) * CFrame.Angles(
+						rng:NextNumber(-0.25, 0.25),
+						rng:NextNumber() * math.pi,
+						rng:NextNumber(-0.25, 0.25)
+					),
+					Color = color,
+					Material = M.Grass,
+				})
+			end
+		end
 		local d = rng:NextNumber(3, 6)
-		MapParts.ball(
-			folder,
-			Vector3.new(rng:NextNumber(-half + 10, half - 10), 4 + d * 0.3, rng:NextNumber(-126, -86)),
-			d,
-			pick(MOSS, rng),
-			M.Grass
-		)
+		MapParts.ball(folder, Vector3.new(cx, 4 + d * 0.3, cz - 4), d, color, M.Grass)
 	end
 end
 
@@ -186,11 +236,18 @@ function MapEdge.build(map: Instance)
 	folder.Name = "MapEdge"
 	folder.Parent = map
 	local rng = Random.new(41)
-	for side = -1, 1, 2 do
-		headland(folder, side, rng)
-		seaStacks(folder, side, rng)
-	end
 	backFringe(folder, rng)
+	local terrain = Workspace:FindFirstChildOfClass("Terrain")
+	if not terrain then
+		return -- tools/tests: no Terrain to write to
+	end
+	local lo, hi = TerrainBuilder.bounds()
+	local inner = hi.X
+	for side = -1, 1, 2 do
+		headland(terrain, folder, side, inner, rng)
+		seaStacks(terrain, side, inner, rng)
+	end
+	hills(terrain, folder, lo.Z, inner + 80, rng)
 end
 
 return MapEdge

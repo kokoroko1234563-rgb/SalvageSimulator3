@@ -106,6 +106,9 @@ local stubs = {
 	Terrain = {
 		WriteVoxels = function() end,
 		SetMaterialColor = function() end,
+		FillBlock = function() end,
+		FillBall = function() end,
+		FillCylinder = function() end,
 	},
 	PhysicsService = {
 		RegisterCollisionGroup = function() end,

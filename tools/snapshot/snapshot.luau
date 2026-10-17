@@ -53,9 +53,37 @@ local step = JOB.step or 2
 -- The terrain: height and colour on a grid (the colour of the material the terrain is built of).
 local reader = Looks.terrainReader()
 local terrain = {}
+local lo, hi = require(Server.TerrainBuilder).bounds()
+-- The top of the terrain in the 4-stud column at (x, z), read from the voxels (raycasts find
+-- nothing here: the place isn't running).
+local function columnTop(x: number, z: number): (number?, Enum.Material?)
+	local cx, cz = math.floor(x / 4) * 4, math.floor(z / 4) * 4
+	local region = Region3.new(Vector3.new(cx, -120, cz), Vector3.new(cx + 4, 120, cz + 4))
+	local materials, occupancy = Workspace.Terrain:ReadVoxels(region, 4)
+	local column, filled = materials[1], occupancy[1]
+	for iy = #column, 1, -1 do
+		local m = column[iy][1]
+		if m ~= Enum.Material.Air and m ~= Enum.Material.Water and filled[iy][1] > 0 then
+			return -120 + (iy - 1 + filled[iy][1]) * 4, m
+		end
+	end
+	return nil, nil
+end
 for z = z0, z1, step do
 	local row = {}
 	for x = x0, x1, step do
+		if x < lo.X or x > hi.X or z < lo.Z then
+			-- Outside what TerrainBuilder writes (MapEdge's cliffs and hills): the real terrain.
+			local top, material = columnTop(x, z)
+			local color = if material
+				then Workspace.Terrain:GetMaterialColor(material)
+				else Color3.new(0.1, 0.1, 0.12)
+			table.insert(
+				row,
+				string.format("%.1f %02x%02x%02x", top or -60, color.R * 255, color.G * 255, color.B * 255)
+			)
+			continue
+		end
 		local height, rock, shapeMaterial = Beach.shapeAt(x, z)
 		local floor, rockMaterial = reader(x, z)
 		local paint = Beach.paintAt(x, z)

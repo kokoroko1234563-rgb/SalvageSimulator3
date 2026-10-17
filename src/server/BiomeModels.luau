@@ -637,10 +637,11 @@ local BIOMES = {
 	{ "Black Sand Vents", B.BlackSand, blackSandVents },
 }
 
--- The showcase strip: every biome on a flat strip behind the dunes, seven to a row. It's
--- off the playable beach, so it's there to look at and walk around.
+-- The showcase strip: every biome on a flat strip, seven to a row, off the map on the shop
+-- side (short of the showroom, Config.Showroom), where nobody on the beach can see it.
 local ROW_Z = { -200, -320 }
 local COLUMN_X = { -300, -200, -100, 0, 100, 200, 300 }
+local SHOWCASE_X = 5200
 
 -- The centre of each biome's plot, by biome name, filled in by showcase. The cosmetic props
 -- use it to dress each biome.
@@ -654,7 +655,7 @@ function BiomeModels.showcase(map: Instance)
 	MapParts.part({
 		Name = "ShowcaseGround",
 		Size = Vector3.new(720, 10, 300),
-		CFrame = CFrame.new(0, -5, -260),
+		CFrame = CFrame.new(SHOWCASE_X, -5, -260),
 		Color = W.Sand,
 		Material = M.Sand,
 	}).Parent =
@@ -663,7 +664,11 @@ function BiomeModels.showcase(map: Instance)
 	for i, entry in BIOMES do
 		local name, ground, build = entry[1], entry[2], entry[3]
 		local index = i - 1
-		local c = Vector3.new(COLUMN_X[index % #COLUMN_X + 1], 0, ROW_Z[math.floor(index / #COLUMN_X) + 1])
+		local c = Vector3.new(
+			SHOWCASE_X + COLUMN_X[index % #COLUMN_X + 1],
+			0,
+			ROW_Z[math.floor(index / #COLUMN_X) + 1]
+		)
 		local p = plot(folder, c, name, ground)
 		BiomeModels.Plots[name] = c
 		build(p, c, Random.new(300 + i))

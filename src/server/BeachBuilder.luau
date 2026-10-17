@@ -405,6 +405,17 @@ function BeachBuilder.build(): Folder
 			map
 	end
 
+	-- And at the back, behind the dunes, where the hills begin.
+	local back = TerrainBuilder.bounds()
+	MapParts.part({
+		Name = "BackBarrier",
+		Size = Vector3.new(beach.Width + 240, 80, 20),
+		CFrame = CFrame.new(0, 20, back.Z - 10),
+		Transparency = 1,
+		CanQuery = false,
+	}).Parent =
+		map
+
 	buildZoneMarkers(map)
 	buildSandbarMarker(map)
 	buildPools(map)
