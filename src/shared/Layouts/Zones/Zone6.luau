@@ -17,7 +17,7 @@ local PITCH = 40 -- grid: lane centres 40 apart
 local X0, Z0 = -360, 12 -- the first node of the picture, in zone coordinates
 
 local function wall(path)
-	return { Kind = "Wall", Path = path, Height = 24, Width = 12 }
+	return { Kind = "Wall", Path = path, Height = 24, Width = 12, Rough = 2 }
 end
 
 -- A pile of rubble filling a doorway: a scramble on foot, too steep for a cart.
@@ -33,12 +33,12 @@ end
 
 -- A pool: low ground that holds the sea from early in the flood.
 local function pool(x, z, radius)
-	return { Kind = "Hollow", At = { x, z }, Radius = radius or 12, Depth = 3 }
+	return { Kind = "Hollow", At = { x, z }, Radius = radius or 12, Depth = 3, Material = "Mud" }
 end
 
 -- A sunk lane: floods before the ground round it.
 local function lane(path)
-	return { Kind = "Channel", Path = path, Depth = 2, Width = 12 }
+	return { Kind = "Channel", Path = path, Depth = 2, Width = 12, Material = "Mud" }
 end
 
 -- Rock over one lane cell of a side room (a marker, like `roof`).
@@ -805,6 +805,18 @@ frame.Slots = {
 						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
 						Count = 4,
 					},
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 8,
+					},
+					{
+						Kind = "DeadCoral",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 3,
+					},
+					{ Kind = "Timber", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 2 },
+					prop("GlowShells", 110, 10),
 				},
 			}),
 			makeRoom(true, false, {
@@ -833,6 +845,8 @@ frame.Slots = {
 						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
 						Count = 1,
 					},
+					{ Kind = "Kelp", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 8 },
+					{ Kind = "Weed", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 4 },
 				},
 			}),
 			makeRoom(true, false, {
@@ -872,6 +886,21 @@ frame.Slots = {
 						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
 						Count = 4,
 					},
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 10,
+					},
+					{
+						Kind = "Urchins",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 4,
+					},
+					{
+						Kind = "Barnacles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 6,
+					},
 				},
 			}),
 		},
@@ -906,6 +935,14 @@ frame.Slots = {
 				Decor = {
 					{ Kind = "Anchor", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
 					{ Kind = "Chain", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
+					{ Kind = "Chain", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 3 },
+					{ Kind = "Bones", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 1 },
+					{
+						Kind = "Barnacles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 6,
+					},
+					prop("GlowShells", 70, 50),
 				},
 			}),
 			makeRoom(false, false, {
@@ -932,6 +969,17 @@ frame.Slots = {
 				Decor = {
 					{ Kind = "Timber", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 2 },
 					{ Kind = "Chain", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
+					{ Kind = "Timber", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 4 },
+					{
+						Kind = "Barnacles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 6,
+					},
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 4,
+					},
 				},
 			}),
 			makeRoom(false, false, {
@@ -961,6 +1009,18 @@ frame.Slots = {
 						Count = 2,
 					},
 					{ Kind = "Pebbles", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 4 },
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 8,
+					},
+					{
+						Kind = "DeadCoral",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 3,
+					},
+					{ Kind = "Timber", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 2 },
+					prop("GlowShells", 70, 50),
 				},
 			}),
 		},
@@ -992,6 +1052,17 @@ frame.Slots = {
 				Decor = {
 					{ Kind = "Bones", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
 					{ Kind = "Starfish", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 2 },
+					{ Kind = "Bones", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 2 },
+					{
+						Kind = "Starfish",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 3,
+					},
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 6,
+					},
 				},
 				Hazards = {
 					{ Type = "Sink", At = { 60, 74 }, Radius = 9 },
@@ -1021,6 +1092,8 @@ frame.Slots = {
 				Decor = {
 					{ Kind = "Kelp", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 3 },
 					{ Kind = "Starfish", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
+					{ Kind = "Kelp", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 8 },
+					{ Kind = "Weed", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 4 },
 				},
 			}),
 			makeRoom(false, true, {
@@ -1046,6 +1119,8 @@ frame.Slots = {
 				Decor = {
 					{ Kind = "Weed", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 4 },
 					{ Kind = "Kelp", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 2 },
+					{ Kind = "Weed", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 10 },
+					{ Kind = "Kelp", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 6 },
 				},
 			}),
 		},
@@ -1085,6 +1160,8 @@ frame.Slots = {
 						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
 						Count = 1,
 					},
+					{ Kind = "Kelp", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 8 },
+					{ Kind = "Weed", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
 				},
 			}),
 			makeRoom(false, false, {
@@ -1125,6 +1202,13 @@ frame.Slots = {
 						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
 						Count = 5,
 					},
+					{ Kind = "Timber", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
+					{ Kind = "Crate", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 2 },
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
+						Count = 12,
+					},
 				},
 				Hazards = {
 					{ Type = "Rockfall", At = { 60, 20 } },
@@ -1162,6 +1246,17 @@ frame.Slots = {
 						Kind = "Chain",
 						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
 						Count = 1,
+					},
+					{ Kind = "Timber", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
+					{
+						Kind = "Barnacles",
+						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
+						Count = 6,
+					},
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
+						Count = 4,
 					},
 					prop("LanternPost", 50, 24),
 					prop("GlowWeed", 90, 34),
@@ -1201,6 +1296,14 @@ frame.Slots = {
 						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
 						Count = 1,
 					},
+					{ Kind = "Bones", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 2 },
+					{
+						Kind = "DeadCoral",
+						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
+						Count = 4,
+					},
+					{ Kind = "Chain", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 2 },
+					prop("GlowShells", 150, 10),
 				},
 				Hazards = {
 					{ Type = "Rockfall", At = { 60, 20 } },
@@ -1245,6 +1348,14 @@ frame.Slots = {
 						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
 						Count = 1,
 					},
+					{ Kind = "Chain", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 3 },
+					{ Kind = "Bones", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 1 },
+					{
+						Kind = "Barnacles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 6,
+					},
+					prop("GlowShells", 70, 50),
 				},
 			}),
 			makeRoom(true, false, {
@@ -1278,6 +1389,18 @@ frame.Slots = {
 						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
 						Count = 4,
 					},
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 8,
+					},
+					{
+						Kind = "DeadCoral",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 3,
+					},
+					{ Kind = "Timber", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 2 },
+					prop("GlowShells", 30, 90),
 				},
 			}),
 			makeRoom(true, false, {
@@ -1315,6 +1438,21 @@ frame.Slots = {
 						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
 						Count = 4,
 					},
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 10,
+					},
+					{
+						Kind = "Urchins",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 4,
+					},
+					{
+						Kind = "Barnacles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 6,
+					},
 				},
 			}),
 		},
@@ -1349,6 +1487,13 @@ frame.Slots = {
 						Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } },
 						Count = 1,
 					},
+					{ Kind = "Chain", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
+					{
+						Kind = "WreckRibs",
+						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
+						Count = 1,
+					},
+					{ Kind = "Kelp", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
 				},
 			}),
 			makeRoom(false, false, {
@@ -1379,6 +1524,8 @@ frame.Slots = {
 						Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } },
 						Count = 1,
 					},
+					{ Kind = "Kelp", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 8 },
+					{ Kind = "Weed", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
 				},
 			}),
 			makeRoom(false, false, {
@@ -1410,6 +1557,13 @@ frame.Slots = {
 						Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } },
 						Count = 5,
 					},
+					{ Kind = "Timber", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
+					{ Kind = "Crate", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 2 },
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
+						Count = 12,
+					},
 				},
 				Hazards = {
 					{ Type = "Rockfall", At = { 60, 100 } },
@@ -1438,6 +1592,14 @@ frame.Slots = {
 				Decor = {
 					{ Kind = "Anchor", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 1 },
 					{ Kind = "Chain", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 1 },
+					{ Kind = "Chain", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 3 },
+					{ Kind = "Bones", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 1 },
+					{
+						Kind = "Barnacles",
+						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
+						Count = 6,
+					},
+					prop("GlowShells", 70, 50),
 				},
 			}),
 		},
@@ -1468,6 +1630,8 @@ frame.Slots = {
 				Decor = {
 					{ Kind = "Kelp", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 3 },
 					{ Kind = "Starfish", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 1 },
+					{ Kind = "Kelp", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 8 },
+					{ Kind = "Weed", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 4 },
 				},
 			}),
 			makeRoom(false, true, {
@@ -1498,6 +1662,18 @@ frame.Slots = {
 						Count = 2,
 					},
 					{ Kind = "Pebbles", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 4 },
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 8,
+					},
+					{
+						Kind = "DeadCoral",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 3,
+					},
+					{ Kind = "Timber", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 2 },
+					prop("GlowShells", 110, 90),
 				},
 			}),
 			makeRoom(false, true, {
@@ -1524,6 +1700,21 @@ frame.Slots = {
 					{ Kind = "Crate", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 1 },
 					{ Kind = "Urchins", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 2 },
 					{ Kind = "Pebbles", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 4 },
+					{
+						Kind = "Pebbles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 10,
+					},
+					{
+						Kind = "Urchins",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 4,
+					},
+					{
+						Kind = "Barnacles",
+						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
+						Count = 6,
+					},
 				},
 			}),
 		},
@@ -1566,6 +1757,18 @@ end
 
 local COLS, ROWS = 18, 14
 
+-- The rock of the walls changes from ward to ward (the zone's own is Basalt, left as it is).
+local WALL_ROCK = {
+	{ false, "Slate", false },
+	{ "Limestone", false, "Slate" },
+	{ "Slate", "Limestone", false },
+}
+local function rockAt(x, z)
+	local col = if x < -120 then 1 elseif x < 120 then 2 else 3
+	local row = if z < 212 then 1 elseif z < 412 then 2 else 3
+	return WALL_ROCK[row][col]
+end
+
 -- Replaces the roof markers in `list` with Area roofs. `arts` are the pictures whose walls hold
 -- the roof up ({ picture, node column, node row } each); the list's own coordinates start at
 -- (ox, oz) in the zone.
@@ -1583,6 +1786,9 @@ local function fit(list, arts, ox, oz)
 	local out = {}
 	for _, item in list do
 		if item.Kind ~= "RoofRun" then
+			if item.Kind == "Wall" then
+				item.Material = rockAt(ox + item.Path[1][1], oz + item.Path[1][2]) or nil
+			end
 			table.insert(out, item)
 			continue
 		end
@@ -1645,6 +1851,7 @@ local function fit(list, arts, ox, oz)
 					Area = { { x0, z0 }, { x1, z0 }, { x1, z1 }, { x0, z1 } },
 					Clearance = 22,
 					Thickness = 8,
+					Material = "Slate",
 				})
 				open[key] = nil
 			end
@@ -1675,6 +1882,70 @@ for _, slot in frame.Slots do
 end
 
 -- Dressing: decor, dangers and tells -----------------------------------------------------------
+
+-- Ground: patches of mud and drowned silt over the floor (the same each tide), and each ward
+-- its own look. Props stand on open ground only, so walls and roofs clear them away.
+local function patches()
+	local list = {}
+	for c = 0, COLS - 1 do
+		for r = 0, ROWS - 1 do
+			local h = (c * 7 + r * 13 + c * r * 3) % 11
+			local material = if h == 0 or h == 1 then "Mud" elseif h == 2 then "Limestone" else nil
+			if material then
+				local x, z = X0 + PITCH * c + PITCH // 2, Z0 + PITCH * r + PITCH // 2
+				table.insert(list, {
+					Kind = "Paint",
+					Area = { { x - 16, z - 16 }, { x + 16, z - 16 }, { x + 16, z + 16 }, { x - 16, z + 16 } },
+					Material = material,
+					Rough = 6,
+				})
+			end
+		end
+	end
+	return list
+end
+
+-- The nine wards (by the long walls): what lies in each, as { kind, count, scale }.
+local THEMES = {
+	{
+		{ { "Kelp", 24 }, { "Weed", 12 }, { "Starfish", 6 } }, -- a kelp forest
+		{ { "WreckRibs", 3, 1.2 }, { "Timber", 8 }, { "Chain", 5 }, { "Crate", 3 }, { "Anchor", 1 } }, -- a wreck yard
+		{ { "Bones", 4, 1.4 }, { "Pebbles", 12 }, { "DeadCoral", 6 } }, -- a bone field
+	},
+	{
+		{ { "DeadCoral", 16 }, { "Urchins", 8 }, { "Starfish", 5 } }, -- coral gardens
+		{ { "WreckRibs", 2, 1.5 }, { "Timber", 6 }, { "Crate", 3 }, { "Pebbles", 10 } }, -- the halls
+		{ { "Kelp", 20 }, { "Weed", 10 }, { "Urchins", 4 } }, -- weed beds
+	},
+	{
+		{ { "Anchor", 2 }, { "Chain", 8 }, { "Timber", 6 }, { "Urchins", 5 } }, -- an anchorage
+		{ { "Kelp", 16 }, { "DeadCoral", 8 }, { "Bones", 3 } }, -- a sunken grove
+		{ { "WreckRibs", 2, 1.3 }, { "Bones", 5, 1.2 }, { "Pebbles", 10 } }, -- a graveyard
+	},
+}
+frame.Decor = {}
+for row, wards in THEMES do
+	for col, items in wards do
+		local x0, x1 = -360 + 240 * (col - 1) + 8, -360 + 240 * col - 8
+		local z0 = ({ 12, 212, 412 })[row] + 8
+		local z1 = ({ 212, 412, 596 })[row] - 8
+		for _, item in items do
+			table.insert(frame.Decor, scatter(item[1], x0, z0, x1, z1, item[2], item[3]))
+		end
+	end
+end
+-- Barnacles crust the tops of the long walls.
+for j = 1, ROWS do
+	local z = Z0 + PITCH * j
+	table.insert(frame.Decor, {
+		Kind = "Barnacles",
+		Path = { { -340, z }, { 340, z } },
+		Count = 22,
+	})
+end
+for _, item in patches() do
+	table.insert(frame.Primitives, item)
+end
 
 -- Each crossing's way in (its first stretch from the top edge) has its own landmark, so a
 -- regular knows which crossing rolled before committing: 1 an anchor and chain, 2 a hull's

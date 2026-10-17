@@ -220,6 +220,33 @@ def door_tell(r):
     return ['{ Kind = "%s", Area = %s, Count = %d }' % (k, area, n) for k, n in TELLS[KINDS[r["name"]]]]
 
 
+# kind: props scattered over the whole room (kind, count)
+FILL = {
+    "cave": [("Pebbles", 8), ("DeadCoral", 3), ("Timber", 2)],
+    "pool": [("Kelp", 8), ("Weed", 4)],
+    "scramble": [("Pebbles", 10), ("Urchins", 4), ("Barnacles", 6)],
+    "ring": [("Chain", 3), ("Bones", 1), ("Barnacles", 6)],
+    "court": [("Timber", 4), ("Barnacles", 6), ("Pebbles", 4)],
+    "flats": [("Bones", 2), ("Starfish", 3), ("Pebbles", 6)],
+    "weed": [("Weed", 10), ("Kelp", 6)],
+    "rubble": [("Timber", 4), ("Crate", 2), ("Pebbles", 12)],
+    "vault": [("Bones", 2), ("DeadCoral", 4), ("Chain", 2)],
+    "gallery": [("Chain", 4), ("WreckRibs", 1), ("Kelp", 4)],
+}
+
+
+def room_decor(r):
+    name, at, w, door, side, _, _ = SLOTS[r["slot"]]
+    area = "{ { 8, 8 }, { %d, 8 }, { %d, 112 }, { 8, 112 } }" % (40 * w - 8, 40 * w - 8)
+    out = ['{ Kind = "%s", Area = %s, Count = %d }' % (k, area, n) for k, n in FILL[KINDS[r["name"]]]]
+    # a glow of shells by the best find in the dark kinds: a light to reach for
+    if KINDS[r["name"]] in ("cave", "vault", "ring") and r["loot"]:
+        best = max(r["loot"], key=lambda l: l[2])
+        x, z = (cx(best[0]) + 10, cx(best[1]) - 10) if best[0] < 10 else (best[0], best[1])
+        out.append('prop("GlowShells", %d, %d)' % (x, z))
+    return out
+
+
 def lua_room(r):
     name, at, w, door, side, edgeL, edgeR = SLOTS[r["slot"]]
     out = []
@@ -239,7 +266,7 @@ def lua_room(r):
         x, z = (cx(l[0]), cx(l[1])) if l[0] < 10 and l[1] < 10 else (l[0], l[1])
         out.append("\t\t\t\t\tloot(%d, %d, %d)," % (x, z, l[2]))
     out.append("\t\t\t\t},")
-    decor = door_tell(r) + r["decor"]
+    decor = door_tell(r) + room_decor(r) + r["decor"]
     if decor:
         out.append("\t\t\t\tDecor = {")
         for d in decor:
