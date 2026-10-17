@@ -13,6 +13,7 @@ local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 
 local BeachCheer = require(script.Parent.BeachCheer)
+local Boardwalk = require(script.Parent.Boardwalk)
 local BeachDressing = require(script.Parent.BeachDressing)
 local Buildings = require(script.Parent.Buildings)
 local MapParts = require(script.Parent.MapParts)
@@ -192,6 +193,7 @@ local function buildShop(map: Folder)
 		Material = Palette.Material.WoodPlanks,
 	}).Parent =
 		shop
+	Boardwalk.build(shop, Vector3.new(0, 1, -beach.ShopDepth / 2 - 2), Vector2.new(120, beach.ShopDepth - 10))
 
 	-- Shopkeeper's house: the shopkeeper stands behind the counter, facing the door.
 	Buildings.house(shop, "ShopHouse", Vector3.new(SHOP_X, 0, HOUSE_Z), HOUSE_WIDTH, HOUSE_DEPTH, "SHOP")

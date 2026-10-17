@@ -1,6 +1,7 @@
 -- Buildings and people for the shore. A house is a floor, four walls with a doorway in the front
--- (facing the sea, +Z), a flat roof, an awning over the door and a sign on the front. People are
--- real Roblox avatars (the default R15 rig, from the engine itself), recoloured in code.
+-- (facing the sea, +Z), a gabled roof, a striped awning over the door, shuttered windows with
+-- flower boxes, white trim and a sign on the front. People are real Roblox avatars (the default
+-- R15 rig, from the engine itself), recoloured in code.
 -- Everything stands on the dry sand behind the shoreline, with the floor raised above it.
 
 local Players = game:GetService("Players")
@@ -81,39 +82,151 @@ function Buildings.house(
 		Vector3.new(cx, floorY + doorH + (height - doorH) / 2, frontZ)
 	)
 
-	-- Windows on both sides, glass a little proud of the wall.
-	for side = -1, 1, 2 do
-		MapParts.part({
+	-- A window: glass a little proud of the wall, in a white frame. `out` is the way the wall
+	-- faces (a unit vector along X or Z); `along` is its width along the wall.
+	local function window(center: Vector3, out: Vector3, along: number, tall: number, shutters: boolean)
+		local flat = if out.X ~= 0 then Vector3.new(0.3, tall, along) else Vector3.new(along, tall, 0.3)
+		local frame = if out.X ~= 0
+			then Vector3.new(0.4, tall + 1, along + 1)
+			else Vector3.new(along + 1, tall + 1, 0.4)
+		MapParts.scenery(model, {
+			Name = "WindowFrame",
+			Size = frame,
+			CFrame = CFrame.new(center + out * 0.1),
+			Color = Palette.World.Trim,
+			Material = Palette.Material.Wood,
+		})
+		MapParts.scenery(model, {
 			Name = "Window",
-			Size = Vector3.new(0.3, height * 0.35, depth * 0.35),
-			CFrame = CFrame.new(cx + side * (width / 2 + 0.05), floorY + height * 0.55, cz),
+			Size = flat,
+			CFrame = CFrame.new(center + out * 0.3),
 			Color = Palette.World.Window,
 			Material = Palette.Material.Glass,
 			Transparency = 0.3,
-			CanCollide = false,
-		}).Parent =
-			model
+		})
+		if not shutters then
+			return
+		end
+		-- Shutters either side and a flower box below.
+		local side = if out.X ~= 0 then Vector3.new(0, 0, 1) else Vector3.new(1, 0, 0)
+		local shutterW = along * 0.32
+		for s = -1, 1, 2 do
+			MapParts.scenery(model, {
+				Name = "Shutter",
+				Size = if out.X ~= 0
+					then Vector3.new(0.3, tall + 1, shutterW)
+					else Vector3.new(shutterW, tall + 1, 0.3),
+				CFrame = CFrame.new(center + out * 0.2 + side * s * (along / 2 + 0.5 + shutterW / 2)),
+				Color = Palette.World.Shutter,
+				Material = Palette.Material.Wood,
+			})
+		end
+		local boxAt = center + out * 0.9 - Vector3.new(0, tall / 2 + 1, 0)
+		MapParts.scenery(model, {
+			Name = "FlowerBox",
+			Size = if out.X ~= 0 then Vector3.new(1.4, 1.2, along + 1) else Vector3.new(along + 1, 1.2, 1.4),
+			CFrame = CFrame.new(boxAt),
+			Color = Palette.World.Counter,
+			Material = Palette.Material.WoodPlanks,
+		})
+		local blooms = { Palette.World.Bloom, Palette.World.Frond, Palette.World.BloomPale }
+		local count = math.max(3, math.floor(along / 1.6))
+		for i = 1, count do
+			local t = (i - 0.5) / count - 0.5
+			MapParts.ball(model, boxAt + side * t * along + Vector3.new(0, 0.9, 0), 1.3, blooms[i % 3 + 1])
+		end
 	end
 
-	-- Flat roof with a small overhang.
-	MapParts.part({
-		Name = "Roof",
-		Size = Vector3.new(width + 2, 1, depth + 2),
-		CFrame = CFrame.new(cx, floorY + height + 0.5, cz),
-		Color = Palette.World.RoofTile,
-		Material = Palette.Material.Rock,
-	}).Parent =
-		model
+	-- Windows on both sides, and either side of the door on the front.
+	for side = -1, 1, 2 do
+		window(
+			Vector3.new(cx + side * (width / 2), floorY + height * 0.55, cz),
+			Vector3.new(side, 0, 0),
+			depth * 0.35,
+			height * 0.35,
+			false
+		)
+		window(
+			Vector3.new(cx + side * (doorW / 2 + sideWidth / 2), floorY + height * 0.45, frontZ + WALL / 2),
+			Vector3.new(0, 0, 1),
+			sideWidth * 0.45,
+			height * 0.3,
+			true
+		)
+	end
 
-	-- Awning over the door.
-	MapParts.part({
-		Name = "Awning",
-		Size = Vector3.new(doorW + 5, 0.5, 4),
-		CFrame = CFrame.new(cx, floorY + doorH + 0.5, frontZ + 2),
-		Color = Palette.World.Awning,
-		Material = Palette.Material.Fabric,
-	}).Parent =
-		model
+	-- White boards up the corners and round the doorway.
+	for sx = -1, 1, 2 do
+		for sz = -1, 1, 2 do
+			MapParts.scenery(model, {
+				Name = "Corner",
+				Size = Vector3.new(1.6, height, 1.6),
+				CFrame = CFrame.new(cx + sx * (width / 2 - 0.5), wallsY, cz + sz * (depth / 2 - 0.5)),
+				Color = Palette.World.Trim,
+				Material = Palette.Material.Wood,
+			})
+		end
+		MapParts.scenery(model, {
+			Name = "DoorFrame",
+			Size = Vector3.new(1, doorH, 1.4),
+			CFrame = CFrame.new(cx + sx * (doorW / 2 + 0.5), floorY + doorH / 2, frontZ),
+			Color = Palette.World.Trim,
+			Material = Palette.Material.Wood,
+		})
+	end
+
+	-- A gabled roof: two slopes meeting in a ridge along the front, with an overhang all round.
+	local top = floorY + height
+	local rise = depth * 0.3
+	local half = depth / 2 + 1.5
+	for s = -1, 1, 2 do
+		local slope = Instance.new("WedgePart")
+		slope.Name = "Roof"
+		slope.Anchored = true
+		slope.Size = Vector3.new(width + 3, rise, half)
+		-- A wedge is tall at its +Z end: the back slope as it is, the front one turned round.
+		slope.CFrame = CFrame.new(cx, top + rise / 2, cz + s * half / 2)
+			* CFrame.Angles(0, if s > 0 then math.pi else 0, 0)
+		slope.Color = Palette.World.RoofTile
+		slope.Material = Palette.Material.Rock
+		slope.TopSurface = Enum.SurfaceType.Smooth
+		slope.BottomSurface = Enum.SurfaceType.Smooth
+		slope.Parent = model
+	end
+	MapParts.scenery(model, {
+		Name = "Ridge",
+		Size = Vector3.new(width + 3.4, 0.8, 0.8),
+		CFrame = CFrame.new(cx, top + rise + 0.1, cz),
+		Color = Palette.World.DarkWood,
+		Material = Palette.Material.Wood,
+	})
+	-- The eaves: a board along the top of each wall, under the overhang.
+	for s = -1, 1, 2 do
+		MapParts.scenery(model, {
+			Name = "Eave",
+			Size = Vector3.new(width + 3, 0.8, 0.6),
+			CFrame = CFrame.new(cx, top - 0.2, cz + s * (half - 0.3)),
+			Color = Palette.World.Trim,
+			Material = Palette.Material.Wood,
+		})
+	end
+
+	-- A striped awning over the door, sloping down toward the sea.
+	local stripes = 5
+	local awningW = doorW + 5
+	for i = 1, stripes do
+		MapParts.scenery(model, {
+			Name = "Awning",
+			Size = Vector3.new(awningW / stripes, 0.4, 4.6),
+			CFrame = CFrame.new(
+				cx + ((i - 0.5) / stripes - 0.5) * awningW,
+				floorY + doorH + 0.9,
+				frontZ + 2.2
+			) * CFrame.Angles(math.rad(22), 0, 0),
+			Color = if i % 2 == 1 then Palette.World.Awning else Palette.World.AwningCream,
+			Material = Palette.Material.Fabric,
+		})
+	end
 
 	-- The sign goes on the front wall, above the awning.
 	MapParts.sign(

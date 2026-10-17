@@ -13,6 +13,7 @@ Usage (from the repo root):
   --showcase decor       every decor kind in a row on zone 1's sand (z 300)
 Top: terrain coloured by its material and shaded by relief (darker under roofs), then parts
 from the lowest up. Front: looking from the shop toward the sea, parts from the farthest in.
+Sea: looking back at the shore from the sea.
 """
 
 import argparse
@@ -73,7 +74,7 @@ def hull(points):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("view", choices=["top", "front"])
+    parser.add_argument("view", choices=["top", "front", "sea"])
     parser.add_argument("x0", type=float)
     parser.add_argument("z0", type=float)
     parser.add_argument("x1", type=float)
@@ -132,21 +133,25 @@ def main():
                 if len(outline) >= 3:
                     draw.polygon(outline, fill=rgb + (alpha,), outline=shade(rgb, 0.6) + (alpha,))
     else:
-        # Front: x across, y up; a band of y from the lowest part.
+        # Front: x across, y up; a band of y from the lowest part. Sea: the same from the other
+        # side, looking back at the shore, so x runs the other way and the nearest parts are
+        # the ones farthest out.
+        sea = args.view == "sea"
+        px = (lambda x: (x1 - x) * s) if sea else (lambda x: (x - x0) * s)
         ys = [c[1] for p in parts for c in corners(p)] or [0, 10]
         y0, y1 = min(ys) - 2, max(ys) + 2
         w, h = int((x1 - x0) * s), int((y1 - y0) * s)
         image = Image.new("RGB", (w, h), (205, 225, 235))
         draw = ImageDraw.Draw(image, "RGBA")
-        for part in sorted(parts, key=lambda p: -p["c"][2]):
+        for part in sorted(parts, key=lambda p: p["c"][2] if sea else -p["c"][2]):
             pts = corners(part)
             if not (z0 - 10 <= part["c"][2] <= z1 + 10):
                 continue
             rgb = hex_rgb(part["k"])
             alpha = int(255 * (1 - part["t"]))
-            poly = [((p[0] - x0) * s, (y1 - p[1]) * s) for p in pts]
+            poly = [(px(p[0]), (y1 - p[1]) * s) for p in pts]
             if part["h"] == "Ball":
-                cx, cy = (part["c"][0] - x0) * s, (y1 - part["c"][1]) * s
+                cx, cy = px(part["c"][0]), (y1 - part["c"][1]) * s
                 rx, ry = part["s"][0] / 2 * s, part["s"][1] / 2 * s
                 draw.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=rgb + (alpha,), outline=shade(rgb, 0.6) + (alpha,))
             else:
