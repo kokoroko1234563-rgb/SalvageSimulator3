@@ -197,12 +197,19 @@ end
 
 -- A boulder: a block of rock, longer one way than the others, tipped at a random angle and
 -- sunk into the sand, with a smaller slab leaning on it so it isn't a plain box.
-local function boulder(parent: Instance, x: number, z: number, size: number, rng: Random): BasePart
+local function boulder(
+	parent: Instance,
+	x: number,
+	z: number,
+	size: number,
+	rng: Random,
+	y: number?
+): BasePart
 	local color = if rng:NextNumber() < 0.5 then Z.RockGrey else Z.RockDark
 	local dims = Vector3.new(size * rng:NextNumber(0.9, 1.4), size * rng:NextNumber(0.6, 0.9), size)
 	local tilt =
 		CFrame.Angles(rng:NextNumber(-0.35, 0.35), rng:NextNumber() * math.pi, rng:NextNumber(-0.35, 0.35))
-	local at = CFrame.new(x, Beach.groundAt(x, z) + dims.Y * 0.25, z) * tilt
+	local at = CFrame.new(x, (y or Beach.groundAt(x, z)) + dims.Y * 0.25, z) * tilt
 	local rock = add(parent, {
 		Name = "Boulder",
 		Size = dims,
@@ -236,11 +243,19 @@ local function rockCluster(parent: Instance, center: Vector3, count: number, rng
 end
 
 -- A tidepool: a ring of rocks around a patch of glassy water.
-local function tidepool(parent: Instance, position: Vector3)
+local function tidepool(parent: Instance, position: Vector3, rng: Random?)
+	local random = rng or Random.new(7)
 	for i = 0, 7 do
-		local angle = i / 8 * math.pi * 2
-		local rim = position + Vector3.new(math.cos(angle) * 2.6, 0.5, math.sin(angle) * 2.6)
-		ball(parent, rim, 1.6, Z.RockDark, Palette.Material.Rock)
+		local angle = (i + random:NextNumber(-0.3, 0.3)) / 8 * math.pi * 2
+		local reach = random:NextNumber(2.4, 3)
+		boulder(
+			parent,
+			position.X + math.cos(angle) * reach,
+			position.Z + math.sin(angle) * reach,
+			random:NextNumber(1.2, 2.2),
+			random,
+			position.Y
+		)
 	end
 	add(parent, {
 		Name = "TidepoolWater",
@@ -405,7 +420,7 @@ builders[4] = function(folder: Folder, rng: Random, zMin: number, zMax: number)
 	for _ = 1, 4 do
 		local x = rng:NextNumber(-280, 280)
 		local z = rng:NextNumber(zMin + 20, zMax - 20)
-		tidepool(folder, ground(x, z) + Vector3.new(0, 0.1, 0))
+		tidepool(folder, ground(x, z) + Vector3.new(0, 0.1, 0), rng)
 	end
 	for _ = 1, 8 do
 		local x = rng:NextNumber(-300, 300)
