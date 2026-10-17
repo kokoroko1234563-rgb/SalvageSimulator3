@@ -16,13 +16,15 @@
 local PITCH = 40 -- grid: lane centres 40 apart
 local X0, Z0 = -360, 12 -- the first node of the picture, in zone coordinates
 
-local function wall(path)
-	return { Kind = "Wall", Path = path, Height = 24, Width = 12, Rough = 2 }
+-- A rock wall; its edges are worn by `rough` studs (the Test Range tolerates 1: more draws the
+-- walls too thin and the terrain strays from the layout). Posts stay square.
+local function wall(path, rough)
+	return { Kind = "Wall", Path = path, Height = 24, Width = 12, Rough = rough }
 end
 
 -- A pile of rubble filling a doorway: a scramble on foot, too steep for a cart.
 local function rubble(path)
-	return { Kind = "Ridge", Path = path, Height = 4, Width = 20 }
+	return { Kind = "Ridge", Path = path, Height = 4, Width = 20, Rough = 3 }
 end
 
 -- Rock overhead along a lane: a marker, turned into exact rectangles by `fit` once the walls
@@ -33,7 +35,7 @@ end
 
 -- A pool: low ground that holds the sea from early in the flood.
 local function pool(x, z, radius)
-	return { Kind = "Hollow", At = { x, z }, Radius = radius or 12, Depth = 3, Material = "Mud" }
+	return { Kind = "Hollow", At = { x, z }, Radius = radius or 12, Depth = 3, Material = "Mud", Rough = 3 }
 end
 
 -- A sunk lane: floods before the ground round it.
@@ -48,7 +50,7 @@ end
 
 -- A boulder.
 local function boulder(x, z, radius, height)
-	return { Kind = "Mound", At = { x, z }, Radius = radius, Height = height, Rock = true }
+	return { Kind = "Mound", At = { x, z }, Radius = radius, Height = height, Rock = true, Rough = 3 }
 end
 
 -- A freestanding column of rock on a grid node.
@@ -113,11 +115,11 @@ local function maze(art, x0, z0, edgeL, edgeR)
 		local key = i * 1000 + j
 		if not posts[key] then
 			posts[key] = true
-			table.insert(list, wall({ { x0 + PITCH * i, z0 + PITCH * j } }))
+			table.insert(list, wall({ { x0 + PITCH * i, z0 + PITCH * j } }, nil))
 		end
 	end
 	local function add(char, path)
-		table.insert(list, if char == "-" or char == "|" then wall(path) else rubble(path))
+		table.insert(list, if char == "-" or char == "|" then wall(path, 1) else rubble(path))
 	end
 	for j = 0, h do
 		local line = art[2 * j + 1]
