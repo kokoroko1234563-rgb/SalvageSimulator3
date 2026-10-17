@@ -78,14 +78,16 @@ def sub(path, a, b):
     return path[int(a * (n - 1)): int(b * (n - 1)) + 1]
 
 
-def row_z(x, z0, amp, ph):
-    return z0 + amp * math.sin((x + ph) / 85.0) + 0.35 * amp * math.sin((x + 2 * ph) / 31.0)
+def row_z(x, z0, amp, ph, tilt=0.0):
+    """A row's centre at x: it waves, and with a tilt it runs a little across the zone, so
+    neighbouring rows close in and open out instead of lying parallel."""
+    return z0 + tilt * x + amp * math.sin((x + ph) / 85.0) + 0.35 * amp * math.sin((x + 2 * ph) / 31.0)
 
 
-def row_path(z0, amp, ph, x0, x1):
+def row_path(z0, amp, ph, x0, x1, tilt=0.0):
     """A bar's centre line along a row, from x0 to x1."""
     n = max(2, int(abs(x1 - x0) / 22))
-    return [[round(x0 + (x1 - x0) * i / n), round(row_z(x0 + (x1 - x0) * i / n, z0, amp, ph))] for i in range(n + 1)]
+    return [[round(x0 + (x1 - x0) * i / n), round(row_z(x0 + (x1 - x0) * i / n, z0, amp, ph, tilt))] for i in range(n + 1)]
 
 
 def offset(path, d):
@@ -249,7 +251,7 @@ def zone1():
 
 
 # ---- rows: bars across a zone, with open gaps and foot-only saddles ------------------------
-def bars(Z, z0, amp, ph, gaps, saddles, h, w, saddle_h, saddle_w, rough=3, trench=3.0):
+def bars(Z, z0, amp, ph, gaps, saddles, h, w, saddle_h, saddle_w, rough=3, trench=3.0, tilt=0.0):
     """A row across the zone from side to side, made of bars. gaps: [(x0, x1)] left open;
     saddles: [(x0, x1)] low enough to walk over but not to haul a cart over."""
     cuts = sorted([(a, b, "gap") for a, b in gaps] + [(a, b, "saddle") for a, b in saddles])
@@ -264,7 +266,7 @@ def bars(Z, z0, amp, ph, gaps, saddles, h, w, saddle_h, saddle_w, rough=3, trenc
     if x < 362:
         pieces.append((x, 362, "solid"))
     for a, b, kind in pieces:
-        p = row_path(z0, amp, ph, a, b)
+        p = row_path(z0, amp, ph, a, b, tilt)
         if kind == "solid":
             # A crest between two runnels: from the bottom of a runnel to the crest is too steep to walk.
             for prim in bank(p, h, w, trench):
@@ -349,11 +351,11 @@ def blocked3(x, z):
 def zone3():
     Z = Zone(33, "Middle Banks", blocked3)
     r = Z.rng
-    A, B, C, D = (200, 22, 10), (320, 28, 70), (440, 24, 130), (555, 20, 40)
+    A, B, C, D = (200, 22, 10, 0.07), (320, 28, 70, -0.05), (440, 24, 130, 0.06), (555, 20, 40, 0.015)
     rows = [(A, [(-135, -85)], [(190, 240)]), (B, [(85, 135)], [(-250, -200)]),
             (C, [(-135, -85)], [(190, 240)]), (D, [(85, 135)], [(-250, -200)])]
     for row, gaps, saddles in rows:
-        for a, b, kind, p in bars(Z, *row, gaps=gaps, saddles=saddles, h=5.8, w=22, saddle_h=3.2, saddle_w=24, rough=4, trench=2.0):
+        for a, b, kind, p in bars(Z, *row[:3], gaps=gaps, saddles=saddles, h=5.8, w=22, saddle_h=3.2, saddle_w=24, rough=4, trench=2.0, tilt=row[3]):
             if kind == "solid":
                 Z.dec("DuneGrass", 10, Path=p)
                 Z.dec("Pebbles", 4, Path=p)
@@ -391,7 +393,7 @@ def zone3():
                       [110, 480], [0, 530], [-110, 555], [-110, 606]], 40))
     plugs = []
     for row, gap in [(A, (-135, -85)), (B, (85, 135)), (C, (-135, -85)), (D, (85, 135))]:
-        plugs += bank(row_path(*row, *gap), 5.8, 22, 2.0)
+        plugs += bank(row_path(*row[:3], *gap, row[3]), 5.8, 22, 2.0)
     write(3, Z.lua([("Down the gaps", [c1]), ("Across the banks", plugs + [c2])],
           "-- Zone 3, Middle Banks: four rows of tall banks (a crest between two runnels) with gaps that zigzag and low\n"
           "-- saddles; they hide the way ahead from the top. A creek that finds the gaps, an old wreck. Drawn by\n"

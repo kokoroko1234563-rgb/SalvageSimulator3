@@ -151,6 +151,11 @@ end
 
 -- A fishing net strung between two posts.
 local function net(parent: Instance, position: Vector3, yaw: number)
+	-- One Model, so it is one prop (it stands on its posts, not each part on the ground).
+	local model = Instance.new("Model")
+	model.Name = "Net"
+	model.Parent = parent
+	parent = model
 	local cf = CFrame.new(position) * CFrame.Angles(0, yaw, 0)
 	for _, x in { -4, 4 } do
 		add(parent, {
