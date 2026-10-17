@@ -25,9 +25,10 @@ local function rubble(path)
 	return { Kind = "Ridge", Path = path, Height = 4, Width = 20 }
 end
 
--- Rock overhead, resting on the walls either side of a lane.
-local function roof(path, width)
-	return { Kind = "Roof", Path = path, Width = width or 52, Clearance = 22, Thickness = 8 }
+-- Rock overhead along a lane: a marker, turned into exact rectangles by `fit` once the walls
+-- are known (see below). `path` runs through the centres of the lane cells it covers.
+local function roof(path)
+	return { Kind = "RoofRun", Path = path }
 end
 
 -- A pool: low ground that holds the sea from early in the flood.
@@ -40,14 +41,28 @@ local function lane(path)
 	return { Kind = "Channel", Path = path, Depth = 2, Width = 12 }
 end
 
--- Rock over one lane cell of a side room.
+-- Rock over one lane cell of a side room (a marker, like `roof`).
 local function cellRoof(x, z)
-	return { Kind = "Roof", At = { x, z }, Radius = 26, Clearance = 22, Thickness = 8 }
+	return { Kind = "RoofRun", Path = { { x, z } } }
 end
 
 -- A boulder.
 local function boulder(x, z, radius, height)
 	return { Kind = "Mound", At = { x, z }, Radius = radius, Height = height, Rock = true }
+end
+
+-- A freestanding column of rock on a grid node.
+local function post(x, z)
+	return wall({ { x, z } })
+end
+
+-- Mud or weed over the ground in an area (the ground's material only).
+local function mud(area)
+	return { Kind = "Paint", Area = area, Material = "Mud" }
+end
+
+local function weed(area)
+	return { Kind = "Paint", Area = area, Material = "Rock" }
 end
 
 local function loot(x, z, weight)
@@ -151,6 +166,13 @@ local function maze(art, x0, z0, edgeL, edgeR)
 	return list
 end
 
+-- A side room: its picture's walls and its shapes, in slot coordinates.
+local function makeRoom(edgeL, edgeR, room)
+	room.Primitives = merge(maze(room.Art, 0, 0, edgeL, edgeR), room.Shapes)
+	room.Shapes = nil
+	return room
+end
+
 local FRAME = {
 	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
 	"                  |                 |                  ",
@@ -199,17 +221,7 @@ local frame = {
 	}),
 	Loot = {
 		loot(-340, 32, 1),
-		loot(340, 32, 1),
-		loot(-220, 192, 2),
-		loot(220, 192, 2),
-		loot(-340, 352, 2),
-		loot(-100, 272, 2),
-		loot(100, 272, 2),
-		loot(-140, 392, 2),
-		loot(140, 392, 2),
-		loot(-340, 552, 2),
-		loot(340, 552, 2),
-		loot(-20, 552, 3),
+		loot(-340, 192, 1),
 	},
 }
 
@@ -410,7 +422,7 @@ local crossing2 = {
 		},
 	}),
 	Loot = {
-		loot(-220, 432, 5),
+		loot(-60, 392, 5),
 		loot(-140, 232, 4),
 		loot(-260, 272, 3),
 		loot(-140, 552, 3),
@@ -740,290 +752,77 @@ local crossing5 = {
 
 frame.Crossings = { crossing1, crossing2, crossing3, crossing4, crossing5 }
 
-local SLOT1ROOM1 = {
-	"+  +  +  +",
-	"          ",
-	"+  +--+--+",
-	"   |      ",
-	"+  +  +--+",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT1ROOM2 = {
-	"+  +  +  +",
-	"   |      ",
-	"+  +  +  +",
-	"   |  |   ",
-	"+  +  +--+",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT1ROOM3 = {
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT2ROOM1 = {
-	"+  +  +  +",
-	"          ",
-	"+  +--+  +",
-	"   |  |   ",
-	"+  +--+  +",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT2ROOM2 = {
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT2ROOM3 = {
-	"+  +  +  +",
-	"          ",
-	"+--+  +  +",
-	"   |  |   ",
-	"+  +  +  +",
-	"      |   ",
-	"+  +  +  +",
-}
-
-local SLOT3ROOM1 = {
-	"+  +  +  +",
-	"          ",
-	"+  +--+  +",
-	"   |      ",
-	"+--+  +--+",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT3ROOM2 = {
-	"+  +  +  +",
-	"          ",
-	"+--+--+  +",
-	"          ",
-	"+--+--+  +",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT3ROOM3 = {
-	"+  +  +  +",
-	"          ",
-	"+  +--+  +",
-	"   |  |   ",
-	"+  +--+  +",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT4ROOM1 = {
-	"+  +  +  +  +",
-	"             ",
-	"+  +--+--+  +",
-	"      |      ",
-	"+  +  +  +--+",
-	"   |  |      ",
-	"+  +  +  +  +",
-}
-
-local SLOT4ROOM2 = {
-	"+  +  +  +  +",
-	"             ",
-	"+  +  +  +  +",
-	"             ",
-	"+  +  +  +  +",
-	"             ",
-	"+  +  +  +  +",
-}
-
-local SLOT4ROOM3 = {
-	"+  +  +  +  +",
-	"             ",
-	"+  +--+--+  +",
-	"   |  |  |   ",
-	"+  +--+--+  +",
-	"             ",
-	"+  +  +  +  +",
-}
-
-local SLOT4ROOM4 = {
-	"+  +  +  +  +",
-	"      |      ",
-	"+  +  +  +  +",
-	"   |     |   ",
-	"+  +--+--+  +",
-	"      |      ",
-	"+  +  +  +  +",
-}
-
-local SLOT5ROOM1 = {
-	"+  +  +  +",
-	"          ",
-	"+  +--+  +",
-	"   |  |   ",
-	"+  +--+  +",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT5ROOM2 = {
-	"+  +  +  +",
-	"   |      ",
-	"+  +  +  +",
-	"      |   ",
-	"+  +--+--+",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT5ROOM3 = {
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT6ROOM1 = {
-	"+  +  +  +  +",
-	"   |     |   ",
-	"+  +  +--+  +",
-	"   |         ",
-	"+  +--+--+  +",
-	"             ",
-	"+  +  +  +  +",
-}
-
-local SLOT6ROOM2 = {
-	"+  +  +  +  +",
-	"      |  |   ",
-	"+  +  +  +  +",
-	"   |     |   ",
-	"+  +--+--+  +",
-	"             ",
-	"+  +  +  +  +",
-}
-
-local SLOT6ROOM3 = {
-	"+  +  +  +  +",
-	"             ",
-	"+  +  +  +  +",
-	"             ",
-	"+  +  +  +  +",
-	"             ",
-	"+  +  +  +  +",
-}
-
-local SLOT6ROOM4 = {
-	"+  +  +  +  +",
-	"             ",
-	"+  +--+--+  +",
-	"   |  |  |   ",
-	"+  +--+--+  +",
-	"             ",
-	"+  +  +  +  +",
-}
-
-local SLOT7ROOM1 = {
-	"+  +  +  +",
-	"   |      ",
-	"+  +--+  +",
-	"      |   ",
-	"+  +  +  +",
-	"   |      ",
-	"+  +  +  +",
-}
-
-local SLOT7ROOM2 = {
-	"+  +  +  +",
-	"   |  |   ",
-	"+  +  +  +",
-	"   |      ",
-	"+  +--+  +",
-	"          ",
-	"+  +  +  +",
-}
-
-local SLOT7ROOM3 = {
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-	"          ",
-	"+  +  +  +",
-}
-
+-- <<< rooms (written by tools/gen/zone6/rooms.py; edit that, not this)
 frame.Slots = {
 	{
 		Name = "West cave",
 		At = { -360, 52 },
 		Size = { 120, 120 },
 		Rooms = {
-			{
-				Name = "Dead-end cave",
-				Art = SLOT1ROOM1,
-				Primitives = merge(maze(SLOT1ROOM1, 0, 0, true, false), {
-					cellRoof(20, 20),
-					cellRoof(20, 60),
-					cellRoof(20, 100),
+			makeRoom(true, false, {
+				Name = "Comb of caves",
+				Art = {
+					"+  +  +  +",
+					"          ",
+					"+  +--+--+",
+					"          ",
+					"+  +--+--+",
+					"          ",
+					"+  +  +  +",
+				},
+				Shapes = {
 					cellRoof(60, 20),
-					cellRoof(60, 60),
-					cellRoof(60, 100),
 					cellRoof(100, 20),
+					cellRoof(60, 100),
 					cellRoof(100, 100),
-				}),
+				},
 				Loot = {
 					loot(100, 20, 6),
-					loot(60, 20, 3),
-					loot(20, 20, 2),
-					loot(20, 100, 1),
+					loot(100, 100, 4),
 				},
-			},
-			{
+			}),
+			makeRoom(true, false, {
 				Name = "Drowned pool",
-				Art = SLOT1ROOM2,
-				Primitives = merge(maze(SLOT1ROOM2, 0, 0, true, false), {
-					cellRoof(20, 60),
-					cellRoof(20, 100),
-					cellRoof(60, 20),
-					pool(60, 60, 13),
-					pool(100, 20, 13),
-					pool(20, 20, 13),
-				}),
+				Art = {
+					"+  +  +  +",
+					"   |      ",
+					"+  +  +  +",
+					"          ",
+					"+  +  +  +",
+					"   |      ",
+					"+  +  +  +",
+				},
+				Shapes = {
+					pool(60, 60, 20),
+					mud({ { 24, 36 }, { 96, 36 }, { 96, 84 }, { 24, 84 } }),
+				},
 				Loot = {
 					loot(20, 20, 6),
-					loot(60, 60, 3),
+					loot(20, 100, 4),
 				},
-			},
-			{
+			}),
+			makeRoom(true, false, {
 				Name = "Boulder scramble",
-				Art = SLOT1ROOM3,
-				Primitives = merge(maze(SLOT1ROOM3, 0, 0, true, false), {
-					boulder(24, 63, 11, 10),
-				}),
+				Art = {
+					"+  +  +  +",
+					"          ",
+					"+--+--+  +",
+					"          ",
+					"+  +  +  +",
+					"          ",
+					"+  +  +  +",
+				},
+				Shapes = {
+					boulder(60, 70, 13, 10),
+					boulder(34, 74, 11, 9),
+					boulder(96, 80, 11, 10),
+					boulder(100, 34, 11, 10),
+				},
 				Loot = {
 					loot(20, 20, 6),
-					loot(60, 100, 3),
-					loot(60, 20, 2),
+					loot(20, 100, 3),
 				},
-			},
+			}),
 		},
 	},
 	{
@@ -1031,57 +830,72 @@ frame.Slots = {
 		At = { -40, 52 },
 		Size = { 120, 120 },
 		Rooms = {
-			{
-				Name = "Tunnel loop",
-				Art = SLOT2ROOM1,
-				Primitives = merge(maze(SLOT2ROOM1, 0, 0, false, false), {
+			makeRoom(false, false, {
+				Name = "Gatehouse ring",
+				Art = {
+					"+  +  +  +",
+					"          ",
+					"+  +--+  +",
+					"   |      ",
+					"+  +--+  +",
+					"      |   ",
+					"+  +  +  +",
+				},
+				Shapes = {
 					cellRoof(20, 20),
-					cellRoof(20, 100),
 					cellRoof(60, 20),
-					cellRoof(60, 100),
 					cellRoof(100, 20),
 					cellRoof(100, 60),
-					cellRoof(100, 100),
-				}),
-				Loot = {
-					loot(100, 60, 6),
-					loot(100, 100, 3),
-					loot(60, 100, 2),
 				},
-			},
-			{
-				Name = "Boulder yard",
-				Art = SLOT2ROOM2,
-				Primitives = merge(maze(SLOT2ROOM2, 0, 0, false, false), {
-					boulder(65, 22, 12, 9),
-					boulder(101, 98, 13, 10),
-				}),
 				Loot = {
-					loot(100, 20, 6),
-					loot(100, 60, 3),
-					loot(60, 100, 2),
+					loot(60, 60, 6),
+					loot(60, 100, 3),
+					loot(100, 100, 2),
 				},
-			},
-			{
-				Name = "Gatehouse cellar",
-				Art = SLOT2ROOM3,
-				Primitives = merge(maze(SLOT2ROOM3, 0, 0, false, false), {
-					cellRoof(20, 20),
-					cellRoof(20, 100),
-					cellRoof(60, 20),
-					cellRoof(60, 60),
-					cellRoof(60, 100),
-					cellRoof(100, 20),
-					cellRoof(100, 60),
-					cellRoof(100, 100),
-				}),
+			}),
+			makeRoom(false, false, {
+				Name = "Pillar court",
+				Art = {
+					"+  +  +  +",
+					"      |   ",
+					"+  +  +  +",
+					"          ",
+					"+  +  +  +",
+					"      |   ",
+					"+  +  +  +",
+				},
+				Shapes = {
+					post(40, 40),
+					post(80, 40),
+					post(40, 80),
+					post(80, 80),
+				},
 				Loot = {
 					loot(100, 100, 6),
-					loot(100, 60, 3),
-					loot(20, 20, 2),
-					loot(60, 20, 1),
+					loot(100, 20, 5),
 				},
-			},
+			}),
+			makeRoom(false, false, {
+				Name = "Gatehouse cellar",
+				Art = {
+					"+  +  +  +",
+					"          ",
+					"+  +--+  +",
+					"   |  |   ",
+					"+  +  +  +",
+					"   |      ",
+					"+  +  +  +",
+				},
+				Shapes = {
+					cellRoof(60, 60),
+					cellRoof(60, 100),
+					cellRoof(100, 60),
+				},
+				Loot = {
+					loot(60, 60, 6),
+					loot(20, 100, 3),
+				},
+			}),
 		},
 	},
 	{
@@ -1089,61 +903,68 @@ frame.Slots = {
 		At = { 240, 212 },
 		Size = { 120, 120 },
 		Rooms = {
-			{
-				Name = "Dead-end cellar",
-				Art = SLOT3ROOM1,
-				Primitives = merge(maze(SLOT3ROOM1, 0, 0, false, true), {
-					cellRoof(20, 20),
-					cellRoof(20, 100),
-					cellRoof(60, 20),
-					cellRoof(60, 60),
-					cellRoof(60, 100),
-					cellRoof(100, 20),
-					cellRoof(100, 60),
-					cellRoof(100, 100),
-				}),
-				Loot = {
-					loot(20, 100, 6),
-					loot(100, 100, 3),
-					loot(60, 100, 2),
-					loot(100, 60, 1),
+			makeRoom(false, true, {
+				Name = "Sinking flats",
+				Art = {
+					"+  +  +  +",
+					"      |   ",
+					"+  +  +  +",
+					"          ",
+					"+  +  +  +",
+					"      |   ",
+					"+  +  +  +",
 				},
-			},
-			{
+				Shapes = {
+					mud({ { 44, 4 }, { 76, 4 }, { 76, 36 }, { 44, 36 } }),
+					mud({ { 44, 84 }, { 76, 84 }, { 76, 116 }, { 44, 116 } }),
+				},
+				Loot = {
+					loot(100, 20, 6),
+					loot(100, 100, 5),
+				},
+			}),
+			makeRoom(false, true, {
 				Name = "Flooded cellar",
-				Art = SLOT3ROOM2,
-				Primitives = merge(maze(SLOT3ROOM2, 0, 0, false, true), {
-					cellRoof(20, 20),
-					cellRoof(60, 100),
-					cellRoof(100, 20),
-					pool(20, 100, 13),
-					pool(60, 20, 13),
-					pool(100, 100, 13),
-				}),
-				Loot = {
-					loot(20, 100, 6),
-					loot(60, 20, 3),
-					loot(20, 20, 4),
+				Art = {
+					"+  +  +  +",
+					"          ",
+					"+  +--+--+",
+					"          ",
+					"+  +  +  +",
+					"      |   ",
+					"+  +  +  +",
 				},
-			},
-			{
-				Name = "Tunnel loop",
-				Art = SLOT3ROOM3,
-				Primitives = merge(maze(SLOT3ROOM3, 0, 0, false, true), {
-					cellRoof(20, 20),
-					cellRoof(20, 100),
+				Shapes = {
+					pool(60, 100, 16),
 					cellRoof(60, 20),
-					cellRoof(60, 100),
 					cellRoof(100, 20),
-					cellRoof(100, 60),
-					cellRoof(100, 100),
-				}),
-				Loot = {
-					loot(100, 60, 6),
-					loot(100, 100, 3),
-					loot(60, 100, 2),
 				},
-			},
+				Loot = {
+					loot(100, 20, 6),
+					loot(100, 100, 4),
+				},
+			}),
+			makeRoom(false, true, {
+				Name = "Weed hall",
+				Art = {
+					"+  +  +  +",
+					"   |      ",
+					"+  +  +--+",
+					"          ",
+					"+  +  +  +",
+					"   |      ",
+					"+  +  +  +",
+				},
+				Shapes = {
+					lane({ { 60, 60 }, { 100, 60 } }),
+					weed({ { 44, 28 }, { 116, 28 }, { 116, 92 }, { 44, 92 } }),
+				},
+				Loot = {
+					loot(100, 20, 6),
+					loot(20, 20, 3),
+					loot(20, 100, 3),
+				},
+			}),
 		},
 	},
 	{
@@ -1151,81 +972,94 @@ frame.Slots = {
 		At = { -80, 212 },
 		Size = { 160, 120 },
 		Rooms = {
-			{
+			makeRoom(false, false, {
 				Name = "Flooded hall",
-				Art = SLOT4ROOM1,
-				Primitives = merge(maze(SLOT4ROOM1, 0, 0, false, false), {
-					cellRoof(20, 20),
-					cellRoof(20, 60),
-					cellRoof(20, 100),
-					pool(100, 20, 13),
-					pool(140, 60, 13),
-					pool(60, 60, 13),
-					pool(100, 100, 13),
-				}),
-				Loot = {
-					loot(100, 100, 6),
-					loot(140, 60, 3),
-					loot(140, 100, 4),
+				Art = {
+					"+  +  +  +  +",
+					"   |     |   ",
+					"+  +  +  +  +",
+					"             ",
+					"+  +  +  +  +",
+					"             ",
+					"+  +  +  +  +",
 				},
-			},
-			{
-				Name = "Collapsed hall",
-				Art = SLOT4ROOM2,
-				Primitives = merge(maze(SLOT4ROOM2, 0, 0, false, false), {
-					boulder(22, 22, 13, 8),
-					boulder(57, 22, 13, 10),
-					boulder(141, 96, 11, 10),
-				}),
+				Shapes = {
+					post(40, 40),
+					post(120, 40),
+					post(40, 80),
+					post(120, 80),
+					pool(60, 60, 15),
+					pool(100, 60, 15),
+				},
 				Loot = {
 					loot(140, 20, 6),
-					loot(100, 20, 3),
-					loot(100, 60, 2),
+					loot(20, 20, 5),
 				},
-			},
-			{
-				Name = "Pillar gallery",
-				Art = SLOT4ROOM3,
-				Primitives = merge(maze(SLOT4ROOM3, 0, 0, false, false), {
-					cellRoof(20, 20),
-					cellRoof(20, 60),
-					cellRoof(20, 100),
-					cellRoof(60, 20),
-					cellRoof(100, 20),
-					cellRoof(100, 100),
-					cellRoof(140, 20),
-					cellRoof(140, 60),
-					cellRoof(140, 100),
-				}),
+			}),
+			makeRoom(false, false, {
+				Name = "Collapsed hall",
+				Art = {
+					"+  +  +  +  +",
+					"         |   ",
+					"+  +--+--+  +",
+					"             ",
+					"+  +  +  +  +",
+					"         |   ",
+					"+  +  +  +  +",
+				},
+				Shapes = {
+					boulder(40, 76, 11, 9),
+					boulder(120, 40, 12, 10),
+					boulder(80, 96, 11, 8),
+				},
 				Loot = {
 					loot(100, 20, 6),
-					loot(140, 20, 3),
-					loot(20, 60, 2),
+					loot(140, 100, 4),
 				},
-			},
-			{
-				Name = "Dead-end vault",
-				Art = SLOT4ROOM4,
-				Primitives = merge(maze(SLOT4ROOM4, 0, 0, false, false), {
-					cellRoof(20, 20),
-					cellRoof(20, 60),
-					cellRoof(20, 100),
-					cellRoof(60, 20),
-					cellRoof(60, 60),
-					cellRoof(100, 20),
-					cellRoof(100, 60),
-					cellRoof(100, 100),
-					cellRoof(140, 20),
-					cellRoof(140, 60),
-					cellRoof(140, 100),
-				}),
+			}),
+			makeRoom(false, false, {
+				Name = "Pillar gallery",
+				Art = {
+					"+  +  +  +  +",
+					"             ",
+					"+  +  +  +--+",
+					"             ",
+					"+  +  +  +  +",
+					"   |         ",
+					"+  +  +  +  +",
+				},
+				Shapes = {
+					post(40, 40),
+					post(80, 40),
+					post(120, 40),
+					post(80, 80),
+					post(120, 80),
+				},
 				Loot = {
-					loot(100, 100, 6),
-					loot(140, 100, 3),
-					loot(140, 60, 2),
-					loot(100, 20, 1),
+					loot(140, 20, 6),
+					loot(20, 100, 3),
 				},
-			},
+			}),
+			makeRoom(false, false, {
+				Name = "Dead-end vault",
+				Art = {
+					"+  +  +  +  +",
+					"             ",
+					"+  +--+--+--+",
+					"             ",
+					"+  +  +  +  +",
+					"   |         ",
+					"+  +  +  +  +",
+				},
+				Shapes = {
+					cellRoof(60, 20),
+					cellRoof(140, 20),
+				},
+				Loot = {
+					loot(140, 20, 6),
+					loot(20, 100, 3),
+				},
+			}),
 		},
 	},
 	{
@@ -1233,57 +1067,69 @@ frame.Slots = {
 		At = { -360, 372 },
 		Size = { 120, 120 },
 		Rooms = {
-			{
-				Name = "Tunnel loop",
-				Art = SLOT5ROOM1,
-				Primitives = merge(maze(SLOT5ROOM1, 0, 0, true, false), {
+			makeRoom(true, false, {
+				Name = "Tunnel ring",
+				Art = {
+					"+  +  +  +",
+					"          ",
+					"+  +--+  +",
+					"   |      ",
+					"+  +--+  +",
+					"          ",
+					"+  +  +  +",
+				},
+				Shapes = {
 					cellRoof(20, 20),
+					cellRoof(100, 20),
 					cellRoof(20, 60),
 					cellRoof(20, 100),
-					cellRoof(60, 20),
-					cellRoof(60, 100),
-					cellRoof(100, 20),
 					cellRoof(100, 100),
-				}),
-				Loot = {
-					loot(20, 60, 6),
-					loot(20, 100, 3),
-					loot(60, 100, 2),
 				},
-			},
-			{
+				Loot = {
+					loot(60, 60, 6),
+				},
+			}),
+			makeRoom(true, false, {
 				Name = "Dead-end cave",
-				Art = SLOT5ROOM2,
-				Primitives = merge(maze(SLOT5ROOM2, 0, 0, true, false), {
-					cellRoof(20, 20),
-					cellRoof(20, 60),
-					cellRoof(20, 100),
-					cellRoof(60, 20),
-					cellRoof(60, 60),
-					cellRoof(60, 100),
-					cellRoof(100, 20),
-					cellRoof(100, 100),
-				}),
-				Loot = {
-					loot(100, 100, 6),
-					loot(60, 100, 3),
-					loot(20, 20, 2),
-					loot(20, 60, 1),
+				Art = {
+					"+  +  +  +",
+					"   |      ",
+					"+  +  +  +",
+					"          ",
+					"+--+--+  +",
+					"          ",
+					"+  +  +  +",
 				},
-			},
-			{
-				Name = "Boulder scramble",
-				Art = SLOT5ROOM3,
-				Primitives = merge(maze(SLOT5ROOM3, 0, 0, true, false), {
-					boulder(24, 23, 11, 9),
-					boulder(16, 60, 13, 9),
-				}),
+				Shapes = {
+					cellRoof(20, 100),
+					cellRoof(60, 100),
+					cellRoof(20, 20),
+				},
 				Loot = {
 					loot(20, 100, 6),
-					loot(60, 20, 3),
-					loot(60, 100, 2),
+					loot(20, 20, 4),
 				},
-			},
+			}),
+			makeRoom(true, false, {
+				Name = "Boulder scramble",
+				Art = {
+					"+  +  +  +",
+					"   !      ",
+					"+--+  +  +",
+					"          ",
+					"+  +  +  +",
+					"          ",
+					"+  +  +  +",
+				},
+				Shapes = {
+					boulder(70, 62, 13, 10),
+					boulder(100, 100, 11, 10),
+					boulder(30, 100, 11, 9),
+				},
+				Loot = {
+					loot(20, 20, 6),
+				},
+			}),
 		},
 	},
 	{
@@ -1291,81 +1137,88 @@ frame.Slots = {
 		At = { -80, 412 },
 		Size = { 160, 120 },
 		Rooms = {
-			{
-				Name = "Dead-end vault",
-				Art = SLOT6ROOM1,
-				Primitives = merge(maze(SLOT6ROOM1, 0, 0, false, false), {
-					cellRoof(20, 20),
-					cellRoof(20, 60),
-					cellRoof(20, 100),
-					cellRoof(60, 20),
-					cellRoof(60, 60),
-					cellRoof(60, 100),
-					cellRoof(100, 60),
-					cellRoof(100, 100),
-					cellRoof(140, 20),
-					cellRoof(140, 60),
-					cellRoof(140, 100),
-				}),
+			makeRoom(false, false, {
+				Name = "Drowned gallery",
+				Art = {
+					"+  +  +  +  +",
+					"             ",
+					"+--+--+--+  +",
+					"             ",
+					"+  +--+--+--+",
+					"             ",
+					"+  +  +  +  +",
+				},
+				Shapes = {
+					roof({ { 140, 60 }, { 20, 60 }, { 20, 100 }, { 140, 100 } }),
+				},
+				Loot = {
+					loot(140, 100, 6),
+					loot(20, 20, 3),
+				},
+			}),
+			makeRoom(false, false, {
+				Name = "Flooded vault",
+				Art = {
+					"+  +  +  +  +",
+					"             ",
+					"+--+--+  +  +",
+					"             ",
+					"+  +  +  +  +",
+					"         |   ",
+					"+  +  +  +  +",
+				},
+				Shapes = {
+					post(80, 40),
+					post(80, 80),
+					pool(80, 80, 18),
+					pool(120, 60, 12),
+				},
 				Loot = {
 					loot(20, 20, 6),
-					loot(20, 60, 3),
-					loot(20, 100, 2),
-					loot(100, 100, 1),
+					loot(140, 100, 4),
 				},
-			},
-			{
-				Name = "Flooded vault",
-				Art = SLOT6ROOM2,
-				Primitives = merge(maze(SLOT6ROOM2, 0, 0, false, false), {
-					cellRoof(20, 60),
-					cellRoof(60, 60),
-					cellRoof(60, 100),
-					pool(140, 20, 13),
-					pool(20, 20, 13),
-					pool(60, 20, 13),
-					pool(20, 100, 13),
-				}),
-				Loot = {
-					loot(140, 20, 6),
-					loot(20, 100, 3),
-				},
-			},
-			{
+			}),
+			makeRoom(false, false, {
 				Name = "Collapsed vault",
-				Art = SLOT6ROOM3,
-				Primitives = merge(maze(SLOT6ROOM3, 0, 0, false, false), {
-					boulder(18, 16, 12, 10),
-					boulder(15, 64, 12, 10),
-					boulder(140, 59, 11, 10),
-					boulder(141, 95, 11, 8),
-				}),
+				Art = {
+					"+  +  +  +  +",
+					"             ",
+					"+  +  +  +  +",
+					"      |      ",
+					"+--+  +  +  +",
+					"      !      ",
+					"+  +  +  +  +",
+				},
+				Shapes = {
+					boulder(30, 70, 11, 9),
+					boulder(110, 90, 12, 10),
+					boulder(140, 60, 11, 9),
+				},
 				Loot = {
 					loot(20, 100, 6),
-					loot(60, 100, 3),
-					loot(60, 60, 2),
 				},
-			},
-			{
-				Name = "Tunnel loop",
-				Art = SLOT6ROOM4,
-				Primitives = merge(maze(SLOT6ROOM4, 0, 0, false, false), {
-					cellRoof(20, 20),
+			}),
+			makeRoom(false, false, {
+				Name = "Ring and vault",
+				Art = {
+					"+  +  +  +  +",
+					"             ",
+					"+  +--+--+  +",
+					"   |         ",
+					"+  +--+--+  +",
+					"             ",
+					"+  +  +  +  +",
+				},
+				Shapes = {
 					cellRoof(20, 60),
 					cellRoof(20, 100),
-					cellRoof(60, 20),
-					cellRoof(60, 100),
-					cellRoof(100, 100),
-					cellRoof(140, 20),
-					cellRoof(140, 60),
 					cellRoof(140, 100),
-				}),
-				Loot = {
-					loot(60, 100, 6),
-					loot(100, 100, 3),
-					loot(20, 20, 2),
+					cellRoof(60, 100),
 				},
-			},
+				Loot = {
+					loot(60, 60, 6),
+				},
+			}),
 		},
 	},
 	{
@@ -1373,59 +1226,72 @@ frame.Slots = {
 		At = { 240, 412 },
 		Size = { 120, 120 },
 		Rooms = {
-			{
+			makeRoom(false, true, {
 				Name = "Flooded pocket",
-				Art = SLOT7ROOM1,
-				Primitives = merge(maze(SLOT7ROOM1, 0, 0, false, true), {
-					cellRoof(20, 20),
-					cellRoof(20, 100),
-					cellRoof(100, 60),
-					pool(20, 60, 13),
-					pool(60, 60, 13),
-					pool(60, 100, 13),
-				}),
-				Loot = {
-					loot(20, 60, 6),
-					loot(60, 60, 3),
-					loot(20, 20, 4),
+				Art = {
+					"+  +  +  +",
+					"          ",
+					"+  +  +  +",
+					"      |   ",
+					"+  +  +  +",
+					"      |   ",
+					"+  +  +  +",
 				},
-			},
-			{
+				Shapes = {
+					pool(40, 80, 20),
+				},
+				Loot = {
+					loot(100, 100, 6),
+					loot(20, 100, 3),
+				},
+			}),
+			makeRoom(false, true, {
 				Name = "Dead-end cave",
-				Art = SLOT7ROOM2,
-				Primitives = merge(maze(SLOT7ROOM2, 0, 0, false, true), {
-					cellRoof(20, 20),
+				Art = {
+					"+  +  +  +",
+					"          ",
+					"+--+--+  +",
+					"          ",
+					"+  +  +--+",
+					"          ",
+					"+  +  +  +",
+				},
+				Shapes = {
+					cellRoof(60, 60),
 					cellRoof(20, 60),
 					cellRoof(20, 100),
-					cellRoof(60, 60),
 					cellRoof(60, 100),
-					cellRoof(100, 20),
-					cellRoof(100, 60),
-					cellRoof(100, 100),
-				}),
-				Loot = {
-					loot(20, 20, 6),
-					loot(20, 60, 3),
-					loot(20, 100, 2),
-					loot(100, 20, 1),
 				},
-			},
-			{
+				Loot = {
+					loot(100, 100, 6),
+					loot(20, 20, 3),
+				},
+			}),
+			makeRoom(false, true, {
 				Name = "Boulder scramble",
-				Art = SLOT7ROOM3,
-				Primitives = merge(maze(SLOT7ROOM3, 0, 0, false, true), {
-					boulder(61, 100, 13, 10),
-					boulder(104, 95, 13, 9),
-				}),
+				Art = {
+					"+  +  +  +",
+					"          ",
+					"+  +  +  +",
+					"          ",
+					"+--+  +  +",
+					"          ",
+					"+  +  +  +",
+				},
+				Shapes = {
+					boulder(70, 62, 13, 10),
+					boulder(96, 76, 11, 10),
+					boulder(30, 56, 11, 9),
+				},
 				Loot = {
 					loot(20, 100, 6),
-					loot(100, 60, 3),
-					loot(20, 60, 2),
+					loot(100, 100, 3),
 				},
-			},
+			}),
 		},
 	},
 }
+-- >>> rooms
 
 -- Fitting the roofs -----------------------------------------------------------------------------
 --
