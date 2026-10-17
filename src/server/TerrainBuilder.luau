@@ -61,7 +61,28 @@ local function shrunkRoof(x: number, z: number): (number?, number?, string?)
 	return bottom, top, material
 end
 
--- The area the terrain covers: the whole beach and seabed, a little past the sides.
+-- Behind the shoreline the terrain is the shop's dry sand (flat, height 0) and the low dunes
+-- behind it: they rise from DUNE_FOOT to DUNE_HEIGHT over 8 studs, run flat (the dune grass
+-- stands on them, MapEdge), and fall away again by DUNE_BACK.
+local DUNE_FOOT, DUNE_HEIGHT, DUNE_TOP_END, DUNE_BACK = -74, 4, -124, -132
+
+local function smoothstep(t: number): number
+	t = math.clamp(t, 0, 1)
+	return t * t * (3 - 2 * t)
+end
+
+local function behindShore(z: number): number
+	if z >= DUNE_FOOT then
+		return 0
+	end
+	local rise = smoothstep((DUNE_FOOT - z) / 8)
+	local fall = 1 - smoothstep((DUNE_TOP_END - z) / (DUNE_TOP_END - DUNE_BACK))
+	return DUNE_HEIGHT * math.min(rise, fall)
+end
+TerrainBuilder.behindShore = behindShore
+
+-- The area the terrain covers: the shop's ground and the dunes behind it, and the whole beach
+-- and seabed, a little past the sides.
 function TerrainBuilder.bounds(): (Vector3, Vector3)
 	local half = Beach.HalfWidth + 40
 	local zEnd = Beach.Depth + beach.SeaExtent
@@ -70,7 +91,7 @@ function TerrainBuilder.bounds(): (Vector3, Vector3)
 	local function snap(v: number, up: boolean): number
 		return (if up then math.ceil(v / VOXEL) else math.floor(v / VOXEL)) * VOXEL
 	end
-	return Vector3.new(snap(-half, false), snap(low, false), 0),
+	return Vector3.new(snap(-half, false), snap(low, false), snap(DUNE_BACK - 4, false)),
 		Vector3.new(snap(half, true), snap(high, true), snap(zEnd, true))
 end
 
@@ -91,6 +112,9 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 		for iz = 1, nz do
 			local z = z0 + (iz - 0.5) * VOXEL
 			local height, rock, shapeMaterial = shrunkShape(x, z)
+			if z < 0 then
+				height = behindShore(z) -- the shop's flat sand and the dunes behind it
+			end
 			local h = Beach.groundY(z) + height - DRAWN_BIGGER
 			local floorMaterial, rockMaterial = materialAt(x, z)
 			-- A shape's own material, else a Paint's on the ground, else the zone's (Looks).

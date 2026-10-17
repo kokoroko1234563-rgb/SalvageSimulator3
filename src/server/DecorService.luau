@@ -518,6 +518,73 @@ function builders.Crate(model, base, s, rng)
 	end
 end
 
+function builders.Shells(model, base, s, rng)
+	local colors = { D.ShellPink, D.ShellCream, D.ShellBand }
+	for _ = 1, rng:NextInteger(6, 11) do
+		local x, z = rng:NextNumber(-2.2, 2.2) * s, rng:NextNumber(-2.2, 2.2) * s
+		local size = rng:NextNumber(0.35, 0.8) * s
+		part(
+			model,
+			base,
+			"Shell",
+			Ball,
+			Vector3.new(size, size * 0.4, size * 0.85),
+			CFrame.new(x, size * 0.12, z) * CFrame.Angles(0, rng:NextNumber(0, 6), 0),
+			colors[rng:NextInteger(1, #colors)],
+			M.Smooth
+		)
+	end
+end
+
+function builders.Rocks(model, base, s, rng)
+	for _ = 1, rng:NextInteger(3, 6) do
+		local x, z = rng:NextNumber(-3, 3) * s, rng:NextNumber(-3, 3) * s
+		local size = rng:NextNumber(1.6, 4.2) * s
+		part(
+			model,
+			base,
+			"Rock",
+			Ball,
+			Vector3.new(size * rng:NextNumber(1, 1.4), size * 0.7, size),
+			CFrame.new(x, size * 0.2, z) * CFrame.Angles(0, rng:NextNumber(0, 6), 0),
+			if rng:NextNumber() < 0.5 then D.RockLight else D.RockMid,
+			M.Rock
+		)
+	end
+end
+
+function builders.DuneGrass(model, base, s, rng)
+	for _ = 1, rng:NextInteger(3, 5) do
+		local cx, cz = rng:NextNumber(-2, 2) * s, rng:NextNumber(-2, 2) * s
+		for _ = 1, rng:NextInteger(4, 7) do
+			local height = rng:NextNumber(1.2, 2.6) * s
+			local tip =
+				Vector3.new(cx + rng:NextNumber(-0.7, 0.7) * s, height, cz + rng:NextNumber(-0.7, 0.7) * s)
+			bar(
+				model,
+				base,
+				"Blade",
+				Vector3.new(cx, 0, cz),
+				tip,
+				0.12 * s,
+				if rng:NextNumber() < 0.6 then D.DuneGrass else D.DuneGrassDry,
+				M.Grass
+			)
+		end
+	end
+end
+
+function builders.Driftwood(model, base, s, rng)
+	local length = rng:NextNumber(4, 7) * s
+	local bend = rng:NextNumber(-0.5, 0.5)
+	local a = Vector3.new(0, 0.35 * s, -length / 2)
+	local m = Vector3.new(bend * 2 * s, 0.4 * s, 0)
+	local b = Vector3.new(-bend * s, 0.3 * s, length / 2)
+	bar(model, base, "Branch", a, m, 0.6 * s, D.Driftwood, M.Wood)
+	bar(model, base, "Branch", m, b, 0.5 * s, D.Driftwood, M.Wood)
+	bar(model, base, "Twig", m, m + Vector3.new(1.4 * s, 0.4 * s, 0.8 * s), 0.25 * s, D.Driftwood, M.Wood)
+end
+
 function builders.GlowShells(model, base, s, rng)
 	local brightest: BasePart? = nil
 	for _ = 1, rng:NextInteger(4, 7) do

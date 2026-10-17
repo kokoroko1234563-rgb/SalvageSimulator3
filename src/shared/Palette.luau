@@ -299,6 +299,14 @@ Palette.Decor = {
 	LanternGlass = rgb(255, 214, 140),
 	LanternIron = rgb(48, 46, 44),
 	Rope = rgb(170, 150, 110),
+	ShellPink = rgb(244, 190, 182),
+	ShellCream = rgb(246, 234, 210),
+	ShellBand = rgb(200, 150, 110),
+	RockLight = rgb(168, 160, 150),
+	RockMid = rgb(132, 126, 120),
+	DuneGrass = rgb(186, 196, 120),
+	DuneGrassDry = rgb(214, 200, 140),
+	Driftwood = rgb(206, 196, 178),
 }
 
 -- Colours for the tool models (src/server/ToolModels.luau).

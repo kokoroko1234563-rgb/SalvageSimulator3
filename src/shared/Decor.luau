@@ -25,6 +25,11 @@ Decor.Kinds = {
 	Starfish = { Note = "a starfish" },
 	Pebbles = { Note = "a scatter of pebbles and shingle" },
 	Crate = { Note = "a smashed crate" },
+	-- The sunny shore's.
+	Shells = { Note = "a scatter of shells, pink, cream and banded" },
+	Rocks = { OnRock = true, Note = "a group of rounded, sea-worn boulders" },
+	DuneGrass = { Note = "tufts of pale dune grass" },
+	Driftwood = { Note = "a bleached, twisted branch of driftwood" },
 	GlowShells = { Ward = 9, Note = "a cluster of shells glowing pale cyan: a small ward against the Gloom" },
 	GlowWeed = { Ward = 12, Note = "a clump of weed glowing green: a ward against the Gloom" },
 	LanternPost = {

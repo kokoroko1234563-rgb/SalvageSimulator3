@@ -380,25 +380,8 @@ function BeachBuilder.build(): Folder
 	local half = Beach.HalfWidth
 	local seaEnd = Beach.Depth + beach.SeaExtent
 
-	-- Flat dry ground behind the shoreline (shop area).
-	MapParts.part({
-		Name = "DrySand",
-		Size = Vector3.new(beach.Width, 10, beach.ShopDepth),
-		CFrame = CFrame.new(0, -5, -beach.ShopDepth / 2),
-		Color = Palette.World.Sand,
-		Material = Palette.Material.Sand,
-	}).Parent =
-		map
-
-	-- Low dunes behind the shop, so the cove stays open.
-	MapParts.part({
-		Name = "Dunes",
-		Size = Vector3.new(beach.Width + 60, 8, 40),
-		CFrame = CFrame.new(0, 0, -beach.ShopDepth - 20),
-		Color = Palette.World.Sand,
-		Material = Palette.Material.Sand,
-	}).Parent =
-		map
+	-- (The shop's dry sand and the low dunes behind it are terrain, the same sand as the
+	-- beach: TerrainBuilder.behindShore.)
 
 	-- The beach: one long slope from the shoreline out under the sea. The tide uncovers more
 	-- or less of it.

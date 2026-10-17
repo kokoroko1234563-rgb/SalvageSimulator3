@@ -38,16 +38,68 @@ local UNDERWATER_CLEARANCE = 1.5
 
 -- A spot in a zone's band, across the width of the beach. Zone 1 keeps clear of the shop, and the
 -- last zone stops where the sea floor does.
-local function bandSpot(zone: number, rng: Random, minZ: number?): Vector3
+-- Props gather in clusters rather than spreading evenly: a shore isn't sprinkled, things wash
+-- up and pile together (a heap of wrack, a scatter of shells by a rock, a camp of
+-- umbrellas), with open sand between. Each zone has its own clusters, the same every time.
+local CLUSTERED = 0.85 -- share of a zone's props that go in its clusters (the rest stray)
+local clusters: { [number]: { { x: number, z: number, r: number, w: number } } } = {}
+
+local function bandRange(zone: number, minZ: number?): (number, number)
 	local zMin, zMax = Beach.zoneRange(zone)
 	local low = math.max(zMin + 14, minZ or 0)
 	local high = zMax - 12
 	if zone == #Config.Zones then
 		high = Beach.Depth + beach.SeaExtent - 12
 	end
+	return low, math.max(high, low)
+end
+
+local function clustersFor(zone: number)
+	if clusters[zone] then
+		return clusters[zone]
+	end
+	local rng = Random.new(4242 + zone * 17)
+	local low, high = bandRange(zone)
+	local half = Beach.HalfWidth - 40
+	local list = {}
+	for _ = 1, 10 + zone do
+		table.insert(list, {
+			x = rng:NextNumber(-half, half),
+			z = rng:NextNumber(low, high),
+			r = rng:NextNumber(14, 38),
+			w = rng:NextNumber(0.5, 1.5), -- some clusters gather more than others
+		})
+	end
+	clusters[zone] = list
+	return list
+end
+
+local function bandSpot(zone: number, rng: Random, minZ: number?): Vector3
+	local low, high = bandRange(zone, minZ)
 	local half = Beach.HalfWidth - 30
-	local z = rng:NextNumber(low, math.max(high, low))
-	local x = rng:NextNumber(-half, half)
+	local x, z
+	if rng:NextNumber() < CLUSTERED then
+		local list = clustersFor(zone)
+		local total = 0
+		for _, c in list do
+			total += c.w
+		end
+		local pick = rng:NextNumber() * total
+		local chosen = list[#list]
+		for _, c in list do
+			pick -= c.w
+			if pick <= 0 then
+				chosen = c
+				break
+			end
+		end
+		local angle, dist = rng:NextNumber() * math.pi * 2, chosen.r * math.sqrt(rng:NextNumber())
+		x = math.clamp(chosen.x + math.cos(angle) * dist, -half, half)
+		z = math.clamp(chosen.z + math.sin(angle) * dist, low, high)
+	else
+		x = rng:NextNumber(-half, half)
+		z = rng:NextNumber(low, high)
+	end
 	return Vector3.new(x, Beach.groundAt(x, z), z)
 end
 
