@@ -19,6 +19,11 @@
 --           pebbles trickling down; it Harms whoever it lands on. Placement: At = {x, z}.
 --   Undertow  while the sea covers it (deeper than MinDepth), a current along a ford or
 --           channel drags you toward the sea at Strength studs/s. Placement: Path, Width.
+--   Hunter  a big creature (the giant hermit crab) that patrols its Path at Speed and hunts:
+--           it sees a player within SightRange (LightRange if they carry a light) with nothing
+--           in the way, chases at ChaseSpeed, gives up LoseTime seconds after losing sight of
+--           them or Leash studs from its route, and walks back the way it came. Placement:
+--           Path; without one it takes the layout's longest Patrol route.
 --   Gloom   a living, magical darkness (the Drowned Reach's): an inky fog Radius studs across
 --           that drifts along its Path at Speed (or lies still At a spot), and swells by Swell
 --           once the tide turns. Inside it your dread rises: in Fill seconds it takes you
@@ -128,6 +133,22 @@ Hazards.Types = {
 		Push = 0,
 		HitText = "",
 	},
+	Hunter = {
+		Count = 1,
+		Speed = 5,
+		ChaseSpeed = 16, -- a player running flat out (20) can outpace it, in the open
+		SightRange = 36,
+		LightRange = 75, -- how far it sees someone carrying a light
+		LoseTime = 2.5,
+		Leash = 90,
+		Size = Vector3.new(12, 6, 10),
+		Color = Color3.fromRGB(176, 72, 52),
+		Damage = 100,
+		Effect = "Harm",
+		HitRadius = 6.5,
+		Push = 40,
+		HitText = "The giant crab got you!",
+	},
 	Gloom = {
 		Count = 2,
 		Radius = 22,
@@ -160,6 +181,7 @@ Hazards.Placement = {
 	Rockfall = { At = true },
 	Undertow = { Path = true, Width = true },
 	Gloom = { Path = true, At = true, Radius = true },
+	Hunter = { Path = true },
 }
 
 -- A biome's hazard entry with every setting filled in from its kind's defaults.

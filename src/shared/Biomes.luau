@@ -86,7 +86,8 @@ Biomes.List = {
 		Loot = { "BigShell" },
 		LootShare = 0.5,
 		UnlockItem = "SpiralConch", -- (its secret isn't built yet, so it has no entrance)
-		-- Hermit crabs patrol the maze's corridors: run into one and you're knocked flat.
+		-- Hermit crabs patrol the maze's corridors: run into one and you're knocked flat. The giant
+		-- one hunts down the longest of them.
 		Hazards = {
 			{
 				Type = "Patrol",
@@ -95,6 +96,8 @@ Biomes.List = {
 				Color = Color3.fromRGB(200, 95, 70),
 				HitText = "A hermit crab knocked you flat!",
 			},
+			-- And the giant one: it hunts down its tunnel, sees a light a long way off, and kills.
+			{ Type = "Hunter", HitText = "The giant hermit crab got you!" },
 		},
 		Decor = Color3.fromRGB(225, 205, 180),
 		-- Crushed-shell grit and shell-crusted rock in a warm, dim, coral-pink gloom.

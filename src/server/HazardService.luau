@@ -6,10 +6,13 @@
 -- client checks itself against those (HazardController).
 
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
+local Gear = require(Shared.Gear)
 local Hazards = require(Shared.Hazards)
 local Layouts = require(Shared.Layouts)
 local Palette = require(Shared.Palette)
@@ -533,6 +536,178 @@ function builders.Undertow(tile, settings, folder)
 	})
 end
 
+-- Hunter: a big creature that patrols a route and hunts players it sees (Hazards.luau). It
+-- only chases someone it can see with nothing in the way, so it never walks through rock; it
+-- leaves a trail of crumbs while it chases and walks back along them to its route.
+local function carriesLight(player: Player): boolean
+	local worn = Gear.getAccessory(player:GetAttribute("Accessory"))
+	local tool = Gear.findTool(player:GetAttribute("Tool"))
+	return (worn ~= nil and worn.Light ~= nil) or (tool ~= nil and tool.Light ~= nil)
+end
+
+function builders.Hunter(tile, settings, folder)
+	local z0 = Beach.tileRange(tile)
+	local routes = {}
+	for _, placement in Layouts.hazardPlacements(tile, "Hunter") do
+		table.insert(routes, placement.Path)
+	end
+	if #routes == 0 then
+		-- The longest crab route the layout has (the Test Range checks those stay in corridors).
+		local best, bestLength = nil, 0
+		for _, placement in Layouts.hazardPlacements(tile, "Patrol") do
+			local length = 0
+			for i = 1, #placement.Path - 1 do
+				local a, b = placement.Path[i], placement.Path[i + 1]
+				length += math.sqrt((b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2)
+			end
+			if length > bestLength then
+				best, bestLength = placement.Path, length
+			end
+		end
+		if best then
+			table.insert(routes, best)
+		end
+	end
+	local size: Vector3 = settings.Size
+	local hunters = {}
+	for index, route in routes do
+		if index > settings.Count then
+			break
+		end
+		local path = {}
+		for _, point in route do
+			table.insert(path, Vector2.new(point[1], z0 + point[2]))
+		end
+		local model, body = creature(settings, Vector3.new(path[1].X, 0, path[1].Y))
+		model.Name = "Hunter"
+		for _, side in { -1, 1 } do
+			local eye = makePart({
+				Name = "Eye",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(0.9, 0.9, 0.9),
+				CFrame = body.CFrame * CFrame.new(side * size.X * 0.15, size.Y * 0.45, -size.Z * 0.45),
+				Color = Color3.fromRGB(255, 230, 120),
+				Material = Enum.Material.Neon,
+			})
+			eye.Parent = model
+		end
+		model.Parent = folder
+		table.insert(hunters, {
+			model = model,
+			path = path,
+			travelled = 0,
+			at = path[1],
+			heading = Vector2.new(0, 1),
+			mode = "patrol",
+			crumbs = {},
+			lost = 0,
+		})
+	end
+	if #hunters == 0 then
+		return
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local function place(h)
+		local ground = Beach.groundAt(h.at.X, h.at.Y)
+		local position = Vector3.new(h.at.X, ground + size.Y / 2, h.at.Y)
+		local look = Vector3.new(h.heading.X, 0, h.heading.Y)
+		h.model:PivotTo(
+			CFrame.lookAt(position, position + (if look.Magnitude > 0 then look else Vector3.zAxis))
+		)
+	end
+	-- Whether a hunter can see a point: nothing solid in between, at about eye height.
+	local function sees(h, target: Vector3): boolean
+		local from = Vector3.new(h.at.X, Beach.groundAt(h.at.X, h.at.Y) + size.Y * 0.6, h.at.Y)
+		local exclude = { folder }
+		for _, p in Players:GetPlayers() do
+			if p.Character then
+				table.insert(exclude, p.Character)
+			end
+		end
+		params.FilterDescendantsInstances = exclude
+		return Workspace:Raycast(from, target - from, params) == nil
+	end
+	local function moveToward(h, goal: Vector2, speed: number, dt: number)
+		local offset = goal - h.at
+		if offset.Magnitude < 0.01 then
+			return true
+		end
+		local stepLength = math.min(offset.Magnitude, speed * dt)
+		h.heading = offset.Unit
+		h.at += offset.Unit * stepLength
+		return stepLength >= offset.Magnitude - 0.01
+	end
+	table.insert(running, {
+		folder = folder,
+		step = function(_, dt)
+			for _, h in hunters do
+				if h.mode ~= "chase" then
+					-- Looking out: the nearest player it can see.
+					for _, player in Players:GetPlayers() do
+						local character = player.Character
+						local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+						local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+						if root and humanoid and humanoid.Health > 0 then
+							local range = if carriesLight(player)
+								then settings.LightRange
+								else settings.SightRange
+							local across = (Vector2.new(root.Position.X, root.Position.Z) - h.at).Magnitude
+							if across <= range and sees(h, root.Position) then
+								h.mode, h.target, h.lost = "chase", player, 0
+								if #h.crumbs == 0 then
+									h.crumbs = { h.at }
+								end
+								break
+							end
+						end
+					end
+				end
+				if h.mode == "chase" then
+					local character = h.target and h.target.Character
+					local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+					local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+					local home = h.crumbs[1]
+					if
+						not root
+						or not humanoid
+						or humanoid.Health <= 0
+						or (h.at - home).Magnitude > settings.Leash
+					then
+						h.mode = "return"
+					elseif sees(h, root.Position) then
+						h.lost = 0
+						moveToward(h, Vector2.new(root.Position.X, root.Position.Z), settings.ChaseSpeed, dt)
+						if (h.at - h.crumbs[#h.crumbs]).Magnitude > 4 then
+							table.insert(h.crumbs, h.at)
+						end
+					else
+						h.lost += dt
+						if h.lost > settings.LoseTime then
+							h.mode = "return"
+						end
+					end
+				elseif h.mode == "return" then
+					local crumb = h.crumbs[#h.crumbs]
+					if not crumb then
+						h.mode = "patrol"
+					elseif moveToward(h, crumb, settings.Speed * 1.5, dt) then
+						table.remove(h.crumbs)
+						if #h.crumbs == 0 then
+							h.mode = "patrol"
+						end
+					end
+				else
+					h.travelled += settings.Speed * dt
+					local at, heading = HazardService.alongPath(h.path, h.travelled)
+					h.at, h.heading = at, heading
+				end
+				place(h)
+			end
+		end,
+	})
+end
+
 -- Gloom: a living darkness, drawn as an inky fog over its area, drifting back and forth along
 -- its Path (or lying still), swelling once the tide turns. The dread it causes is each
 -- client's to feel (HazardController); the server only moves it and takes whoever it fills.
@@ -669,7 +844,7 @@ function HazardService.init()
 		mine[part] = now
 		humanoid:TakeDamage(part:GetAttribute("Damage") or 100)
 	end)
-	game:GetService("Players").PlayerRemoving:Connect(function(player)
+	Players.PlayerRemoving:Connect(function(player)
 		lastHarm[player] = nil
 	end)
 	RunService.Heartbeat:Connect(function(dt)
@@ -691,8 +866,11 @@ end
 
 -- For tools/tests: run every hazard one step.
 function HazardService._step(now: number, dt: number)
-	for _, entry in running do
-		entry.step(now, dt)
+	for i = #running, 1, -1 do
+		-- (A hazard whose folder an earlier test destroyed fails: drop it.)
+		if not pcall(running[i].step, now, dt) then
+			table.remove(running, i)
+		end
 	end
 end
 

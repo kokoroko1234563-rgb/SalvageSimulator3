@@ -2486,6 +2486,35 @@ test("layouts dress their ground with decor, and the glowing kinds ward off the 
 	DecorService.build(tile)
 end)
 
+test("the giant crab takes the longest crab route, and is deadly but can be outrun", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 4
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "lair",
+		Primitives = {},
+		Hazards = {
+			{ Type = "Patrol", Path = { { -100, 100 }, { 100, 100 } } },
+			{ Type = "Patrol", Path = { { -50, 300 }, { -40, 300 } } },
+		},
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, { Hazards = { { Type = "Hunter" } } }, folder)
+	local hunter = folder:FindFirstChild("Hunter")
+	assert(hunter, "a hunter on the longest crab route")
+	-- (It starts where its route starts; Lune's models can't be moved, so the hunting itself is
+	-- checked in the engine.)
+	local body = hunter:FindFirstChild("Body")
+	assert(math.abs(body.CFrame.X + 100) < 1 and math.abs(body.CFrame.Z - (z0 + 100)) < 1, "on its route")
+	local settings = Hazards.settings({ Type = "Hunter" })
+	assert(settings.Damage >= 100 and settings.ChaseSpeed < 20, "deadly, but a running player can outpace it")
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
+end)
+
 test("roofs make caves: rock overhead, the floor still the ground", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
