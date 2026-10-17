@@ -97,10 +97,9 @@ local function merge(...)
 end
 
 -- Turns a maze picture into walls and rubble. The picture's top left node is at (x0, z0).
--- Walls run between nodes (with a point on each node on the way) and stop 6 studs short of the
--- ends; a round post stands on every node
--- a wall touches, so the walls meet exactly (a wall's face is 6 studs off its line) with no
--- crack where two meet end to end. On the picture's left and right edges the posts also close
+-- Walls run between nodes (with a point on each node on the way) and stop 2 studs short of the
+-- ends; a post stands on every node a wall touches, 12 across, so the walls run 4 studs into it
+-- and no crack opens where two meet end to end, even with their edges worn (Rough). On the picture's left and right edges the posts also close
 -- the walls against the cliffs (the ground past the beach's sides carries on as it is at
 -- x = +-360, so a wall must be full height there). `edgeL` and `edgeR` say the picture's left
 -- or right edge is the beach's side: the walls that reach it run right out to it, which also
@@ -132,13 +131,13 @@ local function maze(art, x0, z0, edgeL, edgeR)
 				while last + 1 < w and string.sub(line, 3 * (last + 1) + 2, 3 * (last + 1) + 2) == char do
 					last += 1
 				end
-				local path = { { x0 + PITCH * c + (if c == 0 and edgeL then 0 else 6), z } }
+				local path = { { x0 + PITCH * c + (if c == 0 and edgeL then 0 else 2), z } }
 				for i = c + 1, last do
 					table.insert(path, { x0 + PITCH * i, z })
 				end
 				table.insert(
 					path,
-					{ x0 + PITCH * (last + 1) - (if last + 1 == w and edgeR then 0 else 6), z }
+					{ x0 + PITCH * (last + 1) - (if last + 1 == w and edgeR then 0 else 2), z }
 				)
 				add(char, path)
 				if char == "-" then
@@ -162,11 +161,11 @@ local function maze(art, x0, z0, edgeL, edgeR)
 				while last + 1 < h and string.sub(art[2 * (last + 1) + 2], 3 * i + 1, 3 * i + 1) == char do
 					last += 1
 				end
-				local path = { { x, z0 + PITCH * r + 6 } }
+				local path = { { x, z0 + PITCH * r + 2 } }
 				for j = r + 1, last do
 					table.insert(path, { x, z0 + PITCH * j })
 				end
-				table.insert(path, { x, z0 + PITCH * (last + 1) - 6 })
+				table.insert(path, { x, z0 + PITCH * (last + 1) - 2 })
 				add(char, path)
 				if char == "|" then
 					for j = r, last + 1 do
