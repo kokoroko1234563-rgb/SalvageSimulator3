@@ -411,3 +411,52 @@ weed) and any outline with `Area`.
   Test Range.
 - **Check:** `bash tools/check.sh`, the map tool, `layout_render.py` (look at each zone), the Test
   Range `--every` per zone at the end.
+
+---
+
+## Round 5: the biomes as whole zones
+
+Zone 6 (assignment G, `docs/layouts/Zone6.md`) is the model for how a zone is finished: roofs
+that fit their walls, little roof, rooms that differ, no "find the gap" bars at the ends, loot at
+real dead ends, a landmark at each crossing's way in and at each room's door, deadly but fair
+dangers, and decor that makes every stretch look like somewhere. What it learned:
+
+- Walls take at most `Rough = 1` (the Test Range's wall-width tolerance is 3); rubble, pools and
+  boulders take 3. Run walls 4 studs into their posts so worn ends leave no crack.
+- Roof a cell only where at least two of its sides are walls.
+- A generator script (`tools/gen/<name>/`) that checks reachability and dead ends is cheaper
+  than hand-editing 1500 lines.
+
+### I. Hermit Hollows in zones 5 and 6 (`Biomes/HermitHollows.luau`, rewrite `[5]` and `[6]`)
+
+- **Files:** `Biomes/HermitHollows.luau`, `docs/layouts/HermitHollows.md`, the generator in
+  `tools/hermit_hollows_gen/` (extend it; commit it).
+- **What:** `[5]` and `[6]` are still the old 152-stud tiles repeated (`Tiled(zone5)`,
+  `Tiled(zone6)`). Make each a whole-zone warren like `[4]`, deeper and meaner: zone 5's target is
+  zone 5's CrossTime, zone 6's is zone 6's, a rare biome may be up to 30% over.
+- **Its dangers:** the hermit crab Patrols (on routes that stay in the corridors and cross the
+  way through) and, in zone 6, **the giant hermit crab** (`{ Type = "Hunter", ... }`, see
+  `Hazards.luau`; it patrols, sees you in its sight range, chases and kills). One giant per
+  crossing in zone 6, with its own lair (a big chamber), on a route through the warren so a
+  player has to sneak past or outrun it. It may also appear in zone 5's deepest crossing.
+  Glowing shells and weed (`GlowShells`, `GlowWeed`) mark the safe ways where it's dark.
+- **Apply the zone 6 lessons above:** landmarks at each crossing's way in, rooms that differ,
+  loot at dead ends, decor (shell middens, bones, crab moults: use the decor kinds there are).
+- **Keep:** `[4]` as it is; the biome's `Entrances` spot (one per zone, in a chamber, kept flat).
+
+### J. Shipwreck Shallows as whole zones (`Biomes/ShipwreckShallows.luau`, rewrite)
+
+- **Files:** `Biomes/ShipwreckShallows.luau`, `docs/layouts/ShipwreckShallows.md`, your scripts
+  in `tools/gen/shipwreck/`.
+- **What:** it's one old 152-stud tile repeated down whichever zone it rolls in (zones 2 to 6,
+  `Biomes.luau`). Make whole-zone definitions, one per zone it can roll in (`[2]` to `[6]`, they
+  may share a generator with the depth as a parameter): a wreck-strewn stretch around one big
+  wreck, with scour channels, debris mounds, a gully for the rolling barrels, and the ship's
+  hatch (its `Entrances`) kept as the biome needs (read `BiomeService` and the current file
+  before changing them).
+- **Rules by depth:** in zones 2 and 3 no `Wall` or rock (the shore rules, assignment H); from
+  zone 4 on, walls and roofs as the plain zone may have (the wreck's hull can be a wall).
+- **Its dangers:** the barrels (`Roller`) must still be deadly and readable: the gully and the
+  channels are where they run. Add the zone's own plain dangers where they fit.
+- **Times:** each zone's CrossTime, a biome up to 30% over.
+- **Apply the zone 6 lessons above.**
