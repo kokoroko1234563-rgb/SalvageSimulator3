@@ -88,6 +88,27 @@ def row_path(z0, amp, ph, x0, x1):
     return [[round(x0 + (x1 - x0) * i / n), round(row_z(x0 + (x1 - x0) * i / n, z0, amp, ph))] for i in range(n + 1)]
 
 
+def offset(path, d):
+    """The path moved sideways by d studs (to its left of travel for d > 0)."""
+    out = []
+    for i, (x, z) in enumerate(path):
+        a, b = path[max(0, i - 1)], path[min(len(path) - 1, i + 1)]
+        dx, dz = b[0] - a[0], b[1] - a[1]
+        n = math.hypot(dx, dz) or 1
+        out.append([round(x - dz / n * d), round(z + dx / n * d)])
+    return out
+
+
+def bank(p, h, w, trench):
+    """A crest between two runnels, as primitives."""
+    out = [dict(Kind="Ridge", Path=p, Height=h, Width=w, Rough=3)]
+    for side in (-1, 1):
+        q = offset(p, side * (w / 2 + 3))
+        out.append(dict(Kind="Channel", Path=q, Depth=trench, Width=10, Rough=2))
+        out.append(dict(Kind="Paint", Path=q, Width=22, Material="Ground", Rough=3))
+    return out
+
+
 # ---- builder ----------------------------------------------------------------------------
 class Zone:
     def __init__(self, seed, name, blocked=lambda x, z: False):
@@ -228,7 +249,7 @@ def zone1():
 
 
 # ---- rows: bars across a zone, with open gaps and foot-only saddles ------------------------
-def bars(Z, z0, amp, ph, gaps, saddles, h, w, saddle_h, saddle_w, rough=3):
+def bars(Z, z0, amp, ph, gaps, saddles, h, w, saddle_h, saddle_w, rough=3, trench=3.0):
     """A row across the zone from side to side, made of bars. gaps: [(x0, x1)] left open;
     saddles: [(x0, x1)] low enough to walk over but not to haul a cart over."""
     cuts = sorted([(a, b, "gap") for a, b in gaps] + [(a, b, "saddle") for a, b in saddles])
@@ -245,7 +266,9 @@ def bars(Z, z0, amp, ph, gaps, saddles, h, w, saddle_h, saddle_w, rough=3):
     for a, b, kind in pieces:
         p = row_path(z0, amp, ph, a, b)
         if kind == "solid":
-            Z.add("Ridge", Path=p, Height=h, Width=w, Rough=rough)
+            # A crest between two runnels: from the bottom of a runnel to the crest is too steep to walk.
+            for prim in bank(p, h, w, trench):
+                Z.add(prim.pop("Kind"), **prim)
         else:
             Z.add("Ridge", Path=p, Height=saddle_h, Width=saddle_w, Rough=rough)
         Z.add("Paint", Path=p, Width=10, Material="Salt", Rough=2)
@@ -259,23 +282,34 @@ def blocked2(x, z):
     return any(math.dist((x, z), p) < 30 for p in [(-280, 20), (140, 120)])
 
 
+def solids(row, gaps):
+    """The row's solid stretches between its gaps, as (x0, x1)."""
+    out, x = [], -362
+    for a, b in sorted(gaps):
+        out.append((x, a))
+        x = b
+    out.append((x, 362))
+    return out
+
+
 def zone2():
     Z = Zone(22, "Sunny Stretch", blocked2)
     r = Z.rng
     # The pier's line stays clear.
     for pz in (22, 76, 130, 184, 238, 292):
         Z.prims.append(dict(Kind="Flat", At=[40, pz], Radius=9))
-    A = (200, 34, 0)
-    B = (410, 36, 60)
-    for row, gaps, saddles in [(A, [(2, 78)], [(-250, -205)]), (B, [(-135, -45)], [(205, 250)])]:
-        for a, b, kind, p in bars(Z, *row, gaps=gaps, saddles=saddles, h=5.0, w=18, saddle_h=3.0, saddle_w=22):
+    A, B, C = (200, 30, 0), (330, 26, 60), (460, 32, 130)
+    # Row gaps zigzag: the pier's (x 2 to 78), then west, then east. Saddles are foot-only ways over.
+    rows = [(A, [(2, 78)], [(-260, -215)]), (B, [(-175, -125)], [(215, 260)]), (C, [(125, 175)], [(-260, -215)])]
+    for row, gaps, saddles in rows:
+        for a, b, kind, p in bars(Z, *row, gaps=gaps, saddles=saddles, h=4.2, w=18, saddle_h=3.0, saddle_w=22, trench=2.0):
             if kind == "solid":
                 Z.dec("DuneGrass", 8, Path=p)
-    # Low curving bars between the rows, and the runnels that lie beside them.
-    lows = [(-210, 70, 120, 200, 40), (210, 80, 100, 20, -35), (-70, 300, 110, 5, 30), (200, 300, 90, -20, 40),
-            (-230, 310, 80, 15, -30), (60, 520, 100, 10, 30), (-200, 520, 110, -10, 35), (240, 520, 80, 15, -30),
-            (-40, 100, 70, 30, 30)]
-    for cx, cz, ln, ang, bend in lows:
+    # Low curving bars between the rows, with runnels beside those near the ends of the zone.
+    lows = [(-210, 70, 120, 200, 40, 1), (210, 80, 100, 20, -35, 1), (-40, 100, 70, 30, 30, 1),
+            (-200, 265, 90, 10, 20, 0), (210, 265, 90, -10, 20, 0), (-60, 395, 100, 5, 25, 0), (190, 395, 90, -15, 25, 0),
+            (60, 545, 100, 10, 30, 1), (-200, 550, 110, -10, 35, 1), (240, 545, 80, 15, -30, 1)]
+    for cx, cz, ln, ang, bend, runnel in lows:
         p = curve(cx, cz, ln, ang, bend)
         if not Z.ok(p):
             continue
@@ -284,25 +318,27 @@ def zone2():
         Z.dec("Shells", 8, Path=p)
         nx, nz = -math.sin(math.radians(ang)), math.cos(math.radians(ang))
         q = [[round(x + nx * 24), round(z + nz * 24)] for x, z in p]
-        if Z.ok(q) and all(30 < zz < 580 for _, zz in q):
+        if runnel and Z.ok(q) and all(30 < zz < 580 for _, zz in q):
             Z.add("Channel", Path=q, Depth=1.5, Width=14, Rough=2)
             Z.add("Paint", Path=q, Width=26, Material="Ground", Rough=3)
     # outcrops (decor rocks)
-    for (cx, cz) in [(-215, 330), (215, 500), (-95, 150), (130, 260)]:
+    for (cx, cz) in [(-215, 265), (215, 395), (-95, 130), (130, 270), (-300, 520)]:
         Z.dec("Rocks", 5, Area=blob(r, cx, cz, 24, 15, r.uniform(0, 90), 9), Scale=1.5)
         Z.dec("Barnacles", 3, Area=blob(r, cx, cz, 18, 10, 0, 8))
         Z.dec("Weed", 6, Area=blob(r, cx, cz, 30, 20, 0, 8))
         Z.dec("Starfish", 3, Area=blob(r, cx, cz, 30, 20, 0, 8))
-    scatter(Z, ["Shells", "Pebbles", "Weed", "Shells"], 18, 40, 580)
-    wrack(Z, [[[-345, 300], [-250, 335], [-150, 300], [-50, 345], [60, 305], [160, 350], [250, 310], [345, 335]],
-              [[-345, 520], [-240, 500], [-130, 540], [-10, 505], [100, 545], [210, 510], [345, 540]]],
+    scatter(Z, ["Shells", "Pebbles", "Weed", "Shells"], 20, 40, 580)
+    wrack(Z, [[[-345, 265], [-250, 290], [-150, 262], [-50, 292], [60, 262], [160, 292], [250, 265], [345, 285]],
+              [[-345, 395], [-240, 372], [-130, 400], [-10, 378], [100, 402], [210, 380], [345, 398]],
+              [[-345, 560], [-240, 540], [-130, 572], [-10, 545], [100, 575], [210, 550], [345, 570]]],
           [(0, 0.22), (0.3, 0.5), (0.58, 0.8), (0.86, 1)])
-    c1 = ramp(spline([[36, 2], [52, 110], [34, 200], [30, 300], [-30, 350], [-90, 408], [-100, 500], [-70, 606]], 40))
-    c2 = ramp(spline([[36, 2], [52, 110], [34, 200], [60, 290], [130, 350], [150, 412], [130, 500], [100, 606]], 40))
-    plug = dict(Kind="Ridge", Path=row_path(*B, -135, -45), Height=5.0, Width=18, Rough=3)
-    write(2, Z.lua([("Pier and the west gap", [c1]), ("Pier and the east ford", [plug, c2])],
-          "-- Zone 2, Sunny Stretch: two rows of bars with gaps and low saddles, curving bars and runnels, outcrops.\n"
-          "-- Drawn by tools/gen/shore/gen.py. The pier's line (x = 40, first half) and the rock pools stay clear."))
+    c1 = ramp(spline([[40, 2], [48, 110], [40, 200], [0, 250], [-100, 290], [-150, 335], [-90, 390], [50, 420], [150, 462], [130, 540], [110, 606]], 40))
+    c2 = ramp(spline([[40, 2], [48, 110], [40, 200], [90, 250], [150, 290], [150, 335], [60, 390], [-60, 420], [-150, 462], [-130, 540], [-110, 606]], 40))
+    plugs1 = bank(row_path(*B, -175, -125), 4.2, 18, 2.0) + bank(row_path(*C, 125, 175), 4.6, 14, 2.0)
+    write(2, Z.lua([("Pier, then west, then east", [c1]), ("Pier, then east, then west", plugs1 + [c2])],
+          "-- Zone 2, Sunny Stretch: three rows of sandbars (a crest between two runnels) with gaps that zigzag and low\n"
+          "-- saddles, curving bars and runnels, outcrops. Drawn by tools/gen/shore/gen.py. The pier's line (x = 40,\n"
+          "-- first half) and the rock pools stay clear."))
 
 
 # ---- zone 3 -----------------------------------------------------------------------------
@@ -313,51 +349,53 @@ def blocked3(x, z):
 def zone3():
     Z = Zone(33, "Middle Banks", blocked3)
     r = Z.rng
-    A = (190, 26, 10)
-    B = (345, 26, 70)
-    C = (500, 24, 130)
-    rows = [(A, [(-160, -60)], [(180, 235)]), (B, [(35, 125)], [(-280, -235)]), (C, [(-110, -30)], [(230, 285)])]
+    A, B, C, D = (200, 22, 10), (320, 28, 70), (440, 24, 130), (555, 20, 40)
+    rows = [(A, [(-135, -85)], [(190, 240)]), (B, [(85, 135)], [(-250, -200)]),
+            (C, [(-135, -85)], [(190, 240)]), (D, [(85, 135)], [(-250, -200)])]
     for row, gaps, saddles in rows:
-        for a, b, kind, p in bars(Z, *row, gaps=gaps, saddles=saddles, h=6.6, w=18, saddle_h=3.2, saddle_w=22, rough=4):
+        for a, b, kind, p in bars(Z, *row, gaps=gaps, saddles=saddles, h=5.8, w=22, saddle_h=3.2, saddle_w=24, rough=4, trench=2.0):
             if kind == "solid":
                 Z.dec("DuneGrass", 10, Path=p)
                 Z.dec("Pebbles", 4, Path=p)
-    # extra banks, to hide the way ahead from the top
-    extra = [(-290, 110, 90, 10, 30, 5.5), (-20, 90, 100, -10, -30, 6.0), (200, 100, 90, 25, 30, 5.5),
-             (270, 270, 80, 100, 30, 5.0), (-250, 270, 80, 20, 30, 5.5), (-60, 270, 70, -20, 40, 5.0),
-             (-250, 430, 90, 15, 30, 5.8), (60, 430, 80, -20, 35, 5.2), (270, 430, 80, 30, 30, 5.0),
-             (-250, 570, 70, 10, 30, 5.0), (100, 570, 90, -10, -30, 5.5)]
+    # a few banks beyond the rows, to hide the way ahead from the top
+    extra = [(-290, 110, 90, 10, 30, 5.6), (-20, 100, 100, -10, -30, 5.4), (200, 110, 90, 25, 30, 5.6)]
     for cx, cz, ln, ang, bend, h in extra:
         p = curve(cx, cz, ln, ang, bend)
         if Z.ok(p):
-            Z.add("Ridge", Path=p, Height=h, Width=18, Rough=4)
+            Z.add("Ridge", Path=p, Height=h, Width=20, Rough=3)
             Z.add("Paint", Path=p, Width=10, Material="Salt", Rough=2)
             Z.dec("DuneGrass", 8, Path=p)
-    # creek winding to a wide mouth
-    creek = spline([[-215, 30], [-170, 130], [-220, 250], [-130, 330], [-160, 420], [-60, 470], [-90, 540], [-20, 595]], 26)
+    # the creek finds the gaps, and ends in a wide mouth
+    creek = spline([[-130, 30], [-115, 120], [-110, 200], [-60, 255], [40, 285], [110, 320], [110, 380], [40, 410], [-60, 435],
+                    [-110, 440], [-100, 500], [0, 530], [110, 555], [150, 585]], 26)
     Z.add("Channel", Path=creek, Depth=1.6, Width=16, Rough=2)
     Z.add("Paint", Path=creek, Width=34, Material="Ground", Rough=4)
-    Z.add("Hollow", At=[-20, 580], Radius=30, Depth=1.8, Rough=3)
-    Z.dec("Weed", 20, Area=blob(r, -20, 580, 52, 14, 0, 10))
-    # an old wreck, half buried
-    Z.add("Hollow", At=[210, 405], Radius=24, Depth=1.2, Rough=3)
-    Z.dec("WreckRibs", 1, At=[210, 405], Scale=1.6, Yaw=20)
-    Z.dec("WreckRibs", 1, At=[232, 414], Scale=1.1, Yaw=15)
-    Z.dec("Timber", 4, Area=blob(r, 215, 405, 36, 22, 15, 8))
-    Z.dec("Crate", 2, Area=blob(r, 195, 425, 14, 8, 0, 8))
-    for (cx, cz) in [(-310, 380), (310, 245)]:
+    Z.add("Hollow", At=[140, 590], Radius=26, Depth=1.8, Rough=3)
+    Z.dec("Weed", 20, Area=blob(r, 140, 585, 40, 14, 0, 10))
+    # an old wreck, half buried, between rows 2 and 3
+    Z.add("Hollow", At=[235, 380], Radius=22, Depth=1.2, Rough=3)
+    Z.dec("WreckRibs", 1, At=[235, 380], Scale=1.6, Yaw=20)
+    Z.dec("WreckRibs", 1, At=[256, 388], Scale=1.1, Yaw=15)
+    Z.dec("Timber", 4, Area=blob(r, 238, 380, 34, 20, 15, 8))
+    Z.dec("Crate", 2, Area=blob(r, 218, 392, 12, 8, 0, 8))
+    for (cx, cz) in [(-310, 380), (310, 255)]:
         Z.dec("Rocks", 4, Area=blob(r, cx, cz, 22, 14, 0, 8), Scale=1.4)
-    scatter(Z, ["Shells", "Pebbles", "Weed", "Starfish"], 20, 40, 585)
-    wrack(Z, [[[-345, 255], [-230, 235], [-110, 270], [10, 240], [130, 278], [250, 245], [345, 265]],
-              [[-345, 410], [-210, 385], [-80, 425], [60, 395], [200, 440], [345, 410]],
-              [[-345, 550], [-200, 575], [-60, 545], [90, 580], [250, 552], [345, 575]]],
+    scatter(Z, ["Shells", "Pebbles", "Weed", "Starfish"], 22, 40, 585)
+    wrack(Z, [[[-345, 260], [-230, 280], [-110, 255], [10, 285], [130, 262], [250, 282], [345, 260]],
+              [[-345, 380], [-210, 400], [-80, 375], [60, 402], [200, 395], [345, 380]],
+              [[-345, 500], [-200, 520], [-60, 495], [90, 522], [250, 500], [345, 520]]],
           [(0, 0.2), (0.28, 0.5), (0.58, 0.78), (0.85, 1)], (16, 12, 3, 6))
-    c1 = ramp(spline([[-110, 2], [-100, 100], [-110, 190], [-20, 270], [80, 345], [60, 420], [-70, 500], [-60, 606]], 40))
-    c2 = ramp(spline([[-110, 2], [-100, 100], [-110, 190], [-190, 270], [-195, 345], [-150, 420], [-70, 500], [-60, 606]], 40))
-    plug = dict(Kind="Ridge", Path=row_path(*B, 35, 125), Height=6.6, Width=18, Rough=4)
-    write(3, Z.lua([("The east gap", [c1]), ("The west saddle", [plug, c2])],
-          "-- Zone 3, Middle Banks: three rows of tall banks with gaps and saddles that hide the way ahead, a creek\n"
-          "-- mouth, an old wreck. Drawn by tools/gen/shore/gen.py."))
+    c1 = ramp(spline([[-110, 2], [-110, 100], [-110, 200], [-40, 255], [60, 285], [110, 322], [110, 380], [40, 415], [-60, 440], [-110, 445],
+                      [-95, 500], [0, 530], [110, 555], [110, 606]], 40))
+    c2 = ramp(spline([[-110, 2], [-110, 100], [-110, 150], [60, 240], [110, 285], [-110, 325], [-110, 380], [60, 415], [110, 440],
+                      [110, 480], [0, 530], [-110, 555], [-110, 606]], 40))
+    plugs = []
+    for row, gap in [(A, (-135, -85)), (B, (85, 135)), (C, (-135, -85)), (D, (85, 135))]:
+        plugs += bank(row_path(*row, *gap), 5.8, 22, 2.0)
+    write(3, Z.lua([("Down the gaps", [c1]), ("Across the banks", plugs + [c2])],
+          "-- Zone 3, Middle Banks: four rows of tall banks (a crest between two runnels) with gaps that zigzag and low\n"
+          "-- saddles; they hide the way ahead from the top. A creek that finds the gaps, an old wreck. Drawn by\n"
+          "-- tools/gen/shore/gen.py."))
 
 
 if __name__ == "__main__":
