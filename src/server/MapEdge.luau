@@ -224,7 +224,7 @@ local function backFringe(folder: Folder, rng: Random)
 					Size = Vector3.new(0.25, h, 0.06),
 					CFrame = CFrame.new(
 						x + rng:NextNumber(-0.6, 0.6),
-						4 + h / 2 - 0.5,
+						TerrainBuilder.behindShore(z, x) + h / 2 - 0.5,
 						z + rng:NextNumber(-0.6, 0.6)
 					) * CFrame.Angles(
 						rng:NextNumber(-0.25, 0.25),
@@ -237,7 +237,13 @@ local function backFringe(folder: Folder, rng: Random)
 			end
 		end
 		local d = rng:NextNumber(3, 6)
-		MapParts.ball(folder, Vector3.new(cx, 4 + d * 0.3, cz - 4), d, color, M.Grass)
+		MapParts.ball(
+			folder,
+			Vector3.new(cx, TerrainBuilder.behindShore(cz - 4, cx) + d * 0.3, cz - 4),
+			d,
+			color,
+			M.Grass
+		)
 	end
 end
 

@@ -62,22 +62,29 @@ local function shrunkRoof(x: number, z: number): (number?, number?, string?)
 end
 
 -- Behind the shoreline the terrain is the shop's dry sand (flat, height 0) and the low dunes
--- behind it: they rise from DUNE_FOOT to DUNE_HEIGHT over 8 studs, run flat (the dune grass
--- stands on them, MapEdge), and fall away again by DUNE_BACK.
+-- behind it: they rise from about DUNE_FOOT to about DUNE_HEIGHT over 8 studs, roll along (the
+-- dune grass stands on them, MapEdge), and fall away again by DUNE_BACK. Away from the
+-- boardwalk the foot wanders back and the crest rises and dips, so the dunes aren't one
+-- straight bank.
 local DUNE_FOOT, DUNE_HEIGHT, DUNE_TOP_END, DUNE_BACK = -74, 4, -124, -132
+local DUNE_CLEAR = 70 -- the dunes run straight this far either side of the middle (the boardwalk)
 
 local function smoothstep(t: number): number
 	t = math.clamp(t, 0, 1)
 	return t * t * (3 - 2 * t)
 end
 
-local function behindShore(z: number): number
-	if z >= DUNE_FOOT then
+local function behindShore(z: number, x: number?): number
+	local px = x or 0
+	local wander = smoothstep((math.abs(px) - DUNE_CLEAR) / 40)
+	local foot = DUNE_FOOT - wander * 10 * (0.5 + 0.5 * math.noise(px / 70, 1.7))
+	if z >= foot then
 		return 0
 	end
-	local rise = smoothstep((DUNE_FOOT - z) / 8)
+	local height = DUNE_HEIGHT + wander * 2.5 * math.noise(px / 45, 4.2) * 2
+	local rise = smoothstep((foot - z) / 8)
 	local fall = 1 - smoothstep((DUNE_TOP_END - z) / (DUNE_TOP_END - DUNE_BACK))
-	return DUNE_HEIGHT * math.min(rise, fall)
+	return math.max(height, 1.5) * math.min(rise, fall)
 end
 TerrainBuilder.behindShore = behindShore
 
@@ -113,7 +120,7 @@ function TerrainBuilder.slab(lo: Vector3, hi: Vector3, z0: number, z1: number)
 			local z = z0 + (iz - 0.5) * VOXEL
 			local height, rock, shapeMaterial = shrunkShape(x, z)
 			if z < 0 then
-				height = behindShore(z) -- the shop's flat sand and the dunes behind it
+				height = behindShore(z, x) -- the shop's flat sand and the dunes behind it
 			end
 			local h = Beach.groundY(z) + height - DRAWN_BIGGER
 			local floorMaterial, rockMaterial = materialAt(x, z)
