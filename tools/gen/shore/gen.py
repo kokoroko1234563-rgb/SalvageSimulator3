@@ -300,11 +300,11 @@ def zone2():
     # The pier's line stays clear.
     for pz in (22, 76, 130, 184, 238, 292):
         Z.prims.append(dict(Kind="Flat", At=[40, pz], Radius=9))
-    A, B, C = (200, 30, 0), (330, 26, 60), (460, 32, 130)
+    A, B, C = (200, 30, 0, 0.05), (330, 26, 60, -0.06), (460, 32, 130, 0.04)
     # Row gaps zigzag: the pier's (x 2 to 78), then west, then east. Saddles are foot-only ways over.
     rows = [(A, [(2, 78)], [(-260, -215)]), (B, [(-175, -125)], [(215, 260)]), (C, [(125, 175)], [(-260, -215)])]
     for row, gaps, saddles in rows:
-        for a, b, kind, p in bars(Z, *row, gaps=gaps, saddles=saddles, h=4.2, w=18, saddle_h=3.0, saddle_w=22, trench=2.0):
+        for a, b, kind, p in bars(Z, *row[:3], gaps=gaps, saddles=saddles, h=4.2, w=18, saddle_h=3.0, saddle_w=22, trench=2.0, tilt=row[3]):
             if kind == "solid":
                 Z.dec("DuneGrass", 8, Path=p)
     # Low curving bars between the rows, with runnels beside those near the ends of the zone.
@@ -336,7 +336,7 @@ def zone2():
           [(0, 0.22), (0.3, 0.5), (0.58, 0.8), (0.86, 1)])
     c1 = ramp(spline([[40, 2], [48, 110], [40, 200], [0, 250], [-100, 290], [-150, 335], [-90, 390], [50, 420], [150, 462], [130, 540], [110, 606]], 40))
     c2 = ramp(spline([[40, 2], [48, 110], [40, 200], [90, 250], [150, 290], [150, 335], [60, 390], [-60, 420], [-150, 462], [-130, 540], [-110, 606]], 40))
-    plugs1 = bank(row_path(*B, -175, -125), 4.2, 18, 2.0) + bank(row_path(*C, 125, 175), 4.6, 14, 2.0)
+    plugs1 = bank(row_path(*B[:3], -175, -125, B[3]), 4.2, 18, 2.0) + bank(row_path(*C[:3], 125, 175, C[3]), 4.6, 14, 2.0)
     write(2, Z.lua([("Pier, then west, then east", [c1]), ("Pier, then east, then west", plugs1 + [c2])],
           "-- Zone 2, Sunny Stretch: three rows of sandbars (a crest between two runnels) with gaps that zigzag and low\n"
           "-- saddles, curving bars and runnels, outcrops. Drawn by tools/gen/shore/gen.py. The pier's line (x = 40,\n"
