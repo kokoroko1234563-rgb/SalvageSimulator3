@@ -16,6 +16,7 @@ local Layouts = require(Shared.Layouts)
 local Looks = require(Shared.Looks)
 local Tide = require(Shared.Tide)
 
+local DecorService = require(script.Parent.DecorService)
 local GroundShift = require(script.Parent.GroundShift)
 local HazardService = require(script.Parent.HazardService)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
@@ -258,6 +259,8 @@ function BiomeService.set(tile: number, biomeId: string?, choice: any?)
 	if old then
 		old:Destroy()
 	end
+	-- The layout's decor (its props, the Gloom's wards) goes with its ground.
+	DecorService.build(tile)
 	-- The plain zone has its own hazards (Config.Zones[i].Hazards), where no biome rolled.
 	local zone = Config.Zones[Beach.zoneOfTile(tile)]
 	local plainHazards = not biome and zone and zone.Hazards and #zone.Hazards > 0

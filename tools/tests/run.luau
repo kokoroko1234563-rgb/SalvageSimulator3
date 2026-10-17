@@ -1514,25 +1514,30 @@ test("ramps stay within the cart slope and are clear of the ground's shape", fun
 end)
 
 test("a cart and a player on foot reach the sea whatever the biomes", function()
-	local Beach = h.require("Shared/Beach")
 	local Config = h.require("Shared/Config")
 	local grid = layoutGrid()
-	local carts, feet = 0, 0
-	local combos = 0
-	eachLayoutChoice(grid, function(choice)
-		combos += 1
-		local cart = layoutFlood(grid, choice, Config.Beach.Terrain.CartSlope)
-		if layoutReaches(cart, 0, LAYOUT_END) then
-			carts += 1
+	local cfg = Config.Beach.Terrain
+	-- All the way from the shop with the first way each zone comes out...
+	local choice = {}
+	for zone = 1, Config.Beach.ActiveZones do
+		choice[zone] = 1
+	end
+	assert(layoutReaches(layoutFlood(grid, choice, cfg.CartSlope), 0, LAYOUT_END), "a cart reaches the sea")
+	assert(layoutReaches(layoutFlood(grid, choice, cfg.FootSlope), 0, LAYOUT_END), "so does a player on foot")
+	-- ...and every way each zone can come out crosses it (the zones meet along flat ground,
+	-- so a route can enter the next anywhere along the edge).
+	local failures = {}
+	for zone = 1, Config.Beach.ActiveZones do
+		for _, option in grid.options[zone] do
+			if not layoutCrossesZone(grid, zone, option, cfg.CartSlope) then
+				table.insert(failures, option.name .. " (zone " .. zone .. "): no way across for a cart")
+			end
+			if not layoutCrossesZone(grid, zone, option, cfg.FootSlope) then
+				table.insert(failures, option.name .. " (zone " .. zone .. "): no way across on foot")
+			end
 		end
-		local foot = layoutFlood(grid, choice, Config.Beach.Terrain.FootSlope)
-		if layoutReaches(foot, 0, LAYOUT_END) then
-			feet += 1
-		end
-	end)
-	assert(combos > 0, "there are combinations to test")
-	assert(carts == combos, carts .. " of " .. combos .. " combinations let a cart reach the sea")
-	assert(feet == combos, feet .. " of " .. combos .. " combinations let a player on foot reach the sea")
+	end
+	assert(#failures == 0, table.concat(failures, "; "))
 end)
 
 test("a player on foot can reach every biome's entrance spot in every zone it rolls in", function()
@@ -1655,16 +1660,67 @@ test("every zone has at least two shortcuts a player on foot can take faster tha
 	assert(#weak == 0, "too few shortcuts: " .. table.concat(weak, "; "))
 end)
 
+-- layoutHidden from the test grid's heights (4-stud cells) instead of the ground itself: the
+-- same measure, cheap enough to run on every way every zone can come out.
+local function layoutHiddenGrid(grid, zone: number, option): number
+	local Config = h.require("Shared/Config")
+	local rows = {}
+	for iz = LAYOUT_ROWS[1], LAYOUT_ROWS[2] do
+		if grid.zoneOfRow[iz] == zone then
+			table.insert(rows, iz)
+		end
+	end
+	local top, bottom = rows[1], rows[#rows]
+	if option.every then
+		bottom = math.min(bottom, top + math.floor(option.every / LAYOUT_GRID) - 1)
+	end
+	local function height(ix: number, iz: number): number
+		return option.heights[layoutKey(ix, iz)] or -math.huge
+	end
+	local eye = Config.Beach.Terrain.EyeHeight
+	local eyes = {}
+	for _, x in { -320, -240, -160, -80, 0, 80, 160, 240, 320 } do
+		local ix = math.floor(x / LAYOUT_GRID + 0.5)
+		table.insert(eyes, { ix = ix, iz = top, y = height(ix, top) + eye })
+	end
+	local total, hidden = 0, 0
+	for iz = top + math.floor((bottom - top) / 2), bottom - 1, 2 do
+		for ix = -84, 84, 2 do
+			local ty = height(ix, iz)
+			total += 1
+			local seen = false
+			for _, e in eyes do
+				local blocked = false
+				local steps = math.max(math.abs(iz - e.iz), math.abs(ix - e.ix))
+				for k = 1, steps - 1 do
+					local t = k / steps
+					local cx = math.floor(e.ix + (ix - e.ix) * t + 0.5)
+					local cz = math.floor(e.iz + (iz - e.iz) * t + 0.5)
+					if height(cx, cz) > e.y + (ty - e.y) * t + 0.2 then
+						blocked = true
+						break
+					end
+				end
+				if not blocked then
+					seen = true
+					break
+				end
+			end
+			if not seen then
+				hidden += 1
+			end
+		end
+	end
+	return hidden / math.max(total, 1)
+end
+
 test("zone 1 is readable from the top, and zones 2 to 4 hide their lower half", function()
 	local Config = h.require("Shared/Config")
-	local Layouts = h.require("Shared/Layouts")
 	local grid = layoutGrid()
 	local problems = {}
 	for zone = 1, Config.Beach.ActiveZones do
 		for _, option in grid.options[zone] do
-			Layouts.setActive(zone, option.id, zone, option.choice)
-			local hidden = layoutHidden(zone)
-			Layouts.setActive(zone, nil)
+			local hidden = layoutHiddenGrid(grid, zone, option)
 			if zone == 1 and hidden > 0.2 then
 				table.insert(problems, option.name .. " (zone 1) hides " .. math.floor(hidden * 100) .. "%")
 			elseif zone > 1 and hidden < 0.6 then
@@ -2376,6 +2432,58 @@ test("a plain zone's own dangers go where its layout puts them, and they're dead
 	assert(#empty:GetChildren() == 0, "a plain zone's dangers aren't scattered")
 	folder:Destroy()
 	Layouts.setActive(tile, nil)
+end)
+
+test("layouts dress their ground with decor, and the glowing kinds ward off the Gloom", function()
+	local Beach = h.require("Shared/Beach")
+	local Decor = h.require("Shared/Decor")
+	local Layouts = h.require("Shared/Layouts")
+	local DecorService = h.require("Server/DecorService")
+	local tile = 6
+	local layout = {
+		Name = "dressed",
+		Primitives = { { Kind = "Wall", Path = { { -300, 300 }, { -100, 300 } }, Width = 16, Height = 20 } },
+		Decor = {
+			{ Kind = "LanternPost", At = { 0, 100 } },
+			{ Kind = "Kelp", Area = { { 50, 50 }, { 150, 50 }, { 150, 150 }, { 50, 150 } }, Count = 10 },
+			{ Kind = "Pebbles", Path = { { -300, 300 }, { -100, 300 } }, Count = 6 }, -- on the wall: none
+			{ Kind = "Barnacles", At = { -200, 300 } }, -- barnacles may stand on rock
+		},
+	}
+	local problems = Layouts.problems(layout)
+	assert(#problems == 0, table.concat(problems, "; "))
+	for kind in Decor.Kinds do
+		assert(DecorService.Builders[kind], "a builder for " .. kind)
+	end
+	Layouts.setActive(tile, layout)
+	local folder = DecorService.build(tile)
+	local counts = {}
+	for _, model in folder:GetChildren() do
+		counts[model.Name] = (counts[model.Name] or 0) + 1
+		for _, p in model:GetDescendants() do
+			if p:IsA("BasePart") then
+				assert(not p.CanCollide and not p.CanQuery, model.Name .. " is only for looks")
+			end
+		end
+	end
+	assert(counts.LanternPost == 1 and counts.Kelp == 10, "one lantern, ten kelp")
+	assert(counts.Pebbles == nil and counts.Barnacles == 1, "nothing on the wall but barnacles")
+	local wards = 0
+	for _, ward in folder:GetDescendants() do
+		if ward.Name == "Ward" and (ward:GetAttribute("WardRadius") or 0) > 0 then
+			wards += 1
+		end
+	end
+	assert(wards == 1, "the lantern wards off the Gloom")
+	local before = #folder:GetChildren()
+	local again = DecorService.build(tile)
+	assert(#again:GetChildren() == before, "the same layout, the same decor")
+	assert(
+		#Layouts.problems({ Name = "x", Primitives = {}, Decor = { { Kind = "Gnome", At = { 0, 0 } } } }) > 0,
+		"unknown kinds are problems"
+	)
+	Layouts.setActive(tile, nil)
+	DecorService.build(tile)
 end)
 
 test("roofs make caves: rock overhead, the floor still the ground", function()

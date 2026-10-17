@@ -278,6 +278,29 @@ Palette.ItemModel = {
 	Moss = rgb(95, 140, 75),
 }
 
+-- Colours for the layouts' decor (src/server/DecorService.luau).
+Palette.Decor = {
+	Kelp = rgb(58, 92, 52),
+	KelpLight = rgb(96, 128, 64),
+	Weed = rgb(70, 100, 60),
+	Timber = rgb(92, 72, 52),
+	TimberDark = rgb(58, 46, 36),
+	Rust = rgb(110, 62, 40),
+	RustDark = rgb(70, 42, 30),
+	Bone = rgb(218, 210, 188),
+	DeadCoral = rgb(176, 170, 160),
+	Barnacle = rgb(196, 192, 178),
+	Urchin = rgb(52, 30, 60),
+	Starfish = rgb(214, 110, 70),
+	Pebble = rgb(130, 126, 120),
+	PebbleDark = rgb(92, 90, 88),
+	GlowShell = rgb(150, 245, 235),
+	GlowWeed = rgb(120, 255, 160),
+	LanternGlass = rgb(255, 214, 140),
+	LanternIron = rgb(48, 46, 44),
+	Rope = rgb(170, 150, 110),
+}
+
 -- Colours for the tool models (src/server/ToolModels.luau).
 Palette.ToolModel = {
 	Pole = rgb(238, 214, 170),

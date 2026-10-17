@@ -53,6 +53,7 @@ local Workspace = game:GetService("Workspace")
 
 local Biomes = require(script.Parent.Biomes)
 local Config = require(script.Parent.Config)
+local Decor = require(script.Parent.Decor)
 local Hazards = require(script.Parent.Hazards)
 
 local cfg = Config.Beach.Terrain
@@ -285,7 +286,7 @@ local function moved(value: any, dx: number, dz: number): any
 	return copy
 end
 
-local PLACEMENTS = { "Primitives", "Loot", "Entrances", "Hazards" }
+local PLACEMENTS = { "Primitives", "Loot", "Entrances", "Hazards", "Decor" }
 local composedCache: { [any]: { [string]: Layout } } = setmetatable({}, { __mode = "k" }) :: any
 
 -- The layout a definition makes with a choice: the frame, the chosen crossing and each
@@ -325,7 +326,7 @@ function Layouts.compose(def: any, choice: Choice?): Layout
 			add(room, slot.At[1], slot.At[2])
 		end
 	end
-	for _, field in { "Loot", "Entrances", "Hazards" } do
+	for _, field in { "Loot", "Entrances", "Hazards", "Decor" } do
 		if #layout[field] == 0 then
 			layout[field] = nil
 		end
@@ -868,6 +869,12 @@ function Layouts.entrances(tile: number, z0: number): { Vector2 }
 	return spots
 end
 
+-- The tile's decor (Decor.luau), in tile coordinates: its active layout's Decor list.
+function Layouts.decor(tile: number): { { [string]: any } }
+	local layout = Layouts.active(tile)
+	return (layout and (layout :: any).Decor) or {}
+end
+
 -- The layout's placements for one kind of hazard (tile coordinates), or an empty list.
 function Layouts.hazardPlacements(tile: number, hazardType: string): { { [string]: any } }
 	local layout = Layouts.active(tile)
@@ -910,6 +917,7 @@ function Layouts.problems(layout: any): { string }
 			and key ~= "Loot"
 			and key ~= "Entrances"
 			and key ~= "Hazards"
+			and key ~= "Decor"
 			and key ~= "FadeEvery"
 		then
 			add(layout.Name .. ": unknown field " .. tostring(key))
@@ -936,6 +944,9 @@ function Layouts.problems(layout: any): { string }
 		elseif not onTile(point) then
 			add(layout.Name .. " entrance " .. index .. ": outside the tile")
 		end
+	end
+	for _, problem in Decor.problems(layout.Decor, layout.Name) do
+		add(problem)
 	end
 	for index, placement in layout.Hazards or {} do
 		local where = layout.Name .. " hazard " .. index
@@ -1082,10 +1093,17 @@ function Layouts.defProblems(def: any, where: string): { string }
 	end
 	for key in def do
 		if
-			not table.find(
-				{ "Name", "Primitives", "Loot", "Entrances", "Hazards", "Crossings", "Slots", "FadeEvery" },
-				key
-			)
+			not table.find({
+				"Name",
+				"Primitives",
+				"Loot",
+				"Entrances",
+				"Hazards",
+				"Decor",
+				"Crossings",
+				"Slots",
+				"FadeEvery",
+			}, key)
 		then
 			add("unknown field " .. tostring(key))
 		end
@@ -1128,9 +1146,11 @@ function Layouts.defProblems(def: any, where: string): { string }
 					if type(item) == "table" and isPoint(item.At) then
 						table.insert(points, item.At)
 					end
-					if type(item) == "table" and type(item.Path) == "table" then
-						for _, point in item.Path do
-							table.insert(points, point)
+					for _, list in { "Path", "Area" } do
+						if type(item) == "table" and type(item[list]) == "table" then
+							for _, point in item[list] do
+								table.insert(points, point)
+							end
 						end
 					end
 					for _, point in points do
