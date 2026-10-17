@@ -20,6 +20,11 @@ end
 
 -- A tall trunk with a crown of drooping fronds.
 local function palm(parent: Instance, base: Vector3, height: number, rng: Random)
+	-- One Model, so it is one prop (it stands on its own base, not each part on the ground).
+	local model = Instance.new("Model")
+	model.Name = "Palm"
+	model.Parent = parent
+	parent = model
 	local trunkTop = base + Vector3.new(0, height, 0)
 	scenery({
 		Name = "PalmTrunk",
@@ -48,6 +53,11 @@ end
 
 -- A striped-looking beach umbrella: a pole and a flat canopy.
 local function umbrella(parent: Instance, base: Vector3, color: Color3)
+	-- One Model, so it is one prop (it stands on its pole, not each part on the ground).
+	local model = Instance.new("Model")
+	model.Name = "Umbrella"
+	model.Parent = parent
+	parent = model
 	scenery({
 		Name = "UmbrellaPole",
 		Shape = Enum.PartType.Cylinder,

@@ -31,6 +31,11 @@ end
 -- A striped umbrella: a pole and twelve canopy panels, two colours taking turns, sloping
 -- down from the top.
 local function umbrella(parent: Instance, base: Vector3, colorA: Color3, yaw: number)
+	-- One Model, so it is one prop (it stands on its own pole, not each part on the ground).
+	local model = Instance.new("Model")
+	model.Name = "Umbrella"
+	model.Parent = parent
+	parent = model
 	scenery({
 		Name = "UmbrellaPole",
 		Shape = Enum.PartType.Cylinder,
@@ -92,6 +97,11 @@ end
 
 -- A surfboard stuck upright in the sand, with a stripe down the middle.
 local function surfboard(parent: Instance, base: Vector3, color: Color3, rng: Random)
+	-- One Model, so it is one prop (it stands on its base, not each part on the ground).
+	local model = Instance.new("Model")
+	model.Name = "Surfboard"
+	model.Parent = parent
+	parent = model
 	local frame = CFrame.new(base + Vector3.new(0, 3.7, 0))
 		* CFrame.Angles(0, rng:NextNumber() * math.pi * 2, math.rad(rng:NextNumber(-9, 9)))
 	scenery({

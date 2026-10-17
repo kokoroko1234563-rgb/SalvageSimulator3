@@ -27,6 +27,11 @@ end
 
 -- A deck chair: a seat, a backrest tipped back, and four legs.
 local function lounger(parent: Instance, cf: CFrame, color: Color3)
+	-- One Model, so it is one prop (it stands on its legs, not each part on the ground).
+	local model = Instance.new("Model")
+	model.Name = "Lounger"
+	model.Parent = parent
+	parent = model
 	add(parent, {
 		Name = "ChairSeat",
 		Size = Vector3.new(2.4, 0.5, 4),
@@ -67,6 +72,11 @@ end
 
 -- A small open-fronted beach hut with a shed roof.
 local function hut(parent: Instance, base: Vector3, yaw: number, wall: Color3, roof: Color3)
+	-- One Model, so it is one prop (it stands on its own base, not each part on the ground).
+	local model = Instance.new("Model")
+	model.Name = "Hut"
+	model.Parent = parent
+	parent = model
 	local cf = CFrame.new(base) * CFrame.Angles(0, yaw, 0)
 	add(parent, {
 		Name = "HutFloor",
@@ -128,6 +138,11 @@ end
 
 -- A stack of driftwood logs.
 local function driftwoodPile(parent: Instance, position: Vector3, rng: Random)
+	-- One Model, so it is one prop (it stands on its bottom log, not each part on the ground).
+	local model = Instance.new("Model")
+	model.Name = "DriftwoodPile"
+	model.Parent = parent
+	parent = model
 	for level = 0, 3 do
 		local offset = Vector3.new(rng:NextNumber(-0.8, 0.8), level * 0.8, rng:NextNumber(-0.8, 0.8))
 		BeachDressing.driftwood(parent, position + offset, rng)
@@ -158,6 +173,11 @@ end
 
 -- A rowing boat lying on the sand, bottom down.
 local function boat(parent: Instance, position: Vector3, yaw: number)
+	-- One Model, so it is one prop (it stands on its hull, not each part on the ground).
+	local model = Instance.new("Model")
+	model.Name = "Boat"
+	model.Parent = parent
+	parent = model
 	local cf = CFrame.new(position) * CFrame.Angles(0, yaw, 0)
 	add(parent, {
 		Name = "BoatHull",
@@ -290,6 +310,11 @@ end
 
 -- A wooden pier on pilings, running out from the shore.
 local function pier(parent: Instance, x: number, z0: number, z1: number, deckY: number)
+	-- One Model, so it is one prop (it stands on its own base, not each part on the ground).
+	local model = Instance.new("Model")
+	model.Name = "Pier"
+	model.Parent = parent
+	parent = model
 	local deck = add(parent, {
 		Name = "PierDeck",
 		Size = Vector3.new(8, 0.8, z1 - z0),
