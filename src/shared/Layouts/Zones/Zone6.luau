@@ -780,6 +780,18 @@ frame.Slots = {
 					loot(100, 20, 6),
 					loot(100, 100, 4),
 				},
+				Decor = {
+					{
+						Kind = "DeadCoral",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 2,
+					},
+					{
+						Kind = "Pebbles",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 4,
+					},
+				},
 			}),
 			makeRoom(true, false, {
 				Name = "Drowned pool",
@@ -799,6 +811,14 @@ frame.Slots = {
 				Loot = {
 					loot(20, 20, 6),
 					loot(20, 100, 4),
+				},
+				Decor = {
+					{ Kind = "Kelp", Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } }, Count = 3 },
+					{
+						Kind = "Starfish",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 1,
+					},
 				},
 			}),
 			makeRoom(true, false, {
@@ -821,6 +841,23 @@ frame.Slots = {
 				Loot = {
 					loot(20, 20, 6),
 					loot(20, 100, 3),
+				},
+				Decor = {
+					{
+						Kind = "Crate",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 1,
+					},
+					{
+						Kind = "Urchins",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 2,
+					},
+					{
+						Kind = "Pebbles",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 4,
+					},
 				},
 			}),
 		},
@@ -852,6 +889,10 @@ frame.Slots = {
 					loot(60, 100, 3),
 					loot(100, 100, 2),
 				},
+				Decor = {
+					{ Kind = "Anchor", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
+					{ Kind = "Chain", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
+				},
 			}),
 			makeRoom(false, false, {
 				Name = "Pillar court",
@@ -874,6 +915,10 @@ frame.Slots = {
 					loot(100, 100, 6),
 					loot(100, 20, 5),
 				},
+				Decor = {
+					{ Kind = "Timber", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 2 },
+					{ Kind = "Chain", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
+				},
 			}),
 			makeRoom(false, false, {
 				Name = "Gatehouse cellar",
@@ -894,6 +939,14 @@ frame.Slots = {
 				Loot = {
 					loot(60, 60, 6),
 					loot(20, 100, 3),
+				},
+				Decor = {
+					{
+						Kind = "DeadCoral",
+						Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } },
+						Count = 2,
+					},
+					{ Kind = "Pebbles", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 4 },
 				},
 			}),
 		},
@@ -922,6 +975,10 @@ frame.Slots = {
 					loot(100, 20, 6),
 					loot(100, 100, 5),
 				},
+				Decor = {
+					{ Kind = "Bones", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
+					{ Kind = "Starfish", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 2 },
+				},
 			}),
 			makeRoom(false, true, {
 				Name = "Flooded cellar",
@@ -943,6 +1000,10 @@ frame.Slots = {
 					loot(100, 20, 6),
 					loot(100, 100, 4),
 				},
+				Decor = {
+					{ Kind = "Kelp", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 3 },
+					{ Kind = "Starfish", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
+				},
 			}),
 			makeRoom(false, true, {
 				Name = "Weed hall",
@@ -963,6 +1024,10 @@ frame.Slots = {
 					loot(100, 20, 6),
 					loot(20, 20, 3),
 					loot(20, 100, 3),
+				},
+				Decor = {
+					{ Kind = "Weed", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 4 },
+					{ Kind = "Kelp", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 2 },
 				},
 			}),
 		},
@@ -995,6 +1060,14 @@ frame.Slots = {
 					loot(140, 20, 6),
 					loot(20, 20, 5),
 				},
+				Decor = {
+					{ Kind = "Kelp", Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } }, Count = 3 },
+					{
+						Kind = "Starfish",
+						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
+						Count = 1,
+					},
+				},
 			}),
 			makeRoom(false, false, {
 				Name = "Collapsed hall",
@@ -1015,6 +1088,23 @@ frame.Slots = {
 				Loot = {
 					loot(100, 20, 6),
 					loot(140, 100, 4),
+				},
+				Decor = {
+					{
+						Kind = "Timber",
+						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
+						Count = 1,
+					},
+					{
+						Kind = "Crate",
+						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
+						Count = 1,
+					},
+					{
+						Kind = "Pebbles",
+						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
+						Count = 5,
+					},
 				},
 			}),
 			makeRoom(false, false, {
@@ -1039,6 +1129,18 @@ frame.Slots = {
 					loot(140, 20, 6),
 					loot(20, 100, 3),
 				},
+				Decor = {
+					{
+						Kind = "Timber",
+						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
+						Count = 2,
+					},
+					{
+						Kind = "Chain",
+						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
+						Count = 1,
+					},
+				},
 			}),
 			makeRoom(false, false, {
 				Name = "Dead-end vault",
@@ -1058,6 +1160,18 @@ frame.Slots = {
 				Loot = {
 					loot(140, 20, 6),
 					loot(20, 100, 3),
+				},
+				Decor = {
+					{
+						Kind = "Bones",
+						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
+						Count = 1,
+					},
+					{
+						Kind = "DeadCoral",
+						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
+						Count = 1,
+					},
 				},
 			}),
 		},
@@ -1088,6 +1202,18 @@ frame.Slots = {
 				Loot = {
 					loot(60, 60, 6),
 				},
+				Decor = {
+					{
+						Kind = "Anchor",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 1,
+					},
+					{
+						Kind = "Chain",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 1,
+					},
+				},
 			}),
 			makeRoom(true, false, {
 				Name = "Dead-end cave",
@@ -1109,6 +1235,18 @@ frame.Slots = {
 					loot(20, 100, 6),
 					loot(20, 20, 4),
 				},
+				Decor = {
+					{
+						Kind = "DeadCoral",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 2,
+					},
+					{
+						Kind = "Pebbles",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 4,
+					},
+				},
 			}),
 			makeRoom(true, false, {
 				Name = "Boulder scramble",
@@ -1128,6 +1266,23 @@ frame.Slots = {
 				},
 				Loot = {
 					loot(20, 20, 6),
+				},
+				Decor = {
+					{
+						Kind = "Crate",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 1,
+					},
+					{
+						Kind = "Urchins",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 2,
+					},
+					{
+						Kind = "Pebbles",
+						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
+						Count = 4,
+					},
 				},
 			}),
 		},
@@ -1155,6 +1310,14 @@ frame.Slots = {
 					loot(140, 100, 6),
 					loot(20, 20, 3),
 				},
+				Decor = {
+					{ Kind = "Chain", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 2 },
+					{
+						Kind = "WreckRibs",
+						Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } },
+						Count = 1,
+					},
+				},
 			}),
 			makeRoom(false, false, {
 				Name = "Flooded vault",
@@ -1177,6 +1340,14 @@ frame.Slots = {
 					loot(20, 20, 6),
 					loot(140, 100, 4),
 				},
+				Decor = {
+					{ Kind = "Kelp", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 3 },
+					{
+						Kind = "Starfish",
+						Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } },
+						Count = 1,
+					},
+				},
 			}),
 			makeRoom(false, false, {
 				Name = "Collapsed vault",
@@ -1196,6 +1367,15 @@ frame.Slots = {
 				},
 				Loot = {
 					loot(20, 100, 6),
+				},
+				Decor = {
+					{ Kind = "Timber", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 1 },
+					{ Kind = "Crate", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 1 },
+					{
+						Kind = "Pebbles",
+						Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } },
+						Count = 5,
+					},
 				},
 			}),
 			makeRoom(false, false, {
@@ -1217,6 +1397,10 @@ frame.Slots = {
 				},
 				Loot = {
 					loot(60, 60, 6),
+				},
+				Decor = {
+					{ Kind = "Anchor", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 1 },
+					{ Kind = "Chain", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 1 },
 				},
 			}),
 		},
@@ -1244,6 +1428,10 @@ frame.Slots = {
 					loot(100, 100, 6),
 					loot(20, 100, 3),
 				},
+				Decor = {
+					{ Kind = "Kelp", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 3 },
+					{ Kind = "Starfish", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 1 },
+				},
 			}),
 			makeRoom(false, true, {
 				Name = "Dead-end cave",
@@ -1266,6 +1454,14 @@ frame.Slots = {
 					loot(100, 100, 6),
 					loot(20, 20, 3),
 				},
+				Decor = {
+					{
+						Kind = "DeadCoral",
+						Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } },
+						Count = 2,
+					},
+					{ Kind = "Pebbles", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 4 },
+				},
 			}),
 			makeRoom(false, true, {
 				Name = "Boulder scramble",
@@ -1286,6 +1482,11 @@ frame.Slots = {
 				Loot = {
 					loot(20, 100, 6),
 					loot(100, 100, 3),
+				},
+				Decor = {
+					{ Kind = "Crate", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 1 },
+					{ Kind = "Urchins", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 2 },
+					{ Kind = "Pebbles", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 4 },
 				},
 			}),
 		},
@@ -1433,5 +1634,50 @@ for _, slot in frame.Slots do
 		room.Art = nil
 	end
 end
+
+-- Dressing: decor, dangers and tells -----------------------------------------------------------
+
+-- One prop, and a rectangle of them.
+local function prop(kind, x, z, scale, yaw)
+	return { Kind = kind, At = { x, z }, Scale = scale, Yaw = yaw }
+end
+
+local function scatter(kind, x0, z0, x1, z1, count, scale)
+	return {
+		Kind = kind,
+		Area = { { x0, z0 }, { x1, z0 }, { x1, z1 }, { x0, z1 } },
+		Count = count,
+		Scale = scale,
+	}
+end
+
+-- Each crossing's way in (its first stretch from the top edge) has its own landmark, so a
+-- regular knows which crossing rolled before committing: 1 an anchor and chain, 2 a hull's
+-- ribs, 3 an arch of bones, 4 a pair of lanterns, 5 dead coral and a smashed crate.
+crossing1.Decor = {
+	prop("Anchor", -244, 30, 1.2, 20),
+	prop("Chain", -278, 40, 1.2, 80),
+	scatter("Kelp", -282, 14, -238, 50, 3),
+}
+crossing2.Decor = {
+	prop("WreckRibs", 238, 30, 1.3, 90),
+	prop("WreckRibs", 282, 36, 1.1, 90),
+	prop("Timber", 262, 48, 1, 30),
+}
+crossing3.Decor = {
+	prop("Bones", 260, 22, 1.8, 0),
+	prop("Bones", 260, 44, 1.5, 0),
+	scatter("Pebbles", 240, 14, 282, 50, 4),
+}
+crossing4.Decor = {
+	prop("LanternPost", -244, 20),
+	prop("LanternPost", -276, 20),
+	prop("Chain", -260, 44, 1, 90),
+}
+crossing5.Decor = {
+	scatter("DeadCoral", 240, 14, 282, 50, 4, 1.2),
+	prop("Crate", 270, 40, 1, 20),
+	scatter("Urchins", 240, 14, 282, 50, 2),
+}
 
 return frame

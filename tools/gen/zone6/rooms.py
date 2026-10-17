@@ -28,6 +28,28 @@ SLOTS = {
 
 ROOMS = []
 
+# Each room's kind gives the tell at its door (a regular learns what's behind it).
+KINDS = {
+    "Comb of caves": "cave", "Gatehouse cellar": "cave", "Dead-end cave": "cave",
+    "Drowned pool": "pool", "Flooded cellar": "pool", "Flooded hall": "pool", "Flooded vault": "pool", "Flooded pocket": "pool",
+    "Boulder scramble": "scramble", "Gatehouse ring": "ring", "Tunnel ring": "ring", "Ring and vault": "ring",
+    "Pillar court": "court", "Pillar gallery": "court", "Sinking flats": "flats", "Weed hall": "weed",
+    "Collapsed hall": "rubble", "Collapsed vault": "rubble", "Dead-end vault": "vault", "Drowned gallery": "gallery",
+}
+# kind: (decor kind, count) pairs scattered over the door cell
+TELLS = {
+    "cave": [("DeadCoral", 2), ("Pebbles", 4)],
+    "pool": [("Kelp", 3), ("Starfish", 1)],
+    "scramble": [("Crate", 1), ("Urchins", 2), ("Pebbles", 4)],
+    "ring": [("Anchor", 1), ("Chain", 1)],
+    "court": [("Timber", 2), ("Chain", 1)],
+    "flats": [("Bones", 1), ("Starfish", 2)],
+    "weed": [("Weed", 4), ("Kelp", 2)],
+    "rubble": [("Timber", 1), ("Crate", 1), ("Pebbles", 5)],
+    "vault": [("Bones", 1), ("DeadCoral", 1)],
+    "gallery": [("Chain", 2), ("WreckRibs", 1)],
+}
+
 
 def room(slot, name, h=(), v=(), rh=(), rv=(), roofs=(), shapes=(), loot=(), decor=(), hazards=(), runs=(), tell=None, open_room=False):
     """h/v: walls across/between lanes, rh/rv: rubble; roofs: cells; runs: roof paths (Luau);
@@ -185,6 +207,13 @@ def check():
     return bad
 
 
+def door_tell(r):
+    name, at, w, door, side, _, _ = SLOTS[r["slot"]]
+    x0, z0 = 40 * door[0] + 8, 40 * door[1] + 8
+    area = "{ { %d, %d }, { %d, %d }, { %d, %d }, { %d, %d } }" % (x0, z0, x0 + 24, z0, x0 + 24, z0 + 24, x0, z0 + 24)
+    return ['{ Kind = "%s", Area = %s, Count = %d }' % (k, area, n) for k, n in TELLS[KINDS[r["name"]]]]
+
+
 def lua_room(r):
     name, at, w, door, side, edgeL, edgeR = SLOTS[r["slot"]]
     out = []
@@ -204,7 +233,7 @@ def lua_room(r):
         x, z = (cx(l[0]), cx(l[1])) if l[0] < 10 and l[1] < 10 else (l[0], l[1])
         out.append("\t\t\t\t\tloot(%d, %d, %d)," % (x, z, l[2]))
     out.append("\t\t\t\t},")
-    decor = ([r["tell"]] if r["tell"] else []) + r["decor"]
+    decor = door_tell(r) + r["decor"]
     if decor:
         out.append("\t\t\t\tDecor = {")
         for d in decor:
