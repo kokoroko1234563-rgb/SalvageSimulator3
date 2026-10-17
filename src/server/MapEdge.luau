@@ -161,7 +161,7 @@ local function hills(terrain: Terrain, folder: Folder, back: number, outer: numb
 		Vector3.new(outer * 2, 12, depth - sand),
 		Enum.Material.Grass
 	)
-	local tops = {}
+	local tops, balls = {}, {}
 	for _ = 1, 54 do
 		local r = rng:NextNumber(22, 46)
 		local x = rng:NextNumber(-outer, outer)
@@ -170,6 +170,23 @@ local function hills(terrain: Terrain, folder: Folder, back: number, outer: numb
 		local height = 2 + (back - z) * rng:NextNumber(0.06, 0.14)
 		terrain:FillBall(Vector3.new(x, height - r, z), r, Enum.Material.Grass)
 		table.insert(tops, Vector3.new(x, height, z))
+		table.insert(balls, { Vector3.new(x, height - r, z), r })
+	end
+	-- The ground's height at (x, z): the highest of the hills there, or the flat at 0.
+	local function groundAt(x: number, z: number): number
+		local y = 0
+		for _, hill in balls do
+			local c, r = hill[1], hill[2]
+			local flat = (x - c.X) ^ 2 + (z - c.Z) ^ 2
+			if flat < r * r then
+				y = math.max(y, c.Y + math.sqrt(r * r - flat))
+			end
+		end
+		return y
+	end
+	local function onGround(at: Vector3, a: number, d: number, sink: number): Vector3
+		local x, z = at.X + math.cos(a) * d, at.Z + math.sin(a) * d
+		return Vector3.new(x, groundAt(x, z) - sink, z)
 	end
 	-- Palm groves on a few of the hilltops, and bushes round them.
 	for index, at in tops do
@@ -177,21 +194,14 @@ local function hills(terrain: Terrain, folder: Folder, back: number, outer: numb
 			for _ = 1, rng:NextInteger(3, 6) do
 				local a = rng:NextNumber() * math.pi * 2
 				local d = rng:NextNumber(2, 14)
-				local base = at + Vector3.new(math.cos(a) * d, -1 - d * 0.15, math.sin(a) * d)
-				BeachDressing.palm(folder, base, rng:NextNumber(14, 22), rng)
+				BeachDressing.palm(folder, onGround(at, a, d, 0.8), rng:NextNumber(14, 22), rng)
 			end
 		end
 		for _ = 1, 3 do
 			local a = rng:NextNumber() * math.pi * 2
 			local d = rng:NextNumber(6, 18)
 			local size = rng:NextNumber(5, 9)
-			MapParts.ball(
-				folder,
-				at + Vector3.new(math.cos(a) * d, -0.5 - d * 0.18, math.sin(a) * d),
-				size,
-				pick(MOSS, rng),
-				M.Grass
-			)
+			MapParts.ball(folder, onGround(at, a, d, -size * 0.3), size, pick(MOSS, rng), M.Grass)
 		end
 	end
 end
