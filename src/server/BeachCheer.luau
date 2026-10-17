@@ -301,11 +301,19 @@ function BeachCheer.build(map: Instance, rng: Random)
 
 	local half = Beach.HalfWidth
 
-	-- Umbrellas with towels (and now and then a surfboard), in spots along the top of the
-	-- beach: each umbrella is a colour, with a towel or two on the sand under it.
-	local spots = { -300, -235, -170, -110, 110, 175, 240, 305 }
-	for index, x in spots do
-		local z = rng:NextNumber(16, 34)
+	-- Umbrellas with towels (and now and then a surfboard), gathered in a few camps along the
+	-- top of the beach with open sand between them, as people would: each umbrella is a
+	-- colour, with a towel or two on the sand under it.
+	local camps = { { -265, 24, 3 }, { -120, 32, 2 }, { 170, 26, 3 }, { 290, 36, 2 } }
+	local spots = {}
+	for _, camp in camps do
+		for k = 1, camp[3] do
+			local offset = (k - (camp[3] + 1) / 2) * 11
+			table.insert(spots, { camp[1] + offset + rng:NextNumber(-2, 2), camp[2] + rng:NextNumber(-4, 4) })
+		end
+	end
+	for index, spot in spots do
+		local x, z = spot[1], spot[2]
 		local color = BRIGHT[(index % #BRIGHT) + 1]
 		local centre = groundAt(x, z)
 		umbrella(folder, centre, color, rng:NextNumber() * math.pi)

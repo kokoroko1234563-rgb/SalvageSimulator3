@@ -151,35 +151,67 @@ function BeachDressing.build(map: Instance, rng: Random)
 		return Vector3.new(x, Beach.groundAt(x, z), z)
 	end
 
-	-- Palms beyond the shop buildings, on the dry sand at the sides of the cove.
-	for _ = 1, 12 do
-		local side = if rng:NextNumber() < 0.5 then -1 else 1
-		local x = side * rng:NextNumber(250, half - 25)
-		local z = rng:NextNumber(-70, -12)
-		palm(folder, groundAt(x, z), rng:NextNumber(14, 20), rng)
+	-- Palm groves either side of the cove, beyond the shop buildings, and a pair framing the
+	-- boardwalk: balanced, but each grove its own loose clump.
+	local groves = { { -305, -42, 6 }, { 300, -38, 6 }, { -165, -62, 2 }, { 160, -60, 2 } }
+	for _, grove in groves do
+		for _ = 1, grove[3] do
+			local angle, dist = rng:NextNumber() * math.pi * 2, rng:NextNumber(0, 22)
+			local x = math.clamp(grove[1] + math.cos(angle) * dist, -half + 20, half - 20)
+			local z = math.clamp(grove[2] + math.sin(angle) * dist * 0.6, -70, -10)
+			palm(folder, groundAt(x, z), rng:NextNumber(14, 20), rng)
+		end
 	end
 
-	-- Umbrellas on the top of the beach, scattered along it.
-	local umbrellaColors =
-		{ Palette.World.UmbrellaRed, Palette.World.UmbrellaTeal, Palette.World.UmbrellaYellow }
-	for i = 1, 9 do
-		local x = rng:NextNumber(-half + 60, half - 60)
-		local z = rng:NextNumber(12, 45)
-		umbrella(folder, groundAt(x, z), umbrellaColors[(i % #umbrellaColors) + 1])
+	-- The high-tide line: the wrack the last high tide left, a wavy line across the top of
+	-- the beach: driftwood and shells gathered along it, not sprinkled everywhere.
+	local function wrackZ(x: number): number
+		return 14 + 5 * math.sin(x / 53) + 3 * math.sin(x / 17 + 1.1)
 	end
-
-	-- Driftwood along the high-tide line.
-	for _ = 1, 40 do
+	for _ = 1, 22 do
 		local x = rng:NextNumber(-half + 20, half - 20)
-		local z = rng:NextNumber(4, 40)
-		driftwood(folder, groundAt(x, z) + Vector3.new(0, 0.45, 0), rng)
+		driftwood(folder, groundAt(x, wrackZ(x) + rng:NextNumber(-2, 2)) + Vector3.new(0, 0.45, 0), rng)
+	end
+	for _ = 1, 140 do
+		local x = rng:NextNumber(-half + 10, half - 10)
+		shell(folder, groundAt(x, wrackZ(x) + rng:NextNumber(-3, 3)) + Vector3.new(0, 0.08, 0), rng)
+	end
+	-- A few more under the palms, where people sit.
+	for _, grove in groves do
+		for _ = 1, 8 do
+			local x = grove[1] + rng:NextNumber(-25, 25)
+			local z = math.clamp(grove[2] + rng:NextNumber(-15, 15), -70, -8)
+			shell(folder, groundAt(x, z) + Vector3.new(0, 0.08, 0), rng)
+		end
 	end
 
-	-- Shells and pebbles scattered over the sand, dry and wet.
-	for _ = 1, 260 do
-		local x = rng:NextNumber(-half + 5, half - 5)
-		local z = rng:NextNumber(-70, 50)
-		shell(folder, groundAt(x, z) + Vector3.new(0, 0.08, 0), rng)
+	-- The walkway: from the front of the boardwalk down onto the sand, planks with a gap
+	-- between, on low posts, following the slope.
+	local walkway = Instance.new("Folder")
+	walkway.Name = "Walkway"
+	walkway.Parent = folder
+	for z = -6, 17, 1.6 do
+		local y = Beach.groundAt(0, z) + 0.35
+		scenery({
+			Name = "Plank",
+			Size = Vector3.new(14, 0.3, 1.3),
+			CFrame = CFrame.new(0, y, z),
+			Color = Palette.World.Boardwalk,
+			Material = Palette.Material.WoodPlanks,
+			Parent = walkway,
+		})
+	end
+	for _, x in { -7.2, 7.2 } do
+		for z = -4, 16, 5 do
+			scenery({
+				Name = "Post",
+				Size = Vector3.new(0.6, 2.4, 0.6),
+				CFrame = CFrame.new(x, Beach.groundAt(x, z) + 1, z),
+				Color = Palette.World.Boardwalk,
+				Material = Palette.Material.Wood,
+				Parent = walkway,
+			})
+		end
 	end
 
 	lifeguardTower(folder, groundAt(-265, -22))
