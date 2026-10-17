@@ -240,6 +240,7 @@ local function buildShop(map: Folder)
 		Palette.World.Buyer
 	)
 	MapParts.sign(shop, "BUYER", CFrame.new(BUYER_X - 4, 5, SELL_PAD.Z - 10), 12, 2.4, 0)
+	Boardwalk.stall(shop, Vector3.new(BUYER_X, 0, SELL_PAD.Z))
 	local buyerPrompt = Instance.new("ProximityPrompt")
 	buyerPrompt.Name = "BuyerPrompt"
 	buyerPrompt.ActionText = "Sell"

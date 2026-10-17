@@ -324,4 +324,104 @@ function Boardwalk.build(parent: Instance, center: Vector3, size: Vector2)
 	return folder
 end
 
+-- The buyer's market stall, round the buyer standing at `at` (facing +X, the sell pad): four
+-- posts, a striped canopy sloping toward the pad, and a table behind with crates and baskets.
+function Boardwalk.stall(parent: Instance, at: Vector3)
+	local folder = Instance.new("Folder")
+	folder.Name = "BuyerStall"
+	folder.Parent = parent
+	local rng = Random.new(23)
+	local ground = at.Y
+	for _, dx in { -6, 6 } do
+		for _, dz in { -8, 8 } do
+			local h = if dx < 0 then 11 else 9.5
+			piece(
+				folder,
+				"StallPost",
+				Vector3.new(0.8, h, 0.8),
+				CFrame.new(at.X + dx, ground + h / 2, at.Z + dz),
+				W.DarkWood
+			)
+		end
+	end
+	local stripes = 6
+	for i = 1, stripes do
+		local z = at.Z + ((i - 0.5) / stripes - 0.5) * 18
+		piece(
+			folder,
+			"Canopy",
+			Vector3.new(14.5, 0.3, 18 / stripes),
+			CFrame.new(at.X, ground + 10.4, z) * CFrame.Angles(0, 0, math.rad(-6)),
+			if i % 2 == 1 then W.Shutter else W.AwningCream,
+			Palette.Material.Fabric
+		)
+	end
+	-- The valance: a scalloped edge hanging off the front.
+	for i = 1, 9 do
+		MapParts.ball(
+			folder,
+			Vector3.new(at.X + 7.1, ground + 9.5, at.Z + ((i - 0.5) / 9 - 0.5) * 18),
+			1.6,
+			if i % 2 == 1 then W.Shutter else W.AwningCream,
+			Palette.Material.Fabric
+		)
+	end
+	local tableAt = Vector3.new(at.X - 4.5, ground, at.Z)
+	piece(
+		folder,
+		"StallTable",
+		Vector3.new(3, 0.4, 13),
+		CFrame.new(tableAt + Vector3.new(0, 3, 0)),
+		W.Counter,
+		Palette.Material.WoodPlanks
+	)
+	for _, dz in { -6, 6 } do
+		piece(
+			folder,
+			"TableLeg",
+			Vector3.new(2.6, 2.8, 0.4),
+			CFrame.new(tableAt + Vector3.new(0, 1.4, dz)),
+			W.DarkWood
+		)
+	end
+	for k = 1, 4 do
+		local spot = tableAt + Vector3.new(rng:NextNumber(-0.4, 0.4), 3.2, -5 + (k - 1) * 3.3)
+		if k % 2 == 1 then
+			-- A basket of shells.
+			MapParts.column(folder, spot, 1.2, 2.4, W.Rope, Palette.Material.Fabric)
+			for _ = 1, 3 do
+				MapParts.ball(
+					folder,
+					spot + Vector3.new(rng:NextNumber(-0.6, 0.6), 1.3, rng:NextNumber(-0.6, 0.6)),
+					0.8,
+					W.BloomPale
+				)
+			end
+		else
+			piece(
+				folder,
+				"SmallCrate",
+				Vector3.new(2, 1.6, 2),
+				CFrame.new(spot + Vector3.new(0, 0.8, 0)) * CFrame.Angles(0, rng:NextNumber(-0.4, 0.4), 0),
+				W.ChestWood,
+				Palette.Material.WoodPlanks
+			)
+		end
+	end
+	-- A hanging scale at the front corner.
+	local hook = Vector3.new(at.X + 5, ground + 9.7, at.Z - 7)
+	piece(
+		folder,
+		"ScaleChain",
+		Vector3.new(0.15, 2.4, 0.15),
+		CFrame.new(hook - Vector3.new(0, 1.2, 0)),
+		W.LampIron,
+		Palette.Material.Metal
+	)
+	local pan =
+		MapParts.column(folder, hook - Vector3.new(0, 2.8, 0), 0.3, 2.2, W.LampGlow, Palette.Material.Metal)
+	pan.Name = "ScalePan"
+	return folder
+end
+
 return Boardwalk
