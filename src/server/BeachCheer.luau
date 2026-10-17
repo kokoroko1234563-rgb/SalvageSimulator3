@@ -334,10 +334,16 @@ function BeachCheer.build(map: Instance, rng: Random)
 		end
 	end
 
-	-- Beach huts along the shore, either side of the shop and the bank.
-	local huts = { -300, -135, 135, 300 }
-	for index, x in huts do
-		hut(folder, groundAt(x, -18), PASTEL[(index % #PASTEL) + 1])
+	-- Rows of beach huts along the shore, either side of the shop and the bank, each hut in a
+	-- different pastel.
+	local rows = { { -300, 4 }, { -135, 3 }, { 135, 3 }, { 300, 4 } }
+	local index = 0
+	for _, row in rows do
+		for k = 1, row[2] do
+			index += 1
+			local x = row[1] + (k - (row[2] + 1) / 2) * 9
+			hut(folder, groundAt(x, -18 + rng:NextNumber(-0.6, 0.6)), PASTEL[(index % #PASTEL) + 1])
+		end
 	end
 
 	-- Bunting over the front of the boardwalk.
