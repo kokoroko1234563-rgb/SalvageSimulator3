@@ -195,15 +195,43 @@ local function wreck(parent: Instance, position: Vector3, yaw: number)
 	})
 end
 
--- A cluster of grey rocks, sunk a little into the sand.
+-- A boulder: a block of rock, longer one way than the others, tipped at a random angle and
+-- sunk into the sand, with a smaller slab leaning on it so it isn't a plain box.
+local function boulder(parent: Instance, x: number, z: number, size: number, rng: Random): BasePart
+	local color = if rng:NextNumber() < 0.5 then Z.RockGrey else Z.RockDark
+	local dims = Vector3.new(size * rng:NextNumber(0.9, 1.4), size * rng:NextNumber(0.6, 0.9), size)
+	local tilt =
+		CFrame.Angles(rng:NextNumber(-0.35, 0.35), rng:NextNumber() * math.pi, rng:NextNumber(-0.35, 0.35))
+	local at = CFrame.new(x, Beach.groundAt(x, z) + dims.Y * 0.25, z) * tilt
+	local rock = add(parent, {
+		Name = "Boulder",
+		Size = dims,
+		CFrame = at,
+		Color = color,
+		Material = Palette.Material.Rock,
+	})
+	add(parent, {
+		Name = "BoulderSlab",
+		Size = dims * Vector3.new(0.7, 0.8, 0.55),
+		CFrame = at * CFrame.new(dims.X * 0.25, dims.Y * 0.15, dims.Z * 0.2) * CFrame.Angles(0.5, 0.7, 0.3),
+		Color = if color == Z.RockGrey then Z.RockDark else Z.RockGrey,
+		Material = Palette.Material.Rock,
+	})
+	return rock
+end
+
+-- A cluster of rocks: one big boulder with smaller ones gathered round it, the smallest
+-- furthest out, sunk a little into the sand.
 local function rockCluster(parent: Instance, center: Vector3, count: number, rng: Random)
-	for _ = 1, count do
-		local diameter = rng:NextNumber(2.5, 6)
-		local x, z = center.X + rng:NextNumber(-8, 8), center.Z + rng:NextNumber(-8, 8)
-		local color = if rng:NextNumber() < 0.5 then Z.RockGrey else Z.RockDark
-		-- Each rock sits on the ground under it, not at the cluster's middle's height.
-		local at = Vector3.new(x, Beach.groundAt(x, z) + diameter * 0.3, z)
-		WaterObstacles.mark(ball(parent, at, diameter, color, Palette.Material.Rock), "Solid")
+	WaterObstacles.mark(boulder(parent, center.X, center.Z, rng:NextNumber(6, 8), rng), "Solid")
+	for k = 2, count do
+		local angle = rng:NextNumber() * math.pi * 2
+		local distance = 3 + k * rng:NextNumber(1, 1.8)
+		local x, z = center.X + math.cos(angle) * distance, center.Z + math.sin(angle) * distance
+		WaterObstacles.mark(
+			boulder(parent, x, z, rng:NextNumber(2, 5) * (1.2 - k / count * 0.5), rng),
+			"Solid"
+		)
 	end
 end
 
