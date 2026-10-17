@@ -265,10 +265,10 @@ def zone2():
     # The pier's line stays clear.
     for pz in (22, 76, 130, 184, 238, 292):
         Z.prims.append(dict(Kind="Flat", At=[40, pz], Radius=9))
-    A = (190, 24, 0)
-    B = (410, 24, 60)
+    A = (200, 34, 0)
+    B = (410, 36, 60)
     for row, gaps, saddles in [(A, [(2, 78)], [(-250, -205)]), (B, [(-135, -45)], [(205, 250)])]:
-        for a, b, kind, p in bars(Z, *row, gaps=gaps, saddles=saddles, h=5.0, w=14, saddle_h=3.0, saddle_w=20):
+        for a, b, kind, p in bars(Z, *row, gaps=gaps, saddles=saddles, h=5.0, w=18, saddle_h=3.0, saddle_w=22):
             if kind == "solid":
                 Z.dec("DuneGrass", 8, Path=p)
     # Low curving bars between the rows, and the runnels that lie beside them.
@@ -299,7 +299,7 @@ def zone2():
           [(0, 0.22), (0.3, 0.5), (0.58, 0.8), (0.86, 1)])
     c1 = ramp(spline([[36, 2], [52, 110], [34, 200], [30, 300], [-30, 350], [-90, 408], [-100, 500], [-70, 606]], 40))
     c2 = ramp(spline([[36, 2], [52, 110], [34, 200], [60, 290], [130, 350], [150, 412], [130, 500], [100, 606]], 40))
-    plug = dict(Kind="Ridge", Path=row_path(*B, -135, -45), Height=5.0, Width=14, Rough=3)
+    plug = dict(Kind="Ridge", Path=row_path(*B, -135, -45), Height=5.0, Width=18, Rough=3)
     write(2, Z.lua([("Pier and the west gap", [c1]), ("Pier and the east ford", [plug, c2])],
           "-- Zone 2, Sunny Stretch: two rows of bars with gaps and low saddles, curving bars and runnels, outcrops.\n"
           "-- Drawn by tools/gen/shore/gen.py. The pier's line (x = 40, first half) and the rock pools stay clear."))
