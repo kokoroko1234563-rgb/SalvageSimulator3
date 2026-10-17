@@ -88,7 +88,8 @@ room(2, "Gatehouse cellar", h=[(1, 1)], v=[(1, 1), (2, 1), (1, 2)], roofs=[(1, 1
      loot=[(1, 1, 6), (0, 2, 3)])
 
 # ---- slot 3: East cellar (door west, cliff to the east) ----
-room(3, "Sinking flats", v=[(2, 0), (2, 2)], shapes=["mud({ { 44, 4 }, { 76, 4 }, { 76, 36 }, { 44, 36 } })", "mud({ { 44, 84 }, { 76, 84 }, { 76, 116 }, { 44, 116 } })"],
+room(3, "Sinking flats", v=[(2, 0), (2, 2)], shapes=["mud({ { 44, 58 }, { 76, 58 }, { 76, 90 }, { 44, 90 } })", "mud({ { 84, 30 }, { 116, 30 }, { 116, 62 }, { 84, 62 } })"],
+     hazards=['{ Type = "Sink", At = { 60, 74 }, Radius = 9 }', '{ Type = "Sink", At = { 100, 46 }, Radius = 9 }'],
      loot=[(2, 0, 6), (2, 2, 5)])
 room(3, "Flooded cellar", h=[(1, 1), (2, 1)], v=[(2, 2)], roofs=[(1, 0), (2, 0)], shapes=["pool(60, 100, 16)"],
      loot=[(2, 0, 6), (2, 2, 4)])
@@ -98,12 +99,16 @@ room(3, "Weed hall", v=[(1, 0), (1, 2)], h=[(2, 1)], shapes=["lane({ { 60, 60 },
 # ---- slot 4: Drowned hall (4 x 3, door south) ----
 room(4, "Flooded hall", v=[(3, 0), (1, 0)], shapes=[post(1, 1), post(3, 1), post(1, 2), post(3, 2), "pool(60, 60, 15)", "pool(100, 60, 15)"],
      loot=[(3, 0, 6), (0, 0, 5)])
-room(4, "Collapsed hall", h=[(1, 1), (2, 1)], v=[(3, 0), (3, 2)], rv=[],
+room(4, "Collapsed hall", h=[(1, 1), (2, 1)], v=[(3, 0), (3, 2)], rv=[], roofs=[(1, 0), (2, 0)],
+     hazards=['{ Type = "Rockfall", At = { 60, 20 } }'],
      shapes=[boulder(40, 76, 11, 9), boulder(120, 40, 12, 10), boulder(80, 96, 11, 8)],
      loot=[(2, 0, 6), (3, 2, 4)])
-room(4, "Pillar gallery", h=[(3, 1)], v=[(1, 2)], shapes=[post(1, 1), post(2, 1), post(3, 1), post(2, 2), post(3, 2)],
+room(4, "Pillar gallery", h=[(3, 1)], v=[(1, 2)],
+     hazards=['{ Type = "Gloom", At = { 120, 20 }, Radius = 18 }'],
+     decor=['prop("LanternPost", 50, 24)', 'prop("GlowWeed", 90, 34)', 'prop("GlowShells", 134, 34)'], shapes=[post(1, 1), post(2, 1), post(3, 1), post(2, 2), post(3, 2)],
      loot=[(3, 0, 6), (0, 2, 3)])
 room(4, "Dead-end vault", h=[(1, 1), (2, 1), (3, 1)], v=[(1, 2)], roofs=[(1, 0), (3, 0)],
+     hazards=['{ Type = "Rockfall", At = { 60, 20 } }'],
      loot=[(3, 0, 6), (0, 2, 3)])
 
 # ---- slot 5: Low west vault (door east) ----
@@ -121,7 +126,8 @@ room(6, "Drowned gallery", h=[(0, 1), (1, 1), (2, 1), (1, 2), (2, 2), (3, 2)],
      loot=[(3, 2, 6), (0, 0, 3)])
 room(6, "Flooded vault", h=[(0, 1), (1, 1)], v=[(3, 2)], shapes=[post(2, 1), post(2, 2), "pool(80, 80, 18)", "pool(120, 60, 12)"],
      loot=[(0, 0, 6), (3, 2, 4)])
-room(6, "Collapsed vault", v=[(2, 1)], h=[(0, 2)], rv=[(2, 2)],
+room(6, "Collapsed vault", v=[(2, 1)], h=[(0, 2)], rv=[(2, 2)], roofs=[(0, 2), (1, 2)],
+     hazards=['{ Type = "Rockfall", At = { 60, 100 } }'],
      shapes=[boulder(30, 70, 11, 9), boulder(110, 90, 12, 10), boulder(140, 60, 11, 9)],
      loot=[(0, 2, 6)])
 room(6, "Ring and vault", h=[(1, 1), (2, 1), (1, 2), (2, 2)], v=[(1, 1)], roofs=[(0, 1), (0, 2), (3, 2), (1, 2)],

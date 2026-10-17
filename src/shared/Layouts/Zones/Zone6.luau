@@ -65,6 +65,20 @@ local function weed(area)
 	return { Kind = "Paint", Area = area, Material = "Rock" }
 end
 
+-- One prop, and a rectangle of them.
+local function prop(kind, x, z, scale, yaw)
+	return { Kind = kind, At = { x, z }, Scale = scale, Yaw = yaw }
+end
+
+local function scatter(kind, x0, z0, x1, z1, count, scale)
+	return {
+		Kind = kind,
+		Area = { { x0, z0 }, { x1, z0 }, { x1, z1 }, { x0, z1 } },
+		Count = count,
+		Scale = scale,
+	}
+end
+
 local function loot(x, z, weight)
 	return { At = { x, z }, Radius = 6, Weight = weight }
 end
@@ -968,8 +982,8 @@ frame.Slots = {
 					"+  +  +  +",
 				},
 				Shapes = {
-					mud({ { 44, 4 }, { 76, 4 }, { 76, 36 }, { 44, 36 } }),
-					mud({ { 44, 84 }, { 76, 84 }, { 76, 116 }, { 44, 116 } }),
+					mud({ { 44, 58 }, { 76, 58 }, { 76, 90 }, { 44, 90 } }),
+					mud({ { 84, 30 }, { 116, 30 }, { 116, 62 }, { 84, 62 } }),
 				},
 				Loot = {
 					loot(100, 20, 6),
@@ -978,6 +992,10 @@ frame.Slots = {
 				Decor = {
 					{ Kind = "Bones", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
 					{ Kind = "Starfish", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 2 },
+				},
+				Hazards = {
+					{ Type = "Sink", At = { 60, 74 }, Radius = 9 },
+					{ Type = "Sink", At = { 100, 46 }, Radius = 9 },
 				},
 			}),
 			makeRoom(false, true, {
@@ -1084,6 +1102,8 @@ frame.Slots = {
 					boulder(40, 76, 11, 9),
 					boulder(120, 40, 12, 10),
 					boulder(80, 96, 11, 8),
+					cellRoof(60, 20),
+					cellRoof(100, 20),
 				},
 				Loot = {
 					loot(100, 20, 6),
@@ -1105,6 +1125,9 @@ frame.Slots = {
 						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
 						Count = 5,
 					},
+				},
+				Hazards = {
+					{ Type = "Rockfall", At = { 60, 20 } },
 				},
 			}),
 			makeRoom(false, false, {
@@ -1140,6 +1163,12 @@ frame.Slots = {
 						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
 						Count = 1,
 					},
+					prop("LanternPost", 50, 24),
+					prop("GlowWeed", 90, 34),
+					prop("GlowShells", 134, 34),
+				},
+				Hazards = {
+					{ Type = "Gloom", At = { 120, 20 }, Radius = 18 },
 				},
 			}),
 			makeRoom(false, false, {
@@ -1172,6 +1201,9 @@ frame.Slots = {
 						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
 						Count = 1,
 					},
+				},
+				Hazards = {
+					{ Type = "Rockfall", At = { 60, 20 } },
 				},
 			}),
 		},
@@ -1364,6 +1396,8 @@ frame.Slots = {
 					boulder(30, 70, 11, 9),
 					boulder(110, 90, 12, 10),
 					boulder(140, 60, 11, 9),
+					cellRoof(20, 100),
+					cellRoof(60, 100),
 				},
 				Loot = {
 					loot(20, 100, 6),
@@ -1376,6 +1410,9 @@ frame.Slots = {
 						Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } },
 						Count = 5,
 					},
+				},
+				Hazards = {
+					{ Type = "Rockfall", At = { 60, 100 } },
 				},
 			}),
 			makeRoom(false, false, {
@@ -1618,13 +1655,15 @@ local function fit(list, arts, ox, oz)
 			end
 		end
 	end
-	return out
+	return out, roofed
 end
 
+local roofedOf = {} -- each crossing's roofed cells (row * 100 + column), for the dangers
 frame.Primitives = fit(frame.Primitives, { { FRAME, 0, 0 } }, 0, 0)
 for index, crossing in frame.Crossings do
 	local art = ({ CROSSING1, CROSSING2, CROSSING3, CROSSING4, CROSSING5 })[index]
-	crossing.Primitives = fit(crossing.Primitives, { { FRAME, 0, 0 }, { art, 0, 0 } }, 0, 0)
+	crossing.Primitives, roofedOf[crossing] =
+		fit(crossing.Primitives, { { FRAME, 0, 0 }, { art, 0, 0 } }, 0, 0)
 end
 for _, slot in frame.Slots do
 	local i0, j0 = (slot.At[1] - X0) // PITCH, (slot.At[2] - Z0) // PITCH
@@ -1636,20 +1675,6 @@ for _, slot in frame.Slots do
 end
 
 -- Dressing: decor, dangers and tells -----------------------------------------------------------
-
--- One prop, and a rectangle of them.
-local function prop(kind, x, z, scale, yaw)
-	return { Kind = kind, At = { x, z }, Scale = scale, Yaw = yaw }
-end
-
-local function scatter(kind, x0, z0, x1, z1, count, scale)
-	return {
-		Kind = kind,
-		Area = { { x0, z0 }, { x1, z0 }, { x1, z1 }, { x0, z1 } },
-		Count = count,
-		Scale = scale,
-	}
-end
 
 -- Each crossing's way in (its first stretch from the top edge) has its own landmark, so a
 -- regular knows which crossing rolled before committing: 1 an anchor and chain, 2 a hull's
@@ -1679,5 +1704,134 @@ crossing5.Decor = {
 	prop("Crate", 270, 40, 1, 20),
 	scatter("Urchins", 240, 14, 282, 50, 2),
 }
+
+-- Dangers. Each is where a regular can learn it: the same spot in its crossing (or room), with
+-- its tell, and never the only way through without a safe moment.
+--   Sink      in the lane that leads to a dead end's loot, on dark mud: cross it moving, don't stop.
+--   Rockfall  in the roofed passages along the route, in the middle of the lane (the lane is
+--             wider than its reach), on a floor of old rubble; it trickles dust first.
+--   Undertow  along every flooding channel, while the sea covers it (foam streams along it).
+--   Gloom     drifting back and forth along a straight gallery of the route, with lanterns at
+--             its ends and a trail of glowing weed and shells to wait in or follow through.
+local function sinks(def, spots)
+	def.Hazards = def.Hazards or {}
+	def.Decor = def.Decor or {}
+	for _, spot in spots do
+		local x, z = spot[1], spot[2]
+		table.insert(def.Hazards, { Type = "Sink", At = { x, z }, Radius = 9 })
+		table.insert(
+			def.Primitives,
+			mud({ { x - 14, z - 14 }, { x + 14, z - 14 }, { x + 14, z + 14 }, { x - 14, z + 14 } })
+		)
+		table.insert(def.Decor, prop("Bones", x + 10, z - 10, 0.8, 40))
+		table.insert(def.Decor, prop("Starfish", x - 8, z + 9))
+	end
+end
+
+-- A Gloom along the straight gallery from a to b (lane centre), and its lit trail.
+local function gloom(def, a, b)
+	def.Hazards = def.Hazards or {}
+	def.Decor = def.Decor or {}
+	table.insert(def.Hazards, { Type = "Gloom", Path = { a, b } })
+	local dx, dz = b[1] - a[1], b[2] - a[2]
+	local len = math.sqrt(dx * dx + dz * dz)
+	local ux, uz = dx / len, dz / len
+	local function at(t, side)
+		return a[1] + ux * t - uz * side, a[2] + uz * t + ux * side
+	end
+	local x, z = at(-6, 9)
+	table.insert(def.Decor, prop("LanternPost", x, z))
+	x, z = at(len + 6, -9)
+	table.insert(def.Decor, prop("LanternPost", x, z))
+	local k = 0
+	for t = 30, len - 20, 34 do
+		k += 1
+		x, z = at(t, if k % 2 == 0 then 9 else -9)
+		table.insert(def.Decor, prop(if k % 2 == 0 then "GlowShells" else "GlowWeed", x, z))
+	end
+end
+
+-- A rock falls in the roofed cells along the cart route: every third one, from the second.
+local function rockfalls(def, count)
+	local roofed = roofedOf[def]
+	local ramp
+	for _, item in def.Primitives do
+		if item.Kind == "Ramp" then
+			ramp = item
+		end
+	end
+	local seen, found = {}, {}
+	local function visit(x, z)
+		local c, r = (x - X0) // PITCH, (z - Z0) // PITCH
+		local key = r * 100 + c
+		if roofed[key] and not seen[key] then
+			seen[key] = true
+			table.insert(found, { X0 + PITCH * c + PITCH // 2, Z0 + PITCH * r + PITCH // 2 })
+		end
+	end
+	for k = 1, #ramp.Path - 1 do
+		local a, b = ramp.Path[k], ramp.Path[k + 1]
+		local steps = math.max(math.abs(b[1] - a[1]), math.abs(b[2] - a[2])) // PITCH
+		for s = 0, steps do
+			visit(
+				a[1] + (b[1] - a[1]) * s // math.max(steps, 1),
+				a[2] + (b[2] - a[2]) * s // math.max(steps, 1)
+			)
+		end
+	end
+	def.Hazards = def.Hazards or {}
+	def.Decor = def.Decor or {}
+	local placed = 0
+	for k = 2, #found, 3 do
+		if placed >= count then
+			break
+		end
+		placed += 1
+		local spot = found[k]
+		table.insert(def.Hazards, { Type = "Rockfall", At = spot })
+		table.insert(def.Decor, scatter("Pebbles", spot[1] - 12, spot[2] - 12, spot[1] + 12, spot[2] + 12, 5))
+		table.insert(def.Decor, prop("Timber", spot[1] + 8, spot[2] - 6, 0.8, 60))
+	end
+end
+
+-- Undertow along every channel.
+local function undertows(def)
+	def.Hazards = def.Hazards or {}
+	for _, item in def.Primitives do
+		if item.Kind == "Channel" then
+			table.insert(def.Hazards, { Type = "Undertow", Path = item.Path, Width = item.Width })
+		end
+	end
+end
+
+sinks(crossing1, { { -60, 552 }, { 100, 472 } })
+gloom(crossing1, { -220, 252 }, { -220, 412 })
+gloom(crossing1, { 100, 212 }, { 100, 372 })
+rockfalls(crossing1, 3)
+undertows(crossing1)
+
+sinks(crossing2, { { -180, 232 }, { -260, 232 } })
+gloom(crossing2, { -80, 192 }, { 80, 192 })
+gloom(crossing2, { -100, 372 }, { -100, 532 })
+rockfalls(crossing2, 3)
+undertows(crossing2)
+
+sinks(crossing3, { { -340, 552 }, { 140, 152 } })
+gloom(crossing3, { 80, 192 }, { -80, 192 })
+gloom(crossing3, { -80, 552 }, { 80, 552 })
+rockfalls(crossing3, 3)
+undertows(crossing3)
+
+sinks(crossing4, { { -340, 272 }, { 220, 152 } })
+gloom(crossing4, { -80, 32 }, { 80, 32 })
+gloom(crossing4, { -220, 252 }, { -220, 412 })
+rockfalls(crossing4, 3)
+undertows(crossing4)
+
+sinks(crossing5, { { 140, 472 }, { 300, 352 } })
+gloom(crossing5, { 80, 32 }, { -80, 32 })
+gloom(crossing5, { -80, 392 }, { 80, 392 })
+rockfalls(crossing5, 3)
+undertows(crossing5)
 
 return frame
