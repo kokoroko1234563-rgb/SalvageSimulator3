@@ -16,7 +16,7 @@
 local PITCH = 40 -- grid: lane centres 40 apart
 local X0, Z0 = -360, 12 -- the first node of the picture, in zone coordinates
 
--- A rock wall; its edges are worn by `rough` studs (the Test Range tolerates 1: more draws the
+-- A rock wall; its edges are worn by `rough` studs (the Test Range tolerates 1, and only on the walls that run across: more draws the
 -- walls too thin and the terrain strays from the layout). Posts stay square.
 local function wall(path, rough)
 	return { Kind = "Wall", Path = path, Height = 24, Width = 12, Rough = rough }
@@ -118,7 +118,10 @@ local function maze(art, x0, z0, edgeL, edgeR)
 		end
 	end
 	local function add(char, path)
-		table.insert(list, if char == "-" or char == "|" then wall(path, 1) else rubble(path))
+		table.insert(
+			list,
+			if char == "-" or char == "|" then wall(path, if char == "-" then 1 else nil) else rubble(path)
+		)
 	end
 	for j = 0, h do
 		local line = art[2 * j + 1]
