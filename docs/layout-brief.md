@@ -378,3 +378,36 @@ weed) and any outline with `Area`.
   once at the end, clean.
 - **Report:** what you changed, the times, a render of the first crossing, anything you
   couldn't do.
+
+### H. The shore, zones 1 to 3, as whole natural zones (`Zones/Zone1.luau`, `Zone2.luau`, `Zone3.luau`)
+
+- **Files:** those three, their notes in `docs/layouts/`, and your scripts under
+  `tools/gen/shore/`.
+- **What's wrong now** (look at `python3 tools/layout_render.py 1 Base 1: -o z1.png`): each is an
+  old 152-stud strip repeated four times down the zone, so the same low banks come round every
+  152 studs as straight horizontal stripes, like corduroy. Between the shop and the water there's
+  nothing to look at: flat sand.
+- **What it should be:** a sunny, inviting shore that gets a little wilder going out. Natural,
+  never repeated, nothing ruled straight:
+  - **Zone 1, Shopside Shore** (35 s): open and readable from the top (hides at most 20% of its
+    lower half). Soft dunes near the top, a shallow creek meandering down to the sea, a couple of
+    tide pools, wrack lines (weed, shells and driftwood strung along where high tides left them).
+  - **Zone 2, Sunny Stretch** (40 s): low curving sandbars and runnels (shallow channels between
+    them) that make you weave, a rocky outcrop or two (decor rocks), the rock pools.
+  - **Zone 3, Middle Banks** (45 s): bigger banks with worn edges, a creek mouth, a small old
+    wreck half buried, more wrack. Starts to hide the way ahead (at least 60% of its lower half).
+- **Tools:** curving `Path`s and `Area` outlines, `Rough` edges (2 to 4), `Paint` for damp or
+  firm sand (`Salt`, `Ground`) and a pebble bank (`Slate`), and `Decor`: `Shells`, `Rocks`,
+  `DuneGrass`, `Driftwood`, `Weed`, `Starfish`, `Pebbles`, `Timber`, `WreckRibs` (zone 3),
+  `Crate`. Compose: clusters and lines with open sand between, not an even sprinkle.
+- **Rules (the tests check them):** no rock shapes or walls before zone 4 (rocks as decor are
+  fine); heights at most 2.5 (zone 1), 5 (zone 2), 7 (zone 3); cuts at most 4 deep; keep 6+
+  studs clear of the rock pools in your zones; keep the pier's line clear in zone 2 (the test
+  "the pier's path and every entrance spot are clear of shapes" says where); a cart ramp from
+  each zone's top edge to its bottom edge in every crossing; at least two foot shortcuts.
+  Crossings and slots are optional here: one or two crossings each is plenty, and a slot or two
+  (a tide-pool cove, a dune hollow) where rolled rooms add variety.
+- **Times:** each zone's fastest crossing on foot near its target (35, 40, 45 s) on the
+  Test Range.
+- **Check:** `bash tools/check.sh`, the map tool, `layout_render.py` (look at each zone), the Test
+  Range `--every` per zone at the end.
