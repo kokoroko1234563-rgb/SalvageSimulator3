@@ -89,9 +89,10 @@ end
 TerrainBuilder.behindShore = behindShore
 
 -- The area the terrain covers: the shop's ground and the dunes behind it, and the whole beach
--- and seabed, a little past the sides.
+-- and seabed, out to where the layouts' shapes reach past the sides (CliffReach). The cliffs
+-- (MapEdge) start right there, so the beach ends where its walls and banks do.
 function TerrainBuilder.bounds(): (Vector3, Vector3)
-	local half = Beach.HalfWidth + 40
+	local half = Beach.HalfWidth + shape.CliffReach
 	local zEnd = Beach.Depth + beach.SeaExtent
 	local low = Beach.groundY(zEnd) - beach.FarSandbar.ChannelDepth - 12
 	local high = 4 + math.max(shape.MaxHeight, shape.WallMaxHeight, shape.RoofMaxTop)

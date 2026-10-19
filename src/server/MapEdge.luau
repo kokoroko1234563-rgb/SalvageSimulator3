@@ -78,7 +78,10 @@ local function headland(terrain: Terrain, folder: Folder, side: number, inner: n
 				Vector3.new(width, heightTop - floorY, STEP + 8),
 				rock
 			)
-			if layer == 1 and heightTop > 4 then
+			-- Greenery only along the sunny shore (the shop and zones 1 to 3): further out
+			-- the cliffs are bare, drowned rock.
+			local tile = Beach.tileAt(z)
+			if layer == 1 and heightTop > 4 and (not tile or tile <= 3) then
 				-- Grass on the front terrace, and bushes and now and then a palm on it.
 				terrain:FillBlock(
 					CFrame.new(x + side * 2, heightTop + 0.5, mid) * turn,

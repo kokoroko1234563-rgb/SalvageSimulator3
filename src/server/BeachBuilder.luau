@@ -399,7 +399,13 @@ function BeachBuilder.build(): Folder
 		MapParts.part({
 			Name = "EdgeBarrier",
 			Size = Vector3.new(80, 70, length),
-			CFrame = CFrame.new(side * (half + 60), -25, -beach.ShopDepth - 40 + length / 2),
+			-- Its inner face a little inside where the layouts' walls end (CliffReach), so no
+			-- one slips round the end of a wall along the cliffs.
+			CFrame = CFrame.new(
+				side * (half + beach.Terrain.CliffReach - 4 + 40),
+				-25,
+				-beach.ShopDepth - 40 + length / 2
+			),
 			Transparency = 1,
 			CanQuery = false,
 		}).Parent =
