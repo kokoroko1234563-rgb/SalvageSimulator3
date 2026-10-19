@@ -119,6 +119,82 @@ local function unreachable(): { string }
 	return found
 end
 
+-- Walls too thin for the terrain: rock under THIN studs thick between two open spaces, running
+-- on at least LONG studs (a wall, not a pillar). The terrain's 4-stud cells round a thin wall
+-- down into something a player can climb, and from its top walk over everything.
+-- (Measured where the rock is HIGH: carving's edges slope in over the Blend, so a wall drawn
+-- 24 thick measures about EDGES less.)
+local THIN, LONG, HIGH, LOW, EDGES = 22, 24, 8, 4, 8
+local function thinWalls(): { string }
+	local z0, z1 = Beach.tileRange(zone)
+	local function rise(x: number, lz: number): number
+		return (Beach.shapeAt(x, z0 + lz))
+	end
+	local found, seen = {}, {}
+	local function report(x: number, lz: number, thick: number)
+		local key = math.floor(x / 24) .. "," .. math.floor(lz / 24)
+		if not seen[key] and #found < 12 then
+			seen[key] = true
+			table.insert(
+				found,
+				string.format("a wall about %d studs thick at (%d, %d) (draw them 24)", thick + EDGES, x, lz)
+			)
+		end
+	end
+	-- Runs of high ground along one line; `at(t)` gives the rise at step t, `place(t)` the point.
+	local function scan(count: number, at, place, along)
+		local start = nil
+		for t = 0, count do
+			local high = at(t) >= HIGH
+			if high and not start then
+				start = t
+			elseif not high and start then
+				local low = at(t) < LOW and start > 0 and at(start - 1) < LOW
+				local thick = (t - start) * STEP
+				if low and thick + EDGES < THIN then
+					local mid = math.floor((start + t) / 2)
+					local x, lz = place(mid)
+					if along(x, lz) >= LONG then
+						report(x, lz, thick)
+					end
+				end
+				start = nil
+			end
+		end
+	end
+	local function extent(x: number, lz: number, dx: number, dz: number): number
+		local n = 0
+		for sign = -1, 1, 2 do
+			local k = 1
+			while k * STEP <= LONG and rise(x + sign * dx * k * STEP, lz + sign * dz * k * STEP) >= HIGH do
+				k += 1
+			end
+			n += (k - 1) * STEP
+		end
+		return n
+	end
+	local cols = math.floor(2 * (Beach.HalfWidth - 4) / STEP)
+	for lz = 8, z1 - z0 - 8, STEP do
+		scan(cols, function(t)
+			return rise(-Beach.HalfWidth + 4 + t * STEP, lz)
+		end, function(t)
+			return -Beach.HalfWidth + 4 + t * STEP, lz
+		end, function(x, zz)
+			return extent(x, zz, 0, 1)
+		end)
+	end
+	for x = -Beach.HalfWidth + 4, Beach.HalfWidth - 4, STEP do
+		scan(math.floor((z1 - z0 - 16) / STEP), function(t)
+			return rise(x, 8 + t * STEP)
+		end, function(t)
+			return x, 8 + t * STEP
+		end, function(xx, zz)
+			return extent(xx, zz, 1, 0)
+		end)
+	end
+	return found
+end
+
 local target = Config.Zones[zone].CrossTime
 for _, text in choices do
 	local choice = Layouts.decode(def, text)
@@ -138,6 +214,10 @@ for _, text in choices do
 		bad += 1
 	end
 	for _, problem in unreachable() do
+		print("  PROBLEM " .. problem)
+		bad += 1
+	end
+	for _, problem in thinWalls() do
 		print("  PROBLEM " .. problem)
 		bad += 1
 	end

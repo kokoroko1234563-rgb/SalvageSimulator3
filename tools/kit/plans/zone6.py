@@ -109,7 +109,7 @@ def dead_end(part, points, weight=2, sink=True):
 # ---- the frame ----------------------------------------------------------------------------------
 # The bands: the top (where every path starts) and the bottom (the Far Sandbar's approach).
 f.hall([(-360, -12), (360, -12), (360, 20), (-360, 20)])
-f.hall([(-360, 584), (360, 584), (360, 620), (-360, 620)])
+f.hall([(-360, 592), (360, 592), (360, 620), (-360, 620)])
 
 # The West Court: open sky, light falling in; paths cross here.
 f.court([(-272, 176), (-176, 176), (-176, 264), (-272, 264)])
@@ -142,15 +142,15 @@ f.decor("Chain", path=[(-328, 300), (-328, 484)], count=3)
 #    the Wreck Court and down the east side.
 # Link: the Hall's east door onto B.
 c = z.crossing("Lantern way", paths=2)
-lit_way(c, [(-200, 0), (-200, 60), (184, 60), (184, 128), (-140, 128), (-140, 440), (120, 440),
-            (120, 480), (-60, 480), (-60, 608)])
+lit_way(c, [(-200, 0), (-200, 60), (184, 60), (184, 128), (-140, 128), (-140, 456), (88, 456),
+            (88, 530), (-60, 530), (-60, 608)])
 spur(c, [(-140, 220), (-176, 220)])  # to the West Court
 spur(c, [(-140, 296), (-72, 296)])  # to the Hall's west door
-dark = [(224, 0), (224, 124), (340, 124), (340, 180), (104, 180), (104, 236), (336, 236),
-        (336, 292), (152, 292), (152, 376), (176, 376)]
-dark_way(c, dark, roofed=(3, 5), gloom=[(340, 180), (104, 180), (104, 236), (336, 236)])
-spur(c, [(72, 320), (152, 320)])  # the link: the Hall's east door
-dark_way(c, [(228, 424), (228, 484), (272, 484), (272, 608)])
+dark = [(224, 0), (224, 132), (340, 132), (340, 188), (104, 188), (104, 244), (336, 244),
+        (336, 300), (140, 300), (140, 376), (176, 376)]
+dark_way(c, dark, roofed=(3, 5), gloom=[(340, 188), (104, 188), (104, 244), (336, 244)])
+spur(c, [(72, 320), (140, 320)])  # the link: the Hall's east door
+dark_way(c, [(228, 424), (228, 464), (272, 464), (272, 608)])
 dead_end(c, [(-140, 380), (-240, 380), (-240, 420)], weight=2)
 c.decor(LIT, at=(-188, 10))  # the tell: lanterns at the way in
 c.decor("Anchor", at=(236, 12), yaw=120)
@@ -161,8 +161,8 @@ c.decor("Anchor", at=(236, 12), yaw=120)
 # the east switchbacks or the east rows (above the Wreck Court), and the bottom snakes.
 TOP_WEST = [(-136, 0), (-136, 48), (-224, 48), (-224, 100), (-152, 100), (-152, 148), (-224, 148),
             (-224, 176)]
-WEST_ROWS = [(-224, 264), (-224, 300), (-136, 300), (-136, 336), (-296, 336), (-296, 372),
-             (-136, 372), (-136, 408), (-296, 408), (-296, 444), (-136, 444), (-136, 480),
+WEST_ROWS = [(-224, 264), (-224, 300), (-136, 300), (-136, 336), (-288, 336), (-288, 372),
+             (-136, 372), (-136, 408), (-288, 408), (-288, 444), (-136, 444), (-136, 480),
              (-280, 480), (-280, 608)]
 CENTRE_ROWS = [(40, 0), (40, 48), (-88, 48), (-88, 104), (80, 104), (80, 160), (-88, 160),
                (-88, 216), (40, 216), (40, 248)]
@@ -182,8 +182,8 @@ lit_way(c, [(120, 0), (120, 72), (224, 72), (224, 128), (336, 128), (336, 296), 
             (176, 376)])
 lit_way(c, BOTTOM_EAST)
 dark_way(c, TOP_WEST)
-dark_way(c, WEST_ROWS, roofed=(4, 6, 8), gloom=[(-296, 336), (-296, 372), (-136, 372), (-136, 408),
-                                                (-296, 408)])
+dark_way(c, WEST_ROWS, roofed=(4, 6, 8), gloom=[(-288, 336), (-288, 372), (-136, 372), (-136, 408),
+                                                (-288, 408)])
 dark_way(c, CENTRE_ROWS, roofed=(5,))
 c.hazard("Rockfall", at=(0, 296), radius=16)
 dark_way(c, BOTTOM_CENTRE)
@@ -203,9 +203,9 @@ lit_way(c, [(40, 0), (40, 56), (200, 56), (200, 120), (-60, 120), (-60, 200), (3
 lit_way(c, [(228, 424), (228, 470), (-60, 470), (-60, 608)])
 spur(c, [(72, 320), (140, 320)])  # the Hall's east door
 dark_way(c, TOP_WEST, roofed=(1, 3), gloom=[(-136, 48), (-224, 48), (-224, 100), (-152, 100)])
-dark_way(c, [(-176, 240), (-120, 240), (-120, 480), (-296, 480), (-296, 420), (-160, 420),
-             (-160, 360), (-296, 360), (-296, 300), (-328, 300)], roofed=(5,),
-         gloom=[(-160, 360), (-296, 360)])
+dark_way(c, [(-176, 240), (-120, 240), (-120, 480), (-288, 480), (-288, 420), (-160, 420),
+             (-160, 360), (-288, 360), (-288, 300), (-328, 300)], roofed=(5,),
+         gloom=[(-160, 360), (-288, 360)])
 dark_way(c, [(-328, 488), (-328, 540), (-260, 540), (-260, 608)])
 dead_end(c, [(330, 296), (330, 260)], weight=2)
 c.decor("Bones", at=(-136, 12), scale=1.3, yaw=0)  # the tell: an arch of bones at the way in
@@ -223,13 +223,13 @@ c.roof_lane([(288, 200), (288, 264)], 16)
 c.hazard("Gloom", path=[(336, 136), (336, 288), (288, 288), (288, 176)], radius=9)
 lit_way(c, [(176, 376), (120, 376), (120, 336), (-104, 336), (-104, 220), (-176, 220)])
 c.hazard("Rockfall", at=(0, 330), radius=16)
-lit_way(c, [(-224, 264), (-224, 300), (-144, 300), (-144, 360), (-296, 360), (-296, 420),
-            (-144, 420), (-144, 480), (-296, 480), (-296, 608)])
+lit_way(c, [(-224, 264), (-224, 300), (-144, 300), (-144, 360), (-280, 360), (-280, 420),
+            (-144, 420), (-144, 480), (-280, 480), (-280, 608)])
 dead_end(c, [(200, 128), (40, 128), (40, 200)], weight=2)
 dead_end(c, [(228, 424), (228, 470), (60, 470)], weight=3)
-spur(c, [(-296, 540), (-244, 540)])
-c.channel([(-276, 540), (-248, 540)], depth=2, width=12, material="Mud")
-c.hazard("Undertow", path=[(-276, 540), (-248, 540)], width=12)
+spur(c, [(-280, 540), (-244, 540)])
+c.channel([(-262, 540), (-248, 540)], depth=2, width=12, material="Mud")
+c.hazard("Undertow", path=[(-262, 540), (-248, 540)], width=12)
 c.loot((-248, 540), radius=4, weight=2)
 scramble(c, (-200, 300), (-200, 360))  # shortcuts for feet: rubble a cart can't climb
 scramble(c, (336, 220), (288, 220))
@@ -248,10 +248,10 @@ lit_way(c, CENTRE_ROWS[:-1] + [(100, 216), (100, 376), (176, 376)])
 lit_way(c, [(228, 424), (228, 470), (-60, 470), (-60, 608)])
 spur(c, [(72, 320), (100, 320)])  # the Hall's east door
 dark_way(c, TOP_WEST)
-dark_way(c, WEST_ROWS, roofed=(8,), gloom=[(-136, 408), (-296, 408)])
-dark_way(c, [(200, 0), (200, 120), (336, 120), (336, 176), (152, 176), (152, 232), (336, 232),
-             (336, 288), (240, 288), (240, 328)], roofed=(3,), gloom=[(336, 176), (152, 176)])
-dark_way(c, [(272, 424)] + BOTTOM_EAST[2:])
+dark_way(c, WEST_ROWS, roofed=(8,), gloom=[(-136, 408), (-288, 408)])
+dark_way(c, [(200, 0), (200, 128), (336, 128), (336, 184), (152, 184), (152, 240), (336, 240),
+             (336, 296), (240, 296), (240, 328)], roofed=(3,), gloom=[(336, 184), (152, 184)])
+dark_way(c, [(272, 424), (272, 452)] + BOTTOM_EAST[2:])
 dead_end(c, [(-60, 520), (60, 520)], weight=2)
 c.decor("DeadCoral", at=(40, 12), scale=1.3)  # the tell: dead coral and a smashed crate
 c.decor("Crate", at=(56, 10))
@@ -366,22 +366,22 @@ def boulder_scramble(slot, name, weight=2):
 
 # ---- the slots ----------------------------------------------------------------------------------
 # Rooms differ in kind; the best finds are deepest (the sea vault and the crypt), on covered pits.
-s1 = z.slot("Shore caves", at=(-352, 28), size=(104, 72), door=(52, 0))
+s1 = z.slot("Shore caves", at=(-352, 36), size=(104, 72), door=(52, 0))
 comb_of_caves(s1, "Comb of caves", weight=2)
 boulder_scramble(s1, "Boulder scramble", weight=1)
 
-s2 = z.slot("The lockers", at=(248, 28), size=(104, 72), door=(52, 0))
+s2 = z.slot("The lockers", at=(248, 36), size=(104, 72), door=(52, 0))
 r = s2.room("Crate store")
 r.hall(box(s2))
 r.decor("Crate", area=box(s2, 12), count=5)
 r.loot((24, 52), weight=1)
 flooded_vault(s2, "Flooded locker", weight=2)
 
-s3 = z.slot("West vault", at=(-352, 168), size=(72, 104), door=(72, 52))
+s3 = z.slot("West vault", at=(-360, 168), size=(72, 104), door=(72, 52))
 flooded_vault(s3, "Drowned pool", weight=2)
 sinking_flat(s3, "Sinking flat", weight=2)
 
-s4 = z.slot("The crypt", at=(-48, 352), size=(96, 72), door=(48, 0))
+s4 = z.slot("The crypt", at=(-48, 360), size=(96, 72), door=(48, 0))
 r = pillar_chamber(s4, "Bone crypt", weight=3)
 r.hazard("Pit", at=(48, 52), radius=4, covered=True)
 tunnel_ring(s4, "Ring crypt", weight=3)
@@ -390,7 +390,7 @@ s5 = z.slot("The chapel", at=(120, 504), size=(112, 72), door=(56, 72))
 pillar_chamber(s5, "Pillar chapel", weight=2, rockfall=True)
 comb_of_caves(s5, "Chapel caves", weight=3)
 
-s6 = z.slot("The hold", at=(288, 328), size=(64, 96), door=(0, 48))
+s6 = z.slot("The hold", at=(296, 328), size=(64, 96), door=(0, 48))
 flooded_vault(s6, "Flooded hold", weight=3)
 sinking_flat(s6, "Silted hold", weight=2)
 

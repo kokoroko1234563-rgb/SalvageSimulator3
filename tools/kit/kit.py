@@ -233,9 +233,10 @@ class Part:
             self.roof_lane(points, width, roof)
         return self
 
-    def hall(self, area, roof=False, floor=None, pillars=(), pillar=8):
+    def hall(self, area, roof=False, floor=None, pillars=(), pillar=12):
         """An open area (a polygon) carved out of the rock. `pillars` leave rock standing (posts
-        `pillar` studs across) to hold up a roof and break the space."""
+        `pillar` studs across: the terrain rounds anything thinner away) to hold up a roof and
+        break the space."""
         area = [(snap(x, 2), snap(z, 2)) for x, z in area]
         h = pillar / 2
         holes = [(snap(x) - h, snap(z) - h, snap(x) + h, snap(z) + h) for x, z in pillars]
@@ -428,14 +429,19 @@ class Zone:
         self.crossings.append(c)
         return c
 
-    def slot(self, name, at, size, door=None):
+    def slot(self, name, at, size, door=None, reach=16):
         """A side pocket: its corner `at` (lowest x, lowest z), `size` (width, depth), and its
-        door in its own coordinates, which the frame cuts through to the lane outside."""
+        door in its own coordinates, which the frame cuts through the rock to `reach` studs
+        outside the slot. Keep a slot `reach` studs from the space its door opens onto: with its
+        rooms 8 in from its edge, that leaves the wall between them 24 thick."""
         s = Slot(self, name, at, size, door)
         if door is not None and self.rock:
             x, z = at[0] + door[0], at[1] + door[1]
             before = len(self.frame.primitives)
-            self.frame.lane([(x, z - 8), (x, z + 8)] if door[1] in (0, size[1]) else [(x - 8, z), (x + 8, z)],
+            dx, dz = door
+            w, d = size
+            out = (0, -1) if dz == 0 else (0, 1) if dz == d else (-1, 0) if dx == 0 else (1, 0)
+            self.frame.lane([(x - out[0] * 8, z - out[1] * 8), (x + out[0] * reach, z + out[1] * reach)],
                             width=12)
             for p in self.frame.primitives[before:]:
                 p["_door"] = s
