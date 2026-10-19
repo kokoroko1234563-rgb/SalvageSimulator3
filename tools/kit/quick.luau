@@ -37,12 +37,21 @@ for _, problem in Layouts.defProblems(def, source) do
 end
 
 local choices = {}
+local VERBOSE = false
 for i = 3, #process.args do
-	table.insert(choices, process.args[i])
+	if process.args[i] == "--routes" then
+		VERBOSE = true
+	else
+		table.insert(choices, process.args[i])
+	end
 end
+-- With none given: every way it can come out (each crossing, then each other room).
+local roomsOnly = {}
 if #choices == 0 then
-	for c = 1, math.max(1, #(def.Crossings or {})) do
-		table.insert(choices, c .. ":")
+	for _, way in Layouts.options(def) do
+		local text = Layouts.encode(way.Choice)
+		table.insert(choices, text)
+		roomsOnly[text] = string.find(way.Label, "slot") ~= nil
 	end
 end
 
@@ -114,14 +123,15 @@ local target = Config.Zones[zone].CrossTime
 for _, text in choices do
 	local choice = Layouts.decode(def, text)
 	local crossing = def.Crossings and def.Crossings[choice.Crossing]
-	print(
-		string.format(
-			"%s %s%s",
-			source,
-			text,
-			if crossing and crossing.Name then " (" .. crossing.Name .. ")" else ""
-		)
-	)
+	local label = if crossing and crossing.Name then " (" .. crossing.Name .. ")" else ""
+	if roomsOnly[text] then
+		for index, room in choice.Rooms do
+			if room ~= 1 then
+				label = string.format(" (%s: %s)", def.Slots[index].Name, def.Slots[index].Rooms[room].Name)
+			end
+		end
+	end
+	print(string.format("%s %s%s", source, text, label))
 	Layouts.setActive(zone, def, nil, choice)
 	for _, problem in Layouts.problems(Layouts.active(zone)) do
 		print("  PROBLEM " .. problem)
@@ -131,9 +141,23 @@ for _, text in choices do
 		print("  PROBLEM " .. problem)
 		bad += 1
 	end
+	if roomsOnly[text] then
+		-- A room is a dead end off the frame: the crossing's paths are as they were.
+		Layouts.setActive(zone, nil)
+		continue
+	end
 	local report = PathCheck.analyse(Beach, Config, zone)
 	for _, line in PathCheck.describe(report, target) do
 		print("  " .. line)
+	end
+	if VERBOSE then
+		for i, path in report.paths do
+			local points = {}
+			for _, point in path.turns do
+				table.insert(points, string.format("(%d, %d)", point[1], point[2]))
+			end
+			print(string.format("  path %d goes %s", i, table.concat(points, " ")))
+		end
 	end
 	local wanted = (crossing and crossing.Paths) or def.Paths
 	if wanted then

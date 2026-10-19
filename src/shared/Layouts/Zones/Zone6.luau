@@ -1,2131 +1,3177 @@
--- Zone 6, The Drowned Reach: the deepest, slowest ground on the beach, drawn as one 720 x 608
--- piece. A maze of tall rock walls on a 40-stud grid (28-wide lanes between walls 12 wide and
--- 24 high), cut into nine wards by four long walls with gates, and walled across its top and
--- bottom edges. The frame is always there: the long walls and their gate candidates, the shells
--- of seven side rooms, the roofed galleries round the two halls. Each tide one of five
--- crossings is rolled: it shuts the gates it doesn't want, draws every other wall of the maze
--- (a tree, so there is one way through, and dead ends everywhere), roofs some of its straights,
--- digs some low lanes and pools, and winds a cart ramp along the way through. A few doorways
--- are choked with rubble instead of walled: players scramble over them to cut a bend, carts
--- can't. Each side room's pick fills its shell. See docs/layouts/Zone6.md.
---
--- The mazes are drawn as pictures (see `maze`): '+' is a grid node, '--' a wall between two
--- lanes, '==' or '!' rubble, and a blank an opening. Row by row, a line of nodes, then a line
--- of cells.
-
-local PITCH = 40 -- grid: lane centres 40 apart
-local X0, Z0 = -360, 12 -- the first node of the picture, in zone coordinates
-
--- A rock wall; its edges are worn by `rough` studs (the Test Range tolerates 1, and only on the walls that run across: more draws the
--- walls too thin and the terrain strays from the layout). Posts stay square.
-local function wall(path, rough)
-	return { Kind = "Wall", Path = path, Height = 24, Width = 12, Rough = rough }
-end
-
--- A pile of rubble filling a doorway: a scramble on foot, too steep for a cart.
-local function rubble(path)
-	return { Kind = "Ridge", Path = path, Height = 4, Width = 20, Rough = 3 }
-end
-
--- Rock overhead along a lane: a marker, turned into exact rectangles by `fit` once the walls
--- are known (see below). `path` runs through the centres of the lane cells it covers.
-local function roof(path)
-	return { Kind = "RoofRun", Path = path }
-end
-
--- A pool: low ground that holds the sea from early in the flood.
-local function pool(x, z, radius)
-	return { Kind = "Hollow", At = { x, z }, Radius = radius or 12, Depth = 3, Material = "Mud", Rough = 3 }
-end
-
--- A sunk lane: floods before the ground round it.
-local function lane(path)
-	return { Kind = "Channel", Path = path, Depth = 2, Width = 12, Material = "Mud" }
-end
-
--- Rock over one lane cell of a side room (a marker, like `roof`).
-local function cellRoof(x, z)
-	return { Kind = "RoofRun", Path = { { x, z } } }
-end
-
--- A boulder.
-local function boulder(x, z, radius, height)
-	return { Kind = "Mound", At = { x, z }, Radius = radius, Height = height, Rock = true, Rough = 3 }
-end
-
--- A freestanding column of rock on a grid node.
-local function post(x, z)
-	return wall({ { x, z } })
-end
-
--- Mud or weed over the ground in an area (the ground's material only).
-local function mud(area)
-	return { Kind = "Paint", Area = area, Material = "Mud" }
-end
-
-local function weed(area)
-	return { Kind = "Paint", Area = area, Material = "Rock" }
-end
-
--- One prop, and a rectangle of them.
-local function prop(kind, x, z, scale, yaw)
-	return { Kind = kind, At = { x, z }, Scale = scale, Yaw = yaw }
-end
-
-local function scatter(kind, x0, z0, x1, z1, count, scale)
-	return {
-		Kind = kind,
-		Area = { { x0, z0 }, { x1, z0 }, { x1, z1 }, { x0, z1 } },
-		Count = count,
-		Scale = scale,
-	}
-end
-
-local function loot(x, z, weight)
-	return { At = { x, z }, Radius = 6, Weight = weight }
-end
-
--- Joins lists of shapes into one.
-local function merge(...)
-	local all = {}
-	for _, list in { ... } do
-		for _, item in list do
-			table.insert(all, item)
-		end
-	end
-	return all
-end
-
--- Turns a maze picture into walls and rubble. The picture's top left node is at (x0, z0).
--- Walls run between nodes (with a point on each node on the way) and stop 2 studs short of the
--- ends; a post stands on every node a wall touches, 12 across, so the walls run 4 studs into it
--- and no crack opens where two meet end to end, even with their edges worn (Rough). On the picture's left and right edges the posts also close
--- the walls against the cliffs (the ground past the beach's sides carries on as it is at
--- x = +-360, so a wall must be full height there). `edgeL` and `edgeR` say the picture's left
--- or right edge is the beach's side: the walls that reach it run right out to it, which also
--- stretches their invisible barriers on to the cliffs.
-local function maze(art, x0, z0, edgeL, edgeR)
-	local list = {}
-	local h = (#art - 1) // 2
-	local _, nodes = string.gsub(art[1], "%+", "")
-	local w = nodes - 1
-	local posts = {}
-	local function post(i, j)
-		local key = i * 1000 + j
-		if not posts[key] then
-			posts[key] = true
-			table.insert(list, wall({ { x0 + PITCH * i, z0 + PITCH * j } }, nil))
-		end
-	end
-	local function add(char, path)
-		table.insert(
-			list,
-			if char == "-" or char == "|" then wall(path, if char == "-" then 1 else nil) else rubble(path)
-		)
-	end
-	for j = 0, h do
-		local line = art[2 * j + 1]
-		local z = z0 + PITCH * j
-		local c = 0
-		while c < w do
-			local char = string.sub(line, 3 * c + 2, 3 * c + 2)
-			if char == "-" or char == "=" then
-				local last = c
-				while last + 1 < w and string.sub(line, 3 * (last + 1) + 2, 3 * (last + 1) + 2) == char do
-					last += 1
-				end
-				local path = { { x0 + PITCH * c + (if c == 0 and edgeL then 0 else 2), z } }
-				for i = c + 1, last do
-					table.insert(path, { x0 + PITCH * i, z })
-				end
-				table.insert(
-					path,
-					{ x0 + PITCH * (last + 1) - (if last + 1 == w and edgeR then 0 else 2), z }
-				)
-				add(char, path)
-				if char == "-" then
-					for i = c, last + 1 do
-						post(i, j)
-					end
-				end
-				c = last + 1
-			else
-				c += 1
-			end
-		end
-	end
-	for i = 0, w do
-		local x = x0 + PITCH * i
-		local r = 0
-		while r < h do
-			local char = string.sub(art[2 * r + 2], 3 * i + 1, 3 * i + 1)
-			if char == "|" or char == "!" then
-				local last = r
-				while last + 1 < h and string.sub(art[2 * (last + 1) + 2], 3 * i + 1, 3 * i + 1) == char do
-					last += 1
-				end
-				local path = { { x, z0 + PITCH * r + 2 } }
-				for j = r + 1, last do
-					table.insert(path, { x, z0 + PITCH * j })
-				end
-				table.insert(path, { x, z0 + PITCH * (last + 1) - 2 })
-				add(char, path)
-				if char == "|" then
-					for j = r, last + 1 do
-						post(i, j)
-					end
-				end
-				r = last + 1
-			else
-				r += 1
-			end
-		end
-	end
-	return list
-end
-
--- A side room: its picture's walls and its shapes, in slot coordinates.
-local function makeRoom(edgeL, edgeR, room)
-	room.Primitives = merge(maze(room.Art, 0, 0, edgeL, edgeR), room.Shapes)
-	room.Shapes = nil
-	return room
-end
-
-local FRAME = {
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"                  |                 |                  ",
-	"+--+--+--+  +  +  +  +  +--+--+--+  +  +  +  +  +  +  +",
-	"         |              |        |  |                  ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"                  |              |                     ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"         |        |     |        |  |                  ",
-	"+--+--+--+  +  +  +  +  +--+--+--+  +  +  +  +  +  +  +",
-	"                                    |                  ",
-	"+--+  +--+--+  +--+  +--+--+--+--+  +--+  +--+--+--+--+",
-	"                  |  |           |           |         ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"                  |  |           |  |                  ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"                     |           |  |        |         ",
-	"+  +  +  +  +  +  +  +--+  +--+--+  +  +  +  +--+--+--+",
-	"                  |                                    ",
-	"+--+--+--+  +--+  +  +--+--+  +--+  +  +--+--+  +--+--+",
-	"         |        |                 |                  ",
-	"+  +  +  +  +  +  +  +--+--+  +--+  +  +  +  +--+  +--+",
-	"                     |           |  |        |         ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"         |        |  |           |           |         ",
-	"+--+--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"                     |           |  |        |         ",
-	"+  +  +  +  +  +  +  +--+--+--+--+  +  +  +  +--+--+--+",
-	"                  |                                    ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
-}
-
-local frame = {
+-- Zone 6, The Drowned Reach: drawn with the layout kit from tools/kit/plans/zone6.py (edit
+-- the plan and re-run it, not this file). The role model: docs/design/cards/zone6.md.
+return {
+	Primitives = {
+		{
+			Kind = "Wall",
+			Area = {
+				{ -380, -12 },
+				{ 380, -12 },
+				{ 380, 620 },
+				{ -380, 620 },
+			},
+			Height = 20,
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -360, -12 },
+				{ 360, -12 },
+				{ 360, 20 },
+				{ -360, 20 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -360, 584 },
+				{ 360, 584 },
+				{ 360, 620 },
+				{ -360, 620 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -272, 176 },
+				{ -176, 176 },
+				{ -176, 264 },
+				{ -272, 264 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -72, 276 },
+				{ -72, 248 },
+				{ 72, 248 },
+				{ 72, 276 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -72, 284 },
+				{ -72, 276 },
+				{ -40, 276 },
+				{ -40, 284 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -32, 284 },
+				{ -32, 276 },
+				{ -4, 276 },
+				{ -4, 284 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ 4, 284 },
+				{ 4, 276 },
+				{ 32, 276 },
+				{ 32, 284 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ 40, 284 },
+				{ 40, 276 },
+				{ 72, 276 },
+				{ 72, 284 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -72, 308 },
+				{ -72, 284 },
+				{ 72, 284 },
+				{ 72, 308 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -72, 316 },
+				{ -72, 308 },
+				{ -40, 308 },
+				{ -40, 316 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -32, 316 },
+				{ -32, 308 },
+				{ -4, 308 },
+				{ -4, 316 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ 4, 316 },
+				{ 4, 308 },
+				{ 32, 308 },
+				{ 32, 316 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ 40, 316 },
+				{ 40, 308 },
+				{ 72, 308 },
+				{ 72, 316 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -72, 316 },
+				{ 72, 316 },
+				{ 72, 344 },
+				{ -72, 344 },
+			},
+		},
+		{
+			Kind = "Roof",
+			Area = {
+				{ -75.33, 245.78 },
+				{ 75.33, 245.78 },
+				{ 75.33, 346.22 },
+				{ -75.33, 346.22 },
+			},
+			Clearance = 18,
+			Thickness = 6,
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ 176, 328 },
+				{ 280, 328 },
+				{ 280, 424 },
+				{ 176, 424 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -338, 296 },
+				{ -338, 488 },
+				{ -318, 488 },
+				{ -318, 296 },
+			},
+		},
+		{ Kind = "Flat", At = { -328, 296 }, Radius = 10 },
+		{ Kind = "Flat", At = { -328, 488 }, Radius = 10 },
+		{
+			Kind = "Ridge",
+			Path = {
+				{ -340, 320 },
+				{ -316, 320 },
+			},
+			Height = 2.5,
+			Width = 12,
+			Rough = 0,
+			Over = true,
+		},
+		{
+			Kind = "Ridge",
+			Path = {
+				{ -340, 356 },
+				{ -316, 356 },
+			},
+			Height = 2.5,
+			Width = 12,
+			Rough = 0,
+			Over = true,
+		},
+		{
+			Kind = "Ridge",
+			Path = {
+				{ -340, 392 },
+				{ -316, 392 },
+			},
+			Height = 2.5,
+			Width = 12,
+			Rough = 0,
+			Over = true,
+		},
+		{
+			Kind = "Ridge",
+			Path = {
+				{ -340, 428 },
+				{ -316, 428 },
+			},
+			Height = 2.5,
+			Width = 12,
+			Rough = 0,
+			Over = true,
+		},
+		{
+			Kind = "Ridge",
+			Path = {
+				{ -340, 464 },
+				{ -316, 464 },
+			},
+			Height = 2.5,
+			Width = 12,
+			Rough = 0,
+			Over = true,
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -306, 20 },
+				{ -306, 36 },
+				{ -294, 36 },
+				{ -294, 20 },
+			},
+		},
+		{ Kind = "Flat", At = { -300, 20 }, Radius = 6 },
+		{ Kind = "Flat", At = { -300, 36 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ 294, 20 },
+				{ 294, 36 },
+				{ 306, 36 },
+				{ 306, 20 },
+			},
+		},
+		{ Kind = "Flat", At = { 300, 20 }, Radius = 6 },
+		{ Kind = "Flat", At = { 300, 36 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ -288, 226 },
+				{ -272, 226 },
+				{ -272, 214 },
+				{ -288, 214 },
+			},
+		},
+		{ Kind = "Flat", At = { -288, 220 }, Radius = 6 },
+		{ Kind = "Flat", At = { -272, 220 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ -6, 344 },
+				{ -6, 360 },
+				{ 6, 360 },
+				{ 6, 344 },
+			},
+		},
+		{ Kind = "Flat", At = { 0, 344 }, Radius = 6 },
+		{ Kind = "Flat", At = { 0, 360 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ 170, 568 },
+				{ 170, 584 },
+				{ 182, 584 },
+				{ 182, 568 },
+			},
+		},
+		{ Kind = "Flat", At = { 176, 568 }, Radius = 6 },
+		{ Kind = "Flat", At = { 176, 584 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ 280, 382 },
+				{ 296, 382 },
+				{ 296, 370 },
+				{ 280, 370 },
+			},
+		},
+		{ Kind = "Flat", At = { 280, 376 }, Radius = 6 },
+		{ Kind = "Flat", At = { 296, 376 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ -182, 568 },
+				{ -182, 584 },
+				{ -170, 584 },
+				{ -170, 568 },
+			},
+		},
+		{ Kind = "Flat", At = { -176, 568 }, Radius = 6 },
+		{ Kind = "Flat", At = { -176, 584 }, Radius = 6 },
+	},
+	Loot = {
+		{ At = { 0, 296 }, Radius = 6, Weight = 3 },
+		{ At = { 228, 376 }, Radius = 6, Weight = 2 },
+	},
+	Decor = {
+		{
+			Kind = "DeadCoral",
+			Area = {
+				{ -264, 184 },
+				{ -184, 184 },
+				{ -184, 256 },
+				{ -264, 256 },
+			},
+			Count = 6,
+		},
+		{ Kind = "GlowWeed", At = { -224, 220 } },
+		{ Kind = "Bones", At = { 0, 296 }, Scale = 1.4, Yaw = 90 },
+		{ Kind = "WreckRibs", At = { 228, 376 }, Scale = 1.6, Yaw = 30 },
+		{
+			Kind = "Timber",
+			Area = {
+				{ 184, 336 },
+				{ 272, 336 },
+				{ 272, 416 },
+				{ 184, 416 },
+			},
+			Count = 6,
+		},
+		{ Kind = "Anchor", At = { 196, 404 }, Yaw = 200 },
+		{
+			Kind = "Chain",
+			Path = {
+				{ -328, 300 },
+				{ -328, 484 },
+			},
+			Count = 3,
+		},
+	},
 	Name = "The Drowned Reach",
-	Primitives = merge(maze(FRAME, X0, Z0, true, true), {
-		roof({ { -100, 232 }, { -100, 352 }, { 100, 352 }, { 100, 232 } }),
-		roof({ { -100, 392 }, { -100, 552 }, { 100, 552 }, { 100, 392 } }),
-		pool(-60, 352),
-		pool(60, 352),
-		pool(-100, 272),
-		pool(100, 272),
-		pool(-60, 552),
-		pool(60, 552),
-		pool(-100, 472),
-		pool(100, 472),
-	}),
-	Loot = {
-		loot(-340, 32, 1),
-		loot(-340, 192, 1),
-	},
-}
-
-local CROSSING1 = {
-	"+--+--+  +--+  +--+--+--+  +--+--+--+  +  +--+--+--+--+",
-	"            |              |           |  |     |      ",
-	"+  +  +  +--+--+  +  +--+  +  +  +  +--+--+  +  +  +  +",
-	"               |  |  |                       |     |   ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +--+--+--+--+--+  +",
-	"            |  |     |                                 ",
-	"+  +  +  +  +--+  +  +  +  +  +  +  +--+--+--+--+--+  +",
-	"                                             |         ",
-	"+  +  +  +  +--+  +--+--+  +  +  +  +  +--+--+  +--+--+",
-	"            |     |                                    ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"   |  |     |                       |  |               ",
-	"+  +  +  +  +--+  +  +  +  +  +  +  +  +--+  +  +  +  +",
-	"      !  |  |                                          ",
-	"+--+  +  +  +  +--+  +  +  +  +  +  +  +--+--+  +  +  +",
-	"      !  |  |  |                          |            ",
-	"+  +--+  +  +  +  +--+  +  +  +  +  +--+  +  +  +  +  +",
-	"         |  !  |                 |  |     |            ",
-	"+  +  +  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +",
-	"            |                                          ",
-	"+  +  +  +  +  +--+  +  +  +  +  +--+--+--+  +  +  +  +",
-	"               |  |                    |               ",
-	"+  +  +  +--+--+  +  +  +  +  +  +  +  +  +--+  +  +  +",
-	"               |                       |               ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +  +",
-	"      |     |                                          ",
-	"+  +--+  +--+--+  +--+  +  +  +  +  +--+--+--+  +  +  +",
-	"         |                                             ",
-	"+--+  +--+  +--+--+--+  +--+--+--+--+  +--+--+--+  +--+",
-}
-
-local crossing1 = {
-	Name = "West stair",
-	Primitives = merge(maze(CROSSING1, X0, Z0, true, true), {
-		roof({ { -60, 192 }, { 60, 192 } }),
-		roof({ { 100, 232 }, { 100, 352 } }),
-		roof({ { -60, 32 }, { 60, 32 } }),
-		roof({ { -20, 552 }, { 60, 552 } }),
-		roof({ { 140, 552 }, { 260, 552 } }),
-		roof({ { -100, 352 }, { -20, 352 } }),
-		roof({ { 140, 112 }, { 300, 112 } }),
-		lane({ { -220, 552 }, { -180, 552 } }),
-		lane({ { -100, 232 }, { -100, 272 } }),
-		lane({ { 300, 352 }, { 340, 352 } }),
-		lane({ { -340, 32 }, { -300, 32 } }),
-		lane({ { 180, 152 }, { 220, 152 } }),
-		pool(140, 72),
-		pool(-260, 312),
-		pool(-60, 152),
-		pool(-140, 232),
-		pool(-340, 32),
-		pool(-300, 272),
-		pool(-180, 512),
-		pool(300, 352),
+	Crossings = {
 		{
-			Kind = "Ramp",
-			Path = {
-				{ -260, 0 },
-				{ -260, 32 },
-				{ -140, 32 },
-				{ -140, 152 },
-				{ -220, 152 },
-				{ -220, 192 },
-				{ -300, 192 },
-				{ -300, 312 },
-				{ -340, 312 },
-				{ -340, 352 },
-				{ -260, 352 },
-				{ -260, 232 },
-				{ -220, 232 },
-				{ -220, 432 },
-				{ -180, 432 },
-				{ -180, 392 },
-				{ -140, 392 },
-				{ -140, 312 },
-				{ -100, 312 },
-				{ -100, 192 },
-				{ 100, 192 },
-				{ 100, 392 },
-				{ -100, 392 },
-				{ -100, 512 },
-				{ -180, 512 },
-				{ -180, 472 },
-				{ -220, 472 },
-				{ -220, 512 },
-				{ -260, 512 },
-				{ -260, 552 },
-				{ -300, 552 },
-				{ -300, 604 },
-			},
-			Width = 14,
-		},
-	}),
-	Loot = {
-		loot(340, 552, 5),
-		loot(-100, 552, 4),
-		loot(100, 432, 3),
-		loot(140, 432, 3),
-		loot(220, 312, 2),
-		loot(340, 352, 2),
-	},
-}
-
-local CROSSING2 = {
-	"+  +  +--+--+--+--+  +--+--+--+--+--+  +  +--+  +--+--+",
-	"   |  |     |        |                 |  |     |      ",
-	"+  +  +  +  +  +  +--+  +  +  +  +  +  +--+  +--+  +  +",
-	"               |                       |  |  |     |   ",
-	"+  +  +  +  +--+--+  +  +  +  +  +  +  +  +  +  +--+  +",
-	"               |     |                 |     |     |   ",
-	"+  +  +  +--+  +  +--+  +  +  +  +--+--+  +--+  +  +  +",
-	"            |                          |  |     |  |   ",
-	"+  +  +  +  +--+  +  +--+  +  +  +  +  +  +--+--+  +  +",
-	"                  |                                |   ",
-	"+  +  +  +  +--+  +--+  +  +  +  +  +  +  +  +  +  +  +",
-	"      |                                |               ",
-	"+  +--+  +  +--+--+  +  +  +  +  +--+  +--+  +  +  +  +",
-	"      |  |  |                          |               ",
-	"+--+  +--+  +  +  +  +  +  +  +  +  +  +--+--+  +  +  +",
-	"   |     |     |                                       ",
-	"+  +--+  +--+--+  +--+  +  +  +  +  +--+--+  +  +  +  +",
-	"                                    |        |         ",
-	"+  +  +  +--+  +  +  +  +  +--+  +  +  +  +  +  +  +  +",
-	"               |     |                 |               ",
-	"+  +  +  +  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +",
-	"            |  |  |                    |               ",
-	"+  +  +  +--+  +  +  +  +  +  +  +  +  +--+  +  +  +  +",
-	"               |                    !                  ",
-	"+  +  +  +  +--+  +  +  +  +  +  +  +--+  +  +  +  +  +",
-	"            |     |                    |  |            ",
-	"+  +--+--+--+  +--+  +  +  +  +  +  +  +  +  +  +  +  +",
-	"                                 |        |            ",
-	"+--+--+--+--+--+--+--+  +--+--+  +--+--+--+--+--+--+--+",
-}
-
-local crossing2 = {
-	Name = "Hall gallery",
-	Primitives = merge(maze(CROSSING2, X0, Z0, true, true), {
-		roof({ { -60, 552 }, { 20, 552 } }),
-		roof({ { -60, 192 }, { 60, 192 } }),
-		roof({ { -20, 32 }, { 60, 32 } }),
-		roof({ { -60, 352 }, { 60, 352 } }),
-		roof({ { -100, 392 }, { -100, 512 } }),
-		roof({ { 260, 552 }, { 340, 552 } }),
-		roof({ { -60, 392 }, { 60, 392 } }),
-		roof({ { -340, 32 }, { -260, 32 } }),
-		roof({ { 340, 72 }, { 340, 192 } }),
-		roof({ { -300, 552 }, { -220, 552 } }),
-		roof({ { -140, 392 }, { -140, 472 } }),
-		lane({ { 140, 392 }, { 140, 432 } }),
-		lane({ { -100, 232 }, { -100, 272 } }),
-		lane({ { 220, 192 }, { 260, 192 } }),
-		lane({ { 300, 352 }, { 340, 352 } }),
-		lane({ { -220, 352 }, { -180, 352 } }),
-		pool(-340, 552),
-		pool(140, 232),
-		pool(260, 32),
-		pool(180, 312),
-		pool(220, 72),
-		pool(220, 32),
-		pool(-100, 312),
-		pool(-180, 192),
-		{
-			Kind = "Ramp",
-			Path = {
-				{ 260, 0 },
-				{ 260, 32 },
-				{ 140, 32 },
-				{ 140, 112 },
-				{ 100, 112 },
-				{ 100, 32 },
-				{ -60, 32 },
-				{ -60, 152 },
-				{ -100, 152 },
-				{ -100, 192 },
-				{ 100, 192 },
-				{ 100, 232 },
-				{ 140, 232 },
-				{ 140, 312 },
-				{ 220, 312 },
-				{ 220, 352 },
-				{ 140, 352 },
-				{ 140, 472 },
-				{ 180, 472 },
-				{ 180, 552 },
-				{ 100, 552 },
-				{ 100, 352 },
-				{ -100, 352 },
-				{ -100, 552 },
-				{ 60, 552 },
-				{ 60, 604 },
-			},
-			Width = 14,
-		},
-	}),
-	Loot = {
-		loot(-60, 392, 5),
-		loot(-140, 232, 4),
-		loot(-260, 272, 3),
-		loot(-140, 552, 3),
-		loot(-100, 232, 2),
-		loot(-340, 312, 2),
-	},
-}
-
-local CROSSING3 = {
-	"+  +  +--+--+--+--+  +--+--+  +--+--+  +  +  +  +--+--+",
-	"   |  |              |     |           |  |  |     |   ",
-	"+  +  +  +  +--+  +--+  +  +  +  +  +--+--+--+==+  +  +",
-	"            |                          |        |  |   ",
-	"+  +  +  +  +  +--+--+  +  +  +  +  +  +  +--+  +  +  +",
-	"            |        |                 |  |     |  |   ",
-	"+  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +==+  +  +",
-	"               |                       |  |  |         ",
-	"+  +  +  +--+--+  +--+--+  +  +  +--+  +  +  +--+  +  +",
-	"                  |                    |  !        |   ",
-	"+  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"   |                                                   ",
-	"+  +  +--+--+  +--+  +  +  +  +  +--+--+--+  +  +  +  +",
-	"      |     |                             |            ",
-	"+  +--+  +  +--+  +  +  +  +  +  +  +  +--+  +  +  +  +",
-	"      |  |  |  |                                       ",
-	"+--+  +  +  +  +--+  +  +  +  +  +  +--+  +--+  +  +  +",
-	"         |  |                    |     |               ",
-	"+  +  +  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +",
-	"            |                    |        |            ",
-	"+  +  +  +  +--+  +  +  +  +  +  +  +--+  +  +  +  +  +",
-	"                  |                       |            ",
-	"+  +  +  +--+--+  +  +  +  +  +  +  +  +--+--+  +  +  +",
-	"            |                       |                  ",
-	"+  +  +  +  +  +--+  +  +  +  +  +  +  +--+  +  +  +  +",
-	"   |           |  |                    |  |            ",
-	"+  +  +--+--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"                                    |     |            ",
-	"+--+--+--+--+  +  +--+--+--+--+--+--+  +--+--+  +  +--+",
-}
-
-local crossing3 = {
-	Name = "East switchbacks",
-	Primitives = merge(maze(CROSSING3, X0, Z0, true, true), {
-		roof({ { -100, 432 }, { -100, 512 } }),
-		roof({ { -60, 192 }, { 60, 192 } }),
-		roof({ { 100, 392 }, { 100, 512 } }),
-		roof({ { -60, 552 }, { 60, 552 } }),
-		roof({ { -340, 32 }, { -260, 32 } }),
-		roof({ { -20, 32 }, { 60, 32 } }),
-		roof({ { -220, 312 }, { -220, 392 } }),
-		roof({ { -260, 552 }, { -180, 552 } }),
-		roof({ { 340, 32 }, { 340, 112 } }),
-		roof({ { -260, 192 }, { -180, 192 } }),
-		lane({ { -60, 392 }, { -20, 392 } }),
-		lane({ { 100, 272 }, { 100, 312 } }),
-		lane({ { -100, 232 }, { -100, 272 } }),
-		lane({ { -260, 232 }, { -220, 232 } }),
-		lane({ { 180, 112 }, { 180, 152 } }),
-		pool(-140, 112),
-		pool(220, 352),
-		pool(300, 392),
-		pool(-140, 192),
-		pool(-180, 272),
-		pool(-100, 552),
-		pool(260, 32),
-		pool(140, 272),
-		{
-			Kind = "Ramp",
-			Path = {
-				{ 260, 0 },
-				{ 260, 32 },
-				{ 300, 32 },
-				{ 300, 192 },
-				{ 220, 192 },
-				{ 220, 112 },
-				{ 260, 112 },
-				{ 260, 72 },
-				{ 180, 72 },
-				{ 180, 232 },
-				{ 100, 232 },
-				{ 100, 192 },
-				{ -100, 192 },
-				{ -100, 352 },
-				{ 20, 352 },
-				{ 20, 392 },
-				{ -100, 392 },
-				{ -100, 552 },
-				{ 100, 552 },
-				{ 100, 352 },
-				{ 140, 352 },
-				{ 140, 392 },
-				{ 180, 392 },
-				{ 180, 432 },
-				{ 140, 432 },
-				{ 140, 472 },
-				{ 220, 472 },
-				{ 220, 552 },
-				{ 300, 552 },
-				{ 300, 604 },
-			},
-			Width = 14,
-		},
-	}),
-	Loot = {
-		loot(-140, 512, 5),
-		loot(220, 32, 4),
-		loot(-340, 512, 3),
-		loot(140, 192, 3),
-		loot(100, 152, 2),
-		loot(-220, 472, 2),
-	},
-}
-
-local CROSSING4 = {
-	"+--+--+  +--+--+  +--+--+--+--+--+--+  +--+--+  +--+--+",
-	"            |  |                       |     |         ",
-	"+  +  +  +  +  +--+  +--+  +  +  +  +--+  +  +--+--+  +",
-	"            |        |                    |     |  |   ",
-	"+  +  +  +  +  +  +--+  +  +  +  +  +  +  +--+--+  +  +",
-	"               |                       |  |     |      ",
-	"+  +  +  +--+--+  +  +  +  +  +  +--+  +  +  +  +  +--+",
-	"               |     |                 |  |  |  |  |   ",
-	"+  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"                  |  |                 |  |  |         ",
-	"+  +  +  +  +--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"   |     |                                |            ",
-	"+  +--+  +  +--+  +  +  +  +  +  +--+--+--+  +  +  +  +",
-	"   |     |  |  |                                       ",
-	"+  +  +--+  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +",
-	"   |     |  |  |                       |               ",
-	"+  +--+  +  +  +  +--+  +  +  +  +  +--+  +  +  +  +  +",
-	"         |  !              |           |  |            ",
-	"+  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +  +  +  +",
-	"            !                 |           |            ",
-	"+  +  +  +  +--+--+  +  +  +  +  +  +--+  +  +  +  +  +",
-	"                                       |  |            ",
-	"+  +  +  +--+==+--+--+  +  +  +  +  +  +  +  +  +  +  +",
-	"                                                       ",
-	"+  +  +  +  +  +--+  +  +  +  +  +  +--+  +  +  +  +  +",
-	"            |  |                       |  |            ",
-	"+  +--+--+--+--+  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"            |                          |  |            ",
-	"+--+  +--+--+  +--+--+  +--+--+  +--+--+  +--+--+--+--+",
-}
-
-local crossing4 = {
-	Name = "Long cross",
-	Primitives = merge(maze(CROSSING4, X0, Z0, true, true), {
-		roof({ { 180, 112 }, { 180, 192 } }),
-		roof({ { -60, 32 }, { 60, 32 } }),
-		roof({ { -20, 192 }, { 60, 192 } }),
-		roof({ { -100, 152 }, { -100, 272 } }),
-		roof({ { -340, 232 }, { -340, 312 } }),
-		roof({ { -20, 552 }, { 60, 552 } }),
-		roof({ { 260, 552 }, { 340, 552 } }),
-		lane({ { 220, 152 }, { 220, 192 } }),
-		lane({ { 300, 352 }, { 340, 352 } }),
-		lane({ { -60, 392 }, { -20, 392 } }),
-		lane({ { -340, 32 }, { -300, 32 } }),
-		lane({ { 300, 392 }, { 340, 392 } }),
-		pool(-100, 112),
-		pool(-180, 432),
-		pool(100, 72),
-		pool(-140, 432),
-		pool(100, 232),
-		pool(-180, 512),
-		pool(-20, 352),
-		pool(-300, 192),
-		{
-			Kind = "Ramp",
-			Path = {
-				{ -260, 0 },
-				{ -260, 32 },
-				{ -220, 32 },
-				{ -220, 112 },
-				{ -180, 112 },
-				{ -180, 72 },
-				{ -100, 72 },
-				{ -100, 32 },
-				{ 100, 32 },
-				{ 100, 112 },
-				{ 140, 112 },
-				{ 140, 72 },
-				{ 180, 72 },
-				{ 180, 232 },
-				{ 100, 232 },
-				{ 100, 192 },
-				{ -60, 192 },
-				{ -60, 112 },
-				{ -100, 112 },
-				{ -100, 312 },
-				{ -140, 312 },
-				{ -140, 232 },
-				{ -220, 232 },
-				{ -220, 432 },
-				{ -100, 432 },
-				{ -100, 392 },
-				{ 20, 392 },
-				{ 20, 352 },
-				{ 140, 352 },
-				{ 140, 392 },
-				{ 180, 392 },
-				{ 180, 552 },
-				{ 180, 604 },
-			},
-			Width = 14,
-		},
-	}),
-	Loot = {
-		loot(-220, 552, 5),
-		loot(-340, 232, 4),
-		loot(220, 192, 3),
-		loot(-140, 472, 3),
-		loot(340, 152, 2),
-		loot(-100, 472, 2),
-	},
-}
-
-local CROSSING5 = {
-	"+  +  +  +  +  +  +--+--+--+--+--+--+  +  +  +  +--+--+",
-	"   |  |  |  |  |                       |  |  |  |      ",
-	"+  +  +  +--+--+--+  +--+  +  +  +  +--+--+--+  +  +  +",
-	"                     |                       |  |  |   ",
-	"+  +  +  +  +--+  +--+  +  +  +  +  +--+--+  +  +  +  +",
-	"            |  |                          |        |   ",
-	"+  +  +  +  +  +  +  +  +  +  +  +--+--+  +--+  +--+  +",
-	"            |        |                 |     |  |      ",
-	"+  +  +  +  +--+  +--+  +  +  +  +  +  +--+  +  +  +--+",
-	"               |                          |     |      ",
-	"+  +--+  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +  +",
-	"   |           |                       |               ",
-	"+  +  +--+--+--+  +  +  +  +  +  +--+  +--+  +  +  +  +",
-	"   |  |                                   |            ",
-	"+  +  +  +  +--+--+--+  +  +  +  +  +--+  +  +  +  +  +",
-	"         |  |                             |            ",
-	"+  +  +--+--+  +--+  +  +  +  +  +  +  +--+  +  +  +  +",
-	"   |        |        !                 |               ",
-	"+  +  +  +  +  +  +  +  +  +--+  +--+  +  +  +  +  +  +",
-	"               |                       |               ",
-	"+  +  +  +  +  +  +--+  +  +  +  +  +  +--+  +  +  +  +",
-	"            |  !                                       ",
-	"+  +  +  +--+  +  +  +  +  +  +  +  +--+--+  +  +  +  +",
-	"               |                    |     |            ",
-	"+  +  +  +  +--+  +  +  +  +  +  +  +  +--+  +  +  +  +",
-	"         |     |  |                    |               ",
-	"+  +--+  +  +  +  +  +  +  +  +  +  +  +  +--+  +  +  +",
-	"      |     |                 |     |                  ",
-	"+--+--+--+--+--+--+--+--+--+--+  +  +--+--+--+--+--+--+",
-}
-
-local crossing5 = {
-	Name = "Backtrack",
-	Primitives = merge(maze(CROSSING5, X0, Z0, true, true), {
-		roof({ { 100, 432 }, { 100, 512 } }),
-		roof({ { -60, 32 }, { 60, 32 } }),
-		roof({ { -60, 392 }, { 60, 392 } }),
-		roof({ { -60, 552 }, { 20, 552 } }),
-		roof({ { -60, 352 }, { 60, 352 } }),
-		roof({ { -340, 192 }, { -260, 192 } }),
-		roof({ { 220, 552 }, { 340, 552 } }),
-		roof({ { -20, 192 }, { 60, 192 } }),
-		roof({ { -340, 32 }, { -180, 32 } }),
-		lane({ { -100, 232 }, { -100, 272 } }),
-		lane({ { -140, 472 }, { -140, 512 } }),
-		lane({ { 300, 392 }, { 340, 392 } }),
-		lane({ { -340, 232 }, { -340, 272 } }),
-		lane({ { -100, 472 }, { -100, 512 } }),
-		pool(-220, 552),
-		pool(-60, 192),
-		pool(180, 312),
-		pool(260, 392),
-		pool(-300, 312),
-		pool(-180, 512),
-		pool(220, 272),
-		pool(100, 312),
-		{
-			Kind = "Ramp",
-			Path = {
-				{ 260, 0 },
-				{ 260, 32 },
-				{ 260, 192 },
-				{ 220, 192 },
-				{ 220, 152 },
-				{ 180, 152 },
-				{ 180, 112 },
-				{ 100, 112 },
-				{ 100, 32 },
-				{ -100, 32 },
-				{ -100, 72 },
-				{ -220, 72 },
-				{ -220, 192 },
-				{ -180, 192 },
-				{ -180, 232 },
-				{ -300, 232 },
-				{ -300, 352 },
-				{ -220, 352 },
-				{ -220, 392 },
-				{ -180, 392 },
-				{ -180, 472 },
-				{ -220, 472 },
-				{ -220, 512 },
-				{ -180, 512 },
-				{ -180, 552 },
-				{ -140, 552 },
-				{ -140, 352 },
-				{ -180, 352 },
-				{ -180, 312 },
-				{ -100, 312 },
-				{ -100, 392 },
-				{ 100, 392 },
-				{ 100, 552 },
-				{ 60, 552 },
-				{ 60, 604 },
-			},
-			Width = 14,
-		},
-	}),
-	Loot = {
-		loot(140, 152, 5),
-		loot(180, 472, 4),
-		loot(340, 552, 3),
-		loot(180, 352, 3),
-		loot(340, 352, 2),
-		loot(340, 392, 2),
-	},
-}
-
-frame.Crossings = { crossing1, crossing2, crossing3, crossing4, crossing5 }
-
--- <<< rooms (written by tools/gen/zone6/rooms.py; edit that, not this)
-frame.Slots = {
-	{
-		Name = "West cave",
-		At = { -360, 52 },
-		Size = { 120, 120 },
-		Rooms = {
-			makeRoom(true, false, {
-				Name = "Comb of caves",
-				Art = {
-					"+  +  +  +",
-					"          ",
-					"+  +--+--+",
-					"          ",
-					"+  +--+--+",
-					"          ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					cellRoof(60, 20),
-					cellRoof(100, 20),
-					cellRoof(60, 100),
-					cellRoof(100, 100),
-				},
-				Loot = {
-					loot(100, 20, 6),
-					loot(100, 100, 4),
-				},
-				Decor = {
-					{
-						Kind = "DeadCoral",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 2,
+			Name = "Lantern way",
+			Paths = 2,
+			Primitives = {
+				{
+					Kind = "Ramp",
+					Path = {
+						{ -200, 0 },
+						{ -200, 60 },
+						{ 184, 60 },
+						{ 184, 128 },
+						{ -140, 128 },
+						{ -140, 440 },
+						{ 120, 440 },
+						{ 120, 480 },
+						{ -60, 480 },
+						{ -60, 608 },
 					},
-					{
-						Kind = "Pebbles",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 4,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 8,
-					},
-					{
-						Kind = "DeadCoral",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 3,
-					},
-					{ Kind = "Timber", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 2 },
-					prop("GlowShells", 110, 10),
+					Width = 16,
 				},
-			}),
-			makeRoom(true, false, {
-				Name = "Drowned pool",
-				Art = {
-					"+  +  +  +",
-					"   |      ",
-					"+  +  +  +",
-					"          ",
-					"+  +  +  +",
-					"   |      ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					pool(60, 60, 20),
-					mud({ { 24, 36 }, { 96, 36 }, { 96, 84 }, { 24, 84 } }),
-				},
-				Loot = {
-					loot(20, 20, 6),
-					loot(20, 100, 4),
-				},
-				Decor = {
-					{ Kind = "Kelp", Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } }, Count = 3 },
-					{
-						Kind = "Starfish",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 1,
-					},
-					{ Kind = "Kelp", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 8 },
-					{ Kind = "Weed", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 4 },
-				},
-			}),
-			makeRoom(true, false, {
-				Name = "Boulder scramble",
-				Art = {
-					"+  +  +  +",
-					"          ",
-					"+--+--+  +",
-					"          ",
-					"+  +  +  +",
-					"          ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					boulder(60, 70, 13, 10),
-					boulder(34, 74, 11, 9),
-					boulder(96, 80, 11, 10),
-					boulder(100, 34, 11, 10),
-				},
-				Loot = {
-					loot(20, 20, 6),
-					loot(20, 100, 3),
-				},
-				Decor = {
-					{
-						Kind = "Crate",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 1,
-					},
-					{
-						Kind = "Urchins",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 2,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 4,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 10,
-					},
-					{
-						Kind = "Urchins",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 4,
-					},
-					{
-						Kind = "Barnacles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 6,
+				{
+					Kind = "Flat",
+					Area = {
+						{ -140, 214 },
+						{ -176, 214 },
+						{ -176, 226 },
+						{ -140, 226 },
 					},
 				},
-			}),
-		},
-	},
-	{
-		Name = "Gatehouse yard",
-		At = { -40, 52 },
-		Size = { 120, 120 },
-		Rooms = {
-			makeRoom(false, false, {
-				Name = "Gatehouse ring",
-				Art = {
-					"+  +  +  +",
-					"          ",
-					"+  +--+  +",
-					"   |      ",
-					"+  +--+  +",
-					"      |   ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					cellRoof(20, 20),
-					cellRoof(60, 20),
-					cellRoof(100, 20),
-					cellRoof(100, 60),
-				},
-				Loot = {
-					loot(60, 60, 6),
-					loot(60, 100, 3),
-					loot(100, 100, 2),
-				},
-				Decor = {
-					{ Kind = "Anchor", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
-					{ Kind = "Chain", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
-					{ Kind = "Chain", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 3 },
-					{ Kind = "Bones", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 1 },
-					{
-						Kind = "Barnacles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 6,
-					},
-					prop("GlowShells", 70, 50),
-				},
-			}),
-			makeRoom(false, false, {
-				Name = "Pillar court",
-				Art = {
-					"+  +  +  +",
-					"      |   ",
-					"+  +  +  +",
-					"          ",
-					"+  +  +  +",
-					"      |   ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					post(40, 40),
-					post(80, 40),
-					post(40, 80),
-					post(80, 80),
-				},
-				Loot = {
-					loot(100, 100, 6),
-					loot(100, 20, 5),
-				},
-				Decor = {
-					{ Kind = "Timber", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 2 },
-					{ Kind = "Chain", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
-					{ Kind = "Timber", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 4 },
-					{
-						Kind = "Barnacles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 6,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 4,
+				{ Kind = "Flat", At = { -140, 220 }, Radius = 6 },
+				{ Kind = "Flat", At = { -176, 220 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -140, 302 },
+						{ -72, 302 },
+						{ -72, 290 },
+						{ -140, 290 },
 					},
 				},
-			}),
-			makeRoom(false, false, {
-				Name = "Gatehouse cellar",
-				Art = {
-					"+  +  +  +",
-					"          ",
-					"+  +--+  +",
-					"   |  |   ",
-					"+  +  +  +",
-					"   |      ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					cellRoof(60, 60),
-					cellRoof(60, 100),
-					cellRoof(100, 60),
-				},
-				Loot = {
-					loot(60, 60, 6),
-					loot(20, 100, 3),
-				},
-				Decor = {
-					{
-						Kind = "DeadCoral",
-						Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } },
-						Count = 2,
-					},
-					{ Kind = "Pebbles", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 4 },
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 8,
-					},
-					{
-						Kind = "DeadCoral",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 3,
-					},
-					{ Kind = "Timber", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 2 },
-					prop("GlowShells", 70, 50),
-				},
-			}),
-		},
-	},
-	{
-		Name = "East cellar",
-		At = { 240, 212 },
-		Size = { 120, 120 },
-		Rooms = {
-			makeRoom(false, true, {
-				Name = "Sinking flats",
-				Art = {
-					"+  +  +  +",
-					"      |   ",
-					"+  +  +  +",
-					"          ",
-					"+  +  +  +",
-					"      |   ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					mud({ { 44, 58 }, { 76, 58 }, { 76, 90 }, { 44, 90 } }),
-					mud({ { 84, 30 }, { 116, 30 }, { 116, 62 }, { 84, 62 } }),
-				},
-				Loot = {
-					loot(100, 20, 6),
-					loot(100, 100, 5),
-				},
-				Decor = {
-					{ Kind = "Bones", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
-					{ Kind = "Starfish", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 2 },
-					{ Kind = "Bones", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 2 },
-					{
-						Kind = "Starfish",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 3,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 6,
+				{ Kind = "Flat", At = { -140, 296 }, Radius = 6 },
+				{ Kind = "Flat", At = { -72, 296 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 218, 0 },
+						{ 218, 124 },
+						{ 230, 124 },
+						{ 230, 0 },
 					},
 				},
-				Hazards = {
-					{ Type = "Sink", At = { 60, 74 }, Radius = 9 },
-					{ Type = "Sink", At = { 100, 46 }, Radius = 9 },
-				},
-			}),
-			makeRoom(false, true, {
-				Name = "Flooded cellar",
-				Art = {
-					"+  +  +  +",
-					"          ",
-					"+  +--+--+",
-					"          ",
-					"+  +  +  +",
-					"      |   ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					pool(60, 100, 16),
-					cellRoof(60, 20),
-					cellRoof(100, 20),
-				},
-				Loot = {
-					loot(100, 20, 6),
-					loot(100, 100, 4),
-				},
-				Decor = {
-					{ Kind = "Kelp", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 3 },
-					{ Kind = "Starfish", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 1 },
-					{ Kind = "Kelp", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 8 },
-					{ Kind = "Weed", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 4 },
-				},
-			}),
-			makeRoom(false, true, {
-				Name = "Weed hall",
-				Art = {
-					"+  +  +  +",
-					"   |      ",
-					"+  +  +--+",
-					"          ",
-					"+  +  +  +",
-					"   |      ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					lane({ { 60, 60 }, { 100, 60 } }),
-					weed({ { 44, 28 }, { 116, 28 }, { 116, 92 }, { 44, 92 } }),
-				},
-				Loot = {
-					loot(100, 20, 6),
-					loot(20, 20, 3),
-					loot(20, 100, 3),
-				},
-				Decor = {
-					{ Kind = "Weed", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 4 },
-					{ Kind = "Kelp", Area = { { 8, 48 }, { 32, 48 }, { 32, 72 }, { 8, 72 } }, Count = 2 },
-					{ Kind = "Weed", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 10 },
-					{ Kind = "Kelp", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 6 },
-				},
-			}),
-		},
-	},
-	{
-		Name = "Drowned hall",
-		At = { -80, 212 },
-		Size = { 160, 120 },
-		Rooms = {
-			makeRoom(false, false, {
-				Name = "Flooded hall",
-				Art = {
-					"+  +  +  +  +",
-					"   |     |   ",
-					"+  +  +  +  +",
-					"             ",
-					"+  +  +  +  +",
-					"             ",
-					"+  +  +  +  +",
-				},
-				Shapes = {
-					post(40, 40),
-					post(120, 40),
-					post(40, 80),
-					post(120, 80),
-					pool(60, 60, 15),
-					pool(100, 60, 15),
-				},
-				Loot = {
-					loot(140, 20, 6),
-					loot(20, 20, 5),
-				},
-				Decor = {
-					{ Kind = "Kelp", Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } }, Count = 3 },
-					{
-						Kind = "Starfish",
-						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
-						Count = 1,
-					},
-					{ Kind = "Kelp", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 8 },
-					{ Kind = "Weed", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
-				},
-			}),
-			makeRoom(false, false, {
-				Name = "Collapsed hall",
-				Art = {
-					"+  +  +  +  +",
-					"         |   ",
-					"+  +--+--+  +",
-					"             ",
-					"+  +  +  +  +",
-					"         |   ",
-					"+  +  +  +  +",
-				},
-				Shapes = {
-					boulder(40, 76, 11, 9),
-					boulder(120, 40, 12, 10),
-					boulder(80, 96, 11, 8),
-					cellRoof(60, 20),
-					cellRoof(100, 20),
-				},
-				Loot = {
-					loot(100, 20, 6),
-					loot(140, 100, 4),
-				},
-				Decor = {
-					{
-						Kind = "Timber",
-						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
-						Count = 1,
-					},
-					{
-						Kind = "Crate",
-						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
-						Count = 1,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
-						Count = 5,
-					},
-					{ Kind = "Timber", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
-					{ Kind = "Crate", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 2 },
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
-						Count = 12,
+				{
+					Kind = "Flat",
+					Area = {
+						{ 224, 130 },
+						{ 340, 130 },
+						{ 340, 118 },
+						{ 224, 118 },
 					},
 				},
-				Hazards = {
-					{ Type = "Rockfall", At = { 60, 20 } },
-				},
-			}),
-			makeRoom(false, false, {
-				Name = "Pillar gallery",
-				Art = {
-					"+  +  +  +  +",
-					"             ",
-					"+  +  +  +--+",
-					"             ",
-					"+  +  +  +  +",
-					"   |         ",
-					"+  +  +  +  +",
-				},
-				Shapes = {
-					post(40, 40),
-					post(80, 40),
-					post(120, 40),
-					post(80, 80),
-					post(120, 80),
-				},
-				Loot = {
-					loot(140, 20, 6),
-					loot(20, 100, 3),
-				},
-				Decor = {
-					{
-						Kind = "Timber",
-						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
-						Count = 2,
-					},
-					{
-						Kind = "Chain",
-						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
-						Count = 1,
-					},
-					{ Kind = "Timber", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
-					{
-						Kind = "Barnacles",
-						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
-						Count = 6,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
-						Count = 4,
-					},
-					prop("LanternPost", 50, 24),
-					prop("GlowWeed", 90, 34),
-					prop("GlowShells", 134, 34),
-				},
-				Hazards = {
-					{ Type = "Gloom", At = { 120, 20 }, Radius = 18 },
-				},
-			}),
-			makeRoom(false, false, {
-				Name = "Dead-end vault",
-				Art = {
-					"+  +  +  +  +",
-					"             ",
-					"+  +--+--+--+",
-					"             ",
-					"+  +  +  +  +",
-					"   |         ",
-					"+  +  +  +  +",
-				},
-				Shapes = {
-					cellRoof(60, 20),
-					cellRoof(140, 20),
-				},
-				Loot = {
-					loot(140, 20, 6),
-					loot(20, 100, 3),
-				},
-				Decor = {
-					{
-						Kind = "Bones",
-						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
-						Count = 1,
-					},
-					{
-						Kind = "DeadCoral",
-						Area = { { 48, 88 }, { 72, 88 }, { 72, 112 }, { 48, 112 } },
-						Count = 1,
-					},
-					{ Kind = "Bones", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 2 },
-					{
-						Kind = "DeadCoral",
-						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
-						Count = 4,
-					},
-					{ Kind = "Chain", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 2 },
-					prop("GlowShells", 150, 10),
-				},
-				Hazards = {
-					{ Type = "Rockfall", At = { 60, 20 } },
-				},
-			}),
-		},
-	},
-	{
-		Name = "Low west vault",
-		At = { -360, 372 },
-		Size = { 120, 120 },
-		Rooms = {
-			makeRoom(true, false, {
-				Name = "Tunnel ring",
-				Art = {
-					"+  +  +  +",
-					"          ",
-					"+  +--+  +",
-					"   |      ",
-					"+  +--+  +",
-					"          ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					cellRoof(20, 20),
-					cellRoof(100, 20),
-					cellRoof(20, 60),
-					cellRoof(20, 100),
-					cellRoof(100, 100),
-				},
-				Loot = {
-					loot(60, 60, 6),
-				},
-				Decor = {
-					{
-						Kind = "Anchor",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 1,
-					},
-					{
-						Kind = "Chain",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 1,
-					},
-					{ Kind = "Chain", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 3 },
-					{ Kind = "Bones", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 1 },
-					{
-						Kind = "Barnacles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 6,
-					},
-					prop("GlowShells", 70, 50),
-				},
-			}),
-			makeRoom(true, false, {
-				Name = "Dead-end cave",
-				Art = {
-					"+  +  +  +",
-					"   |      ",
-					"+  +  +  +",
-					"          ",
-					"+--+--+  +",
-					"          ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					cellRoof(20, 100),
-					cellRoof(60, 100),
-					cellRoof(20, 20),
-				},
-				Loot = {
-					loot(20, 100, 6),
-					loot(20, 20, 4),
-				},
-				Decor = {
-					{
-						Kind = "DeadCoral",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 2,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 4,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 8,
-					},
-					{
-						Kind = "DeadCoral",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 3,
-					},
-					{ Kind = "Timber", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 2 },
-					prop("GlowShells", 30, 90),
-				},
-			}),
-			makeRoom(true, false, {
-				Name = "Boulder scramble",
-				Art = {
-					"+  +  +  +",
-					"   !      ",
-					"+--+  +  +",
-					"          ",
-					"+  +  +  +",
-					"          ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					boulder(70, 62, 13, 10),
-					boulder(100, 100, 11, 10),
-					boulder(30, 100, 11, 9),
-				},
-				Loot = {
-					loot(20, 20, 6),
-				},
-				Decor = {
-					{
-						Kind = "Crate",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 1,
-					},
-					{
-						Kind = "Urchins",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 2,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 88, 48 }, { 112, 48 }, { 112, 72 }, { 88, 72 } },
-						Count = 4,
-					},
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 10,
-					},
-					{
-						Kind = "Urchins",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 4,
-					},
-					{
-						Kind = "Barnacles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 6,
+				{
+					Kind = "Flat",
+					Area = {
+						{ 334, 124 },
+						{ 334, 180 },
+						{ 346, 180 },
+						{ 346, 124 },
 					},
 				},
-			}),
-		},
-	},
-	{
-		Name = "Sea vault",
-		At = { -80, 412 },
-		Size = { 160, 120 },
-		Rooms = {
-			makeRoom(false, false, {
-				Name = "Drowned gallery",
-				Art = {
-					"+  +  +  +  +",
-					"             ",
-					"+--+--+--+  +",
-					"             ",
-					"+  +--+--+--+",
-					"             ",
-					"+  +  +  +  +",
-				},
-				Shapes = {
-					roof({ { 140, 60 }, { 20, 60 }, { 20, 100 }, { 140, 100 } }),
-				},
-				Loot = {
-					loot(140, 100, 6),
-					loot(20, 20, 3),
-				},
-				Decor = {
-					{ Kind = "Chain", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 2 },
-					{
-						Kind = "WreckRibs",
-						Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } },
-						Count = 1,
-					},
-					{ Kind = "Chain", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
-					{
-						Kind = "WreckRibs",
-						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
-						Count = 1,
-					},
-					{ Kind = "Kelp", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
-				},
-			}),
-			makeRoom(false, false, {
-				Name = "Flooded vault",
-				Art = {
-					"+  +  +  +  +",
-					"             ",
-					"+--+--+  +  +",
-					"             ",
-					"+  +  +  +  +",
-					"         |   ",
-					"+  +  +  +  +",
-				},
-				Shapes = {
-					post(80, 40),
-					post(80, 80),
-					pool(80, 80, 18),
-					pool(120, 60, 12),
-				},
-				Loot = {
-					loot(20, 20, 6),
-					loot(140, 100, 4),
-				},
-				Decor = {
-					{ Kind = "Kelp", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 3 },
-					{
-						Kind = "Starfish",
-						Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } },
-						Count = 1,
-					},
-					{ Kind = "Kelp", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 8 },
-					{ Kind = "Weed", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
-				},
-			}),
-			makeRoom(false, false, {
-				Name = "Collapsed vault",
-				Art = {
-					"+  +  +  +  +",
-					"             ",
-					"+  +  +  +  +",
-					"      |      ",
-					"+--+  +  +  +",
-					"      !      ",
-					"+  +  +  +  +",
-				},
-				Shapes = {
-					boulder(30, 70, 11, 9),
-					boulder(110, 90, 12, 10),
-					boulder(140, 60, 11, 9),
-					cellRoof(20, 100),
-					cellRoof(60, 100),
-				},
-				Loot = {
-					loot(20, 100, 6),
-				},
-				Decor = {
-					{ Kind = "Timber", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 1 },
-					{ Kind = "Crate", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 1 },
-					{
-						Kind = "Pebbles",
-						Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } },
-						Count = 5,
-					},
-					{ Kind = "Timber", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 4 },
-					{ Kind = "Crate", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 2 },
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
-						Count = 12,
+				{
+					Kind = "Flat",
+					Area = {
+						{ 340, 174 },
+						{ 104, 174 },
+						{ 104, 186 },
+						{ 340, 186 },
 					},
 				},
-				Hazards = {
-					{ Type = "Rockfall", At = { 60, 100 } },
-				},
-			}),
-			makeRoom(false, false, {
-				Name = "Ring and vault",
-				Art = {
-					"+  +  +  +  +",
-					"             ",
-					"+  +--+--+  +",
-					"   |         ",
-					"+  +--+--+  +",
-					"             ",
-					"+  +  +  +  +",
-				},
-				Shapes = {
-					cellRoof(20, 60),
-					cellRoof(20, 100),
-					cellRoof(140, 100),
-					cellRoof(60, 100),
-				},
-				Loot = {
-					loot(60, 60, 6),
-				},
-				Decor = {
-					{ Kind = "Anchor", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 1 },
-					{ Kind = "Chain", Area = { { 88, 8 }, { 112, 8 }, { 112, 32 }, { 88, 32 } }, Count = 1 },
-					{ Kind = "Chain", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 3 },
-					{ Kind = "Bones", Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } }, Count = 1 },
-					{
-						Kind = "Barnacles",
-						Area = { { 8, 8 }, { 152, 8 }, { 152, 112 }, { 8, 112 } },
-						Count = 6,
-					},
-					prop("GlowShells", 70, 50),
-				},
-			}),
-		},
-	},
-	{
-		Name = "East deeps",
-		At = { 240, 412 },
-		Size = { 120, 120 },
-		Rooms = {
-			makeRoom(false, true, {
-				Name = "Flooded pocket",
-				Art = {
-					"+  +  +  +",
-					"          ",
-					"+  +  +  +",
-					"      |   ",
-					"+  +  +  +",
-					"      |   ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					pool(40, 80, 20),
-				},
-				Loot = {
-					loot(100, 100, 6),
-					loot(20, 100, 3),
-				},
-				Decor = {
-					{ Kind = "Kelp", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 3 },
-					{ Kind = "Starfish", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 1 },
-					{ Kind = "Kelp", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 8 },
-					{ Kind = "Weed", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 4 },
-				},
-			}),
-			makeRoom(false, true, {
-				Name = "Dead-end cave",
-				Art = {
-					"+  +  +  +",
-					"          ",
-					"+--+--+  +",
-					"          ",
-					"+  +  +--+",
-					"          ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					cellRoof(60, 60),
-					cellRoof(20, 60),
-					cellRoof(20, 100),
-					cellRoof(60, 100),
-				},
-				Loot = {
-					loot(100, 100, 6),
-					loot(20, 20, 3),
-				},
-				Decor = {
-					{
-						Kind = "DeadCoral",
-						Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } },
-						Count = 2,
-					},
-					{ Kind = "Pebbles", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 4 },
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 8,
-					},
-					{
-						Kind = "DeadCoral",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 3,
-					},
-					{ Kind = "Timber", Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } }, Count = 2 },
-					prop("GlowShells", 110, 90),
-				},
-			}),
-			makeRoom(false, true, {
-				Name = "Boulder scramble",
-				Art = {
-					"+  +  +  +",
-					"          ",
-					"+  +  +  +",
-					"          ",
-					"+--+  +  +",
-					"          ",
-					"+  +  +  +",
-				},
-				Shapes = {
-					boulder(70, 62, 13, 10),
-					boulder(96, 76, 11, 10),
-					boulder(30, 56, 11, 9),
-				},
-				Loot = {
-					loot(20, 100, 6),
-					loot(100, 100, 3),
-				},
-				Decor = {
-					{ Kind = "Crate", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 1 },
-					{ Kind = "Urchins", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 2 },
-					{ Kind = "Pebbles", Area = { { 48, 8 }, { 72, 8 }, { 72, 32 }, { 48, 32 } }, Count = 4 },
-					{
-						Kind = "Pebbles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 10,
-					},
-					{
-						Kind = "Urchins",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 4,
-					},
-					{
-						Kind = "Barnacles",
-						Area = { { 8, 8 }, { 112, 8 }, { 112, 112 }, { 8, 112 } },
-						Count = 6,
+				{
+					Kind = "Flat",
+					Area = {
+						{ 98, 180 },
+						{ 98, 236 },
+						{ 110, 236 },
+						{ 110, 180 },
 					},
 				},
-			}),
-		},
-	},
-}
--- >>> rooms
-
--- Fitting the roofs -----------------------------------------------------------------------------
---
--- A roof is drawn as `roof(path)`: the lane cells along the path. Here each one becomes exact
--- rectangles whose edges lie on the grid lines, on the walls under them: a cell is roofed only
--- if at least two of its sides are walls (a bend, a straight, a dead end: never an open
--- junction), and a long run is broken by light shafts (every third cell stays open to the sky).
-
--- The walls of some pictures, as sets: h[j * 100 + i] a wall on node row j between node columns i
--- and i + 1; v[i * 100 + j] one on node column i between node rows j and j + 1.
-local function wallSets(arts)
-	local h, v = {}, {}
-	for _, item in arts do
-		local art, i0, j0 = item[1], item[2], item[3]
-		local rows = (#art - 1) // 2
-		local cols = (#art[1] + 2) // 3 - 1
-		for j = 0, rows do
-			for c = 0, cols - 1 do
-				if string.sub(art[2 * j + 1], 3 * c + 2, 3 * c + 2) == "-" then
-					h[(j0 + j) * 100 + i0 + c] = true
-				end
-			end
-		end
-		for r = 0, rows - 1 do
-			for i = 0, cols do
-				if string.sub(art[2 * r + 2], 3 * i + 1, 3 * i + 1) == "|" then
-					v[(i0 + i) * 100 + j0 + r] = true
-				end
-			end
-		end
-	end
-	return h, v
-end
-
-local COLS, ROWS = 18, 14
-
--- The rock of the walls changes from ward to ward (the zone's own is Basalt, left as it is).
-local WALL_ROCK = {
-	{ false, "Slate", false },
-	{ "Limestone", false, "Slate" },
-	{ "Slate", "Limestone", false },
-}
-local function rockAt(x, z)
-	local col = if x < -120 then 1 elseif x < 120 then 2 else 3
-	local row = if z < 212 then 1 elseif z < 412 then 2 else 3
-	return WALL_ROCK[row][col]
-end
-
--- Replaces the roof markers in `list` with Area roofs. `arts` are the pictures whose walls hold
--- the roof up ({ picture, node column, node row } each); the list's own coordinates start at
--- (ox, oz) in the zone.
-local function fit(list, arts, ox, oz)
-	local h, v = wallSets(arts)
-	local function supported(c, r)
-		local n = 0
-		n += if h[r * 100 + c] then 1 else 0
-		n += if h[(r + 1) * 100 + c] then 1 else 0
-		n += if c == 0 or v[c * 100 + r] then 1 else 0
-		n += if c == COLS - 1 or v[(c + 1) * 100 + r] then 1 else 0
-		return n >= 2
-	end
-	local roofed = {}
-	local out = {}
-	for _, item in list do
-		if item.Kind ~= "RoofRun" then
-			if item.Kind == "Wall" then
-				item.Material = rockAt(ox + item.Path[1][1], oz + item.Path[1][2]) or nil
-			end
-			table.insert(out, item)
-			continue
-		end
-		local run = {}
-		local function cell(x, z)
-			local c = math.floor((ox + x - X0) / PITCH)
-			local r = math.floor((oz + z - Z0) / PITCH)
-			local last = run[#run]
-			if not last or last[1] ~= c or last[2] ~= r then
-				table.insert(run, { c, r })
-			end
-		end
-		local path = item.Path
-		cell(path[1][1], path[1][2])
-		for k = 2, #path do
-			local a, b = path[k - 1], path[k]
-			local steps = math.max(math.abs(b[1] - a[1]), math.abs(b[2] - a[2])) // PITCH
-			for s = 1, steps do
-				cell(a[1] + (b[1] - a[1]) * s // steps, a[2] + (b[2] - a[2]) * s // steps)
-			end
-		end
-		for k, c in run do
-			local shaft = if #run == 3 then k == 2 else (#run > 3 and k % 3 == 0)
-			if
-				not shaft
-				and c[1] >= 0
-				and c[1] < COLS
-				and c[2] >= 0
-				and c[2] < ROWS
-				and supported(c[1], c[2])
-			then
-				roofed[c[2] * 100 + c[1]] = true
-			end
-		end
-	end
-	-- Rows of roofed cells, joined down into rectangles of equal width.
-	local open = {}
-	for r = 0, ROWS do
-		local now = {}
-		local c = 0
-		while c < COLS do
-			if roofed[r * 100 + c] then
-				local last = c
-				while last + 1 < COLS and roofed[r * 100 + last + 1] do
-					last += 1
-				end
-				now[c * 100 + last] = true
-				c = last + 1
-			else
-				c += 1
-			end
-		end
-		for key, first in open do
-			if not now[key] then
-				local c0, c1 = key // 100, key % 100
-				local x0, x1 = X0 + PITCH * c0 - ox, X0 + PITCH * (c1 + 1) - ox
-				local z0, z1 = Z0 + PITCH * first - oz, Z0 + PITCH * r - oz
-				table.insert(out, {
+				{
+					Kind = "Flat",
+					Area = {
+						{ 104, 242 },
+						{ 336, 242 },
+						{ 336, 230 },
+						{ 104, 230 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 330, 236 },
+						{ 330, 292 },
+						{ 342, 292 },
+						{ 342, 236 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 336, 286 },
+						{ 152, 286 },
+						{ 152, 298 },
+						{ 336, 298 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 146, 292 },
+						{ 146, 376 },
+						{ 158, 376 },
+						{ 158, 292 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 382 },
+						{ 176, 382 },
+						{ 176, 370 },
+						{ 152, 370 },
+					},
+				},
+				{ Kind = "Flat", At = { 224, 0 }, Radius = 6 },
+				{ Kind = "Flat", At = { 224, 124 }, Radius = 6 },
+				{ Kind = "Flat", At = { 340, 124 }, Radius = 6 },
+				{ Kind = "Flat", At = { 340, 180 }, Radius = 6 },
+				{ Kind = "Flat", At = { 104, 180 }, Radius = 6 },
+				{ Kind = "Flat", At = { 104, 236 }, Radius = 6 },
+				{ Kind = "Flat", At = { 336, 236 }, Radius = 6 },
+				{ Kind = "Flat", At = { 336, 292 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 292 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 376 }, Radius = 6 },
+				{ Kind = "Flat", At = { 176, 376 }, Radius = 6 },
+				{
 					Kind = "Roof",
-					Area = { { x0, z0 }, { x1, z0 }, { x1, z1 }, { x0, z1 } },
-					Clearance = 22,
-					Thickness = 8,
-					Material = "Slate",
-				})
-				open[key] = nil
-			end
-		end
-		for key in now do
-			if not open[key] then
-				open[key] = r
-			end
-		end
-	end
-	return out, roofed
-end
-
-local roofedOf = {} -- each crossing's roofed cells (row * 100 + column), for the dangers
-frame.Primitives = fit(frame.Primitives, { { FRAME, 0, 0 } }, 0, 0)
-for index, crossing in frame.Crossings do
-	local art = ({ CROSSING1, CROSSING2, CROSSING3, CROSSING4, CROSSING5 })[index]
-	crossing.Primitives, roofedOf[crossing] =
-		fit(crossing.Primitives, { { FRAME, 0, 0 }, { art, 0, 0 } }, 0, 0)
-end
-for _, slot in frame.Slots do
-	local i0, j0 = (slot.At[1] - X0) // PITCH, (slot.At[2] - Z0) // PITCH
-	for _, room in slot.Rooms do
-		room.Primitives =
-			fit(room.Primitives, { { FRAME, 0, 0 }, { room.Art, i0, j0 } }, slot.At[1], slot.At[2])
-		room.Art = nil
-	end
-end
-
--- Dressing: decor, dangers and tells -----------------------------------------------------------
-
--- Ground: patches of mud and drowned silt over the floor (the same each tide), and each ward
--- its own look. Props stand on open ground only, so walls and roofs clear them away.
-local function patches()
-	local list = {}
-	for c = 0, COLS - 1 do
-		for r = 0, ROWS - 1 do
-			local h = (c * 7 + r * 13 + c * r * 3) % 11
-			local material = if h == 0 or h == 1 then "Mud" elseif h == 2 then "Limestone" else nil
-			if material then
-				local x, z = X0 + PITCH * c + PITCH // 2, Z0 + PITCH * r + PITCH // 2
-				table.insert(list, {
-					Kind = "Paint",
-					Area = { { x - 16, z - 16 }, { x + 16, z - 16 }, { x + 16, z + 16 }, { x - 16, z + 16 } },
-					Material = material,
-					Rough = 6,
-				})
-			end
-		end
-	end
-	return list
-end
-
--- The nine wards (by the long walls): what lies in each, as { kind, count, scale }.
-local THEMES = {
-	{
-		{ { "Kelp", 24 }, { "Weed", 12 }, { "Starfish", 6 } }, -- a kelp forest
-		{ { "WreckRibs", 3, 1.2 }, { "Timber", 8 }, { "Chain", 5 }, { "Crate", 3 }, { "Anchor", 1 } }, -- a wreck yard
-		{ { "Bones", 4, 1.4 }, { "Pebbles", 12 }, { "DeadCoral", 6 } }, -- a bone field
+					Area = {
+						{ 340, 170 },
+						{ 104, 170 },
+						{ 104, 190 },
+						{ 340, 190 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Roof",
+					Area = {
+						{ 104, 246 },
+						{ 336, 246 },
+						{ 336, 226 },
+						{ 104, 226 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 72, 326 },
+						{ 152, 326 },
+						{ 152, 314 },
+						{ 72, 314 },
+					},
+				},
+				{ Kind = "Flat", At = { 72, 320 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 320 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 222, 424 },
+						{ 222, 484 },
+						{ 234, 484 },
+						{ 234, 424 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 228, 490 },
+						{ 272, 490 },
+						{ 272, 478 },
+						{ 228, 478 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 266, 484 },
+						{ 266, 608 },
+						{ 278, 608 },
+						{ 278, 484 },
+					},
+				},
+				{ Kind = "Flat", At = { 228, 424 }, Radius = 6 },
+				{ Kind = "Flat", At = { 228, 484 }, Radius = 6 },
+				{ Kind = "Flat", At = { 272, 484 }, Radius = 6 },
+				{ Kind = "Flat", At = { 272, 608 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -140, 374 },
+						{ -240, 374 },
+						{ -240, 386 },
+						{ -140, 386 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -246, 380 },
+						{ -246, 420 },
+						{ -234, 420 },
+						{ -234, 380 },
+					},
+				},
+				{ Kind = "Flat", At = { -140, 380 }, Radius = 6 },
+				{ Kind = "Flat", At = { -240, 380 }, Radius = 6 },
+				{ Kind = "Flat", At = { -240, 420 }, Radius = 6 },
+			},
+			Loot = {
+				{ At = { -240, 420 }, Radius = 5, Weight = 2 },
+			},
+			Hazards = {
+				{
+					Type = "Gloom",
+					Path = {
+						{ 340, 180 },
+						{ 104, 180 },
+						{ 104, 236 },
+						{ 336, 236 },
+					},
+					Radius = 9,
+				},
+				{ Type = "Sink", At = { -240, 400 }, Radius = 10 },
+			},
+			Decor = {
+				{ Kind = "LanternPost", At = { -209, 36 } },
+				{ Kind = "LanternPost", At = { -164, 69 } },
+				{ Kind = "LanternPost", At = { -92, 69 } },
+				{ Kind = "LanternPost", At = { -20, 69 } },
+				{ Kind = "LanternPost", At = { 52, 69 } },
+				{ Kind = "LanternPost", At = { 124, 69 } },
+				{ Kind = "LanternPost", At = { 175, 96 } },
+				{ Kind = "LanternPost", At = { 148, 119 } },
+				{ Kind = "LanternPost", At = { 76, 119 } },
+				{ Kind = "LanternPost", At = { 4, 119 } },
+				{ Kind = "LanternPost", At = { -68, 119 } },
+				{ Kind = "LanternPost", At = { -149, 164 } },
+				{ Kind = "LanternPost", At = { -149, 236 } },
+				{ Kind = "LanternPost", At = { -149, 308 } },
+				{ Kind = "LanternPost", At = { -149, 380 } },
+				{ Kind = "LanternPost", At = { -104, 449 } },
+				{ Kind = "LanternPost", At = { -32, 449 } },
+				{ Kind = "LanternPost", At = { 40, 449 } },
+				{ Kind = "LanternPost", At = { 112, 449 } },
+				{ Kind = "LanternPost", At = { 84, 471 } },
+				{ Kind = "LanternPost", At = { 12, 471 } },
+				{ Kind = "LanternPost", At = { -69, 516 } },
+				{ Kind = "LanternPost", At = { -69, 588 } },
+				{ Kind = "GlowShells", At = { 224, 70 } },
+				{ Kind = "GlowShells", At = { 310, 124 } },
+				{ Kind = "GlowShells", At = { 286, 180 } },
+				{ Kind = "GlowShells", At = { 146, 180 } },
+				{ Kind = "GlowShells", At = { 146, 236 } },
+				{ Kind = "GlowShells", At = { 286, 236 } },
+				{ Kind = "GlowShells", At = { 302, 292 } },
+				{ Kind = "GlowShells", At = { 162, 292 } },
+				{ Kind = "GlowShells", At = { 238, 484 } },
+				{ Kind = "GlowShells", At = { 272, 590 } },
+				{ Kind = "LanternPost", At = { -188, 10 } },
+				{ Kind = "Anchor", At = { 236, 12 }, Yaw = 120 },
+			},
+		},
+		{
+			Name = "The falling hall",
+			Paths = 3,
+			Primitives = {
+				{
+					Kind = "Ramp",
+					Path = {
+						{ 120, 0 },
+						{ 120, 72 },
+						{ 224, 72 },
+						{ 224, 128 },
+						{ 336, 128 },
+						{ 336, 296 },
+						{ 288, 296 },
+						{ 288, 168 },
+						{ 240, 168 },
+						{ 240, 296 },
+						{ 192, 296 },
+						{ 192, 168 },
+						{ 144, 168 },
+						{ 144, 376 },
+						{ 176, 376 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Ramp",
+					Path = {
+						{ 228, 424 },
+						{ 228, 452 },
+						{ 336, 452 },
+						{ 336, 500 },
+						{ 256, 500 },
+						{ 256, 548 },
+						{ 336, 548 },
+						{ 336, 608 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -142, 0 },
+						{ -142, 48 },
+						{ -130, 48 },
+						{ -130, 0 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -136, 42 },
+						{ -224, 42 },
+						{ -224, 54 },
+						{ -136, 54 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -230, 48 },
+						{ -230, 100 },
+						{ -218, 100 },
+						{ -218, 48 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -224, 106 },
+						{ -152, 106 },
+						{ -152, 94 },
+						{ -224, 94 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 100 },
+						{ -158, 148 },
+						{ -146, 148 },
+						{ -146, 100 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 142 },
+						{ -224, 142 },
+						{ -224, 154 },
+						{ -152, 154 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -230, 148 },
+						{ -230, 176 },
+						{ -218, 176 },
+						{ -218, 148 },
+					},
+				},
+				{ Kind = "Flat", At = { -136, 0 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 48 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 48 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 100 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 100 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 148 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 148 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 176 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -230, 264 },
+						{ -230, 300 },
+						{ -218, 300 },
+						{ -218, 264 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -224, 306 },
+						{ -136, 306 },
+						{ -136, 294 },
+						{ -224, 294 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -142, 300 },
+						{ -142, 336 },
+						{ -130, 336 },
+						{ -130, 300 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -136, 330 },
+						{ -296, 330 },
+						{ -296, 342 },
+						{ -136, 342 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -302, 336 },
+						{ -302, 372 },
+						{ -290, 372 },
+						{ -290, 336 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -296, 378 },
+						{ -136, 378 },
+						{ -136, 366 },
+						{ -296, 366 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -142, 372 },
+						{ -142, 408 },
+						{ -130, 408 },
+						{ -130, 372 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -136, 402 },
+						{ -296, 402 },
+						{ -296, 414 },
+						{ -136, 414 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -302, 408 },
+						{ -302, 444 },
+						{ -290, 444 },
+						{ -290, 408 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -296, 450 },
+						{ -136, 450 },
+						{ -136, 438 },
+						{ -296, 438 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -142, 444 },
+						{ -142, 480 },
+						{ -130, 480 },
+						{ -130, 444 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -136, 474 },
+						{ -280, 474 },
+						{ -280, 486 },
+						{ -136, 486 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -286, 480 },
+						{ -286, 608 },
+						{ -274, 608 },
+						{ -274, 480 },
+					},
+				},
+				{ Kind = "Flat", At = { -224, 264 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 300 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 336 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 336 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 372 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 372 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 408 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 408 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 444 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 444 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 480 }, Radius = 6 },
+				{ Kind = "Flat", At = { -280, 480 }, Radius = 6 },
+				{ Kind = "Flat", At = { -280, 608 }, Radius = 6 },
+				{
+					Kind = "Roof",
+					Area = {
+						{ -306, 336 },
+						{ -306, 372 },
+						{ -286, 372 },
+						{ -286, 336 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Roof",
+					Area = {
+						{ -146, 372 },
+						{ -146, 408 },
+						{ -126, 408 },
+						{ -126, 372 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Roof",
+					Area = {
+						{ -306, 408 },
+						{ -306, 444 },
+						{ -286, 444 },
+						{ -286, 408 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 34, 0 },
+						{ 34, 48 },
+						{ 46, 48 },
+						{ 46, 0 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 40, 42 },
+						{ -88, 42 },
+						{ -88, 54 },
+						{ 40, 54 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -94, 48 },
+						{ -94, 104 },
+						{ -82, 104 },
+						{ -82, 48 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -88, 110 },
+						{ 80, 110 },
+						{ 80, 98 },
+						{ -88, 98 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 74, 104 },
+						{ 74, 160 },
+						{ 86, 160 },
+						{ 86, 104 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 80, 154 },
+						{ -88, 154 },
+						{ -88, 166 },
+						{ 80, 166 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -94, 160 },
+						{ -94, 216 },
+						{ -82, 216 },
+						{ -82, 160 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -88, 222 },
+						{ 40, 222 },
+						{ 40, 210 },
+						{ -88, 210 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 34, 216 },
+						{ 34, 248 },
+						{ 46, 248 },
+						{ 46, 216 },
+					},
+				},
+				{ Kind = "Flat", At = { 40, 0 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 48 }, Radius = 6 },
+				{ Kind = "Flat", At = { -88, 48 }, Radius = 6 },
+				{ Kind = "Flat", At = { -88, 104 }, Radius = 6 },
+				{ Kind = "Flat", At = { 80, 104 }, Radius = 6 },
+				{ Kind = "Flat", At = { 80, 160 }, Radius = 6 },
+				{ Kind = "Flat", At = { -88, 160 }, Radius = 6 },
+				{ Kind = "Flat", At = { -88, 216 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 216 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 248 }, Radius = 6 },
+				{
+					Kind = "Roof",
+					Area = {
+						{ 80, 150 },
+						{ -88, 150 },
+						{ -88, 170 },
+						{ 80, 170 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -72, 322 },
+						{ -100, 322 },
+						{ -100, 334 },
+						{ -72, 334 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -106, 328 },
+						{ -106, 452 },
+						{ -94, 452 },
+						{ -94, 328 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -100, 458 },
+						{ 80, 458 },
+						{ 80, 446 },
+						{ -100, 446 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 74, 452 },
+						{ 74, 520 },
+						{ 86, 520 },
+						{ 86, 452 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 80, 514 },
+						{ -60, 514 },
+						{ -60, 526 },
+						{ 80, 526 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -66, 520 },
+						{ -66, 608 },
+						{ -54, 608 },
+						{ -54, 520 },
+					},
+				},
+				{ Kind = "Flat", At = { -72, 328 }, Radius = 6 },
+				{ Kind = "Flat", At = { -100, 328 }, Radius = 6 },
+				{ Kind = "Flat", At = { -100, 452 }, Radius = 6 },
+				{ Kind = "Flat", At = { 80, 452 }, Radius = 6 },
+				{ Kind = "Flat", At = { 80, 520 }, Radius = 6 },
+				{ Kind = "Flat", At = { -60, 520 }, Radius = 6 },
+				{ Kind = "Flat", At = { -60, 608 }, Radius = 6 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ 60, 520 },
+						{ -40, 520 },
+					},
+					Depth = 2,
+					Width = 12,
+					Rough = 2,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 72, 334 },
+						{ 144, 334 },
+						{ 144, 322 },
+						{ 72, 322 },
+					},
+				},
+				{ Kind = "Flat", At = { 72, 328 }, Radius = 6 },
+				{ Kind = "Flat", At = { 144, 328 }, Radius = 6 },
+			},
+			Hazards = {
+				{
+					Type = "Gloom",
+					Path = {
+						{ -296, 336 },
+						{ -296, 372 },
+						{ -136, 372 },
+						{ -136, 408 },
+						{ -296, 408 },
+					},
+					Radius = 9,
+				},
+				{ Type = "Rockfall", At = { 0, 296 }, Radius = 16 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ 60, 520 },
+						{ -40, 520 },
+					},
+					Width = 12,
+				},
+			},
+			Decor = {
+				{ Kind = "LanternPost", At = { 111, 36 } },
+				{ Kind = "LanternPost", At = { 156, 81 } },
+				{ Kind = "LanternPost", At = { 215, 108 } },
+				{ Kind = "LanternPost", At = { 260, 137 } },
+				{ Kind = "LanternPost", At = { 332, 137 } },
+				{ Kind = "LanternPost", At = { 327, 164 } },
+				{ Kind = "LanternPost", At = { 327, 236 } },
+				{ Kind = "LanternPost", At = { 300, 287 } },
+				{ Kind = "LanternPost", At = { 297, 260 } },
+				{ Kind = "LanternPost", At = { 297, 188 } },
+				{ Kind = "LanternPost", At = { 252, 159 } },
+				{ Kind = "LanternPost", At = { 231, 204 } },
+				{ Kind = "LanternPost", At = { 231, 276 } },
+				{ Kind = "LanternPost", At = { 204, 287 } },
+				{ Kind = "LanternPost", At = { 201, 260 } },
+				{ Kind = "LanternPost", At = { 201, 188 } },
+				{ Kind = "LanternPost", At = { 156, 159 } },
+				{ Kind = "LanternPost", At = { 135, 204 } },
+				{ Kind = "LanternPost", At = { 135, 276 } },
+				{ Kind = "LanternPost", At = { 135, 348 } },
+				{ Kind = "LanternPost", At = { 264, 461 } },
+				{ Kind = "LanternPost", At = { 327, 488 } },
+				{ Kind = "LanternPost", At = { 300, 491 } },
+				{ Kind = "LanternPost", At = { 247, 536 } },
+				{ Kind = "LanternPost", At = { 292, 557 } },
+				{ Kind = "LanternPost", At = { 327, 584 } },
+				{ Kind = "GlowShells", At = { -158, 48 } },
+				{ Kind = "GlowShells", At = { -202, 100 } },
+				{ Kind = "GlowShells", At = { -194, 148 } },
+				{ Kind = "GlowShells", At = { -190, 300 } },
+				{ Kind = "GlowShells", At = { -186, 336 } },
+				{ Kind = "GlowShells", At = { -296, 366 } },
+				{ Kind = "GlowShells", At = { -162, 372 } },
+				{ Kind = "GlowShells", At = { -214, 408 } },
+				{ Kind = "GlowShells", At = { -274, 444 } },
+				{ Kind = "GlowShells", At = { -136, 446 } },
+				{ Kind = "GlowShells", At = { -242, 480 } },
+				{ Kind = "GlowShells", At = { -280, 582 } },
+				{ Kind = "GlowShells", At = { 18, 48 } },
+				{ Kind = "GlowShells", At = { -88, 82 } },
+				{ Kind = "GlowShells", At = { 30, 104 } },
+				{ Kind = "GlowShells", At = { 46, 160 } },
+				{ Kind = "GlowShells", At = { -88, 166 } },
+				{ Kind = "GlowShells", At = { 2, 216 } },
+				{ Kind = "GlowShells", At = { -100, 370 } },
+				{ Kind = "GlowShells", At = { -42, 452 } },
+				{ Kind = "GlowShells", At = { 80, 470 } },
+				{ Kind = "GlowShells", At = { -10, 520 } },
+				{ Kind = "WreckRibs", At = { 130, 12 }, Scale = 0.8, Yaw = 90 },
+			},
+		},
+		{
+			Name = "The Stair",
+			Paths = 2,
+			Primitives = {
+				{
+					Kind = "Ramp",
+					Path = {
+						{ 40, 0 },
+						{ 40, 56 },
+						{ 200, 56 },
+						{ 200, 120 },
+						{ -60, 120 },
+						{ -60, 200 },
+						{ 330, 200 },
+						{ 330, 296 },
+						{ 140, 296 },
+						{ 140, 376 },
+						{ 176, 376 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Ramp",
+					Path = {
+						{ 228, 424 },
+						{ 228, 470 },
+						{ -60, 470 },
+						{ -60, 608 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 72, 326 },
+						{ 140, 326 },
+						{ 140, 314 },
+						{ 72, 314 },
+					},
+				},
+				{ Kind = "Flat", At = { 72, 320 }, Radius = 6 },
+				{ Kind = "Flat", At = { 140, 320 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -142, 0 },
+						{ -142, 48 },
+						{ -130, 48 },
+						{ -130, 0 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -136, 42 },
+						{ -224, 42 },
+						{ -224, 54 },
+						{ -136, 54 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -230, 48 },
+						{ -230, 100 },
+						{ -218, 100 },
+						{ -218, 48 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -224, 106 },
+						{ -152, 106 },
+						{ -152, 94 },
+						{ -224, 94 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 100 },
+						{ -158, 148 },
+						{ -146, 148 },
+						{ -146, 100 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 142 },
+						{ -224, 142 },
+						{ -224, 154 },
+						{ -152, 154 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -230, 148 },
+						{ -230, 176 },
+						{ -218, 176 },
+						{ -218, 148 },
+					},
+				},
+				{ Kind = "Flat", At = { -136, 0 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 48 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 48 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 100 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 100 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 148 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 148 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 176 }, Radius = 6 },
+				{
+					Kind = "Roof",
+					Area = {
+						{ -136, 38 },
+						{ -224, 38 },
+						{ -224, 58 },
+						{ -136, 58 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Roof",
+					Area = {
+						{ -224, 110 },
+						{ -152, 110 },
+						{ -152, 90 },
+						{ -224, 90 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -176, 246 },
+						{ -120, 246 },
+						{ -120, 234 },
+						{ -176, 234 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -126, 240 },
+						{ -126, 480 },
+						{ -114, 480 },
+						{ -114, 240 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -120, 474 },
+						{ -296, 474 },
+						{ -296, 486 },
+						{ -120, 486 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -290, 480 },
+						{ -290, 420 },
+						{ -302, 420 },
+						{ -302, 480 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -296, 426 },
+						{ -160, 426 },
+						{ -160, 414 },
+						{ -296, 414 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -154, 420 },
+						{ -154, 360 },
+						{ -166, 360 },
+						{ -166, 420 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -160, 354 },
+						{ -296, 354 },
+						{ -296, 366 },
+						{ -160, 366 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -290, 360 },
+						{ -290, 300 },
+						{ -302, 300 },
+						{ -302, 360 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -296, 294 },
+						{ -328, 294 },
+						{ -328, 306 },
+						{ -296, 306 },
+					},
+				},
+				{ Kind = "Flat", At = { -176, 240 }, Radius = 6 },
+				{ Kind = "Flat", At = { -120, 240 }, Radius = 6 },
+				{ Kind = "Flat", At = { -120, 480 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 480 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 420 }, Radius = 6 },
+				{ Kind = "Flat", At = { -160, 420 }, Radius = 6 },
+				{ Kind = "Flat", At = { -160, 360 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 360 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 300 }, Radius = 6 },
+				{ Kind = "Flat", At = { -328, 300 }, Radius = 6 },
+				{
+					Kind = "Roof",
+					Area = {
+						{ -150, 420 },
+						{ -150, 360 },
+						{ -170, 360 },
+						{ -170, 420 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -334, 488 },
+						{ -334, 540 },
+						{ -322, 540 },
+						{ -322, 488 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -328, 546 },
+						{ -260, 546 },
+						{ -260, 534 },
+						{ -328, 534 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -266, 540 },
+						{ -266, 608 },
+						{ -254, 608 },
+						{ -254, 540 },
+					},
+				},
+				{ Kind = "Flat", At = { -328, 488 }, Radius = 6 },
+				{ Kind = "Flat", At = { -328, 540 }, Radius = 6 },
+				{ Kind = "Flat", At = { -260, 540 }, Radius = 6 },
+				{ Kind = "Flat", At = { -260, 608 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 334, 296 },
+						{ 334, 260 },
+						{ 322, 260 },
+						{ 322, 296 },
+					},
+				},
+				{ Kind = "Flat", At = { 328, 296 }, Radius = 6 },
+				{ Kind = "Flat", At = { 328, 260 }, Radius = 6 },
+			},
+			Loot = {
+				{ At = { 330, 260 }, Radius = 5, Weight = 2 },
+			},
+			Hazards = {
+				{
+					Type = "Gloom",
+					Path = {
+						{ -136, 48 },
+						{ -224, 48 },
+						{ -224, 100 },
+						{ -152, 100 },
+					},
+					Radius = 9,
+				},
+				{
+					Type = "Gloom",
+					Path = {
+						{ -160, 360 },
+						{ -296, 360 },
+					},
+					Radius = 9,
+				},
+				{ Type = "Sink", At = { 330, 278 }, Radius = 10 },
+			},
+			Decor = {
+				{ Kind = "LanternPost", At = { 31, 36 } },
+				{ Kind = "LanternPost", At = { 76, 65 } },
+				{ Kind = "LanternPost", At = { 148, 65 } },
+				{ Kind = "LanternPost", At = { 191, 92 } },
+				{ Kind = "LanternPost", At = { 164, 111 } },
+				{ Kind = "LanternPost", At = { 92, 111 } },
+				{ Kind = "LanternPost", At = { 20, 111 } },
+				{ Kind = "LanternPost", At = { -52, 111 } },
+				{ Kind = "LanternPost", At = { -69, 156 } },
+				{ Kind = "LanternPost", At = { -24, 209 } },
+				{ Kind = "LanternPost", At = { 48, 209 } },
+				{ Kind = "LanternPost", At = { 120, 209 } },
+				{ Kind = "LanternPost", At = { 192, 209 } },
+				{ Kind = "LanternPost", At = { 264, 209 } },
+				{ Kind = "LanternPost", At = { 321, 236 } },
+				{ Kind = "LanternPost", At = { 294, 287 } },
+				{ Kind = "LanternPost", At = { 222, 287 } },
+				{ Kind = "LanternPost", At = { 150, 287 } },
+				{ Kind = "LanternPost", At = { 131, 332 } },
+				{ Kind = "LanternPost", At = { 219, 460 } },
+				{ Kind = "LanternPost", At = { 192, 461 } },
+				{ Kind = "LanternPost", At = { 120, 461 } },
+				{ Kind = "LanternPost", At = { 48, 461 } },
+				{ Kind = "LanternPost", At = { -24, 461 } },
+				{ Kind = "LanternPost", At = { -69, 506 } },
+				{ Kind = "LanternPost", At = { -69, 578 } },
+				{ Kind = "GlowShells", At = { -158, 48 } },
+				{ Kind = "GlowShells", At = { -202, 100 } },
+				{ Kind = "GlowShells", At = { -194, 148 } },
+				{ Kind = "GlowShells", At = { -120, 254 } },
+				{ Kind = "GlowShells", At = { -120, 394 } },
+				{ Kind = "GlowShells", At = { -174, 480 } },
+				{ Kind = "GlowShells", At = { -296, 462 } },
+				{ Kind = "GlowShells", At = { -198, 420 } },
+				{ Kind = "GlowShells", At = { -202, 360 } },
+				{ Kind = "GlowShells", At = { -296, 314 } },
+				{ Kind = "GlowShells", At = { -310, 540 } },
+				{ Kind = "Bones", At = { -136, 12 }, Scale = 1.3, Yaw = 0 },
+			},
+		},
+		{
+			Name = "The long dark",
+			Paths = 1,
+			Primitives = {
+				{
+					Kind = "Ramp",
+					Path = {
+						{ 200, 0 },
+						{ 200, 128 },
+						{ 336, 128 },
+						{ 336, 296 },
+						{ 288, 296 },
+						{ 288, 168 },
+						{ 240, 168 },
+						{ 240, 328 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Roof",
+					Area = {
+						{ 324, 160 },
+						{ 324, 264 },
+						{ 348, 264 },
+						{ 348, 160 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Roof",
+					Area = {
+						{ 276, 200 },
+						{ 276, 264 },
+						{ 300, 264 },
+						{ 300, 200 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Ramp",
+					Path = {
+						{ 176, 376 },
+						{ 120, 376 },
+						{ 120, 336 },
+						{ -104, 336 },
+						{ -104, 220 },
+						{ -176, 220 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Ramp",
+					Path = {
+						{ -224, 264 },
+						{ -224, 300 },
+						{ -144, 300 },
+						{ -144, 360 },
+						{ -296, 360 },
+						{ -296, 420 },
+						{ -144, 420 },
+						{ -144, 480 },
+						{ -296, 480 },
+						{ -296, 608 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 200, 122 },
+						{ 40, 122 },
+						{ 40, 134 },
+						{ 200, 134 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 34, 128 },
+						{ 34, 200 },
+						{ 46, 200 },
+						{ 46, 128 },
+					},
+				},
+				{ Kind = "Flat", At = { 200, 128 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 128 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 200 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 222, 424 },
+						{ 222, 472 },
+						{ 234, 472 },
+						{ 234, 424 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 228, 466 },
+						{ 60, 466 },
+						{ 60, 478 },
+						{ 228, 478 },
+					},
+				},
+				{ Kind = "Flat", At = { 228, 424 }, Radius = 6 },
+				{ Kind = "Flat", At = { 228, 472 }, Radius = 6 },
+				{ Kind = "Flat", At = { 60, 472 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -296, 546 },
+						{ -244, 546 },
+						{ -244, 534 },
+						{ -296, 534 },
+					},
+				},
+				{ Kind = "Flat", At = { -296, 540 }, Radius = 6 },
+				{ Kind = "Flat", At = { -244, 540 }, Radius = 6 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ -276, 540 },
+						{ -248, 540 },
+					},
+					Depth = 2,
+					Width = 12,
+					Rough = 2,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -206, 300 },
+						{ -206, 360 },
+						{ -194, 360 },
+						{ -194, 300 },
+					},
+				},
+				{ Kind = "Flat", At = { -200, 300 }, Radius = 6 },
+				{ Kind = "Flat", At = { -200, 360 }, Radius = 6 },
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -200, 316 },
+						{ -200, 344 },
+					},
+					Height = 2.5,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 336, 214 },
+						{ 288, 214 },
+						{ 288, 226 },
+						{ 336, 226 },
+					},
+				},
+				{ Kind = "Flat", At = { 336, 220 }, Radius = 6 },
+				{ Kind = "Flat", At = { 288, 220 }, Radius = 6 },
+				{
+					Kind = "Ridge",
+					Path = {
+						{ 320, 220 },
+						{ 304, 220 },
+					},
+					Height = 2.5,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+			},
+			Loot = {
+				{ At = { 40, 200 }, Radius = 5, Weight = 2 },
+				{ At = { 60, 470 }, Radius = 5, Weight = 3 },
+				{ At = { -248, 540 }, Radius = 4, Weight = 2 },
+			},
+			Hazards = {
+				{
+					Type = "Gloom",
+					Path = {
+						{ 336, 136 },
+						{ 336, 288 },
+						{ 288, 288 },
+						{ 288, 176 },
+					},
+					Radius = 9,
+				},
+				{ Type = "Rockfall", At = { 0, 330 }, Radius = 16 },
+				{ Type = "Sink", At = { 40, 164 }, Radius = 10 },
+				{ Type = "Sink", At = { 144, 470 }, Radius = 10 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -276, 540 },
+						{ -248, 540 },
+					},
+					Width = 12,
+				},
+			},
+			Decor = {
+				{ Kind = "LanternPost", At = { 191, 36 } },
+				{ Kind = "LanternPost", At = { 191, 108 } },
+				{ Kind = "LanternPost", At = { 236, 137 } },
+				{ Kind = "LanternPost", At = { 308, 137 } },
+				{ Kind = "LanternPost", At = { 327, 164 } },
+				{ Kind = "LanternPost", At = { 327, 236 } },
+				{ Kind = "LanternPost", At = { 300, 287 } },
+				{ Kind = "LanternPost", At = { 297, 260 } },
+				{ Kind = "LanternPost", At = { 297, 188 } },
+				{ Kind = "LanternPost", At = { 252, 159 } },
+				{ Kind = "LanternPost", At = { 231, 204 } },
+				{ Kind = "LanternPost", At = { 231, 276 } },
+				{ Kind = "LanternPost", At = { 140, 367 } },
+				{ Kind = "LanternPost", At = { 84, 327 } },
+				{ Kind = "LanternPost", At = { 12, 327 } },
+				{ Kind = "LanternPost", At = { -60, 327 } },
+				{ Kind = "LanternPost", At = { -95, 300 } },
+				{ Kind = "LanternPost", At = { -95, 228 } },
+				{ Kind = "LanternPost", At = { -140, 211 } },
+				{ Kind = "LanternPost", At = { -188, 309 } },
+				{ Kind = "LanternPost", At = { -153, 336 } },
+				{ Kind = "LanternPost", At = { -180, 351 } },
+				{ Kind = "LanternPost", At = { -252, 351 } },
+				{ Kind = "LanternPost", At = { -305, 396 } },
+				{ Kind = "LanternPost", At = { -260, 429 } },
+				{ Kind = "LanternPost", At = { -188, 429 } },
+				{ Kind = "LanternPost", At = { -153, 456 } },
+				{ Kind = "LanternPost", At = { -180, 471 } },
+				{ Kind = "LanternPost", At = { -252, 471 } },
+				{ Kind = "LanternPost", At = { -305, 516 } },
+				{ Kind = "LanternPost", At = { -305, 588 } },
+				{ Kind = "LanternPost", At = { 188, 10 } },
+				{ Kind = "LanternPost", At = { 212, 10 } },
+			},
+		},
+		{
+			Name = "The courts",
+			Paths = 3,
+			Primitives = {
+				{
+					Kind = "Ramp",
+					Path = {
+						{ 40, 0 },
+						{ 40, 48 },
+						{ -88, 48 },
+						{ -88, 104 },
+						{ 80, 104 },
+						{ 80, 160 },
+						{ -88, 160 },
+						{ -88, 216 },
+						{ 40, 216 },
+						{ 100, 216 },
+						{ 100, 376 },
+						{ 176, 376 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Ramp",
+					Path = {
+						{ 228, 424 },
+						{ 228, 470 },
+						{ -60, 470 },
+						{ -60, 608 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 72, 326 },
+						{ 100, 326 },
+						{ 100, 314 },
+						{ 72, 314 },
+					},
+				},
+				{ Kind = "Flat", At = { 72, 320 }, Radius = 6 },
+				{ Kind = "Flat", At = { 100, 320 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -142, 0 },
+						{ -142, 48 },
+						{ -130, 48 },
+						{ -130, 0 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -136, 42 },
+						{ -224, 42 },
+						{ -224, 54 },
+						{ -136, 54 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -230, 48 },
+						{ -230, 100 },
+						{ -218, 100 },
+						{ -218, 48 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -224, 106 },
+						{ -152, 106 },
+						{ -152, 94 },
+						{ -224, 94 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 100 },
+						{ -158, 148 },
+						{ -146, 148 },
+						{ -146, 100 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 142 },
+						{ -224, 142 },
+						{ -224, 154 },
+						{ -152, 154 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -230, 148 },
+						{ -230, 176 },
+						{ -218, 176 },
+						{ -218, 148 },
+					},
+				},
+				{ Kind = "Flat", At = { -136, 0 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 48 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 48 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 100 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 100 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 148 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 148 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 176 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -230, 264 },
+						{ -230, 300 },
+						{ -218, 300 },
+						{ -218, 264 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -224, 306 },
+						{ -136, 306 },
+						{ -136, 294 },
+						{ -224, 294 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -142, 300 },
+						{ -142, 336 },
+						{ -130, 336 },
+						{ -130, 300 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -136, 330 },
+						{ -296, 330 },
+						{ -296, 342 },
+						{ -136, 342 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -302, 336 },
+						{ -302, 372 },
+						{ -290, 372 },
+						{ -290, 336 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -296, 378 },
+						{ -136, 378 },
+						{ -136, 366 },
+						{ -296, 366 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -142, 372 },
+						{ -142, 408 },
+						{ -130, 408 },
+						{ -130, 372 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -136, 402 },
+						{ -296, 402 },
+						{ -296, 414 },
+						{ -136, 414 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -302, 408 },
+						{ -302, 444 },
+						{ -290, 444 },
+						{ -290, 408 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -296, 450 },
+						{ -136, 450 },
+						{ -136, 438 },
+						{ -296, 438 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -142, 444 },
+						{ -142, 480 },
+						{ -130, 480 },
+						{ -130, 444 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -136, 474 },
+						{ -280, 474 },
+						{ -280, 486 },
+						{ -136, 486 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -286, 480 },
+						{ -286, 608 },
+						{ -274, 608 },
+						{ -274, 480 },
+					},
+				},
+				{ Kind = "Flat", At = { -224, 264 }, Radius = 6 },
+				{ Kind = "Flat", At = { -224, 300 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 336 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 336 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 372 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 372 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 408 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 408 }, Radius = 6 },
+				{ Kind = "Flat", At = { -296, 444 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 444 }, Radius = 6 },
+				{ Kind = "Flat", At = { -136, 480 }, Radius = 6 },
+				{ Kind = "Flat", At = { -280, 480 }, Radius = 6 },
+				{ Kind = "Flat", At = { -280, 608 }, Radius = 6 },
+				{
+					Kind = "Roof",
+					Area = {
+						{ -306, 408 },
+						{ -306, 444 },
+						{ -286, 444 },
+						{ -286, 408 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 194, 0 },
+						{ 194, 120 },
+						{ 206, 120 },
+						{ 206, 0 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 200, 126 },
+						{ 336, 126 },
+						{ 336, 114 },
+						{ 200, 114 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 330, 120 },
+						{ 330, 176 },
+						{ 342, 176 },
+						{ 342, 120 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 336, 170 },
+						{ 152, 170 },
+						{ 152, 182 },
+						{ 336, 182 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 146, 176 },
+						{ 146, 232 },
+						{ 158, 232 },
+						{ 158, 176 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 238 },
+						{ 336, 238 },
+						{ 336, 226 },
+						{ 152, 226 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 330, 232 },
+						{ 330, 288 },
+						{ 342, 288 },
+						{ 342, 232 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 336, 282 },
+						{ 240, 282 },
+						{ 240, 294 },
+						{ 336, 294 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 234, 288 },
+						{ 234, 328 },
+						{ 246, 328 },
+						{ 246, 288 },
+					},
+				},
+				{ Kind = "Flat", At = { 200, 0 }, Radius = 6 },
+				{ Kind = "Flat", At = { 200, 120 }, Radius = 6 },
+				{ Kind = "Flat", At = { 336, 120 }, Radius = 6 },
+				{ Kind = "Flat", At = { 336, 176 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 176 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 232 }, Radius = 6 },
+				{ Kind = "Flat", At = { 336, 232 }, Radius = 6 },
+				{ Kind = "Flat", At = { 336, 288 }, Radius = 6 },
+				{ Kind = "Flat", At = { 240, 288 }, Radius = 6 },
+				{ Kind = "Flat", At = { 240, 328 }, Radius = 6 },
+				{
+					Kind = "Roof",
+					Area = {
+						{ 336, 166 },
+						{ 152, 166 },
+						{ 152, 186 },
+						{ 336, 186 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 269.6, 429.5 },
+						{ 333.6, 457.5 },
+						{ 338.4, 446.5 },
+						{ 274.4, 418.5 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 330, 452 },
+						{ 330, 500 },
+						{ 342, 500 },
+						{ 342, 452 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 336, 494 },
+						{ 256, 494 },
+						{ 256, 506 },
+						{ 336, 506 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 250, 500 },
+						{ 250, 548 },
+						{ 262, 548 },
+						{ 262, 500 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 256, 554 },
+						{ 336, 554 },
+						{ 336, 542 },
+						{ 256, 542 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 330, 548 },
+						{ 330, 608 },
+						{ 342, 608 },
+						{ 342, 548 },
+					},
+				},
+				{ Kind = "Flat", At = { 272, 424 }, Radius = 6 },
+				{ Kind = "Flat", At = { 336, 452 }, Radius = 6 },
+				{ Kind = "Flat", At = { 336, 500 }, Radius = 6 },
+				{ Kind = "Flat", At = { 256, 500 }, Radius = 6 },
+				{ Kind = "Flat", At = { 256, 548 }, Radius = 6 },
+				{ Kind = "Flat", At = { 336, 548 }, Radius = 6 },
+				{ Kind = "Flat", At = { 336, 608 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -60, 526 },
+						{ 60, 526 },
+						{ 60, 514 },
+						{ -60, 514 },
+					},
+				},
+				{ Kind = "Flat", At = { -60, 520 }, Radius = 6 },
+				{ Kind = "Flat", At = { 60, 520 }, Radius = 6 },
+			},
+			Loot = {
+				{ At = { 60, 520 }, Radius = 5, Weight = 2 },
+			},
+			Hazards = {
+				{
+					Type = "Gloom",
+					Path = {
+						{ -136, 408 },
+						{ -296, 408 },
+					},
+					Radius = 9,
+				},
+				{
+					Type = "Gloom",
+					Path = {
+						{ 336, 176 },
+						{ 152, 176 },
+					},
+					Radius = 9,
+				},
+				{ Type = "Sink", At = { 0, 520 }, Radius = 10 },
+			},
+			Decor = {
+				{ Kind = "LanternPost", At = { 31, 36 } },
+				{ Kind = "LanternPost", At = { 4, 39 } },
+				{ Kind = "LanternPost", At = { -68, 39 } },
+				{ Kind = "LanternPost", At = { -97, 84 } },
+				{ Kind = "LanternPost", At = { -52, 113 } },
+				{ Kind = "LanternPost", At = { 20, 113 } },
+				{ Kind = "LanternPost", At = { 71, 140 } },
+				{ Kind = "LanternPost", At = { 44, 151 } },
+				{ Kind = "LanternPost", At = { -28, 151 } },
+				{ Kind = "LanternPost", At = { -97, 196 } },
+				{ Kind = "LanternPost", At = { -52, 225 } },
+				{ Kind = "LanternPost", At = { 20, 225 } },
+				{ Kind = "LanternPost", At = { 76, 225 } },
+				{ Kind = "LanternPost", At = { 91, 252 } },
+				{ Kind = "LanternPost", At = { 91, 324 } },
+				{ Kind = "LanternPost", At = { 136, 385 } },
+				{ Kind = "LanternPost", At = { 219, 460 } },
+				{ Kind = "LanternPost", At = { 192, 461 } },
+				{ Kind = "LanternPost", At = { 120, 461 } },
+				{ Kind = "LanternPost", At = { 48, 461 } },
+				{ Kind = "LanternPost", At = { -24, 461 } },
+				{ Kind = "LanternPost", At = { -69, 506 } },
+				{ Kind = "LanternPost", At = { -69, 578 } },
+				{ Kind = "GlowShells", At = { -158, 48 } },
+				{ Kind = "GlowShells", At = { -202, 100 } },
+				{ Kind = "GlowShells", At = { -194, 148 } },
+				{ Kind = "GlowShells", At = { -190, 300 } },
+				{ Kind = "GlowShells", At = { -186, 336 } },
+				{ Kind = "GlowShells", At = { -296, 366 } },
+				{ Kind = "GlowShells", At = { -162, 372 } },
+				{ Kind = "GlowShells", At = { -214, 408 } },
+				{ Kind = "GlowShells", At = { -274, 444 } },
+				{ Kind = "GlowShells", At = { -136, 446 } },
+				{ Kind = "GlowShells", At = { -242, 480 } },
+				{ Kind = "GlowShells", At = { -280, 582 } },
+				{ Kind = "GlowShells", At = { 200, 70 } },
+				{ Kind = "GlowShells", At = { 290, 120 } },
+				{ Kind = "GlowShells", At = { 298, 176 } },
+				{ Kind = "GlowShells", At = { 158, 176 } },
+				{ Kind = "GlowShells", At = { 230, 232 } },
+				{ Kind = "GlowShells", At = { 336, 266 } },
+				{ Kind = "GlowShells", At = { 240, 310 } },
+				{ Kind = "GlowShells", At = { 336, 452 } },
+				{ Kind = "GlowShells", At = { 256, 512 } },
+				{ Kind = "GlowShells", At = { 336, 572 } },
+				{ Kind = "DeadCoral", At = { 40, 12 }, Scale = 1.3 },
+				{ Kind = "Crate", At = { 56, 10 } },
+			},
+		},
 	},
-	{
-		{ { "DeadCoral", 16 }, { "Urchins", 8 }, { "Starfish", 5 } }, -- coral gardens
-		{ { "WreckRibs", 2, 1.5 }, { "Timber", 6 }, { "Crate", 3 }, { "Pebbles", 10 } }, -- the halls
-		{ { "Kelp", 20 }, { "Weed", 10 }, { "Urchins", 4 } }, -- weed beds
+	Slots = {
+		{
+			Name = "Shore caves",
+			At = { -352, 28 },
+			Size = { 104, 72 },
+			Rooms = {
+				{
+					Name = "Comb of caves",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 46, 0 },
+								{ 46, 60 },
+								{ 58, 60 },
+								{ 58, 0 },
+							},
+						},
+						{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+						{ Kind = "Flat", At = { 52, 60 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 52, 26 },
+								{ 96, 26 },
+								{ 96, 14 },
+								{ 52, 14 },
+							},
+						},
+						{ Kind = "Flat", At = { 52, 20 }, Radius = 6 },
+						{ Kind = "Flat", At = { 96, 20 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 52, 34 },
+								{ 8, 34 },
+								{ 8, 46 },
+								{ 52, 46 },
+							},
+						},
+						{ Kind = "Flat", At = { 52, 40 }, Radius = 6 },
+						{ Kind = "Flat", At = { 8, 40 }, Radius = 6 },
+					},
+					Loot = {
+						{ At = { 94, 20 }, Radius = 3, Weight = 1 },
+						{ At = { 10, 42 }, Radius = 3, Weight = 1 },
+						{ At = { 52, 60 }, Radius = 4, Weight = 2 },
+					},
+					Hazards = {
+						{ Type = "Pit", At = { 52, 60 }, Radius = 4, Covered = true },
+					},
+					Decor = {
+						{
+							Kind = "Barnacles",
+							Area = {
+								{ 8, 8 },
+								{ 96, 8 },
+								{ 96, 64 },
+								{ 8, 64 },
+							},
+							Count = 6,
+						},
+					},
+				},
+				{
+					Name = "Boulder scramble",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 46, 0 },
+								{ 46, 36 },
+								{ 58, 36 },
+								{ 58, 0 },
+							},
+						},
+						{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+						{ Kind = "Flat", At = { 52, 36 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 96, 8 },
+								{ 96, 64 },
+								{ 8, 64 },
+							},
+						},
+						{ Kind = "Mound", At = { 31, 25 }, Radius = 7, Height = 5, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 73, 36 }, Radius = 7, Height = 6, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 42, 50 }, Radius = 7, Height = 5, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 68, 18 }, Radius = 7, Height = 6, Rock = true, Over = true },
+					},
+					Loot = {
+						{ At = { 52, 60 }, Radius = 4, Weight = 1 },
+					},
+				},
+			},
+		},
+		{
+			Name = "The lockers",
+			At = { 248, 28 },
+			Size = { 104, 72 },
+			Rooms = {
+				{
+					Name = "Crate store",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 46, 0 },
+								{ 46, 36 },
+								{ 58, 36 },
+								{ 58, 0 },
+							},
+						},
+						{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+						{ Kind = "Flat", At = { 52, 36 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 96, 8 },
+								{ 96, 64 },
+								{ 8, 64 },
+							},
+						},
+					},
+					Loot = {
+						{ At = { 24, 52 }, Radius = 6, Weight = 1 },
+					},
+					Decor = {
+						{
+							Kind = "Crate",
+							Area = {
+								{ 12, 12 },
+								{ 92, 12 },
+								{ 92, 60 },
+								{ 12, 60 },
+							},
+							Count = 5,
+						},
+					},
+				},
+				{
+					Name = "Flooded locker",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 46, 0 },
+								{ 46, 36 },
+								{ 58, 36 },
+								{ 58, 0 },
+							},
+						},
+						{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+						{ Kind = "Flat", At = { 52, 36 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 96, 8 },
+								{ 96, 64 },
+								{ 8, 64 },
+							},
+						},
+						{
+							Kind = "Hollow",
+							At = { 52, 60 },
+							Radius = 24,
+							Depth = 4,
+							Rough = 3,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 52, 60 }, Radius = 4, Weight = 2 },
+					},
+					Decor = {
+						{
+							Kind = "Kelp",
+							Area = {
+								{ 12, 12 },
+								{ 92, 12 },
+								{ 92, 60 },
+								{ 12, 60 },
+							},
+							Count = 5,
+						},
+					},
+				},
+			},
+		},
+		{
+			Name = "West vault",
+			At = { -352, 168 },
+			Size = { 72, 104 },
+			Rooms = {
+				{
+					Name = "Drowned pool",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 72, 46 },
+								{ 36, 46 },
+								{ 36, 58 },
+								{ 72, 58 },
+							},
+						},
+						{ Kind = "Flat", At = { 72, 52 }, Radius = 6 },
+						{ Kind = "Flat", At = { 36, 52 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 64, 8 },
+								{ 64, 96 },
+								{ 8, 96 },
+							},
+						},
+						{
+							Kind = "Hollow",
+							At = { 12, 52 },
+							Radius = 24,
+							Depth = 4,
+							Rough = 3,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 12, 52 }, Radius = 4, Weight = 2 },
+					},
+					Decor = {
+						{
+							Kind = "Kelp",
+							Area = {
+								{ 12, 12 },
+								{ 60, 12 },
+								{ 60, 92 },
+								{ 12, 92 },
+							},
+							Count = 5,
+						},
+					},
+				},
+				{
+					Name = "Sinking flat",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 72, 46 },
+								{ 36, 46 },
+								{ 36, 58 },
+								{ 72, 58 },
+							},
+						},
+						{ Kind = "Flat", At = { 72, 52 }, Radius = 6 },
+						{ Kind = "Flat", At = { 36, 52 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 64, 8 },
+								{ 64, 96 },
+								{ 8, 96 },
+							},
+						},
+					},
+					Loot = {
+						{ At = { 12, 52 }, Radius = 4, Weight = 2 },
+					},
+					Hazards = {
+						{ Type = "Sink", At = { 42, 52 }, Radius = 12 },
+					},
+					Decor = {
+						{ Kind = "Bones", At = { 12, 66 }, Scale = 0.8 },
+					},
+				},
+			},
+		},
+		{
+			Name = "The crypt",
+			At = { -48, 352 },
+			Size = { 96, 72 },
+			Rooms = {
+				{
+					Name = "Bone crypt",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 42, 0 },
+								{ 42, 36 },
+								{ 54, 36 },
+								{ 54, 0 },
+							},
+						},
+						{ Kind = "Flat", At = { 48, 0 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 36 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 24 },
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 24 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 32 },
+								{ 8, 24 },
+								{ 24, 24 },
+								{ 24, 32 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 32, 32 },
+								{ 32, 24 },
+								{ 52, 24 },
+								{ 52, 32 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 60, 32 },
+								{ 60, 24 },
+								{ 88, 24 },
+								{ 88, 32 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 32 },
+								{ 88, 32 },
+								{ 88, 64 },
+								{ 8, 64 },
+							},
+						},
+						{
+							Kind = "Roof",
+							Area = {
+								{ 4.72, 5.71 },
+								{ 91.28, 5.71 },
+								{ 91.28, 66.29 },
+								{ 4.72, 66.29 },
+							},
+							Clearance = 18,
+							Thickness = 6,
+						},
+					},
+					Loot = {
+						{ At = { 48, 60 }, Radius = 4, Weight = 3 },
+					},
+					Hazards = {
+						{ Type = "Pit", At = { 48, 52 }, Radius = 4, Covered = true },
+					},
+					Decor = {
+						{ Kind = "Bones", At = { 48, 36 }, Scale = 1.1 },
+					},
+				},
+				{
+					Name = "Ring crypt",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 16, 22 },
+								{ 80, 22 },
+								{ 80, 10 },
+								{ 16, 10 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 74, 16 },
+								{ 74, 56 },
+								{ 86, 56 },
+								{ 86, 16 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 80, 50 },
+								{ 16, 50 },
+								{ 16, 62 },
+								{ 80, 62 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 22, 56 },
+								{ 22, 16 },
+								{ 10, 16 },
+								{ 10, 56 },
+							},
+						},
+						{ Kind = "Flat", At = { 16, 16 }, Radius = 6 },
+						{ Kind = "Flat", At = { 80, 16 }, Radius = 6 },
+						{ Kind = "Flat", At = { 80, 56 }, Radius = 6 },
+						{ Kind = "Flat", At = { 16, 56 }, Radius = 6 },
+						{ Kind = "Flat", At = { 16, 16 }, Radius = 6 },
+						{
+							Kind = "Roof",
+							Area = {
+								{ 14, 24 },
+								{ 82, 24 },
+								{ 82, 4 },
+								{ 14, 4 },
+							},
+							Clearance = 18,
+							Thickness = 6,
+						},
+						{
+							Kind = "Roof",
+							Area = {
+								{ 72, 14 },
+								{ 72, 58 },
+								{ 92, 58 },
+								{ 92, 14 },
+							},
+							Clearance = 18,
+							Thickness = 6,
+						},
+						{
+							Kind = "Roof",
+							Area = {
+								{ 82, 48 },
+								{ 14, 48 },
+								{ 14, 68 },
+								{ 82, 68 },
+							},
+							Clearance = 18,
+							Thickness = 6,
+						},
+						{
+							Kind = "Roof",
+							Area = {
+								{ 24, 58 },
+								{ 24, 14 },
+								{ 4, 14 },
+								{ 4, 58 },
+							},
+							Clearance = 18,
+							Thickness = 6,
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 42, 0 },
+								{ 42, 16 },
+								{ 54, 16 },
+								{ 54, 0 },
+							},
+						},
+						{ Kind = "Flat", At = { 48, 0 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 16 }, Radius = 6 },
+					},
+					Loot = {
+						{ At = { 48, 60 }, Radius = 3, Weight = 3 },
+					},
+					Decor = {
+						{ Kind = "GlowShells", At = { 48, 60 } },
+					},
+				},
+			},
+		},
+		{
+			Name = "The chapel",
+			At = { 120, 504 },
+			Size = { 112, 72 },
+			Rooms = {
+				{
+					Name = "Pillar chapel",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 62, 72 },
+								{ 62, 36 },
+								{ 50, 36 },
+								{ 50, 72 },
+							},
+						},
+						{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+						{ Kind = "Flat", At = { 56, 36 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 24 },
+								{ 8, 8 },
+								{ 104, 8 },
+								{ 104, 24 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 32 },
+								{ 8, 24 },
+								{ 24, 24 },
+								{ 24, 32 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 32, 32 },
+								{ 32, 24 },
+								{ 52, 24 },
+								{ 52, 32 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 60, 32 },
+								{ 60, 24 },
+								{ 80, 24 },
+								{ 80, 32 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 88, 32 },
+								{ 88, 24 },
+								{ 104, 24 },
+								{ 104, 32 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 32 },
+								{ 104, 32 },
+								{ 104, 64 },
+								{ 8, 64 },
+							},
+						},
+						{
+							Kind = "Roof",
+							Area = {
+								{ 4.54, 5.98 },
+								{ 107.46, 5.98 },
+								{ 107.46, 66.02 },
+								{ 4.54, 66.02 },
+							},
+							Clearance = 18,
+							Thickness = 6,
+						},
+					},
+					Loot = {
+						{ At = { 56, 12 }, Radius = 4, Weight = 2 },
+					},
+					Hazards = {
+						{ Type = "Rockfall", At = { 56, 36 }, Radius = 12 },
+					},
+					Decor = {
+						{ Kind = "Bones", At = { 56, 36 }, Scale = 1.1 },
+					},
+				},
+				{
+					Name = "Chapel caves",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 62, 72 },
+								{ 62, 12 },
+								{ 50, 12 },
+								{ 50, 72 },
+							},
+						},
+						{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+						{ Kind = "Flat", At = { 56, 12 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 56, 46 },
+								{ 8, 46 },
+								{ 8, 58 },
+								{ 56, 58 },
+							},
+						},
+						{ Kind = "Flat", At = { 56, 52 }, Radius = 6 },
+						{ Kind = "Flat", At = { 8, 52 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 56, 38 },
+								{ 104, 38 },
+								{ 104, 26 },
+								{ 56, 26 },
+							},
+						},
+						{ Kind = "Flat", At = { 56, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 104, 32 }, Radius = 6 },
+					},
+					Loot = {
+						{ At = { 10, 52 }, Radius = 3, Weight = 1 },
+						{ At = { 102, 30 }, Radius = 3, Weight = 1 },
+						{ At = { 56, 12 }, Radius = 4, Weight = 3 },
+					},
+					Hazards = {
+						{ Type = "Pit", At = { 56, 12 }, Radius = 4, Covered = true },
+					},
+					Decor = {
+						{
+							Kind = "Barnacles",
+							Area = {
+								{ 8, 8 },
+								{ 104, 8 },
+								{ 104, 64 },
+								{ 8, 64 },
+							},
+							Count = 6,
+						},
+					},
+				},
+			},
+		},
+		{
+			Name = "The hold",
+			At = { 288, 328 },
+			Size = { 64, 96 },
+			Rooms = {
+				{
+					Name = "Flooded hold",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 0, 54 },
+								{ 32, 54 },
+								{ 32, 42 },
+								{ 0, 42 },
+							},
+						},
+						{ Kind = "Flat", At = { 0, 48 }, Radius = 6 },
+						{ Kind = "Flat", At = { 32, 48 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 56, 8 },
+								{ 56, 88 },
+								{ 8, 88 },
+							},
+						},
+						{
+							Kind = "Hollow",
+							At = { 52, 48 },
+							Radius = 20,
+							Depth = 4,
+							Rough = 3,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 52, 48 }, Radius = 4, Weight = 3 },
+					},
+					Decor = {
+						{
+							Kind = "Kelp",
+							Area = {
+								{ 12, 12 },
+								{ 52, 12 },
+								{ 52, 84 },
+								{ 12, 84 },
+							},
+							Count = 5,
+						},
+					},
+				},
+				{
+					Name = "Silted hold",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 0, 54 },
+								{ 32, 54 },
+								{ 32, 42 },
+								{ 0, 42 },
+							},
+						},
+						{ Kind = "Flat", At = { 0, 48 }, Radius = 6 },
+						{ Kind = "Flat", At = { 32, 48 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 56, 8 },
+								{ 56, 88 },
+								{ 8, 88 },
+							},
+						},
+					},
+					Loot = {
+						{ At = { 52, 48 }, Radius = 4, Weight = 2 },
+					},
+					Hazards = {
+						{ Type = "Sink", At = { 26, 48 }, Radius = 12 },
+					},
+					Decor = {
+						{ Kind = "Bones", At = { 52, 34 }, Scale = 0.8 },
+					},
+				},
+			},
+		},
+		{
+			Name = "The sea vault",
+			At = { -232, 504 },
+			Size = { 112, 72 },
+			Rooms = {
+				{
+					Name = "Sea vault",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 16, 22 },
+								{ 96, 22 },
+								{ 96, 10 },
+								{ 16, 10 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 90, 16 },
+								{ 90, 56 },
+								{ 102, 56 },
+								{ 102, 16 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 96, 50 },
+								{ 16, 50 },
+								{ 16, 62 },
+								{ 96, 62 },
+							},
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 22, 56 },
+								{ 22, 16 },
+								{ 10, 16 },
+								{ 10, 56 },
+							},
+						},
+						{ Kind = "Flat", At = { 16, 16 }, Radius = 6 },
+						{ Kind = "Flat", At = { 96, 16 }, Radius = 6 },
+						{ Kind = "Flat", At = { 96, 56 }, Radius = 6 },
+						{ Kind = "Flat", At = { 16, 56 }, Radius = 6 },
+						{ Kind = "Flat", At = { 16, 16 }, Radius = 6 },
+						{
+							Kind = "Roof",
+							Area = {
+								{ 14, 24 },
+								{ 98, 24 },
+								{ 98, 4 },
+								{ 14, 4 },
+							},
+							Clearance = 18,
+							Thickness = 6,
+						},
+						{
+							Kind = "Roof",
+							Area = {
+								{ 88, 14 },
+								{ 88, 58 },
+								{ 108, 58 },
+								{ 108, 14 },
+							},
+							Clearance = 18,
+							Thickness = 6,
+						},
+						{
+							Kind = "Roof",
+							Area = {
+								{ 98, 48 },
+								{ 14, 48 },
+								{ 14, 68 },
+								{ 98, 68 },
+							},
+							Clearance = 18,
+							Thickness = 6,
+						},
+						{
+							Kind = "Roof",
+							Area = {
+								{ 24, 58 },
+								{ 24, 14 },
+								{ 4, 14 },
+								{ 4, 58 },
+							},
+							Clearance = 18,
+							Thickness = 6,
+						},
+						{
+							Kind = "Flat",
+							Area = {
+								{ 62, 72 },
+								{ 62, 56 },
+								{ 50, 56 },
+								{ 50, 72 },
+							},
+						},
+						{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+						{ Kind = "Flat", At = { 56, 56 }, Radius = 6 },
+					},
+					Loot = {
+						{ At = { 56, 12 }, Radius = 3, Weight = 4 },
+					},
+					Hazards = {
+						{ Type = "Pit", At = { 56, 12 }, Radius = 4, Covered = true },
+					},
+					Decor = {
+						{ Kind = "GlowShells", At = { 56, 12 } },
+					},
+				},
+				{
+					Name = "Drowned vault",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 62, 72 },
+								{ 62, 36 },
+								{ 50, 36 },
+								{ 50, 72 },
+							},
+						},
+						{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+						{ Kind = "Flat", At = { 56, 36 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 104, 8 },
+								{ 104, 64 },
+								{ 8, 64 },
+							},
+						},
+						{
+							Kind = "Hollow",
+							At = { 56, 12 },
+							Radius = 24,
+							Depth = 4,
+							Rough = 3,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 56, 12 }, Radius = 4, Weight = 4 },
+					},
+					Decor = {
+						{
+							Kind = "Kelp",
+							Area = {
+								{ 12, 12 },
+								{ 100, 12 },
+								{ 100, 60 },
+								{ 12, 60 },
+							},
+							Count = 5,
+						},
+					},
+				},
+				{
+					Name = "Fallen vault",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 62, 72 },
+								{ 62, 36 },
+								{ 50, 36 },
+								{ 50, 72 },
+							},
+						},
+						{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+						{ Kind = "Flat", At = { 56, 36 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 104, 8 },
+								{ 104, 64 },
+								{ 8, 64 },
+							},
+						},
+						{ Kind = "Mound", At = { 34, 25 }, Radius = 7, Height = 5, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 78, 36 }, Radius = 7, Height = 6, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 45, 50 }, Radius = 7, Height = 5, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 73, 18 }, Radius = 7, Height = 6, Rock = true, Over = true },
+					},
+					Loot = {
+						{ At = { 56, 12 }, Radius = 4, Weight = 3 },
+					},
+				},
+			},
+		},
 	},
-	{
-		{ { "Anchor", 2 }, { "Chain", 8 }, { "Timber", 6 }, { "Urchins", 5 } }, -- an anchorage
-		{ { "Kelp", 16 }, { "DeadCoral", 8 }, { "Bones", 3 } }, -- a sunken grove
-		{ { "WreckRibs", 2, 1.3 }, { "Bones", 5, 1.2 }, { "Pebbles", 10 } }, -- a graveyard
-	},
 }
-frame.Decor = {}
-for row, wards in THEMES do
-	for col, items in wards do
-		local x0, x1 = -360 + 240 * (col - 1) + 8, -360 + 240 * col - 8
-		local z0 = ({ 12, 212, 412 })[row] + 8
-		local z1 = ({ 212, 412, 596 })[row] - 8
-		for _, item in items do
-			table.insert(frame.Decor, scatter(item[1], x0, z0, x1, z1, item[2], item[3]))
-		end
-	end
-end
--- Barnacles crust the tops of the long walls.
-for j = 1, ROWS do
-	local z = Z0 + PITCH * j
-	table.insert(frame.Decor, {
-		Kind = "Barnacles",
-		Path = { { -340, z }, { 340, z } },
-		Count = 22,
-	})
-end
-for _, item in patches() do
-	table.insert(frame.Primitives, item)
-end
-
--- Each crossing's way in (its first stretch from the top edge) has its own landmark, so a
--- regular knows which crossing rolled before committing: 1 an anchor and chain, 2 a hull's
--- ribs, 3 an arch of bones, 4 a pair of lanterns, 5 dead coral and a smashed crate.
-crossing1.Decor = {
-	prop("Anchor", -244, 30, 1.2, 20),
-	prop("Chain", -278, 40, 1.2, 80),
-	scatter("Kelp", -282, 14, -238, 50, 3),
-}
-crossing2.Decor = {
-	prop("WreckRibs", 238, 30, 1.3, 90),
-	prop("WreckRibs", 282, 36, 1.1, 90),
-	prop("Timber", 262, 48, 1, 30),
-}
-crossing3.Decor = {
-	prop("Bones", 260, 22, 1.8, 0),
-	prop("Bones", 260, 44, 1.5, 0),
-	scatter("Pebbles", 240, 14, 282, 50, 4),
-}
-crossing4.Decor = {
-	prop("LanternPost", -244, 20),
-	prop("LanternPost", -276, 20),
-	prop("Chain", -260, 44, 1, 90),
-}
-crossing5.Decor = {
-	scatter("DeadCoral", 240, 14, 282, 50, 4, 1.2),
-	prop("Crate", 270, 40, 1, 20),
-	scatter("Urchins", 240, 14, 282, 50, 2),
-}
-
--- Dangers. Each is where a regular can learn it: the same spot in its crossing (or room), with
--- its tell, and never the only way through without a safe moment.
---   Sink      in the lane that leads to a dead end's loot, on dark mud: cross it moving, don't stop.
---   Rockfall  in the roofed passages along the route, in the middle of the lane (the lane is
---             wider than its reach), on a floor of old rubble; it trickles dust first.
---   Undertow  along every flooding channel, while the sea covers it (foam streams along it).
---   Gloom     drifting back and forth along a straight gallery of the route, with lanterns at
---             its ends and a trail of glowing weed and shells to wait in or follow through.
-local function sinks(def, spots)
-	def.Hazards = def.Hazards or {}
-	def.Decor = def.Decor or {}
-	for _, spot in spots do
-		local x, z = spot[1], spot[2]
-		table.insert(def.Hazards, { Type = "Sink", At = { x, z }, Radius = 12 })
-		table.insert(
-			def.Primitives,
-			mud({ { x - 14, z - 14 }, { x + 14, z - 14 }, { x + 14, z + 14 }, { x - 14, z + 14 } })
-		)
-		table.insert(def.Decor, prop("Bones", x + 10, z - 10, 0.8, 40))
-		table.insert(def.Decor, prop("Starfish", x - 8, z + 9))
-	end
-end
-
--- A Gloom along the straight gallery from a to b (lane centre), and its lit trail.
-local function gloom(def, a, b)
-	def.Hazards = def.Hazards or {}
-	def.Decor = def.Decor or {}
-	table.insert(def.Hazards, { Type = "Gloom", Path = { a, b } })
-	local dx, dz = b[1] - a[1], b[2] - a[2]
-	local len = math.sqrt(dx * dx + dz * dz)
-	local ux, uz = dx / len, dz / len
-	local function at(t, side)
-		return a[1] + ux * t - uz * side, a[2] + uz * t + ux * side
-	end
-	local x, z = at(-6, 9)
-	table.insert(def.Decor, prop("LanternPost", x, z))
-	x, z = at(len + 6, -9)
-	table.insert(def.Decor, prop("LanternPost", x, z))
-	local k = 0
-	for t = 30, len - 20, 34 do
-		k += 1
-		x, z = at(t, if k % 2 == 0 then 9 else -9)
-		table.insert(def.Decor, prop(if k % 2 == 0 then "GlowShells" else "GlowWeed", x, z))
-	end
-end
-
--- A rock falls in the roofed cells along the cart route: every third one, from the second.
-local function rockfalls(def, count)
-	local roofed = roofedOf[def]
-	local ramp
-	for _, item in def.Primitives do
-		if item.Kind == "Ramp" then
-			ramp = item
-		end
-	end
-	local seen, found = {}, {}
-	local function visit(x, z)
-		local c, r = (x - X0) // PITCH, (z - Z0) // PITCH
-		local key = r * 100 + c
-		if roofed[key] and not seen[key] then
-			seen[key] = true
-			table.insert(found, { X0 + PITCH * c + PITCH // 2, Z0 + PITCH * r + PITCH // 2 })
-		end
-	end
-	for k = 1, #ramp.Path - 1 do
-		local a, b = ramp.Path[k], ramp.Path[k + 1]
-		local steps = math.max(math.abs(b[1] - a[1]), math.abs(b[2] - a[2])) // PITCH
-		for s = 0, steps do
-			visit(
-				a[1] + (b[1] - a[1]) * s // math.max(steps, 1),
-				a[2] + (b[2] - a[2]) * s // math.max(steps, 1)
-			)
-		end
-	end
-	def.Hazards = def.Hazards or {}
-	def.Decor = def.Decor or {}
-	local placed = 0
-	for k = 2, #found, 3 do
-		if placed >= count then
-			break
-		end
-		placed += 1
-		local spot = found[k]
-		table.insert(def.Hazards, { Type = "Rockfall", At = spot })
-		table.insert(def.Decor, scatter("Pebbles", spot[1] - 12, spot[2] - 12, spot[1] + 12, spot[2] + 12, 5))
-		table.insert(def.Decor, prop("Timber", spot[1] + 8, spot[2] - 6, 0.8, 60))
-	end
-end
-
--- Undertow along every channel.
-local function undertows(def)
-	def.Hazards = def.Hazards or {}
-	for _, item in def.Primitives do
-		if item.Kind == "Channel" then
-			table.insert(def.Hazards, { Type = "Undertow", Path = item.Path, Width = item.Width })
-		end
-	end
-end
-
--- Spike pits: the best find of each crossing lies on a covered pit. Its false floor's cracks
--- are the only tell: a regular learns to look before stepping on the prize.
-local function pits(def)
-	def.Hazards = def.Hazards or {}
-	local best
-	for _, find in def.Loot or {} do
-		if not best or (find.Weight or 1) > (best.Weight or 1) then
-			best = find
-		end
-	end
-	if best then
-		table.insert(def.Hazards, { Type = "Pit", At = best.At, Radius = 4, Covered = true })
-	end
-end
-
-for _, crossing in { crossing1, crossing2, crossing3, crossing4, crossing5 } do
-	pits(crossing)
-end
-
-sinks(crossing1, { { -60, 552 }, { 100, 472 } })
-gloom(crossing1, { -220, 252 }, { -220, 412 })
-gloom(crossing1, { 100, 212 }, { 100, 372 })
-rockfalls(crossing1, 3)
-undertows(crossing1)
-
-sinks(crossing2, { { -180, 232 }, { -260, 232 } })
-gloom(crossing2, { -80, 192 }, { 80, 192 })
-gloom(crossing2, { -100, 372 }, { -100, 532 })
-rockfalls(crossing2, 3)
-undertows(crossing2)
-
-sinks(crossing3, { { -340, 552 }, { 140, 152 } })
-gloom(crossing3, { 80, 192 }, { -80, 192 })
-gloom(crossing3, { -80, 552 }, { 80, 552 })
-rockfalls(crossing3, 3)
-undertows(crossing3)
-
-sinks(crossing4, { { -340, 272 }, { 220, 152 } })
-gloom(crossing4, { -80, 32 }, { 80, 32 })
-gloom(crossing4, { -220, 252 }, { -220, 412 })
-rockfalls(crossing4, 3)
-undertows(crossing4)
-
-sinks(crossing5, { { 140, 472 }, { 300, 352 } })
-gloom(crossing5, { 80, 32 }, { -80, 32 })
-gloom(crossing5, { -80, 392 }, { 80, 392 })
-rockfalls(crossing5, 3)
-undertows(crossing5)
-
-return frame

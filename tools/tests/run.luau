@@ -2437,10 +2437,14 @@ test("a plain zone's own dangers go where its layout puts them, and they're dead
 			gloom = part
 		end
 	end
+	-- (Where along its path it starts is random, and it may turn back: watch it a while.)
 	HazardService._step(0, 0.1)
-	local startX = gloom.CFrame.X
-	HazardService._step(10, 0.1)
-	assert(math.abs(gloom.CFrame.X - startX) > 20, "the Gloom's shadow moves along its path")
+	local startX, farthest = gloom.CFrame.X, 0
+	for t = 2, 40, 2 do
+		HazardService._step(t, 0.1)
+		farthest = math.max(farthest, math.abs(gloom.CFrame.X - startX))
+	end
+	assert(farthest > 20, "the Gloom's shadow moves along its path")
 	assert(gloom:GetAttribute("Duration") > 0, "it Benights whoever it touches")
 	for _, entry in zone.Hazards do
 		local settings = Hazards.settings(entry)
@@ -2448,9 +2452,9 @@ test("a plain zone's own dangers go where its layout puts them, and they're dead
 			assert(settings.Damage >= 100, settings.Type .. " kills")
 		end
 	end
-	-- Rocks fall in turn, each warned first.
+	-- Rocks fall in turn, each warned first (time going on from the Gloom's).
 	local seen = {}
-	for t = 10, 18, 0.1 do
+	for t = 42, 50, 0.1 do
 		HazardService._step(t, 0.1)
 		for _, part in folder:GetChildren() do
 			if part.Name == "RockfallShadow" then

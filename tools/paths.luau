@@ -32,6 +32,7 @@ export type Path = {
 	shared: number, -- the share of it along earlier paths (0 for the first)
 	sizes: { string }, -- the cart sizes that fit along it (none: foot only)
 	cells: { number },
+	turns: { { number } }, -- where it turns, roughly (x, z in the zone), for reports
 }
 
 export type Report = {
@@ -313,11 +314,28 @@ function Paths.analyse(Beach: any, Config: any, tile: number): Report
 				break
 			end
 		end
+		-- Its turns (zone coordinates, z from the zone's top): where it changes direction.
+		local turns = {}
+		local lastDir
+		for i, cell in cells do
+			local col, row = cell % cols, cell // cols
+			local nextCell = cells[i + 1]
+			local dir = if nextCell then (nextCell % cols - col) .. "," .. (nextCell // cols - row) else nil
+			if i == 1 or i == #cells or dir ~= lastDir then
+				local point = { (col - n) * STEP, (top + row) * STEP - z0 }
+				local last = turns[#turns]
+				if not last or math.abs(last[1] - point[1]) + math.abs(last[2] - point[2]) >= 24 then
+					table.insert(turns, point)
+				end
+			end
+			lastDir = dir
+		end
 		return {
 			seconds = length(cells) / WALK_SPEED,
 			shared = shared,
 			sizes = sizes,
 			cells = cells,
+			turns = turns,
 		}
 	end
 

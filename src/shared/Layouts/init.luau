@@ -35,7 +35,9 @@
 -- Materials: Material = a terrain material from Config.Looks.Materials ("Basalt", "Mud") makes
 -- a shape (or a Roof, or a cut's floor) of that instead of the zone's own (see Looks).
 -- Raised shapes take the highest, cuts the lowest, and the two add. Ramps and Flats apply
--- last and blend into the ground around them over Config.Beach.Terrain.Blend studs. Rock
+-- last and blend into the ground around them over Config.Beach.Terrain.Blend studs. A Wall,
+-- Ridge, Mound, Channel or Hollow with Over = true sits on top of that instead (Flats and Ramps
+-- don't clear it): rubble, pools and cuts in ground that was carved out of rock. Rock
 -- shapes have steeper faces and are built from rock. Beach.feature adds the fades at the
 -- tile edges, the cliffs and the rock pools.
 --
@@ -70,6 +72,7 @@ export type Primitive = {
 	Width: number?,
 	Radius: number?,
 	Rock: boolean?,
+	Over: boolean?,
 }
 export type Layout = { Name: string, Primitives: { Primitive } }
 
@@ -84,8 +87,17 @@ Layouts.Kinds = {
 		Rock = false,
 		Rough = false,
 		Material = false,
+		Over = false,
 	},
-	Wall = { Path = false, Area = false, Height = true, Width = false, Rough = false, Material = false },
+	Wall = {
+		Path = false,
+		Area = false,
+		Height = true,
+		Width = false,
+		Rough = false,
+		Material = false,
+		Over = false,
+	},
 	Roof = {
 		Path = false,
 		Width = false,
@@ -97,9 +109,25 @@ Layouts.Kinds = {
 		Rough = false,
 		Material = false,
 	},
-	Mound = { At = true, Radius = true, Height = true, Rock = false, Rough = false, Material = false },
-	Channel = { Path = true, Depth = true, Width = true, Rough = false, Material = false },
-	Hollow = { At = false, Radius = false, Area = false, Depth = true, Rough = false, Material = false },
+	Mound = {
+		At = true,
+		Radius = true,
+		Height = true,
+		Rock = false,
+		Rough = false,
+		Material = false,
+		Over = false,
+	},
+	Channel = { Path = true, Depth = true, Width = true, Rough = false, Material = false, Over = false },
+	Hollow = {
+		At = false,
+		Radius = false,
+		Area = false,
+		Depth = true,
+		Rough = false,
+		Material = false,
+		Over = false,
+	},
 	Ramp = { Path = true, Width = true },
 	Flat = { At = false, Radius = false, Area = false, Rough = false },
 	Paint = {
@@ -578,8 +606,13 @@ local function compile(layout: Layout): Compiled
 		paintCount = 0,
 	}
 	for _, p in layout.Primitives do
-		local entry: any =
-			{ kind = p.Kind, rock = p.Rock == true, rough = p.Rough or 0, material = p.Material }
+		local entry: any = {
+			kind = p.Kind,
+			rock = p.Rock == true,
+			rough = p.Rough or 0,
+			material = p.Material,
+			over = p.Over == true,
+		}
 		local reach: number
 		if p.Area then
 			-- A polygon: its edges as segments; the edge distance is signed (see edgeOf).
@@ -761,21 +794,24 @@ function Layouts.evaluate(layout: Layout, x: number, z: number): (number, boolea
 	if not cell then
 		return 0, false, nil
 	end
-	local up, rock, upMaterial = 0, false, nil
+	-- Raised and cut shapes, those Flats and Ramps clear and those Over them, kept apart.
+	local up, rock, upMaterial = { 0, 0 }, { false, false }, { nil, nil } :: { string? }
 	for _, p in cell.raised do
 		local e = edgeOf(p, x, z)
 		local v = if p.wall
 			then p.amount * math.clamp(-e / WALL_EDGE, 0, 1)
 			else p.amount * profile((e + p.band) / p.band, p.rock)
-		if v > up then
-			up, rock, upMaterial = v, p.rock, p.material
+		local i = if p.over then 2 else 1
+		if v > up[i] then
+			up[i], rock[i], upMaterial[i] = v, p.rock, p.material
 		end
 	end
-	local down, downMaterial = 0, nil
+	local down, downMaterial = { 0, 0 }, { nil, nil } :: { string? }
 	for _, p in cell.cuts do
 		local v = p.amount * profile((edgeOf(p, x, z) + p.band) / p.band, false)
-		if v > down then
-			down, downMaterial = v, p.material
+		local i = if p.over then 2 else 1
+		if v > down[i] then
+			down[i], downMaterial[i] = v, p.material
 		end
 	end
 	local mask = 1
@@ -785,12 +821,18 @@ function Layouts.evaluate(layout: Layout, x: number, z: number): (number, boolea
 			mask = k
 		end
 	end
-	local height = (up - down) * mask
-	local material = if up * mask > 0.5 and up >= down
-		then upMaterial
-		elseif down * mask > 0.5 then downMaterial
-		else nil
-	return height, rock and up * mask > cfg.RockMin, material
+	-- The highest raised and the lowest cut, after the clearing.
+	local high, low = up[1] * mask, down[1] * mask
+	local isRock, highMaterial, lowMaterial = rock[1], upMaterial[1], downMaterial[1]
+	if up[2] > high then
+		high, isRock, highMaterial = up[2], rock[2], upMaterial[2]
+	end
+	if down[2] > low then
+		low, lowMaterial = down[2], downMaterial[2]
+	end
+	local height = high - low
+	local material = if high > 0.5 and high >= low then highMaterial elseif low > 0.5 then lowMaterial else nil
+	return height, isRock and high > cfg.RockMin, material
 end
 
 -- The ground material a layout paints at (x, local z), or nil: the last Paint covering it.
@@ -1023,9 +1065,9 @@ function Layouts.problems(layout: any): { string }
 				if not isPoint(value) then
 					add(where .. ": At is {x, z}")
 				end
-			elseif key == "Rock" then
+			elseif key == "Rock" or key == "Over" then
 				if type(value) ~= "boolean" then
-					add(where .. ": Rock is true or false")
+					add(where .. ": " .. key .. " is true or false")
 				end
 			elseif key == "Area" then
 				local ok = type(value) == "table" and #value >= 3

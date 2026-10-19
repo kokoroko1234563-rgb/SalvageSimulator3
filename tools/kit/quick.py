@@ -2,9 +2,10 @@
 """The quick check for a layout, in seconds: its problems, its paths and times, and a picture.
 
 Usage: python3 tools/kit/quick.py <zone> [Zones/Zone5 | Biomes/Id | Biomes/Planned/Id] [choice...]
-                                  [--plan plan.py] [--no-png]
+                                  [--plan plan.py] [--no-png] [--routes]
 
   --plan   run a kit plan first (it writes the layout), then check what it wrote
+  --routes print where each path goes (its turns), to find a shortcut
   choice   "2:" crossing 2 with the first rooms, "2:1,3" with rooms; none: every crossing
 
 Prints each problem (the definition's, each way's, the paths'), each path's time against the
@@ -29,7 +30,11 @@ def main():
     parser.add_argument("choices", nargs="*")
     parser.add_argument("--plan")
     parser.add_argument("--no-png", action="store_true")
+    parser.add_argument("--routes", action="store_true", help="print where each path goes")
     args = parser.parse_args()
+    if args.source and ":" in args.source:  # a choice, with the source left out
+        args.choices.insert(0, args.source)
+        args.source = None
     source = args.source or f"Zones/Zone{args.zone}"
 
     if args.plan:
@@ -37,7 +42,8 @@ def main():
                        env={**os.environ, "PYTHONPATH": HERE})
     subprocess.run(["stylua", "src/shared/Layouts"], cwd=ROOT, capture_output=True)
 
-    result = subprocess.run(["lune", "run", "tools/kit/quick.luau", str(args.zone), source, *args.choices],
+    result = subprocess.run(["lune", "run", "tools/kit/quick.luau", str(args.zone), source, *args.choices,
+                             *(["--routes"] if args.routes else [])],
                             cwd=ROOT, capture_output=True, text=True)
     print((result.stdout + result.stderr).rstrip())
 

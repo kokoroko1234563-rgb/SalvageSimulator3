@@ -71,6 +71,8 @@ def lua(value, indent=0):
             return "{}"
         items = []
         for key, v in value.items():
+            if key.startswith("_"):
+                continue
             items.append(f"{key} = {lua(v, indent + 1)}")
         short = "{ " + ", ".join(items) + " }"
         if len(short) + len(pad) <= 96 and "\n" not in short:
@@ -169,6 +171,33 @@ def without(area, holes):
     return pieces
 
 
+def inside(points, x, z):
+    hit = False
+    for (ax, az), (bx, bz) in zip(points, points[1:] + points[:1]):
+        if (az > z) != (bz > z) and x < ax + (bx - ax) * (z - az) / (bz - az):
+            hit = not hit
+    return hit
+
+
+def near_path(points, x, z, half):
+    for (ax, az), (bx, bz) in zip(points, points[1:]):
+        dx, dz = bx - ax, bz - az
+        l2 = dx * dx + dz * dz
+        t = 0 if l2 == 0 else max(0, min(1, ((x - ax) * dx + (z - az) * dz) / l2))
+        if math.hypot(ax + dx * t - x, az + dz * t - z) <= half:
+            return True
+    return False
+
+
+def carves(p, x, z):
+    """Whether a Flat or Ramp primitive clears (x, z)."""
+    if "Area" in p:
+        return inside(p["Area"], x, z)
+    if "Path" in p:
+        return near_path(p["Path"], x, z, p["Width"] / 2)
+    return math.hypot(p["At"][0] - x, p["At"][1] - z) <= p["Radius"]
+
+
 def rounded(points):
     return [[round(x, 2), round(z, 2)] for x, z in points]
 
@@ -246,6 +275,14 @@ class Part:
         return self
 
     # -- adding (anywhere) --
+    def _over(self, p):
+        """In a rock zone what's added sits on the carved ground (Over: the carving doesn't
+        clear it): rubble on a gallery's floor, a pool in a hall."""
+        if self.zone.rock:
+            p["Over"] = True
+        self.primitives.append(p)
+        return self
+
     def wall(self, points, width=12, height=None, rough=0, material=None):
         p = {"Kind": "Wall", "Path": rounded(points), "Width": width,
              "Height": height or self.zone.rock or 14}
@@ -253,8 +290,7 @@ class Part:
             p["Rough"] = min(rough, 1)
         if material:
             p["Material"] = material
-        self.primitives.append(p)
-        return self
+        return self._over(p)
 
     def wall_area(self, area, height=None, material=None):
         p = {"Kind": "Wall", "Area": rounded(area), "Height": height or self.zone.rock or 14}
@@ -267,23 +303,24 @@ class Part:
         p = {"Kind": "Ridge", "Path": rounded(points), "Height": height, "Width": width, "Rough": rough}
         if rock:
             p["Rock"] = True
-        self.primitives.append(p)
-        return self
+        return self._over(p)
 
     def mound(self, at, radius=8, height=5, rock=True):
-        self.primitives.append({"Kind": "Mound", "At": list(at), "Radius": radius, "Height": height,
-                                "Rock": rock})
-        return self
+        return self._over({"Kind": "Mound", "At": list(at), "Radius": radius, "Height": height,
+                           "Rock": rock})
 
-    def hollow(self, at, radius=10, depth=3, rough=3):
-        self.primitives.append({"Kind": "Hollow", "At": list(at), "Radius": radius, "Depth": depth,
-                                "Rough": rough})
-        return self
+    def hollow(self, at, radius=10, depth=3, rough=3, material=None):
+        p = {"Kind": "Hollow", "At": list(at), "Radius": radius, "Depth": depth, "Rough": rough}
+        if material:
+            p["Material"] = material
+        return self._over(p)
 
-    def channel(self, points, depth=3, width=14, rough=2):
-        self.primitives.append({"Kind": "Channel", "Path": rounded(points), "Depth": depth,
-                                "Width": width, "Rough": rough})
-        return self
+    def channel(self, points, depth=3, width=14, rough=2, material=None):
+        p = {"Kind": "Channel", "Path": rounded(points), "Depth": depth, "Width": width,
+             "Rough": rough}
+        if material:
+            p["Material"] = material
+        return self._over(p)
 
     def ramp(self, points, width=16):
         """The cart route (bare slope, cleared through everything): a Huge cart needs 14."""
@@ -350,10 +387,11 @@ class Slot:
         self.door = door
         self.rooms = []
 
-    def room(self, name):
-        """A room in the slot, in the slot's own coordinates. Its way to the door is cut for it."""
+    def room(self, name, lead=True):
+        """A room in the slot, in the slot's own coordinates. Its way from the door to the
+        slot's middle is cut for it (lead=False: the room cuts its own)."""
         r = Part(self.zone, name)
-        if self.door is not None and self.zone.rock:
+        if lead and self.door is not None and self.zone.rock:
             dx, dz = self.door
             w, d = self.size
             # From the door straight into the middle of the slot.
@@ -396,10 +434,33 @@ class Zone:
         s = Slot(self, name, at, size, door)
         if door is not None and self.rock:
             x, z = at[0] + door[0], at[1] + door[1]
+            before = len(self.frame.primitives)
             self.frame.lane([(x, z - 8), (x, z + 8)] if door[1] in (0, size[1]) else [(x - 8, z), (x + 8, z)],
                             width=12)
+            for p in self.frame.primitives[before:]:
+                p["_door"] = s
         self.slots.append(s)
         return s
+
+    def intrusions(self):
+        """Where the frame's or a crossing's carving cuts into a slot (other than at its door):
+        a room would get a second way in, or lose its walls. Returns messages."""
+        found = []
+        for slot in self.slots:
+            (sx, sz), (w, d) = slot.at, slot.size
+            for part in [self.frame] + self.crossings:
+                for p in part.primitives:
+                    if p.get("Kind") not in ("Flat", "Ramp") or p.get("_door") is slot:
+                        continue
+                    hits = 0
+                    for gx in range(int(sx) + 6, int(sx + w) - 5, 4):
+                        for gz in range(int(sz) + 6, int(sz + d) - 5, 4):
+                            if carves(p, gx, gz):
+                                hits += 1
+                    if hits:
+                        found.append(f"{part.name or 'the frame'} carves into slot {slot.name} "
+                                     f"({hits} points)")
+        return found
 
     def table(self):
         t = self.frame.table()
@@ -411,6 +472,8 @@ class Zone:
         return t
 
     def write(self, path, comment=None):
+        for message in self.intrusions():
+            print("WARNING " + message)
         head = comment or f"-- Zone {self.number}, {self.name}: drawn with the layout kit (tools/kit)."
         text = head.rstrip() + "\n" + "return " + lua(self.table()) + "\n"
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
