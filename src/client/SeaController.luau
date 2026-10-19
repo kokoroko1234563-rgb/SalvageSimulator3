@@ -116,7 +116,13 @@ local function bilinear(grid: (number, number) -> number, x: number, z: number):
 	return a + (b - a) * tx
 end
 
+-- tools/water (the water lab) swaps in the ground it measured from the terrain's voxels.
+local groundOverride: ((number, number) -> number)? = nil
+
 local function surfaceY(x: number, z: number): number
+	if groundOverride then
+		return groundOverride(x, z)
+	end
 	return bilinear(gridY, x, z)
 end
 
@@ -133,21 +139,37 @@ end
 -- The continuous surfaces -------------------------------------------------------------------
 
 local SAMPLE = 12 -- studs along the shore between the columns where the water is worked out
-local SEA_STEP = 6 -- studs between the sea surface's columns over the beach
--- Near the shore the sea surface is a band of rows that drapes over the ground: from BAND_BACK
--- studs up the beach of the waterline (the furthest a dip can flood, MaxDepth / Slope) to
--- BAND_OUT studs out, every BAND_STEP studs. What's under water is decided from the ground's
--- ideal shape, so the shoreline is a smooth curve even where the terrain is faceted; the water
--- tucks under the sand where it's dry and lies just over any facet poking up where it's wet.
+local SEA_STEP = 8 -- studs between the sea surface's columns over the beach
+-- Near the shore the sea surface is a band of rows over the ground: from BAND_BACK studs up the
+-- beach of the shore (the furthest a dip can flood, MaxDepth / Slope) to BAND_OUT studs out.
+-- The surface lies flat at the sea's height where the game's ground is wet and sinks into the
+-- sand where it's dry (seaPointY), so the drawn ground cuts the shoreline out of it: the rows
+-- needn't be close for the shore to be a smooth curve. They're every BAND_NEAR studs up to
+-- NEAR_OUT studs out, where the water first gets deep, and every BAND_FAR beyond. Out to sea
+-- the band reaches past where the sea is deep enough to lose things on the plain slope, and
+-- then some, so the colour that shows the depth (depthColor) follows every bank and pit.
 local BAND_BACK = math.ceil(Config.Beach.Terrain.MaxDepth / Config.Beach.Slope) + 4
-local BAND_OUT = 16
-local BAND_STEP = 3
-local BAND_ROWS = math.floor((BAND_BACK + BAND_OUT) / BAND_STEP) + 1
+local BAND_OUT = math.ceil((Config.Beach.LostDepth + 6) / Config.Beach.Slope)
+local BAND_NEAR, BAND_FAR, NEAR_OUT = 4, 8, 24
+local BAND_OFFSETS: { number } = {} -- each row's offset from the shore
+do
+	local offset = -BAND_BACK
+	while offset < NEAR_OUT do
+		table.insert(BAND_OFFSETS, offset)
+		offset += BAND_NEAR
+	end
+	while offset < BAND_OUT do
+		table.insert(BAND_OFFSETS, offset)
+		offset += BAND_FAR
+	end
+	table.insert(BAND_OFFSETS, BAND_OUT)
+end
+local BAND_ROWS = #BAND_OFFSETS
 local FAR_LENGTH = 2000 -- the open sea parts' length (a part can be at most 2048)
 local SEA_OUT = 900 -- studs out to sea the sea mesh reaches past the waterline (then flat parts)
 local BOX_BACK = 400 -- each sheet's box reaches this far up the beach of the tide's anchor
 local BOX_OUT = 1200 -- and this far out to sea
-local SEA_REFRESH = 0.1 -- seconds between sea surface updates (the tide moves slowly)
+local SEA_REFRESH = 0.2 -- seconds between sea surface updates (the tide moves slowly)
 local SWASH_ROWS = 5 -- points across the run-up sheet and the wet sand
 local CREST_SLOTS = 2 -- crest ribbons (a rolling wave uses slot Index % CREST_SLOTS)
 
@@ -164,6 +186,8 @@ type Chunk = {
 	mesh: any,
 	part: MeshPart,
 	ids: { number }, -- vertex ids, for the sheet's points `first` onward
+	colorIds: { number }?, -- each vertex's own colour id, for a sheet coloured per point
+	shown: { Color3 }?, -- the colours last set, so only the ones that change are set again
 	first: number,
 	batch: boolean,
 	center: Vector3, -- the middle of its box; Z is from the sheet's anchor (see flush)
@@ -173,6 +197,7 @@ type Chunk = {
 type Sheet = {
 	chunks: { Chunk },
 	points: { Vector3 },
+	colors: { Color3 }?, -- each point's colour, for a sheet coloured per point
 	cols: number,
 	rows: number,
 }
@@ -195,6 +220,19 @@ local function newChunk(
 	for i = 1, cols * rows do
 		ids[i] = mesh:AddVertex(Vector3.zero)
 	end
+	-- Coloured per point: each vertex gets a colour of its own, and every face's corners use
+	-- their vertices' colours, so the colour blends smoothly across the sheet.
+	local perPoint = props.PerPointColor
+	local colorIds: { number }? = nil
+	local colorOf: { [number]: number } = {}
+	if perPoint then
+		local list = table.create(cols * rows)
+		for i, id in ids do
+			list[i] = mesh:AddColor(Color3.new(1, 1, 1), 1)
+			colorOf[id] = list[i]
+		end
+		colorIds = list
+	end
 	-- All lit as if facing up (the water and sand lie nearly flat), so slopes and folds in
 	-- the sheet don't shade it unevenly.
 	local up = mesh:AddNormal(Vector3.yAxis)
@@ -203,6 +241,9 @@ local function newChunk(
 		local face = mesh:AddTriangle(a, b, c)
 		if normals then
 			normals = pcall(mesh.SetFaceNormals, mesh, face, { up, up, up })
+		end
+		if colorIds and colorOf[a] then
+			mesh:SetFaceColors(face, { colorOf[a], colorOf[b], colorOf[c] })
 		end
 	end
 	for c = 1, cols - 1 do
@@ -227,7 +268,12 @@ local function newChunk(
 	part.CanTouch = false
 	part.CastShadow = false
 	for key, value in props do
-		(part :: any)[key] = value
+		if key ~= "PerPointColor" then
+			(part :: any)[key] = value
+		end
+	end
+	if perPoint then
+		part.Color = Color3.new(1, 1, 1) -- the vertices carry the colour
 	end
 	part.Size = part.MeshSize
 	part.CFrame = CFrame.new(center)
@@ -236,6 +282,8 @@ local function newChunk(
 		mesh = mesh,
 		part = part,
 		ids = ids,
+		colorIds = colorIds,
+		shown = if colorIds then {} else nil,
 		first = (fromCol - 1) * rows + 1,
 		batch = true,
 		center = center,
@@ -274,7 +322,13 @@ local function newSheet(
 ): Sheet
 	local cols = #colXs
 	local points = table.create(cols * rows, (low + high) / 2)
-	local sheet: Sheet = { chunks = {}, points = points, cols = cols, rows = rows }
+	local sheet: Sheet = {
+		chunks = {},
+		points = points,
+		colors = if props.PerPointColor then table.create(cols * rows, Palette.Water.Shallow) else nil,
+		cols = cols,
+		rows = rows,
+	}
 	for _, range in chunkRanges(colXs, rows) do
 		local fromCol, toCol = range[1], range[2]
 		local boxLow = Vector3.new(colXs[fromCol] - 1, low.Y, low.Z)
@@ -287,6 +341,14 @@ end
 
 local function setPoint(sheet: Sheet, col: number, row: number, point: Vector3)
 	sheet.points[(col - 1) * sheet.rows + row] = point
+end
+
+-- A point's colour, on a sheet drawn with colours per point (the sea).
+local function setColor(sheet: Sheet, col: number, row: number, color: Color3)
+	local colors = sheet.colors
+	if colors then
+		colors[(col - 1) * sheet.rows + row] = color
+	end
 end
 
 -- Moves the sheet's points to where they were set this frame.
@@ -312,6 +374,24 @@ local function flush(sheet: Sheet, anchorZ: number)
 				math.clamp(p.Y, -half.Y, half.Y),
 				math.clamp(p.Z, -half.Z, half.Z)
 			)
+		end
+		local colorIds, shown, colors = chunk.colorIds, chunk.shown, sheet.colors
+		if colorIds and shown and colors then
+			-- Only the colours that changed enough to see.
+			for i = 1, count do
+				local color = colors[first + i]
+				local last = shown[i]
+				if
+					not last
+					or math.abs(last.R - color.R)
+							+ math.abs(last.G - color.G)
+							+ math.abs(last.B - color.B)
+						> 0.02
+				then
+					shown[i] = color
+					chunk.mesh:SetColor(colorIds[i], color)
+				end
+			end
 		end
 		if chunk.batch then
 			local ok = pcall(chunk.mesh.BatchSetValues, chunk.mesh, ids, values)
@@ -392,7 +472,7 @@ local function plan(): { Plan }
 			rows = BAND_ROWS + 2,
 			low = Vector3.new(-half - SIDE - 1, low, -BOX_BACK),
 			high = Vector3.new(half + SIDE + 1, 20, BOX_OUT),
-			props = { Material = Palette.Material.Glass, Color = Palette.World.Sea, Transparency = 0.3 },
+			props = { Material = Palette.Material.Glass, Transparency = 0.25, PerPointColor = true },
 		},
 		{
 			name = "Swash",
@@ -458,8 +538,8 @@ local function buildMeshes(folder: Folder): Meshes
 		local part = makePart("FarSea", {
 			Size = Vector3.new(Beach.HalfWidth + SIDE, THICKNESS, FAR_LENGTH),
 			Material = Palette.Material.Glass,
-			Color = Palette.World.Sea,
-			Transparency = 0.3,
+			Color = Palette.Water.Lost, -- the open sea is deep
+			Transparency = 0.25,
 		})
 		part.Parent = folder
 		result.far[i] = part
@@ -545,6 +625,49 @@ end
 
 local seaUpdatedAt = -math.huge
 
+-- How high the sea surface is drawn at (x, z). The game's water is level: wherever the ground
+-- (Beach.groundAt) is below the sea's height it's water, as deep as the difference. So the
+-- surface lies flat at the sea's height, and the drawn ground cuts the shoreline out of it,
+-- along banks, walls, pits and channels alike. Where the game's ground is dry it sinks just
+-- under the sea's height (or under the drawn ground, if that's lower), so it's hidden in the
+-- sand and never slants up a wall between a wet point and a dry one. Where the game's ground
+-- is wet but the drawn terrain bulges above the water (its cells round things off), the
+-- surface lifts over it a little, but never far above the sea.
+local LIFT = 0.6 -- the most the surface lifts over the drawn ground in the water
+
+-- The sea's colour over water `depth` deep (the game's depth, from Beach.groundAt): pale where
+-- it's shallow, darkening through knee and waist deep, then a quick step to deep blue where
+-- it's deep enough to drown (WaistDepth), and darker still where things are lost (LostDepth).
+-- So you can read from the colour how the water will treat you.
+local DEPTH_COLORS = {
+	{ 0, Palette.Water.Shallow },
+	{ beach.ShallowDepth, Palette.Water.Shallow:Lerp(Palette.Water.Knee, 0.5) },
+	{ beach.KneeDepth, Palette.Water.Knee },
+	{ beach.WaistDepth - 0.4, Palette.Water.Waist },
+	{ beach.WaistDepth, Palette.Water.Deep },
+	{ beach.LostDepth, Palette.Water.Lost },
+}
+local function depthColor(depth: number): Color3
+	if depth <= DEPTH_COLORS[1][1] then
+		return DEPTH_COLORS[1][2]
+	end
+	for i = 2, #DEPTH_COLORS do
+		local b = DEPTH_COLORS[i]
+		if depth < b[1] then
+			local a = DEPTH_COLORS[i - 1]
+			return a[2]:Lerp(b[2], (depth - a[1]) / (b[1] - a[1]))
+		end
+	end
+	return DEPTH_COLORS[#DEPTH_COLORS][2]
+end
+local function seaPointY(x: number, z: number, waterY: number): number
+	local ground = surfaceY(x, z)
+	if idealY(x, z) < waterY then
+		return math.max(waterY, math.min(ground + 0.06, waterY + LIFT))
+	end
+	return math.min(waterY - 0.05, ground - 0.3)
+end
+
 -- The sea surface: flat at each column's water level, draped over the ground near the shore.
 local function updateSea(m: Meshes, sea: Tide.Sea)
 	local rows = BAND_ROWS + 2
@@ -556,21 +679,22 @@ local function updateSea(m: Meshes, sea: Tide.Sea)
 		-- same Z as the beach's, so the surface joins up without stretching.
 		local open = math.abs(x) >= half - 1
 		local shore = if open then line else Beach.shoreFrom(x, line)
-		local first = math.min(line, shore) - BAND_BACK
+		local from = math.min(line, shore)
+		local first = from - BAND_BACK
 		-- Far up the beach it's all dry: well under the sand.
 		setPoint(m.sea, c, 1, Vector3.new(x, if open then waterY else waterY - 50, first - 40))
+		setColor(m.sea, c, 1, Palette.Water.Shallow)
 		for k = 1, BAND_ROWS do
-			local z = first + (k - 1) * BAND_STEP
+			local z = from + BAND_OFFSETS[k]
 			local y = waterY
 			if not open then
-				local ideal = idealY(x, z)
-				local wet = if z >= shore then ideal <= waterY + 0.3 else ideal < waterY - 0.3
-				local ground = surfaceY(x, z)
-				y = if wet then math.max(waterY, ground + 0.06) else ground - 0.3
+				y = seaPointY(x, z, waterY)
 			end
 			setPoint(m.sea, c, k + 1, Vector3.new(x, y, z))
+			setColor(m.sea, c, k + 1, depthColor(waterY - idealY(x, z)))
 		end
 		setPoint(m.sea, c, rows, Vector3.new(x, waterY, line + SEA_OUT))
+		setColor(m.sea, c, rows, Palette.Water.Lost)
 	end
 	flush(m.sea, anchorFor(sea))
 	-- The open sea beyond, a hair under the mesh where they meet.
@@ -914,6 +1038,67 @@ function SeaController.init()
 	end
 
 	RunService.RenderStepped:Connect(update)
+end
+
+-- For tools/tests and the water lab (tools/water): everything the water would draw at a
+-- moment, without drawing it. Each sheet's points are listed column by column, `rows` to a
+-- column, at the X positions in `colXs`.
+local virtual: Meshes? = nil
+function SeaController._frame(sea: Tide.Sea, wetSea: Tide.Sea, ground: ((number, number) -> number)?)
+	setup()
+	groundOverride = ground
+	forgetGround()
+	if not virtual then
+		local sheets: { [string]: Sheet } = {}
+		local colXsOf: { [string]: { number } } = {}
+		local looks: { [string]: { [string]: any } } = {}
+		for _, entry in plan() do
+			looks[entry.name] = entry.props
+			local count = #entry.colXs * entry.rows
+			sheets[entry.name] = {
+				chunks = {},
+				points = table.create(count, Vector3.zero),
+				colors = if entry.props.PerPointColor
+					then table.create(count, Palette.Water.Shallow)
+					else nil,
+				cols = #entry.colXs,
+				rows = entry.rows,
+			}
+			colXsOf[entry.name] = entry.colXs
+		end
+		local crests = {}
+		for i = 1, CREST_SLOTS do
+			crests[i] = sheets["Crest" .. i]
+		end
+		virtual = {
+			sea = sheets.Sea,
+			seaXs = colXsOf.Sea,
+			swash = sheets.Swash,
+			foam = sheets.Foam,
+			wet = sheets.WetSand,
+			crests = crests,
+			far = { {} :: any, {} :: any },
+		}
+		(virtual :: any).colXsOf = colXsOf;
+		(virtual :: any).byName = sheets;
+		(virtual :: any).looks = looks
+	end
+	local m = virtual :: Meshes
+	seaUpdatedAt = -math.huge
+	local columns = computeColumns(sea, wetSea)
+	updateMeshes(m, sea, columns)
+	groundOverride = nil
+	local out = {}
+	for name, sheet in (m :: any).byName do
+		out[name] = {
+			points = sheet.points,
+			colors = (sheet :: any).colors,
+			rows = sheet.rows,
+			colXs = (m :: any).colXsOf[name],
+			look = (m :: any).looks[name],
+		}
+	end
+	return out, columns, xs
 end
 
 -- For tools/tests.

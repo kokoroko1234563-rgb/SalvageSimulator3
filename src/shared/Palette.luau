@@ -238,6 +238,16 @@ Palette.Cosmetic = {
 	Stone = rgb(170, 165, 155),
 }
 
+-- The sea's colour by how deep it is (src/client/SeaController): the deeper, the darker, with a
+-- clear step to the deep blue where it's deep enough to drown (Config.Beach.WaistDepth).
+Palette.Water = {
+	Shallow = rgb(120, 228, 222), -- ankle to shin: pale, the sand shows through
+	Knee = rgb(40, 200, 214),
+	Waist = rgb(22, 150, 200), -- slow going, nearly out of your depth
+	Deep = rgb(16, 78, 160), -- over your head: you drown here
+	Lost = rgb(10, 50, 120), -- loose things are lost to the tide
+}
+
 Palette.Material = {
 	Sand = Enum.Material.Sand,
 	Wood = Enum.Material.Wood,

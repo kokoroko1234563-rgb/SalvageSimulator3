@@ -426,6 +426,13 @@ end
 
 local overrides: { [number]: { def: any, choice: Choice? } | false } = {}
 
+Layouts.LabAttribute = "WaterLab"
+
+-- The water lab's test layout (Layouts/Lab).
+function Layouts.lab(): any
+	return require(script.Lab) :: any
+end
+
 -- The Workspace attribute holding a tile's choice.
 function Layouts.attributeFor(tile: number): string
 	return "TileLayout" .. tile
@@ -436,6 +443,10 @@ function Layouts.activeDef(tile: number): any
 	local forced = overrides[tile]
 	if forced ~= nil then
 		return forced and forced.def or nil
+	end
+	-- The water lab's test layout (Layouts/Lab), put in a zone from the review place.
+	if Workspace:GetAttribute(Layouts.LabAttribute) == tile then
+		return Layouts.lab()
 	end
 	local zone = zoneOfTile(tile)
 	local biome = Biomes.activeIn(tile)
