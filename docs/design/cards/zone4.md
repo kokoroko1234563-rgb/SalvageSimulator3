@@ -39,4 +39,6 @@ covered pit under a prize per crossing (the tell: cracks).
 
 **Questions.**
 1. Rockfall as zone 4's own danger (zone 5 gets sinking sand, zone 6 the Gloom): agreed?
+Answer: That is fine
 2. Are open pits in zone 4 too early, or right as the first deadly thing a player meets?
+Answer: For normal zones I would say that the odd pit is fine in this zone so long as it is well shown
