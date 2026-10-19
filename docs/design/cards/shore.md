@@ -13,4 +13,9 @@ Low banks can't slow a walker (terrain rounds them), and rock isn't allowed befo
 
 **Questions.**
 1. Zone 3: allow a few rock outcrops (walls) to lengthen the way, or lower its target to 40?
-2. Dangers on the shore: none (as now), or the first gentle one in zone 3?
+
+Answer: Lower the target, no walls that high should be present here
+
+3. Dangers on the shore: none (as now), or the first gentle one in zone 3?
+
+Answer: Let's not have dangers here, if it seems necessary they can be added way later
