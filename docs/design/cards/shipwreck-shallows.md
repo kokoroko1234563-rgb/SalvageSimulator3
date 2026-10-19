@@ -32,3 +32,5 @@ a flooded scour hole. The ShipBell and the best crates in the holds.
 **Questions.**
 1. Barrels: make big ones deadly (crush) and small ones knock things out of your hands? Or
    keep them non-deadly as the biome's gentler hazard?
+
+Answer: Maybe not deadly, but they should definitely launch you tumbling, I also think they should be telegraphed somehow, and only appear where it makes sense for them to appear. I also think this area should have spike traps.
