@@ -42,6 +42,7 @@ local TILT = CFrame.Angles(math.atan(beach.Slope), 0, 0) -- lies flat on the slo
 local FAR = CFrame.new(0, -10000, 0)
 
 local SWASH = Palette.World.Sea:Lerp(Color3.new(1, 1, 1), 0.35)
+local WET_TINT = Color3.fromRGB(60, 45, 28) -- darkens the ground under it: wet sand
 
 local zMax = 0
 
@@ -171,6 +172,7 @@ local BOX_BACK = 400 -- each sheet's box reaches this far up the beach of the ti
 local BOX_OUT = 1200 -- and this far out to sea
 local SEA_REFRESH = 0.2 -- seconds between sea surface updates (the tide moves slowly)
 local SWASH_ROWS = 5 -- points across the run-up sheet and the wet sand
+local WET_BAND = 24 -- the most sand shown wet above the shore, in studs
 local CREST_SLOTS = 2 -- crest ribbons (a rolling wave uses slot Index % CREST_SLOTS)
 
 -- A sheet: a grid of points (columns along the shore, rows across), given in world space each
@@ -496,7 +498,8 @@ local function plan(): { Plan }
 			rows = SWASH_ROWS,
 			low = beachLow,
 			high = beachHigh,
-			props = { Material = Palette.Material.Sand, Color = Palette.World.WetSand, Transparency = 0.45 },
+			-- A dark, see-through tint, so wet ground looks darker than dry in any zone's colours.
+			props = { Material = Palette.Material.Smooth, Color = WET_TINT, Transparency = 0.7 },
 		},
 	}
 	for i = 1, CREST_SLOTS do
@@ -590,7 +593,9 @@ local function sampleColumn(x: number, sea: Tide.Sea, wetSea: Tide.Sea): Column
 	local lastReach = line
 		+ Waves.frontAt(x, line, shore - line - Waves.reach(Waves.indexAt(sea.Now) - 1, line, x))
 	local wetLine = Tide.waterlineAt(wetSea, x)
-	column.wetTo = math.min(Beach.shoreFrom(x, wetLine), lastReach, column.edge)
+	-- At most WET_BAND up the beach: its few rows can only follow the ground that far (past
+	-- it, the sheet would float over dips and cut through banks).
+	column.wetTo = math.max(math.min(Beach.shoreFrom(x, wetLine), lastReach, column.edge), shore - WET_BAND)
 	return column
 end
 
@@ -669,6 +674,7 @@ local function seaPointY(x: number, z: number, waterY: number): number
 end
 
 -- The sea surface: flat at each column's water level, draped over the ground near the shore.
+local depths = table.create(BAND_ROWS, 0)
 local function updateSea(m: Meshes, sea: Tide.Sea)
 	local rows = BAND_ROWS + 2
 	local half = Beach.HalfWidth
@@ -691,7 +697,28 @@ local function updateSea(m: Meshes, sea: Tide.Sea)
 				y = seaPointY(x, z, waterY)
 			end
 			setPoint(m.sea, c, k + 1, Vector3.new(x, y, z))
-			setColor(m.sea, c, k + 1, depthColor(waterY - idealY(x, z)))
+			depths[k] = waterY - idealY(x, z)
+		end
+		-- A point on dry ground (a wall, a bank, the beach) is hidden, but its colour blends into
+		-- the water around it: give it the depth of the nearest wet point in the column, or the
+		-- open slope's there, so deep water beside a wall doesn't look shallow.
+		for k = 1, BAND_ROWS do
+			local depth = depths[k]
+			if depth <= 0 then
+				local z = from + BAND_OFFSETS[k]
+				depth = waterY - Beach.groundY(z)
+				for reach = 1, 3 do
+					local before, after = depths[k - reach], depths[k + reach]
+					if before and before > 0 then
+						depth = before
+						break
+					elseif after and after > 0 then
+						depth = after
+						break
+					end
+				end
+			end
+			setColor(m.sea, c, k + 1, depthColor(depth))
 		end
 		setPoint(m.sea, c, rows, Vector3.new(x, waterY, line + SEA_OUT))
 		setColor(m.sea, c, rows, Palette.Water.Lost)
@@ -837,9 +864,9 @@ local function buildPieces(folder: Folder): Pieces
 				Transparency = 0.45,
 			})
 			result.wet[c][i] = make("WetSand", Vector3.new(width, 0.06, 1), {
-				Material = Palette.Material.Sand,
-				Color = Palette.World.WetSand,
-				Transparency = 0.45,
+				Material = Palette.Material.Smooth,
+				Color = WET_TINT,
+				Transparency = 0.7,
 			})
 		end
 		result.foam[c] = make("Foam", Vector3.new(width, 0.14, 1.4), {

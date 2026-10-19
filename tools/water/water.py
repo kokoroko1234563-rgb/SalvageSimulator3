@@ -260,6 +260,15 @@ def draw_eye(scene, out, eye_x, eye_z, width=960, height=540, fov=70, pitch=-10,
     def raster(tris, colours, alphas, opaque):
         """tris: (n, 3, 3) world points; colours: (n, 3); alphas: (n,)."""
         pts = project(tris.reshape(-1, 3)).reshape(-1, 3, 3)
+        shade = None
+        if opaque and len(tris):
+            # Sunlight from high in the south-west, and a little sky light everywhere.
+            n = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
+            n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-9)
+            n *= np.sign(n[:, 1:2] + 1e-9)
+            light = np.array([0.35, 0.85, -0.4])
+            light /= np.linalg.norm(light)
+            shade = 0.45 + 0.6 * np.clip(n @ light, 0, 1)
         keep = (pts[:, :, 2] > 0.5).all(1)
         for t in np.nonzero(keep)[0]:
             a, b, c = pts[t]
@@ -283,6 +292,8 @@ def draw_eye(scene, out, eye_x, eye_z, width=960, height=540, fov=70, pitch=-10,
             if not near.any():
                 continue
             colour = colours[t]
+            if opaque and shade is not None:
+                colour = colour * shade[t]
             if opaque:
                 region[near] = depth[near]
                 img[ymin:ymax, xmin:xmax][near] = colour
@@ -326,9 +337,8 @@ def draw_eye(scene, out, eye_x, eye_z, width=960, height=540, fov=70, pitch=-10,
         sheet = scene.sheets.get(name)
         if not sheet:
             continue
+        # The ground hides what's under it, pixel by pixel (the depth test), as in the engine.
         y = sheet["y"].copy()
-        # Only what's above the ground shows (the rest is hidden in the sand).
-        y[~(np.nan_to_num(y, nan=-1e9) > scene.floor + 0.01)] = np.nan
         t, c, a = grid_tris(y, sheet["rgb"], sheet["alpha"], stride=stride)
         if len(t):
             centre = t.mean(1)
