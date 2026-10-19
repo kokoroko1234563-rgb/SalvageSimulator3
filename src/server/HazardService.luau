@@ -536,14 +536,54 @@ function builders.Undertow(tile, settings, folder)
 	})
 end
 
--- Hunter: a big creature that patrols a route and hunts players it sees (Hazards.luau). It
--- only chases someone it can see with nothing in the way, so it never walks through rock; it
--- leaves a trail of crumbs while it chases and walks back along them to its route.
+-- Hunter: a big creature that patrols a route and hunts players it sees (Hazards.luau). It sees
+-- ahead of it, in a cone, with nothing solid in the way (and feels anyone right beside it), and
+-- it never leaves its route: it runs along it to the point nearest its prey, so in a tunnel it
+-- fills the way and can't be run round.
 local function carriesLight(player: Player): boolean
 	local worn = Gear.getAccessory(player:GetAttribute("Accessory"))
 	local tool = Gear.findTool(player:GetAttribute("Tool"))
 	return (worn ~= nil and worn.Light ~= nil) or (tool ~= nil and tool.Light ~= nil)
 end
+
+-- A route as a rail: the point (and the way it runs) at a distance along it, and the distance
+-- along it of the point nearest a position.
+local function rail(path: { Vector2 })
+	local starts, total = {}, 0
+	for i = 1, #path - 1 do
+		starts[i] = total
+		total += (path[i + 1] - path[i]).Magnitude
+	end
+	local function at(s: number): (Vector2, Vector2)
+		s = math.clamp(s, 0, total)
+		for i = #path - 1, 1, -1 do
+			if s >= starts[i] then
+				local segment = path[i + 1] - path[i]
+				local length = segment.Magnitude
+				if length <= 0 then
+					return path[i], Vector2.new(0, 1)
+				end
+				return path[i] + segment.Unit * math.min(s - starts[i], length), segment.Unit
+			end
+		end
+		return path[1], Vector2.new(0, 1)
+	end
+	local function nearest(p: Vector2): number
+		local best, bestDistance = 0, math.huge
+		for i = 1, #path - 1 do
+			local a, segment = path[i], path[i + 1] - path[i]
+			local length = segment.Magnitude
+			local t = if length > 0 then math.clamp((p - a):Dot(segment) / (length * length), 0, 1) else 0
+			local distance = (a + segment * t - p).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = starts[i] + t * length, distance
+			end
+		end
+		return best
+	end
+	return { at = at, nearest = nearest, length = total }
+end
+HazardService._rail = rail
 
 function builders.Hunter(tile, settings, folder)
 	local z0 = Beach.tileRange(tile)
@@ -594,12 +634,13 @@ function builders.Hunter(tile, settings, folder)
 		model.Parent = folder
 		table.insert(hunters, {
 			model = model,
-			path = path,
-			travelled = 0,
+			rail = rail(path),
+			s = 0, -- how far along its route it is
+			dir = 1, -- which way it's patrolling
 			at = path[1],
 			heading = Vector2.new(0, 1),
 			mode = "patrol",
-			crumbs = {},
+			home = 0, -- where along the route the chase began (its leash runs from there)
 			lost = 0,
 		})
 	end
@@ -616,6 +657,7 @@ function builders.Hunter(tile, settings, folder)
 			CFrame.lookAt(position, position + (if look.Magnitude > 0 then look else Vector3.zAxis))
 		)
 	end
+	local viewCos = math.cos(math.rad(settings.SightAngle / 2))
 	-- Whether a hunter can see a point: nothing solid in between, at about eye height.
 	local function sees(h, target: Vector3): boolean
 		local from = Vector3.new(h.at.X, Beach.groundAt(h.at.X, h.at.Y) + size.Y * 0.6, h.at.Y)
@@ -628,15 +670,18 @@ function builders.Hunter(tile, settings, folder)
 		params.FilterDescendantsInstances = exclude
 		return Workspace:Raycast(from, target - from, params) == nil
 	end
-	local function moveToward(h, goal: Vector2, speed: number, dt: number)
-		local offset = goal - h.at
-		if offset.Magnitude < 0.01 then
-			return true
+	-- Moves a hunter along its route toward `goal` (a distance along it) at `speed`. It turns to
+	-- face the way it goes, or, standing still, toward `face`.
+	local function slide(h, goal: number, speed: number, dt: number, face: Vector2?)
+		local step = math.clamp(goal - h.s, -speed * dt, speed * dt)
+		h.s += step
+		local at, tangent = h.rail.at(h.s)
+		h.at = at
+		if math.abs(step) > 1e-4 then
+			h.heading = tangent * math.sign(step)
+		elseif face and (face - at).Magnitude > 0.1 then
+			h.heading = (face - at).Unit
 		end
-		local stepLength = math.min(offset.Magnitude, speed * dt)
-		h.heading = offset.Unit
-		h.at += offset.Unit * stepLength
-		return stepLength >= offset.Magnitude - 0.01
 	end
 	table.insert(running, {
 		folder = folder,
@@ -652,55 +697,53 @@ function builders.Hunter(tile, settings, folder)
 							local range = if carriesLight(player)
 								then settings.LightRange
 								else settings.SightRange
-							local across = (Vector2.new(root.Position.X, root.Position.Z) - h.at).Magnitude
-							if across <= range and sees(h, root.Position) then
-								h.mode, h.target, h.lost = "chase", player, 0
-								if #h.crumbs == 0 then
-									h.crumbs = { h.at }
-								end
+							local offset = Vector2.new(root.Position.X, root.Position.Z) - h.at
+							local across = offset.Magnitude
+							-- It sees ahead of it, in a cone; behind it, only someone close
+							-- enough to feel.
+							local ahead = across <= settings.FeelRange
+								or (across > 0 and offset.Unit:Dot(h.heading) >= viewCos)
+							if across <= range and ahead and sees(h, root.Position) then
+								h.mode, h.target, h.lost, h.home = "chase", player, 0, h.s
 								break
 							end
 						end
 					end
 				end
 				if h.mode == "chase" then
+					-- It hunts along its route, never off it: to the point of its route
+					-- nearest the player, no further than its leash from where it began. In a
+					-- tunnel it fills the way, so it can't be run round.
 					local character = h.target and h.target.Character
 					local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 					local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-					local home = h.crumbs[1]
-					if
-						not root
-						or not humanoid
-						or humanoid.Health <= 0
-						or (h.at - home).Magnitude > settings.Leash
-					then
-						h.mode = "return"
-					elseif sees(h, root.Position) then
-						h.lost = 0
-						moveToward(h, Vector2.new(root.Position.X, root.Position.Z), settings.ChaseSpeed, dt)
-						if (h.at - h.crumbs[#h.crumbs]).Magnitude > 4 then
-							table.insert(h.crumbs, h.at)
-						end
-					else
-						h.lost += dt
-						if h.lost > settings.LoseTime then
-							h.mode = "return"
-						end
-					end
-				elseif h.mode == "return" then
-					local crumb = h.crumbs[#h.crumbs]
-					if not crumb then
+					if not root or not humanoid or humanoid.Health <= 0 then
 						h.mode = "patrol"
-					elseif moveToward(h, crumb, settings.Speed * 1.5, dt) then
-						table.remove(h.crumbs)
-						if #h.crumbs == 0 then
+					else
+						local where = Vector2.new(root.Position.X, root.Position.Z)
+						if sees(h, root.Position) then
+							h.lost = 0
+						else
+							h.lost += dt
+						end
+						if h.lost > settings.LoseTime then
 							h.mode = "patrol"
+						else
+							local goal = math.clamp(
+								h.rail.nearest(where),
+								h.home - settings.Leash,
+								h.home + settings.Leash
+							)
+							slide(h, goal, settings.ChaseSpeed, dt, where)
 						end
 					end
 				else
-					h.travelled += settings.Speed * dt
-					local at, heading = HazardService.alongPath(h.path, h.travelled)
-					h.at, h.heading = at, heading
+					-- Patrolling: back and forth along its route.
+					local goal = if h.dir > 0 then h.rail.length else 0
+					slide(h, goal, settings.Speed, dt)
+					if math.abs(h.s - goal) < 0.01 then
+						h.dir = -h.dir
+					end
 				end
 				place(h)
 			end

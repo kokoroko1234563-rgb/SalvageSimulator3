@@ -2530,6 +2530,16 @@ test("the giant crab takes the longest crab route, and is deadly but can be outr
 	assert(math.abs(body.CFrame.X + 100) < 1 and math.abs(body.CFrame.Z - (z0 + 100)) < 1, "on its route")
 	local settings = Hazards.settings({ Type = "Hunter" })
 	assert(settings.Damage >= 100 and settings.ChaseSpeed < 20, "deadly, but a running player can outpace it")
+	assert(settings.SightAngle < 360, "it can't see behind it")
+	-- It keeps to its route like a rail: an L-shaped route, 100 along X then 50 along Z.
+	local V2 = roblox.Vector2.new
+	local route = HazardService._rail({ V2(0, 0), V2(100, 0), V2(100, 50) })
+	assert(math.abs(route.length - 150) < 1e-6, "the route's length")
+	local at, way = route.at(120)
+	assert((at - V2(100, 20)).Magnitude < 1e-6 and (way - V2(0, 1)).Magnitude < 1e-6, "a point along it")
+	assert(math.abs(route.nearest(V2(40, -30)) - 40) < 1e-6, "someone beside the first leg")
+	assert(math.abs(route.nearest(V2(130, 35)) - 135) < 1e-6, "someone beside the second leg")
+	assert(math.abs(route.nearest(V2(-50, 5))) < 1e-6, "someone past its start: it waits at the end")
 	folder:Destroy()
 	Layouts.setActive(tile, nil)
 end)
