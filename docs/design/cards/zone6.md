@@ -40,3 +40,4 @@ channel.
 **Questions.**
 1. Keep the current zone 6 (built as the role model) and add paths to it, or rebuild it fully
    with the kit (which also fixes the grid look)?
+Answer: Let's rebuild it, but still, we will need to have one main zone/biome to use as the "role model" for future designs.
