@@ -21,13 +21,16 @@ local SkyBeamController = require(script.SkyBeamController)
 local TradeUI = require(script.TradeUI)
 local TraderUI = require(script.TraderUI)
 
--- Each system starts on its own: if one fails, it says so in the output and the rest still
--- start (one bad init used to stop everything after it, grabbing included).
+-- Each system starts on its own thread: if one fails, it says so in the output, and if one
+-- waits (for its GUI, a remote, the engine), the rest still start (one bad init used to stop
+-- everything after it, grabbing included). They still start in this order.
 local function start(name: string, init: () -> ())
-	local ok, err = pcall(init)
-	if not ok then
-		warn("[Client] " .. name .. " failed to start: " .. tostring(err))
-	end
+	task.spawn(function()
+		local ok, err = pcall(init)
+		if not ok then
+			warn("[Client] " .. name .. " failed to start: " .. tostring(err))
+		end
+	end)
 end
 
 start("WaterObstacles", require(game:GetService("ReplicatedStorage").Shared.WaterObstacles).init)

@@ -37,6 +37,9 @@ local TraderService = require(script.TraderService)
 local VesselService = require(script.VesselService)
 
 Remotes.init()
+-- Admins are marked first, so the admin console and the review place's panel work even if
+-- something later in the start-up stalls or fails (the commands themselves wait for nothing).
+AdminService.init()
 
 -- Check that the game's data fits together before anything uses it.
 do
@@ -97,8 +100,8 @@ ToolModels.init()
 RebirthService.init(notify, ShopService.nearShop)
 AuctionService.init(notify)
 MonetizationService.init(notify)
-AdminService.init()
 require(script.ReviewService).init() -- the review place only
+print("[Startup] the server is ready")
 
 -- The showroom (admins: tp showroom). Built last, off the startup path: some exhibits load
 -- avatars, which waits on Roblox.

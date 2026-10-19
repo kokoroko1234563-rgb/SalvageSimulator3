@@ -1142,6 +1142,14 @@ function AdminService.init()
 		local isAdmin = checkAdmin(player)
 		admins[player] = isAdmin or nil
 		player:SetAttribute("IsAdmin", isAdmin)
+		print(
+			string.format(
+				"[Admin] %s (%d): %s",
+				player.Name,
+				player.UserId,
+				if isAdmin then "admin" else "not an admin"
+			)
+		)
 	end
 	Players.PlayerAdded:Connect(onPlayer)
 	for _, player in Players:GetPlayers() do
