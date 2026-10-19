@@ -1010,7 +1010,7 @@ function SeaController.init()
 	setup()
 
 	Workspace.AttributeChanged:Connect(function(name)
-		if string.match(name, "^TileBiome") then
+		if string.match(name, "^TileBiome") or string.match(name, "^TileLayout") or name == "WaterLab" then
 			-- The tile's terrain is rebuilt (and replicates a moment later).
 			forgetGround()
 			seaUpdatedAt = -math.huge

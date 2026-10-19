@@ -406,24 +406,44 @@ command(
 	end
 )
 
-command("tide", "tide <out|hold|in> [percent]", "Jump the tide, e.g. tide in 90", function(_, args)
-	local phases = { out = "Out", hold = "Hold", ["in"] = "In" }
-	local phase = phases[(args[1] or ""):lower()]
-	if not phase then
-		return { "Usage: tide <out|hold|in> [percent]" }
+command(
+	"tide",
+	"tide <out|hold|in> [percent] | tide at <z>",
+	"Jump the tide, e.g. tide in 90, tide at 2000",
+	function(_, args)
+		local phases = { out = "Out", hold = "Hold", ["in"] = "In" }
+		local phase = phases[(args[1] or ""):lower()]
+		local progress = math.clamp((tonumber(args[2]) or 0) / 100, 0, 0.999)
+		if (args[1] or ""):lower() == "at" and tonumber(args[2]) then
+			-- Going out, at the moment the waterline (at X = 0) reaches that Z.
+			local target, now = tonumber(args[2]) :: number, Tide.now()
+			local lo, hi = 0, 0.999
+			for _ = 1, 40 do
+				local mid = (lo + hi) / 2
+				Workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("Out", mid, now))
+				if Tide.waterline(now) < target then
+					lo = mid
+				else
+					hi = mid
+				end
+			end
+			phase, progress = "Out", (lo + hi) / 2
+		end
+		if not phase then
+			return { "Usage: tide <out|hold|in> [percent], or tide at <z>" }
+		end
+		Workspace:SetAttribute(Tide.StartAttribute, Tide.startFor(phase, progress))
+		local state = Tide.getState()
+		return {
+			string.format(
+				"Tide set to %s %.0f%%, waterline z=%.0f",
+				state.Phase,
+				state.PhaseProgress * 100,
+				state.Waterline
+			),
+		}
 	end
-	local progress = math.clamp((tonumber(args[2]) or 0) / 100, 0, 0.999)
-	Workspace:SetAttribute(Tide.StartAttribute, Tide.startFor(phase, progress))
-	local state = Tide.getState()
-	return {
-		string.format(
-			"Tide set to %s %.0f%%, waterline z=%.0f",
-			state.Phase,
-			state.PhaseProgress * 100,
-			state.Waterline
-		),
-	}
-end)
+)
 
 command("tidespeed", "tidespeed <scale>", "Tide time scale: 1 = real 25 min, 0.1 = 2.5 min", function(_, args)
 	local scale = tonumber(args[1])
@@ -727,6 +747,38 @@ command(
 				)
 			)
 		end
+		return lines
+	end
+)
+
+command(
+	"waterlab",
+	"waterlab <zone|off>",
+	"Put the water lab's test ground (Layouts/Lab) in a zone, e.g. waterlab 4, then tide at 2000",
+	function(_, args)
+		local which = (args[1] or ""):lower()
+		local was = Workspace:GetAttribute(Layouts.LabAttribute)
+		local zone = tonumber(which)
+		if
+			which ~= "off" and not (zone and Config.Zones[zone] and zone >= 1 and zone <= Beach.ActiveTiles)
+		then
+			return { "Usage: waterlab <zone|off>" }
+		end
+		Workspace:SetAttribute(Layouts.LabAttribute, if which == "off" then nil else zone)
+		local lines = {}
+		for _, tile in { was, zone } do
+			if type(tile) == "number" then
+				local biome = Biomes.activeIn(tile)
+				BiomeService.set(tile, biome and biome.Id, "1:")
+				table.insert(lines, string.format("Zone %d rebuilt", tile))
+			end
+		end
+		table.insert(
+			lines,
+			if zone
+				then string.format("The water lab is in zone %d (z %d to %d)", zone, Beach.tileRange(zone))
+				else "The water lab is off"
+		)
 		return lines
 	end
 )

@@ -14,6 +14,7 @@ terrain as TerrainBuilder builds it) and draws:
 and prints the checks (tools/water/README.md).
 
 Usage (from the repo root):
+  python3 tools/water/water.py check                              # the checks (tools/check.sh)
   python3 tools/water/water.py 4 Base 1: 2000                     # zone 4, waterline z 2000
   python3 tools/water/water.py 6 Lab 1: 3300 --views top,eye,cut --cut-x 40
   python3 tools/water/water.py 3 Base 2: 1500 --region -200 1400 200 1700 -o out/z3
@@ -336,7 +337,44 @@ def draw_eye(scene, out, eye_x, eye_z, width=960, height=540, fov=70, pitch=-10,
     Image.fromarray(np.clip(img, 0, 255).astype(np.uint8)).save(out)
 
 
+# The water's checks (tools/check.sh runs them): the lab layout and real zones at a few tides.
+# A rough edge's cells and anything under a roof aren't judged (Scene.checks).
+CHECKS = [
+    (4, "Lab", "1:", 1860), (4, "Lab", "1:", 2000), (4, "Lab", "1:", 2150), (4, "Lab", "1:", 2350),
+    (1, "Base", "1:", 300), (2, "Base", "1:", 908), (3, "Base", "2:", 1500),
+    (4, "Base", "1:", 2000), (5, "Base", "1:", 2700), (6, "Base", "1:", 3300),
+]
+LIMITS = {
+    "highest water above sea level": 0.7,  # it never climbs walls or banks
+    "wet but no water shows": 0.01,  # share of the wet cells
+    "dry but water shows": 0.03,
+}
+
+
+def check_all():
+    failed = []
+    for zone, layout, choice, line in CHECKS:
+        args = argparse.Namespace(zone=zone, layout=layout, choice=choice, waterline=line,
+                                  region=[-358, line - 110, 358, line + 150], step=2, seconds=0)
+        result = Scene(run_lab(args)).checks()
+        wet = max(result["wet cells"], 1)
+        bad = []
+        if result["highest water above sea level"] > LIMITS["highest water above sea level"]:
+            bad.append("water %.1f above sea level" % result["highest water above sea level"])
+        for key in ("wet but no water shows", "dry but water shows"):
+            if result[key] / wet > LIMITS[key]:
+                bad.append("%s: %d of %d" % (key, result[key], wet))
+        name = "zone %d %s %s at z %d" % (zone, layout, choice, line)
+        print(("FAIL  " if bad else "ok    ") + name + ("  " + "; ".join(bad) if bad else ""))
+        if bad:
+            failed.append(name)
+    return not failed
+
+
 def main():
+    if sys.argv[1:] == ["check"]:
+        load_materials()
+        sys.exit(0 if check_all() else 1)
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("zone", type=int)
     parser.add_argument("layout")

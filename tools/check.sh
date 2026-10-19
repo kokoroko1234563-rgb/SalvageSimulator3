@@ -5,7 +5,8 @@
 #   3. Roblox API names (Enums, classes, properties), against Roblox's real API
 #   4. Lune tests: load every module, validate the data, build every vessel, biome,
 #      secret course, item and the beach with real Roblox instances
-#   5. Rojo build
+#   5. The water: drawn where the game's water is, never climbing walls (tools/water)
+#   6. Rojo build
 set -u
 cd "$(dirname "$0")/.."
 failed=0
@@ -26,6 +27,9 @@ python3 tools/check_api.py || failed=1
 
 step "Lune tests"
 lune run tools/tests/run.luau || failed=1
+
+step "Water (tools/water)"
+python3 tools/water/water.py check || failed=1
 
 step "Rojo build"
 rojo build -o "${TMPDIR:-/tmp}/SalvageSimulator3-check.rbxlx" >/dev/null && echo "built" || failed=1
