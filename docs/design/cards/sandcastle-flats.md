@@ -26,3 +26,5 @@ walls (foot only).
 
 **Questions.**
 1. Should Sandcastle Flats have deadly dangers at all, being the holiday biome in zones 1 to 4?
+
+Answer: No, I do not think it should have any very deadly dangers, but should instead have some pretty hidden secrets, along with entering the castle at all being optional rather than required. I do think there should be traps that throw the player out of the castle though upon failure, like hidden trap-doors and walls, I also think this will require making the engine possible to create multiple layers, so maybe we should discuss it and weather it is a good idea at all.
