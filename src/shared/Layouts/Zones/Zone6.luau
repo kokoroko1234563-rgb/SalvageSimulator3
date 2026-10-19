@@ -1619,18 +1619,18 @@ return {
 					Kind = "Flat",
 					Area = {
 						{ -280, 546 },
-						{ -244, 546 },
-						{ -244, 534 },
+						{ -252, 546 },
+						{ -252, 534 },
 						{ -280, 534 },
 					},
 				},
 				{ Kind = "Flat", At = { -280, 540 }, Radius = 6 },
-				{ Kind = "Flat", At = { -244, 540 }, Radius = 6 },
+				{ Kind = "Flat", At = { -252, 540 }, Radius = 6 },
 				{
 					Kind = "Channel",
 					Path = {
-						{ -262, 540 },
-						{ -248, 540 },
+						{ -266, 540 },
+						{ -254, 540 },
 					},
 					Depth = 2,
 					Width = 12,
@@ -1686,7 +1686,7 @@ return {
 			Loot = {
 				{ At = { 40, 200 }, Radius = 5, Weight = 2 },
 				{ At = { 60, 470 }, Radius = 5, Weight = 3 },
-				{ At = { -248, 540 }, Radius = 4, Weight = 2 },
+				{ At = { -254, 540 }, Radius = 4, Weight = 2 },
 			},
 			Hazards = {
 				{
@@ -1705,8 +1705,8 @@ return {
 				{
 					Type = "Undertow",
 					Path = {
-						{ -262, 540 },
-						{ -248, 540 },
+						{ -266, 540 },
+						{ -254, 540 },
 					},
 					Width = 12,
 				},

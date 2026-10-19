@@ -227,10 +227,10 @@ lit_way(c, [(-224, 264), (-224, 300), (-144, 300), (-144, 360), (-280, 360), (-2
             (-144, 420), (-144, 480), (-280, 480), (-280, 608)])
 dead_end(c, [(200, 128), (40, 128), (40, 200)], weight=2)
 dead_end(c, [(228, 424), (228, 470), (60, 470)], weight=3)
-spur(c, [(-280, 540), (-244, 540)])
-c.channel([(-262, 540), (-248, 540)], depth=2, width=12, material="Mud")
-c.hazard("Undertow", path=[(-262, 540), (-248, 540)], width=12)
-c.loot((-248, 540), radius=4, weight=2)
+spur(c, [(-280, 540), (-252, 540)])
+c.channel([(-266, 540), (-254, 540)], depth=2, width=12, material="Mud")
+c.hazard("Undertow", path=[(-266, 540), (-254, 540)], width=12)
+c.loot((-254, 540), radius=4, weight=2)
 scramble(c, (-200, 300), (-200, 360))  # shortcuts for feet: rubble a cart can't climb
 scramble(c, (336, 220), (288, 220))
 c.decor(LIT, at=(188, 10))  # the tell: a pair of lanterns at the way in

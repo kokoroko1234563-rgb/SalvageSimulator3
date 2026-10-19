@@ -2,7 +2,9 @@
 -- rough slopes a player can scramble up, so each wall gets a solid, invisible slab down its
 -- middle, a little narrower than the wall and well above its top (more than a jump), that
 -- nobody gets over. Where a ramp or a flat cuts through a wall, the barrier stops too, so the
--- gap stays open. Rebuilt with the tile's terrain whenever its layout changes.
+-- gap stays open. An Area wall (a block of rock, often with lanes and halls carved out of it)
+-- is covered wherever its rock still stands, INSET in from every edge, carved ones included.
+-- Rebuilt with the tile's terrain whenever its layout changes.
 
 local Workspace = game:GetService("Workspace")
 
@@ -17,8 +19,8 @@ local STEP = 2 -- studs between the points along a wall that are checked
 local INSET = 2 -- studs narrower than the wall on each side
 local ABOVE = 9 -- studs above the wall's top (a jump reaches about 7)
 local STANDING = 0.6 -- a stretch of wall counts while it stands this share of its height
-local AREA_IN = 4 -- studs inside an Area wall's edge its slabs run
-local AREA_THICKNESS = 4
+local CELL = 4 -- an Area wall's barrier is laid over its standing rock in cells this size
+local MERGE = 64 -- the most studs of rows one Area slab covers (the beach slopes under it)
 
 local function folderFor(tile: number): Folder
 	local root = Workspace:FindFirstChild("WallBarriers")
@@ -38,6 +40,82 @@ local function folderFor(tile: number): Folder
 	return folder
 end
 
+-- An Area wall's slabs: rows of CELL-stud cells where its rock stands (and still stands INSET
+-- studs further out each way), runs along each row, merged down the rows while they match.
+local function areaSlabs(p, tile: number, slabs)
+	local z0, z1 = Beach.tileRange(tile)
+	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+	for _, point in p.Area do
+		minX, maxX = math.min(minX, point[1]), math.max(maxX, point[1])
+		minZ, maxZ = math.min(minZ, z0 + point[2]), math.max(maxZ, z0 + point[2])
+	end
+	local reach = Beach.HalfWidth + Config.Beach.Terrain.CliffReach
+	minX, maxX = math.max(minX, -reach), math.min(maxX, reach)
+	minZ, maxZ = math.max(minZ, z0), math.min(maxZ, z1)
+	local need = p.Height * STANDING
+	local edge = CELL / 2 + INSET
+	local function stands(x: number, z: number): boolean
+		return Beach.feature(x, z) >= need
+	end
+	local function solid(x: number, z: number): boolean
+		return stands(x, z)
+			and stands(x - edge, z)
+			and stands(x + edge, z)
+			and stands(x, z - edge)
+			and stands(x, z + edge)
+	end
+	local open = {} -- "x0,x1" -> { x0, x1, zFrom, zTo }
+	local function emit(r)
+		local low, high = Beach.groundY(r[3]), Beach.groundY(r[4])
+		local bottom = math.min(low, high) - 2
+		local top = math.max(low, high) + p.Height + ABOVE
+		local width, depth = r[2] - r[1], r[4] - r[3]
+		table.insert(slabs, {
+			cframe = CFrame.new((r[1] + r[2]) / 2, (bottom + top) / 2, (r[3] + r[4]) / 2),
+			size = Vector3.new(width, top - bottom, depth),
+		})
+	end
+	for z = minZ, maxZ - CELL, CELL do
+		local runs = {}
+		local start = nil
+		local x = minX
+		while x <= maxX - CELL do
+			if solid(x + CELL / 2, z + CELL / 2) then
+				start = start or x
+			elseif start then
+				table.insert(runs, { start, x })
+				start = nil
+			end
+			x += CELL
+		end
+		if start then
+			table.insert(runs, { start, x })
+		end
+		local still = {}
+		for _, run in runs do
+			local key = run[1] .. "," .. run[2]
+			local r = open[key]
+			if r and r[4] - r[3] < MERGE then
+				r[4] = z + CELL
+			else
+				if r then
+					emit(r)
+				end
+				r = { run[1], run[2], z, z + CELL }
+			end
+			still[key] = r
+			open[key] = nil
+		end
+		for _, r in open do
+			emit(r)
+		end
+		open = still
+	end
+	for _, r in open do
+		emit(r)
+	end
+end
+
 -- The barrier slabs for a tile's walls: { CFrame, Size } each.
 function WallBarriers.slabsFor(tile: number): { { cframe: CFrame, size: Vector3 } }
 	local layout = Layouts.active(tile)
@@ -50,35 +128,13 @@ function WallBarriers.slabsFor(tile: number): { { cframe: CFrame, size: Vector3 
 		if p.Kind ~= "Wall" then
 			continue
 		end
-		-- The lines the slabs run along: a Path wall's middle line; an Area wall's edges, moved
-		-- in by AREA_IN (a slab down each side, inside the rock).
-		local runs = {}
 		if p.Area then
-			local area = p.Area
-			local cx, cz = 0, 0
-			for _, point in area do
-				cx += point[1] / #area
-				cz += point[2] / #area
-			end
-			for i = 1, #area do
-				local a, b = area[i], area[i % #area + 1]
-				local along = Vector3.new(b[1] - a[1], 0, b[2] - a[2])
-				if along.Magnitude < 0.1 then
-					continue
-				end
-				local normal = Vector3.new(-along.Z, 0, along.X).Unit
-				local middle = Vector3.new((a[1] + b[1]) / 2, 0, (a[2] + b[2]) / 2)
-				if (Vector3.new(cx, 0, cz) - middle):Dot(normal) < 0 then
-					normal = -normal
-				end
-				local inset = normal * AREA_IN
-				table.insert(runs, {
-					Vector3.new(a[1], 0, z0 + a[2]) + inset,
-					Vector3.new(b[1], 0, z0 + b[2]) + inset,
-					AREA_THICKNESS,
-				})
-			end
-		else
+			areaSlabs(p, tile, slabs)
+			continue
+		end
+		-- The lines the slabs run along: a Path wall's middle line.
+		local runs = {}
+		do
 			for i = 1, #p.Path - 1 do
 				table.insert(runs, {
 					Vector3.new(p.Path[i][1], 0, z0 + p.Path[i][2]),
