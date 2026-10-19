@@ -36,4 +36,6 @@ the drowned pools (reachable only at low tide).
 
 **Questions.**
 1. Patrol crabs in zone 5 as well as Hermit Hollows, or keep crabs Hermit Hollows' own?
+Answer: With how I talked about the patrolling crabs in the hermit hollows section, I think we should keep it to Hermit hollows, Instead I think this is where we can work with some spike pits that are well placed (will almost never catch any player that is being cautious, but can catch others.)
 2. Should the wet path be quicker by a lot (tempting, 75% of the target) or a little?
+Answer: It can be quite a bit quicker, but in exchange, you should not kill you by itself, instead helping the sea do that job, this will make it so that people do not really die to it when going down, but can very easily when going up too late
