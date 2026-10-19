@@ -831,7 +831,8 @@ local LONG = 2000 -- the sea part's length (it's moved, never resized, as the sh
 local BACK = 400 -- the length of the part that floods dips up the beach
 
 type Pieces = {
-	seaOut: { Part }, -- the sea from the shore out
+	seaNear: { Part }, -- the sea from the shore out to where it's deep enough to drown
+	seaOut: { Part }, -- the sea from there out, deep blue
 	seaIn: { Part }, -- water in dips up the beach, a little lower so it never fights the shore
 	lap: { Part }, -- a band of shallow water over the shore, hiding where the sand meets the sea
 	swash: { { Part } },
@@ -846,8 +847,17 @@ local PIECE_ROWS = 2 -- pieces per column for the run-up sheet and the wet sand
 
 local function buildPieces(folder: Folder): Pieces
 	local width = spacing + 0.1
-	local result: Pieces =
-		{ seaOut = {}, seaIn = {}, lap = {}, swash = {}, wet = {}, foam = {}, crests = {}, sides = {} }
+	local result: Pieces = {
+		seaNear = {},
+		seaOut = {},
+		seaIn = {},
+		lap = {},
+		swash = {},
+		wet = {},
+		foam = {},
+		crests = {},
+		sides = {},
+	}
 	local function make(name: string, size: Vector3, props: { [string]: any }): Part
 		props.Size = size
 		local part = makePart(name, props)
@@ -858,7 +868,16 @@ local function buildPieces(folder: Folder): Pieces
 		return { Material = Palette.Material.Glass, Color = Palette.World.Sea, Transparency = 0.3 }
 	end
 	for c in xs do
-		result.seaOut[c] = make("Sea", Vector3.new(width, THICKNESS, LONG), seaProps())
+		result.seaNear[c] = make("Sea", Vector3.new(width, THICKNESS, 1), {
+			Material = Palette.Material.Glass,
+			Color = Palette.Water.Knee,
+			Transparency = 0.3,
+		})
+		result.seaOut[c] = make("Sea", Vector3.new(width, THICKNESS, LONG), {
+			Material = Palette.Material.Glass,
+			Color = Palette.Water.Deep,
+			Transparency = 0.25,
+		})
 		result.seaIn[c] = make("Sea", Vector3.new(width, THICKNESS, BACK), seaProps())
 		result.lap[c] = make("Lap", Vector3.new(width, 0.1, 3), {
 			Material = Palette.Material.Glass,
@@ -893,7 +912,9 @@ local function buildPieces(folder: Folder): Pieces
 		end
 	end
 	for i = 1, 2 do
-		result.sides[i] = make("Sea", Vector3.new(SIDE, THICKNESS, FAR_LENGTH), seaProps())
+		local deep = seaProps()
+		deep.Color = Palette.Water.Lost -- the open sea is deep
+		result.sides[i] = make("Sea", Vector3.new(SIDE, THICKNESS, FAR_LENGTH), deep)
 	end
 	return result
 end
@@ -934,7 +955,12 @@ local function updatePieces(p: Pieces, sea: Tide.Sea, columns: { Column }, place
 	for c, x in xs do
 		local column = columns[c]
 		local shore, waterY = column.shore, column.waterY
-		place(p.seaOut[c], CFrame.new(x, waterY - THICKNESS / 2, shore + LONG / 2))
+		-- Pale out to where the sea is deep enough to drown (on the open slope), deep blue beyond:
+		-- the parts can't follow every bank and pit as the meshes do, but the step shows.
+		local drown = math.max(shore + 0.5, column.line + beach.WaistDepth / beach.Slope)
+		resize(p.seaNear[c], drown - shore)
+		place(p.seaNear[c], CFrame.new(x, waterY - THICKNESS / 2 + 0.02, (shore + drown) / 2))
+		place(p.seaOut[c], CFrame.new(x, waterY - THICKNESS / 2, drown + LONG / 2))
 		place(p.seaIn[c], CFrame.new(x, waterY - 0.4 - THICKNESS / 2, shore - BACK / 2))
 		-- The lap: over the shore, never below the water or the sand.
 		local a = Vector3.new(x, math.max(waterY, surfaceY(x, shore + 1.5)) + 0.05, shore + 1.5)
@@ -1135,6 +1161,17 @@ function SeaController._frame(sea: Tide.Sea, wetSea: Tide.Sea, ground: ((number,
 		}
 	end
 	return out, columns, xs
+end
+
+-- For tools/tests: the fallback's parts, laid out for one moment.
+function SeaController._piecesFrame(sea: Tide.Sea, wetSea: Tide.Sea)
+	setup()
+	local folder = Instance.new("Folder")
+	local built = buildPieces(folder)
+	updatePieces(built, sea, computeColumns(sea, wetSea), function(part: Part, frame: CFrame)
+		part.CFrame = frame
+	end)
+	return built, xs
 end
 
 -- For tools/tests.

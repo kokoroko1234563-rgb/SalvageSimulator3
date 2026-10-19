@@ -1954,6 +1954,25 @@ test("waves break where the sea really meets the sand", function()
 	Layouts.setActive(3, nil)
 end)
 
+test("the water's fallback parts show the step to deep water", function()
+	local SeaController = h.require("Client/SeaController")
+	local Tide = h.require("Shared/Tide")
+	local Config = h.require("Shared/Config")
+	local sea = Tide.sea(1000)
+	local pieces, columnXs = SeaController._piecesFrame(sea, sea)
+	for c, x in columnXs do
+		local near, out = pieces.seaNear[c], pieces.seaOut[c]
+		local nearEnd = near.CFrame.Position.Z + near.Size.Z / 2
+		local outStart = out.CFrame.Position.Z - out.Size.Z / 2
+		assert(math.abs(nearEnd - outStart) < 0.6, "the pale and deep parts meet at x " .. x)
+		local line = Tide.waterlineAt(sea, x)
+		assert(
+			outStart >= line + Config.Beach.WaistDepth / Config.Beach.Slope - 0.6,
+			"the deep part starts where the sea is deep enough to drown, at x " .. x
+		)
+	end
+end)
+
 test("the water meshes fit Roblox's limits", function()
 	local SeaController = h.require("Client/SeaController")
 	local total = 0
