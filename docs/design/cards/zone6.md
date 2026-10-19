@@ -37,7 +37,12 @@ ring, a comb of caves. Best finds deepest, the very best on covered pits.
 **Keep.** The Far Sandbar's approach (the zone's bottom edge) open: it leads straight to the
 channel.
 
-**Questions.**
+**Decided.**
+- Rebuilt with the kit (`tools/kit/plans/zone6.py`), and it's **the role model**: the plan every
+  other zone and biome copies (how crossings are laid out, rooms meet doors, landmarks and tells
+  are placed).
+
+**Questions (answered by the designer).**
 1. Keep the current zone 6 (built as the role model) and add paths to it, or rebuild it fully
    with the kit (which also fixes the grid look)?
 Answer: Let's rebuild it, but still, we will need to have one main zone/biome to use as the "role model" for future designs.

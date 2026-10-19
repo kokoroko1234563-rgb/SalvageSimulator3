@@ -31,7 +31,18 @@ The BigShell finds in the nests.
 
 **Keep.** The entrance flat. Zone 4's warren as built (it plays), extended with paths.
 
-**Questions.**
+**Decided.**
+- Lanterns still draw the giant crab.
+- The giant crab gets two new, well-telegraphed moves, still on its rail (hazard work, before
+  the layouts): a **dash** (it rears up and scrapes for about 0.8 s, then charges along its rail)
+  and a **dig** (it burrows in a dust cloud, the ground shakes and cracks at a **burrow hole**
+  for about 2.5 s, then it bursts out there). Burrow holes are fixed points in the layout
+  (churned-sand mounds), so a regular learns where it can come out.
+- **Callers**: a patrol crab that spots you stops and drums its claws (a pulsing ring, clacking)
+  for about 2 s; still seen when it finishes, the giant digs to the burrow hole nearest it.
+  Breaking its line of sight cancels the call.
+
+**Questions (answered by the designer).**
 1. Should a lantern really draw the giant crab (a trade-off in the dark), as it does now?
 
 Answer: I do think that is fine, but I also think that as this is a biome, the giant crab should have some better way of chasing players, like a dash and a "timer teleport" disguised as a digging ability, though both of these must be telegraphed well for the player, with this new ability of the big crab, there should be some way for the smaller crabs to call the big crab to them, which is also very telegraphed.

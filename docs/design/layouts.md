@@ -54,8 +54,8 @@ so a zone keeps its identity while the way through and the side pockets change.
 | Zone | Name | Target (fastest way across on foot) |
 |---|---|---|
 | 1 | Shopside Shore | 35 s |
-| 2 | Sunny Stretch | 40 s |
-| 3 | Middle Banks | 45 s |
+| 2 | Sunny Stretch | 36 s |
+| 3 | Middle Banks | 38 s |
 | 4 | Outer Shore | 55 s |
 | 5 | The Shoals | 65 s |
 | 6 | The Drowned Reach | 85 s |
@@ -124,7 +124,7 @@ biome's its `Hazards`.
 | Danger | Placement | Put it |
 |---|---|---|
 | **Rockfall**: an area strewn with rubble; rocks fall at random in it, mostly aimed at whoever is inside, each warned by dust and a growing shadow | `At`, `Radius` (≈12) | on a stretch a path must cross: a timing test |
-| **Sink**: an irregular patch of wet sand; slows hard, no jumping, visibly swallows; stopping kills | `At`, `Radius` (≈12) | across a lane, so going round costs real time |
+| **Sink**: an irregular patch of wet sand; slows hard, no jumping, visibly swallows; stopping kills | `At`, `Radius` (≈12), `Lethal` | across a lane, so going round costs real time; `Lethal = false` holds you waist deep instead (zone 5: the sea does the killing) |
 | **Gloom**: something unseen walking its path, casting a shadow; touch it and you're Benighted (dark, only lights show) for half a minute | `Path` or `At`, `Radius` (≈9) | along galleries, with lantern posts and glowing weed (wards) |
 | **Pit**: a spike pit, open or under a false floor whose cracks are the only tell | `At`, `Radius`, `Depth` (≤12), `Covered` | off the cart route and clear of doors; covered under a prize |
 | **Undertow**: a current dragging seaward while the sea covers a ford or channel | `Path`, `Width` | along the channels |

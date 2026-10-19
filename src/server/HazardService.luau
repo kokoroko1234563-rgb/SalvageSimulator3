@@ -398,6 +398,10 @@ function builders.Sink(tile, settings, folder)
 			part:SetAttribute("Factor", settings.Factor)
 			part:SetAttribute("SinkTime", settings.SinkTime)
 			part:SetAttribute("MovingShare", settings.MovingShare)
+			part:SetAttribute(
+				"Lethal",
+				if spot.placement.Lethal ~= nil then spot.placement.Lethal else settings.Lethal
+			)
 			if index == 1 then
 				local bubbles = Instance.new("ParticleEmitter")
 				bubbles.Color = ColorSequence.new(settings.Color:Lerp(Color3.new(1, 1, 1), 0.25))
@@ -1135,7 +1139,11 @@ function HazardService.init()
 			return
 		end
 		local effect = part:GetAttribute("Effect")
-		if (effect ~= "Harm" and effect ~= "Sink") or part:GetAttribute("Active") == false then
+		if
+			(effect ~= "Harm" and effect ~= "Sink")
+			or part:GetAttribute("Active") == false
+			or part:GetAttribute("Lethal") == false
+		then
 			return
 		end
 		local character = player.Character

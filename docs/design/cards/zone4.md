@@ -37,7 +37,11 @@ covered pit under a prize per crossing (the tell: cracks).
 
 **Keep.** The rock pool at (260, z 70 in the zone) clear by 6. The cart route 14+ wide.
 
-**Questions.**
+**Decided.**
+- Rockfall is zone 4's own danger.
+- The odd open pit, always clearly shown (the zone's first deadly thing, so no surprises).
+
+**Questions (answered by the designer).**
 1. Rockfall as zone 4's own danger (zone 5 gets sinking sand, zone 6 the Gloom): agreed?
 Answer: That is fine
 2. Are open pits in zone 4 too early, or right as the first deadly thing a player meets?

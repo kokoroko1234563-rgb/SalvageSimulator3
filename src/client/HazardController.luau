@@ -35,6 +35,7 @@ local HazardController = {}
 local BODY = 1.5 -- studs of the character's own width counted in a hit
 local REACH_Y = 6 -- a hazard this far above or below you can't reach you
 local DROP_COOLDOWN = 1.5 -- seconds before the same hazard can knock something out of your hands again
+local HOLD_DEPTH = 0.6 -- how far down sand that holds (Lethal = false) takes you, as a share of swallowed
 
 local lastDrop: { [Instance]: number } = {}
 local lastHarm: { [Instance]: number } = {}
@@ -140,12 +141,21 @@ local function step(dt: number)
 	if sinking then
 		local velocity = root.AssemblyLinearVelocity
 		local moving = Vector3.new(velocity.X, 0, velocity.Z).Magnitude > 3
+		local lethal = sinking:GetAttribute("Lethal") ~= false
 		sunk += dt * (if moving then sinking:GetAttribute("MovingShare") or 0.6 else 1)
+		if not lethal then
+			-- Sand that holds rather than swallows: down to the waist, then no further.
+			sunk = math.min(sunk, limit * HOLD_DEPTH)
+		end
 		if sunk >= limit * 0.35 and not warned then
 			warned = true
-			HUD.notify("You're sinking! Keep moving and get out!")
+			HUD.notify(
+				if lethal
+					then "You're sinking! Keep moving and get out!"
+					else "The sand has you! Keep wading out before the sea comes in!"
+			)
 		end
-		if sunk >= limit then
+		if lethal and sunk >= limit then
 			sunk, warned = 0, false
 			Remotes.get("HazardHarm"):FireServer(sinking)
 			HUD.notify(sinking:GetAttribute("HitText") or "The sand swallowed you!")

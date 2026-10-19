@@ -21,12 +21,17 @@ across fords (they were someone's).
 - The wet path is foot-only (fords have a sill a cart can't climb).
 
 **Dangers** (the zone's own kit, new: `Config.Zones[5].Hazards`).
-- **Sinking sand**: its own danger. Patches across the wet paths' approaches to fords, on dark
-  mud, so the quick way means crossing one without stopping.
+- **Sinking sand that holds** (`Lethal = false`): patches across the wet path's approaches to
+  fords, on dark mud. It never kills by itself: it takes you waist deep, slows you hard and
+  stops you jumping for as long as you're in it. Going down at low tide that's lost seconds;
+  coming back late it's what lets the sea and the undertow catch you.
 - **Undertow** in every ford and runnel: deadly once the sea covers it, it drags you into the
   deep. The quick wet path is safe going down and deadly coming back late.
-- **Patrols** (crabs) on the sandbars, crossing the dry path.
-- A regular learns: cross the sand moving, take the fords early and the sandbars late.
+- **Spike pits**, well placed: open ones at the edges of fords and on corner-cutting lines,
+  covered ones only where a hurried player shortcuts. A careful player walking the lane never
+  meets one; a careless one does.
+- No crabs: they're Hermit Hollows' own.
+- A regular learns: take the fords early and the sandbars late, keep to the lanes.
 
 **Rooms and loot.** Seven pockets against the bars: a drowned pool (floods first), a dead-end
 cave, a boulder scramble, a weed-choked channel. Best finds in the caves and at the bottom of
@@ -34,7 +39,12 @@ the drowned pools (reachable only at low tide).
 
 **Keep.** The cart route on dry ground the whole way. The rock pools clear.
 
-**Questions.**
+**Decided.**
+- No patrol crabs (Hermit Hollows keeps them); well-placed spike pits instead.
+- The wet path is quite a bit quicker (75 to 80% of the target; the dry path 115 to 135%), and
+  its sinking sand holds rather than kills: the sea does that.
+
+**Questions (answered by the designer).**
 1. Patrol crabs in zone 5 as well as Hermit Hollows, or keep crabs Hermit Hollows' own?
 Answer: With how I talked about the patrolling crabs in the hermit hollows section, I think we should keep it to Hermit hollows, Instead I think this is where we can work with some spike pits that are well placed (will almost never catch any player that is being cautious, but can catch others.)
 2. Should the wet path be quicker by a lot (tempting, 75% of the target) or a little?

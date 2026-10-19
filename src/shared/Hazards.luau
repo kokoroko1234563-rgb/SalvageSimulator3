@@ -113,6 +113,7 @@ Hazards.Types = {
 		Factor = 0.4,
 		SinkTime = 4, -- seconds standing still until it swallows you
 		MovingShare = 0.6, -- how fast you sink while moving, as a share of standing still
+		Lethal = true, -- false: it holds you (waist deep, slow, no jumping) but never swallows you
 		Damage = 100,
 		Color = Color3.fromRGB(84, 72, 54),
 		Effect = "Sink",
@@ -204,7 +205,7 @@ Hazards.Placement = {
 	Patrol = { Path = true, Count = true },
 	Pulse = { At = true },
 	Slow = { At = true, Radius = true },
-	Sink = { At = true, Radius = true },
+	Sink = { At = true, Radius = true, Lethal = true },
 	Rockfall = { At = true, Radius = true },
 	Pit = { At = true, Radius = true, Depth = true, Covered = true },
 	Undertow = { Path = true, Width = true },

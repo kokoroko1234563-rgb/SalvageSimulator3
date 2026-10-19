@@ -991,8 +991,8 @@ function Layouts.problems(layout: any): { string }
 				and (type(value) ~= "number" or value <= 0)
 			then
 				add(where .. ": " .. key .. " must be a positive number")
-			elseif key == "Covered" and type(value) ~= "boolean" then
-				add(where .. ": Covered is true or false")
+			elseif (key == "Covered" or key == "Lethal") and type(value) ~= "boolean" then
+				add(where .. ": " .. key .. " is true or false")
 			end
 		end
 	end

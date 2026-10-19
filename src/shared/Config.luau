@@ -117,13 +117,13 @@ Config.Zones = {
 	{
 		Name = "Sunny Stretch",
 		Multiplier = 2,
-		CrossTime = 40,
+		CrossTime = 36,
 		Rarity = { Common = 70, Uncommon = 25, Rare = 5 },
 	},
 	{
 		Name = "Middle Banks",
 		Multiplier = 4,
-		CrossTime = 45,
+		CrossTime = 38,
 		Rarity = { Common = 50, Uncommon = 32, Rare = 15, VeryRare = 3 },
 	},
 	{
@@ -137,6 +137,12 @@ Config.Zones = {
 		Multiplier = 12,
 		CrossTime = 65,
 		Rarity = { Common = 20, Uncommon = 35, Rare = 30, VeryRare = 15 },
+		-- Its sand holds you rather than swallowing you: the sea coming in does the killing.
+		Hazards = {
+			{ Type = "Sink", Scatter = false, Lethal = false },
+			{ Type = "Undertow", Scatter = false },
+			{ Type = "Pit", Scatter = false },
+		},
 	},
 	{
 		Name = "The Drowned Reach",

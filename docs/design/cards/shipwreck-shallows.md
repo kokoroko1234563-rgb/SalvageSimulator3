@@ -29,7 +29,13 @@ a flooded scour hole. The ShipBell and the best crates in the holds.
 
 **Keep.** The hatch (entrance) spots. The rock pools.
 
-**Questions.**
+**Decided.**
+- Barrels aren't deadly but **launch you tumbling** (thrown and ragdolled for about 1.5 s). Each
+  is telegraphed (it teeters on the deck's edge with a creak for about 2 s, then rumbles down),
+  and they only start at the wreck and run down the gullies that begin at it.
+- Spike pits: open ones as well as the covered rotten decking.
+
+**Questions (answered by the designer).**
 1. Barrels: make big ones deadly (crush) and small ones knock things out of your hands? Or
    keep them non-deadly as the biome's gentler hazard?
 

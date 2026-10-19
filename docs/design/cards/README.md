@@ -6,13 +6,13 @@ it. The rules every zone follows are in `docs/design/layouts.md`.
 
 | Card | Zones | Status |
 |---|---|---|
-| [Zone 4: Outer Shore](zone4.md) | 4 | draft |
-| [Zone 5: The Shoals](zone5.md) | 5 | draft |
-| [Zone 6: The Drowned Reach](zone6.md) | 6 | draft |
-| [Hermit Hollows](hermit-hollows.md) | 4 to 6 | draft |
-| [Shipwreck Shallows](shipwreck-shallows.md) | 2 to 6 | draft |
-| [Sandcastle Flats](sandcastle-flats.md) | 1 to 4 | draft |
-| [The shore](shore.md) | 1 to 3 | built; small changes |
+| [Zone 4: Outer Shore](zone4.md) | 4 | approved |
+| [Zone 5: The Shoals](zone5.md) | 5 | approved |
+| [Zone 6: The Drowned Reach](zone6.md) | 6 | approved; the role model (built first) |
+| [Hermit Hollows](hermit-hollows.md) | 4 to 6 | approved; the giant crab's new moves first |
+| [Shipwreck Shallows](shipwreck-shallows.md) | 2 to 6 | approved; the barrels' tumble first |
+| [Sandcastle Flats](sandcastle-flats.md) | 1 to 4 | on hold: upper floors and traps to discuss |
+| [The shore](shore.md) | 1 to 3 | approved; targets lowered |
 
 Each card says:
 
