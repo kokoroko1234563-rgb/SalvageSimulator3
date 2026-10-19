@@ -240,6 +240,7 @@ Gear.Tools = {
 Gear.Vessels = {
 	{
 		Id = "Wheelbarrow",
+		Size = "Small", -- its box against the map (Config.Carts)
 		Rarity = "Common",
 		Name = "Wheelbarrow",
 		Price = 250,
@@ -249,6 +250,7 @@ Gear.Vessels = {
 	},
 	{
 		Id = "BeachWagon",
+		Size = "Medium", -- its box against the map (Config.Carts)
 		Rarity = "Common",
 		Name = "Beach Wagon",
 		Price = 1500,
@@ -258,6 +260,7 @@ Gear.Vessels = {
 	},
 	{
 		Id = "SandCart",
+		Size = "Medium", -- its box against the map (Config.Carts)
 		Rarity = "Uncommon",
 		Name = "Sand Cart",
 		Price = 6000,
@@ -269,6 +272,7 @@ Gear.Vessels = {
 	},
 	{
 		Id = "QuadBike",
+		Size = "Large", -- its box against the map (Config.Carts)
 		Rarity = "Rare",
 		Name = "Quad Bike + Trailer",
 		Price = 25000,
@@ -280,6 +284,7 @@ Gear.Vessels = {
 	},
 	{
 		Id = "Dinghy",
+		Size = "Large", -- its box against the map (Config.Carts)
 		Rarity = "Rare",
 		Name = "Inflatable Dinghy",
 		Price = 60000,
@@ -291,6 +296,7 @@ Gear.Vessels = {
 	},
 	{
 		Id = "PickupTruck",
+		Size = "Huge", -- its box against the map (Config.Carts)
 		Rarity = "VeryRare",
 		Name = "Pickup Truck",
 		Price = 150000,
@@ -303,6 +309,7 @@ Gear.Vessels = {
 	{
 		-- Magical vessel from a rebirth reward: never sold in the shop, kept through rebirths.
 		Id = "FloatingClamshell",
+		Size = "Medium", -- its box against the map (Config.Carts)
 		Rarity = "VeryRare",
 		Name = "Floating Clamshell",
 		Price = 0,
@@ -314,6 +321,7 @@ Gear.Vessels = {
 	{
 		-- Exotic (Sunken Hold lootbox): needs attunement to spawn. Never in the shop.
 		Id = "CaptainsLongboat",
+		Size = "Large", -- its box against the map (Config.Carts)
 		Name = "Captain's Longboat",
 		Rarity = "Exotic",
 		Price = 0,
@@ -325,6 +333,7 @@ Gear.Vessels = {
 	{
 		-- Magical (rebirth reward): swims, so deep water doesn't take it.
 		Id = "SeaTurtle",
+		Size = "Small", -- its box against the map (Config.Carts)
 		Name = "Sea Turtle",
 		Rarity = "VeryRare",
 		Price = 0,
@@ -337,6 +346,7 @@ Gear.Vessels = {
 	{
 		-- Exotic (Sunken Bell Tower lootbox).
 		Id = "LeviathanRowboat",
+		Size = "Huge", -- its box against the map (Config.Carts)
 		Name = "Leviathan Rowboat",
 		Rarity = "Exotic",
 		Price = 0,
@@ -349,6 +359,7 @@ Gear.Vessels = {
 	{
 		-- Jellyfish Lagoon: a bouncy raft that follows you and swims.
 		Id = "JellyRaft",
+		Size = "Medium", -- its box against the map (Config.Carts)
 		Name = "Jelly Raft",
 		Rarity = "Exotic",
 		Price = 0,
@@ -362,6 +373,7 @@ Gear.Vessels = {
 	{
 		-- Whirlwind Dunes: flies behind you, over sand and sea alike.
 		Id = "MagicCarpet",
+		Size = "Medium", -- its box against the map (Config.Carts)
 		Name = "Magic Carpet",
 		Rarity = "Exotic",
 		Price = 0,
@@ -376,6 +388,7 @@ Gear.Vessels = {
 	{
 		-- Hermit Hollows: a giant shell on wheels, very hard to tip.
 		Id = "ShellWagon",
+		Size = "Large", -- its box against the map (Config.Carts)
 		Name = "Shell Wagon",
 		Rarity = "Exotic",
 		Price = 0,
@@ -388,6 +401,7 @@ Gear.Vessels = {
 	{
 		-- Sea-Glass Shore: a glass swan that swims behind you.
 		Id = "GlassSwan",
+		Size = "Medium", -- its box against the map (Config.Carts)
 		Name = "Glass Swan",
 		Rarity = "Exotic",
 		Price = 0,
@@ -401,6 +415,7 @@ Gear.Vessels = {
 	{
 		-- Stranded Iceberg: slides fast over sand and ice.
 		Id = "FrostSled",
+		Size = "Large", -- its box against the map (Config.Carts)
 		Name = "Frost Sled",
 		Rarity = "Exotic",
 		Price = 0,

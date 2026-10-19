@@ -219,17 +219,14 @@ end
 for c, column in columns do
 	local cx = columnXs[c]
 	if cx >= x0 - 12 and cx <= x1 + 12 then
-		table.insert(
-			out.columns,
-			{
-				r2(cx),
-				r2(column.line),
-				r2(column.shore),
-				r2(column.edge),
-				r2(column.wetTo),
-				r2(column.waterY),
-			}
-		)
+		table.insert(out.columns, {
+			r2(cx),
+			r2(column.line),
+			r2(column.shore),
+			r2(column.edge),
+			r2(column.wetTo),
+			r2(column.waterY),
+		})
 	end
 end
 print(serde.encode("json", out))

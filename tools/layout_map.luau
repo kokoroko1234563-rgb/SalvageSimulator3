@@ -21,6 +21,7 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 
 local Harness = require("./tests/harness")
+local PathCheck = require("./paths")
 
 -- Arguments: an optional notes folder (or -), then sources; --maps anywhere draws the maps.
 local args, drawMaps = {}, false
@@ -445,6 +446,7 @@ local function report(zone: number, source: string, def, way): string
 	local high, low = extremes(tile)
 	local short = shortcuts(tile)
 	local cross = crossSeconds(tile)
+	local paths = PathCheck.analyse(Beach, Config, tile)
 	local key = source .. "@" .. zone .. tagOf(way.Choice)
 	-- The maps and flood orders only when they're wanted (they're the slow, long part).
 	maps[key] = if drawMaps then mapOf(layout, tile) else ""
@@ -469,6 +471,17 @@ local function report(zone: number, source: string, def, way): string
 			Config.Zones[zone].CrossTime
 		),
 	}
+	local target = Config.Zones[zone].CrossTime
+	for _, line in PathCheck.describe(paths, target) do
+		table.insert(lines, "  " .. line)
+	end
+	local crossing = def.Crossings and def.Crossings[way.Choice and way.Choice.Crossing or 1]
+	local wanted = (crossing and crossing.Paths) or def.Paths
+	if wanted then
+		for _, problem in PathCheck.problems(Config, paths, wanted, target) do
+			table.insert(lines, "  PROBLEM " .. problem)
+		end
+	end
 	for _, line in order do
 		table.insert(lines, "  " .. line)
 	end

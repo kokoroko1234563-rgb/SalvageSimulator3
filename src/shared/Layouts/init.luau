@@ -1128,6 +1128,7 @@ function Layouts.defProblems(def: any, where: string): { string }
 				"Crossings",
 				"Slots",
 				"FadeEvery",
+				"Paths",
 			}, key)
 		then
 			add("unknown field " .. tostring(key))
@@ -1136,9 +1137,22 @@ function Layouts.defProblems(def: any, where: string): { string }
 	if def.Crossings ~= nil and (type(def.Crossings) ~= "table" or #def.Crossings == 0) then
 		add("Crossings must be a list of layouts")
 	end
+	-- How many distinct paths through it a crossing (or a zone without crossings) has: 1 to
+	-- Config.Paths.MaxCount. The path checks (tools/paths.luau) hold it to that.
+	local function pathsProblem(where: string, paths: any)
+		if
+			paths ~= nil
+			and (type(paths) ~= "number" or paths % 1 ~= 0 or paths < 1 or paths > Config.Paths.MaxCount)
+		then
+			add(where .. ": Paths is a whole number from 1 to " .. Config.Paths.MaxCount)
+		end
+	end
+	pathsProblem("the layout", def.Paths)
 	for index, crossing in def.Crossings or {} do
 		if type(crossing) ~= "table" or type(crossing.Primitives) ~= "table" then
 			add("crossing " .. index .. " needs Primitives")
+		else
+			pathsProblem("crossing " .. index, crossing.Paths)
 		end
 	end
 	for index, slot in def.Slots or {} do

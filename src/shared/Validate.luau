@@ -101,6 +101,7 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		local where = "Vessel " .. vessel.Id
 		check(Palette.Rarity[vessel.Rarity] ~= nil, where .. ": rarity has no colour")
 		check(type(vessel.Capacity) == "number" and vessel.Capacity > 0, where .. ": bad Capacity")
+		check(Config.Carts.Sizes[vessel.Size] ~= nil, where .. ": Size must be one of Config.Carts.Order")
 		local usable = vessel.Available or vessel.Magical or vessel.Exotic
 		if usable and extra and extra.VesselBuilders then
 			check(

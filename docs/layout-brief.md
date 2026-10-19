@@ -460,3 +460,64 @@ dangers, and decor that makes every stretch look like somewhere. What it learned
   channels are where they run. Add the zone's own plain dangers where they fit.
 - **Times:** each zone's CrossTime, a biome up to 30% over.
 - **Apply the zone 6 lessons above.**
+
+---
+
+## Round 6: paths, cart sizes and the new dangers (rules for the rebuild)
+
+These hold for every zone and biome drawn from now on. They replace "one way through with
+branches off it".
+
+### Paths through a zone
+
+- **1, 2 or 3 paths.** Each crossing says how many it has: `Paths = 2` on the crossing (or on
+  the definition, for a zone without crossings). Vary it between crossings: a one-path crossing
+  is a tense corridor, a three-path one a web.
+- **Distinct, but allowed to cross.** Paths may cross each other and link up (one or two
+  links per zone is good: it's what makes getting lost recoverable). Each path still needs its
+  own way: at most 40% of it may run along another (in the same open ground; a wall between
+  two corridors makes them different ways).
+- **Every path takes 75% to 140% of the zone's CrossTime** on foot (`Config.Paths`). The
+  minimum is what stops a straight run: no path, however it's found, may be quicker.
+- **Give each path a character.** For example: short but through the dangers, long and
+  safe, dark (the Gloom's), foot-only through squeezes and fords. A regular chooses by tide,
+  gear and nerve.
+
+### Cart sizes (`Config.Carts`)
+
+Carts meet the map as one of four standard boxes, whatever their model:
+
+| Size | Box (wide × long) | Fits a path at least |
+|---|---|---|
+| Small | 4 × 6 | 8 wide |
+| Medium | 6 × 9 | 10 wide |
+| Large | 7 × 12 | 12 wide |
+| Huge | 8 × 15 | 14 wide |
+
+- Narrower than 8 is foot-only.
+- Carts climb no steeper than `CartSlope` (fords and steps are foot-only).
+- **Every crossing has at least one path a Huge cart can take**, within the time window. The
+  others may be narrower: smaller carts get shortcuts, and feet get the quickest.
+- Draw squeezes to these widths, with a stud or two of margin.
+
+### Checking
+
+- `lune run tools/layout_map.luau - <source>` lists each crossing's distinct paths: their
+  times against the target, which cart sizes fit each, and how fast each size gets down. Where
+  a crossing says its `Paths`, it prints a PROBLEM for anything that breaks the rules.
+- `bash tools/check.sh` holds every layout that says its `Paths` to them (tools/paths.luau).
+
+### The dangers now (Hazards.luau)
+
+- **Rockfall:** an area (`At`, `Radius`, about 12) strewn with rubble. Rocks fall at random in
+  it, mostly aimed at whoever is inside, each warned by dust and a growing shadow. Put it on a
+  stretch a path must cross; it's a timing test, not a spot to step round.
+- **Sink:** an irregular patch (`At`, `Radius`, about 12). It slows hard, stops jumps and
+  visibly swallows; stopping kills. Put it across a lane, so going round costs real time.
+- **Gloom:** something unseen walking its `Path` (or lurking `At`), casting a shadow (`Radius`,
+  about 9). Touching the shadow Benights you (dark, only lights show) for half a minute. Give
+  the dark stretches lantern posts and glowing weed (wards).
+- **Pit:** a spike pit (`At`, `Radius`, `Depth` up to 12), open or `Covered = true` (a false
+  floor whose cracks are the only tell). Keep pits off the cart paths and clear of doors.
+- **Undertow** and the **giant crab (Hunter)** as before. The crab now sees in a cone ahead and
+  keeps to its route, so in a tunnel it can't be run round.

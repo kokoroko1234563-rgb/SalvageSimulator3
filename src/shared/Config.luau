@@ -663,6 +663,32 @@ Config.Rebirth = {
 	MaxPicks = 5, -- reward picks at the first 5 rebirths
 }
 
+-- Carts (vessels) meet the map as one of four standard boxes: a vessel's size decides the box
+-- its body collides with, whatever its model looks like (its capacity, speed and handling are
+-- its own, Gear.Vessels). Box: width, height, length. PathWidth: the narrowest a path can be for
+-- that size to get along it (the layouts' path checks rate every path by it, tools/paths.luau).
+Config.Carts = {
+	Order = { "Small", "Medium", "Large", "Huge" },
+	Sizes = {
+		Small = { Box = Vector3.new(4, 3, 6), PathWidth = 8 },
+		Medium = { Box = Vector3.new(6, 3, 9), PathWidth = 10 },
+		Large = { Box = Vector3.new(7, 3.5, 12), PathWidth = 12 },
+		Huge = { Box = Vector3.new(8, 4, 15), PathWidth = 14 },
+	},
+}
+
+-- The paths through a zone (a crossing of its layout): each crossing has 1 to MaxCount of them,
+-- distinct (sharing at most MaxShared of their length with the others; they may cross and link
+-- up), each taking between Min and Max of the zone's CrossTime on foot, and at least one taking
+-- the biggest cart (tools/paths.luau measures them; tools/tests holds layouts to it).
+Config.Paths = {
+	MaxCount = 3,
+	Min = 0.75,
+	Max = 1.4,
+	MaxShared = 0.4,
+	BigCart = "Huge",
+}
+
 Config.Pockets = {
 	Slots = 3, -- from Deep Pockets
 	MaxSlots = 6, -- Deep Pockets plus the Deckhand's Satchel

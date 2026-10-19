@@ -2520,6 +2520,68 @@ test("layouts dress their ground with decor, and the glowing kinds ward off the 
 	DecorService.build(tile)
 end)
 
+test("paths through a zone: counted, timed, and rated for the cart sizes that fit", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local PathCheck = require("../paths")
+	local tile = 4
+	-- Two lanes straight down the zone between rock: one 20 wide, one 9 wide.
+	local function rock(x0, x1)
+		return { Kind = "Wall", Area = { { x0, -10 }, { x1, -10 }, { x1, 618 }, { x0, 618 } }, Height = 12 }
+	end
+	Layouts.setActive(tile, {
+		Name = "two lanes",
+		Primitives = { rock(-400, -60), rock(-40, 30), rock(39, 400) },
+	})
+	local report = PathCheck.analyse(Beach, Config, tile)
+	assert(#report.paths == 2, "two distinct paths, found " .. #report.paths)
+	local bySizes = {}
+	for _, path in report.paths do
+		bySizes[#path.sizes] = path
+	end
+	assert(bySizes[4], "the wide lane takes every cart, up to Huge")
+	local narrow = nil
+	for _, path in report.paths do
+		if #path.sizes < 4 then
+			narrow = path
+		end
+	end
+	-- (Widths are measured on 2-stud cells: to within a couple of studs.)
+	assert(
+		narrow and narrow.sizes[1] == "Small" and not table.find(narrow.sizes, "Large"),
+		"the narrow lane takes small carts, not a Large one"
+	)
+	assert(report.carts.Huge, "a Huge cart gets down")
+	-- Straight down is far too quick for the rules.
+	local problems = PathCheck.problems(Config, report, 2, Config.Zones[tile].CrossTime)
+	assert(#problems >= 2, "both paths are under the minimum time")
+	assert(#PathCheck.problems(Config, report, 3, 20) >= 1, "three were wanted: too few")
+	Layouts.setActive(tile, nil)
+end)
+
+test("layouts that say how many paths they have, have them", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local PathCheck = require("../paths")
+	local failures = {}
+	for _, entry in Layouts.all(true) do
+		local def, zone = entry.Def, entry.Zone
+		local crossing = def.Crossings and def.Crossings[entry.Choice.Crossing]
+		local wanted = (crossing and crossing.Paths) or def.Paths
+		if wanted then
+			Layouts.setActive(zone, def, nil, entry.Choice)
+			local report = PathCheck.analyse(Beach, Config, zone)
+			for _, problem in PathCheck.problems(Config, report, wanted, Config.Zones[zone].CrossTime) do
+				table.insert(failures, entry.Source .. ": " .. problem)
+			end
+			Layouts.setActive(zone, nil)
+		end
+	end
+	assert(#failures == 0, table.concat(failures, "\n      "))
+end)
+
 test("the giant crab takes the longest crab route, and is deadly but can be outrun", function()
 	local Beach = h.require("Shared/Beach")
 	local Hazards = h.require("Shared/Hazards")
