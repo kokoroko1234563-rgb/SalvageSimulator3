@@ -156,7 +156,67 @@ zone's note in `docs/layouts/` says what was built and the measured times.
 
 ## Building
 
-(The layout kit: to come.)
+Draw a zone with the layout kit (`tools/kit/kit.py`) rather than by hand: a short Python plan
+says what's carved where, and the kit writes the layout file. A walled zone starts as solid
+rock (`rock=14`: its height) and you carve what can be walked; walls are whatever you didn't
+carve, so they always meet, lane edges land on the terrain's grid, and roofs rest on the rock
+either side. An open zone (`rock=0`, the shore) places features on open sand instead.
+
+(`tools/kit/plans/example.py`; it writes over zone 5, so only to try the kit.)
+
+```python
+from kit import Zone
+
+z = Zone(5, "The Shoals", rock=14)
+f = z.frame                                    # always there
+f.hall([(-80, 260), (80, 260), (80, 340), (-80, 340)], roof=True, pillars=[(-24, 300), (24, 300)])
+f.lane([(-132, 240), (-132, 300)], width=12)  # up to the slot's door
+f.loot((0, 300), weight=4)
+f.decor("LanternPost", at=(0, 270))
+
+c = z.crossing("Zigzag fords", paths=2)         # one rolled each tide
+c.ramp([(-280, 0), (-280, 120), (144, 120), (144, 470), (-200, 470), (-200, 608)])
+c.lane([(-280, 120), (-280, 300), (-80, 300)], width=12)
+c.lane([(80, 300), (260, 300), (260, 608)], width=12)
+c.hazard("Sink", at=(144, 400), radius=12)
+
+s = z.slot("Weed cove", at=(-180, 176), size=(96, 64), door=(48, 64))
+r = s.room("Drowned pool")                     # in the slot's own coordinates
+r.hall([(8, 8), (88, 8), (88, 48), (8, 48)])
+r.hollow((48, 28), radius=12, depth=3)
+r.loot((48, 28), weight=3)
+
+z.write("src/shared/Layouts/Zones/Zone5.luau")
+```
+
+| Call | What it makes |
+|---|---|
+| `lane(points, width=16, roof=False, floor=None)` | a corridor along the points (width snapped to 12, 20, 28...; 12 is foot and small carts) |
+| `hall(area, roof=False, pillars=[...])`, `court(...)` | an open area; pillars are rock left standing (8 across) |
+| `door(at, width, depth, along="z")` | a short gap through rock |
+| `ramp(points, width=16)` | the cart route, cleared through everything (14+) |
+| `wall`, `wall_area`, `ridge`, `mound`, `hollow`, `channel`, `paint` | the shapes in "The shapes" |
+| `add(Kind=..., ...)` | any shape as the engine takes it |
+| `loot(at, radius, weight)`, `entrance(at)`, `hazard(Type, ...)`, `decor(Kind, ...)` | placements; fields as in the tables above (`at=`, `radius=`, `path=`) |
+
+- A slot's `door` (in its own coordinates, on its edge) is cut through the rock for you, and each
+  room gets a lane from the door to its middle. **Lead a lane of the frame up to the door**: the
+  quick check says if a find can't be walked to.
+- Keep each zone's plan beside its layout, as `tools/kit/plans/zone5.py` (or the biome's name),
+  so the next person changes the plan and re-runs it, not the Luau.
+
+**The quick check** runs the plan and checks what it wrote, in a few seconds:
+
+```
+python3 tools/kit/quick.py 5 --plan tools/kit/plans/zone5.py      # every crossing
+python3 tools/kit/quick.py 5 Zones/Zone5 2: 3:                    # just crossings 2 and 3
+python3 tools/kit/quick.py 5 Biomes/HermitHollows 1:2,1            # a biome; rooms too
+```
+
+It prints every problem (the definition's, each way's, paths that are too quick or too slow or
+too few, finds and entrances nobody can walk to), each path's time and which carts fit it, and
+draws each choice to `tools/kit/out/` (look at the pictures). Iterate with it; then the map tool
+and the Test Range as in "Checking your work".
 
 ## Working rules for agents
 

@@ -32,7 +32,7 @@ shells as the only lights.
   they're without a lantern, which prizes have cracks round them.
 
 **Rooms and loot.** Seven slots: a pillared chamber, a flooded vault, a sinking flat, a tunnel
-ring, a combs of caves. Best finds deepest, the very best on covered pits.
+ring, a comb of caves. Best finds deepest, the very best on covered pits.
 
 **Keep.** The Far Sandbar's approach (the zone's bottom edge) open: it leads straight to the
 channel.
