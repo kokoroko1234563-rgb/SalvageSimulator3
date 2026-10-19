@@ -33,3 +33,5 @@ The BigShell finds in the nests.
 
 **Questions.**
 1. Should a lantern really draw the giant crab (a trade-off in the dark), as it does now?
+
+Answer: I do think that is fine, but I also think that as this is a biome, the giant crab should have some better way of chasing players, like a dash and a "timer teleport" disguised as a digging ability, though both of these must be telegraphed well for the player, with this new ability of the big crab, there should be some way for the smaller crabs to call the big crab to them, which is also very telegraphed.
