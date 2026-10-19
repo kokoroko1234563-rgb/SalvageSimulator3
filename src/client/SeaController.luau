@@ -674,12 +674,18 @@ local function depthColor(depth: number): Color3
 	end
 	return DEPTH_COLORS[#DEPTH_COLORS][2]
 end
-local function seaPointY(x: number, z: number, waterY: number): number
+local function seaPointY(x: number, z: number, waterY: number, ideal: number): number
 	local ground = surfaceY(x, z)
-	if idealY(x, z) < waterY then
+	if ideal < waterY then
 		return math.max(waterY, math.min(ground + 0.06, waterY + LIFT))
 	end
-	return math.min(waterY - 0.05, ground - 0.3)
+	-- Dry: a hair under the sea's height, which the ground above it hides; or, where the drawn
+	-- ground dips below the sea, under that. (Sinking it further would drag the shoreline out:
+	-- the level sheet must meet the sand right at the shore.)
+	if ground >= waterY then
+		return waterY - 0.02
+	end
+	return ground - 0.3
 end
 
 -- The sea surface: flat at each column's water level, draped over the ground near the shore.
@@ -701,12 +707,13 @@ local function updateSea(m: Meshes, sea: Tide.Sea)
 		setColor(m.sea, c, 1, Palette.Water.Shallow)
 		for k = 1, BAND_ROWS do
 			local z = from + BAND_OFFSETS[k]
+			local ideal = idealY(x, z)
 			local y = waterY
 			if not open then
-				y = seaPointY(x, z, waterY)
+				y = seaPointY(x, z, waterY, ideal)
 			end
 			setPoint(m.sea, c, k + 1, Vector3.new(x, y, z))
-			depths[k] = waterY - idealY(x, z)
+			depths[k] = waterY - ideal
 		end
 		-- A point on dry ground (a wall, a bank, the beach) is hidden, but its colour blends into
 		-- the water around it: give it the depth of the nearest wet point in the column, or the

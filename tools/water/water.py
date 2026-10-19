@@ -85,44 +85,61 @@ class Scene:
             self.sheets[name] = self.sample(sheet)
 
     def sample(self, sheet):
-        """A sheet's height (and colour, alpha) at every grid point; NaN where it isn't."""
+        """A sheet's height, colour and alpha at every grid point, from its real triangles (as
+        the mesh draws it: columns of points, two triangles between each pair of columns and
+        rows); NaN where there's none. Where folded sheets overlap, the higher one shows."""
         cols = sheet["cols"]
-        cx = np.array([c[0] for c in cols])
-        ys = np.zeros((self.nz, len(cols)))
-        for i, (_, cy, cz) in enumerate(cols):
-            cz, cy = np.array(cz), np.array(cy)
-            order = np.argsort(cz, kind="stable")
-            cz, cy = cz[order], cy[order]
-            inside = (self.zs >= cz[0]) & (self.zs <= cz[-1]) & (cz[-1] - cz[0] > 0.05)
-            ys[:, i] = np.where(inside, np.interp(self.zs, cz, cy), np.nan)
-        y = np.full((self.nz, self.nx), np.nan)
-        colour = None
+        rows = sheet["rows"]
         base = np.array(hex_rgb(sheet["color"]), dtype=float)
-        alpha = np.full((self.nz, self.nx), 1 - sheet["transparency"])
+        y = np.full((self.nz, self.nx), np.nan)
         rgb = np.tile(base, (self.nz, self.nx, 1))
-        if sheet.get("colors"):
-            per = []
-            for i, (_, cy, cz) in enumerate(cols):
-                cz = np.array(cz)
-                order = np.argsort(cz, kind="stable")
-                k = [sheet["colors"][i][j] for j in order]
-                cz = cz[order]
-                chans = [np.array([int(h[n:n + 2], 16) for h in k], dtype=float) for n in (0, 2, 4, 6)]
-                per.append([np.interp(self.zs, cz, ch) for ch in chans])
-            colour = per
-        for j, x in enumerate(self.xs):
-            k = np.searchsorted(cx, x) - 1
-            k = min(max(k, 0), len(cx) - 2)
-            t = (x - cx[k]) / max(cx[k + 1] - cx[k], 1e-6)
-            if t < -0.01 or t > 1.01:
-                continue
-            a, b = ys[:, k], ys[:, k + 1]
-            y[:, j] = a + (b - a) * t
-            if colour:
-                for n in range(3):
-                    rgb[:, j, n] = colour[k][n] + (colour[k + 1][n] - colour[k][n]) * t
-                alpha[:, j] = (colour[k][3] + (colour[k + 1][3] - colour[k][3]) * t) / 255 * (1 - sheet["transparency"])
-        return {"y": y, "rgb": rgb, "alpha": alpha}
+        alpha = np.full((self.nz, self.nx), 1 - sheet["transparency"])
+        colours = sheet.get("colors")
+
+        def point(c, r):
+            x, ys, zs = cols[c]
+            k = np.array(hex_rgb(colours[c][r][:6]), dtype=float) if colours else base
+            return np.array([x, ys[r], zs[r]]), k
+
+        tris, tri_rgb = [], []
+
+        for c in range(len(cols) - 1):
+            for r in range(rows - 1):
+                p00, k00 = point(c, r)
+                p01, k01 = point(c, r + 1)
+                p10, k10 = point(c + 1, r)
+                p11, k11 = point(c + 1, r + 1)
+                for (a, ka), (b, kb), (cc, kc) in (((p00, k00), (p01, k01), (p10, k10)),
+                                                   ((p10, k10), (p01, k01), (p11, k11))):
+                    den = (b[2] - cc[2]) * (a[0] - cc[0]) + (cc[0] - b[0]) * (a[2] - cc[2])
+                    if abs(den) < 1e-6:
+                        continue
+                    tris.append((a, b, cc))
+                    tri_rgb.append((ka + kb + kc) / 3)
+                    x_lo, x_hi = min(a[0], b[0], cc[0]), max(a[0], b[0], cc[0])
+                    z_lo, z_hi = min(a[2], b[2], cc[2]), max(a[2], b[2], cc[2])
+                    i0 = max(int(np.ceil((x_lo - self.x0) / self.step)), 0)
+                    i1 = min(int(np.floor((x_hi - self.x0) / self.step)), self.nx - 1)
+                    j0 = max(int(np.ceil((z_lo - self.z0) / self.step)), 0)
+                    j1 = min(int(np.floor((z_hi - self.z0) / self.step)), self.nz - 1)
+                    if i0 > i1 or j0 > j1:
+                        continue
+                    px, pz = np.meshgrid(self.xs[i0:i1 + 1], self.zs[j0:j1 + 1])
+                    w0 = ((b[2] - cc[2]) * (px - cc[0]) + (cc[0] - b[0]) * (pz - cc[2])) / den
+                    w1 = ((cc[2] - a[2]) * (px - cc[0]) + (a[0] - cc[0]) * (pz - cc[2])) / den
+                    w2 = 1 - w0 - w1
+                    inside = (w0 >= -1e-6) & (w1 >= -1e-6) & (w2 >= -1e-6)
+                    if not inside.any():
+                        continue
+                    ty = w0 * a[1] + w1 * b[1] + w2 * cc[1]
+                    here = y[j0:j1 + 1, i0:i1 + 1]
+                    take = inside & ~(np.nan_to_num(here, nan=-1e9) >= ty)
+                    here[take] = ty[take]
+                    if colours:
+                        tk = w0[..., None] * ka + w1[..., None] * kb + w2[..., None] * kc
+                        rgb[j0:j1 + 1, i0:i1 + 1][take] = tk[take]
+        return {"y": y, "rgb": rgb, "alpha": alpha, "tris": np.array(tris).reshape(-1, 3, 3),
+                "tri_rgb": np.array(tri_rgb).reshape(-1, 3), "opacity": 1 - sheet["transparency"]}
 
     def ground_rgb(self):
         rgb = np.zeros((self.nz, self.nx, 3))
@@ -233,7 +250,8 @@ def draw_cut(scene, out, cut_x, yscale=6, scale=3):
 
 
 # ---- eye: a small z-buffered rasteriser ------------------------------------------------------
-def draw_eye(scene, out, eye_x, eye_z, width=960, height=540, fov=70, pitch=-10, yaw=0):
+def draw_eye(scene, out, eye_x, eye_z, width=960, height=540, fov=70, pitch=-10, yaw=0,
+             sheets_shown=("WetSand", "Sea", "Swash", "Foam", "Crest1", "Crest2")):
     j = int(np.clip((eye_z - scene.z0) / scene.step, 0, scene.nz - 1))
     i = int(np.argmin(np.abs(scene.xs - eye_x)))
     eye = np.array([eye_x, scene.floor[j, i] + 5.5, eye_z])
@@ -331,15 +349,17 @@ def draw_eye(scene, out, eye_x, eye_z, width=960, height=540, fov=70, pitch=-10,
     if not np.isnan(roof_top).all():
         t, c, a = grid_tris(roof_top, np.full_like(ground, 105), stride=stride)
         raster(t, c, a, True)
-    order = ("WetSand", "Sea", "Swash", "Foam", "Crest1", "Crest2")
+    order = [n for n in ("WetSand", "Sea", "Swash", "Foam", "Crest1", "Crest2") if n in sheets_shown]
     # Water: far to near, blended over what's behind (it's see-through).
     for name in order:
         sheet = scene.sheets.get(name)
         if not sheet:
             continue
-        # The ground hides what's under it, pixel by pixel (the depth test), as in the engine.
-        y = sheet["y"].copy()
-        t, c, a = grid_tris(y, sheet["rgb"], sheet["alpha"], stride=stride)
+        # The sheet's own triangles; the ground hides what's under them pixel by pixel (the
+        # depth test), as in the engine.
+        t = sheet["tris"]
+        c = sheet["tri_rgb"]
+        a = np.full(len(t), sheet["opacity"])
         if len(t):
             centre = t.mean(1)
             far = np.argsort(-np.linalg.norm(centre - eye, axis=1))
@@ -400,6 +420,8 @@ def main():
     parser.add_argument("--eye", type=float, nargs=3, metavar=("X", "Z", "YAW"),
                         help="where the eye view stands (default: up the beach from the waterline, at the cut's X)")
     parser.add_argument("--scale", type=float, default=2)
+    parser.add_argument("--sheets", default="WetSand,Sea,Swash,Foam,Crest1,Crest2",
+                        help="which water sheets the eye view draws")
     parser.add_argument("-o", "--out", default=os.path.join(ROOT, "tools", "water", "out", "water"))
     args = parser.parse_args()
     if not args.region:
@@ -414,7 +436,7 @@ def main():
         draw_cut(scene, args.out + "-cut.png", args.cut_x)
     if "eye" in views:
         ex, ez, yaw = args.eye if args.eye else (args.cut_x, args.waterline - 60, 0)
-        draw_eye(scene, args.out + "-eye.png", ex, ez, yaw=yaw)
+        draw_eye(scene, args.out + "-eye.png", ex, ez, yaw=yaw, sheets_shown=args.sheets.split(","))
     print(json.dumps(scene.checks()))
 
 
