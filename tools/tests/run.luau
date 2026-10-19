@@ -2399,10 +2399,13 @@ test("a plain zone's own dangers go where its layout puts them, and they're dead
 			{ Type = "Rockfall", At = { 0, 120 } },
 			{ Type = "Undertow", Path = { { -200, 300 }, { -200, 400 } }, Width = 12 },
 			{ Type = "Gloom", Path = { { 100, 400 }, { 250, 400 } }, Radius = 20 },
+			{ Type = "Pit", At = { -150, 200 } },
+			{ Type = "Pit", At = { -150, 260 }, Radius = 6, Depth = 10, Covered = true },
 		},
 	})
 	local folder = Harness.wrap(roblox.Instance.new("Folder"))
-	HazardService.start(tile, Config.Zones[tile], folder)
+	local zone = Config.Zones[tile]
+	HazardService.start(tile, zone, folder)
 	local effects = {}
 	for _, part in folder:GetChildren() do
 		local effect = part:GetAttribute("Effect")
@@ -2410,38 +2413,50 @@ test("a plain zone's own dangers go where its layout puts them, and they're dead
 			effects[effect] = (effects[effect] or 0) + 1
 		end
 	end
+	local sinkSettings = Hazards.settings({ Type = "Sink" })
+	local count = function(name)
+		local n = 0
+		for _, part in folder:GetDescendants() do
+			if part.Name == name then
+				n += 1
+			end
+		end
+		return n
+	end
+	assert(effects.Sink == 1 + sinkSettings.Lobes, "the sinking sand: a blob of lobes")
+	assert(count("RockfallShadow") >= 3 and count("Rubble") >= 5, "the rockfall: rubble, and rocks to fall")
 	assert(
-		effects.Sink == 1 and effects.Harm == 1 and (effects.Current or 0) >= 3,
-		"each where it was placed"
+		count("SpikePit") == 2 and count("PitCover") == 1 and count("Spike") >= 10,
+		"a spike pit open, one covered"
 	)
+	assert((effects.Current or 0) >= 3, "the undertow")
 	assert(effects.Gloom == 1, "and the Gloom")
 	local gloom
 	for _, part in folder:GetChildren() do
-		if part.Name == "Gloom" then
+		if part.Name == "GloomShadow" then
 			gloom = part
 		end
 	end
 	HazardService._step(0, 0.1)
 	local startX = gloom.CFrame.X
-	HazardService._step(20, 0.1)
-	assert(math.abs(gloom.CFrame.X - startX) > 20, "the Gloom drifts along its path")
-	for _, entry in Config.Zones[tile].Hazards do
+	HazardService._step(10, 0.1)
+	assert(math.abs(gloom.CFrame.X - startX) > 20, "the Gloom's shadow moves along its path")
+	assert(gloom:GetAttribute("Duration") > 0, "it Benights whoever it touches")
+	for _, entry in zone.Hazards do
 		local settings = Hazards.settings(entry)
 		if settings.Damage then
 			assert(settings.Damage >= 100, settings.Type .. " kills")
 		end
 	end
-	-- The rock falls in turn; the undertow only runs under the sea.
-	local rockfall
-	for _, part in folder:GetChildren() do
-		if part.Name == "RockfallSpot" then
-			rockfall = part
-		end
-	end
+	-- Rocks fall in turn, each warned first.
 	local seen = {}
-	for t = 0, 8, 0.25 do
-		HazardService._step(t, 0.6)
-		seen[rockfall:GetAttribute("Active")] = true
+	for t = 10, 18, 0.1 do
+		HazardService._step(t, 0.1)
+		for _, part in folder:GetChildren() do
+			if part.Name == "RockfallShadow" then
+				seen[part:GetAttribute("Active")] = true
+			end
+		end
 	end
 	assert(seen[true] and seen[false], "rock falls, then doesn't")
 	-- (Without a placement, nothing is scattered for a plain zone.)

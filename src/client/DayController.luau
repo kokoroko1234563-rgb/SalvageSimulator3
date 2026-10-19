@@ -70,6 +70,14 @@ local function correction(): ColorCorrectionEffect?
 	return Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 end
 
+-- Benighted by the Gloom (HazardController sets it, 0 or 1): the world goes black, the sky
+-- and the fog with it, so only lights show (the player's own lantern lights what's round them).
+-- It closes in quickly and lifts slowly.
+DayController.blind = 0
+local blindNow = 0
+local BLIND_IN, BLIND_OUT = 3, 0.6 -- per second
+local atmosphereBase: { Glare: number, Haze: number }? = nil
+
 function DayController.apply(hour: number, dt: number?)
 	local target, covered = targetLook()
 	local k = if dt then math.min(1, dt * Config.Looks.Response) else 1
@@ -80,16 +88,32 @@ function DayController.apply(hour: number, dt: number?)
 
 	local night = DayCycle.nightness(hour)
 	local warm = glow(hour)
+	local wanted = DayController.blind
+	local rate = if wanted > blindNow then BLIND_IN else BLIND_OUT
+	blindNow += math.clamp(wanted - blindNow, -rate * (dt or 1), rate * (dt or 1))
+	local blind = blindNow
+	local black = Color3.new()
 	Lighting.ClockTime = hour
-	Lighting.Brightness = (look.Brightness + (cfg.NightBrightness - look.Brightness) * night) * shade
-	Lighting.OutdoorAmbient = look.Outdoor:Lerp(cfg.NightAmbient, night):Lerp(Color3.new(), 1 - shade)
-	Lighting.Ambient = look.Ambient:Lerp(cfg.NightAmbient, night * 0.5):Lerp(Color3.new(), (1 - shade) * 0.5)
-	local haze = look.Haze:Lerp(cfg.DuskColor, warm * 0.5):Lerp(NIGHT_FOG, night * 0.6)
+	Lighting.Brightness = (look.Brightness + (cfg.NightBrightness - look.Brightness) * night)
+		* shade
+		* (1 - blind)
+	Lighting.OutdoorAmbient =
+		look.Outdoor:Lerp(cfg.NightAmbient, night):Lerp(Color3.new(), 1 - shade):Lerp(black, blind)
+	Lighting.Ambient = look.Ambient
+		:Lerp(cfg.NightAmbient, night * 0.5)
+		:Lerp(Color3.new(), (1 - shade) * 0.5)
+		:Lerp(black, blind)
+	Lighting.ExposureCompensation = -1.5 * blind
+	local haze = look.Haze:Lerp(cfg.DuskColor, warm * 0.5):Lerp(NIGHT_FOG, night * 0.6):Lerp(black, blind)
 	Lighting.FogColor = haze
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 	if atmosphere then
 		atmosphere.Color = haze
-		atmosphere.Decay = look.Decay:Lerp(NIGHT_FOG, night * 0.6)
+		atmosphere.Decay = look.Decay:Lerp(NIGHT_FOG, night * 0.6):Lerp(black, blind)
+		-- (Its own glare and haze, remembered the first time, fade with the light.)
+		atmosphereBase = atmosphereBase or { Glare = atmosphere.Glare, Haze = atmosphere.Haze }
+		atmosphere.Glare = atmosphereBase.Glare * (1 - blind)
+		atmosphere.Haze = atmosphereBase.Haze * (1 - blind)
 	end
 	local grading = correction()
 	if grading then

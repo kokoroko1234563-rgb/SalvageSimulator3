@@ -280,7 +280,7 @@ end
 
 -- Props: floating, buried, inside rock --------------------------------------------------------
 
-local SKIP_FOLDERS = { MapEdge = true, SandPatches = true, BiomeShowcase = true, Shop = true }
+local SKIP_FOLDERS = { MapEdge = true, SandPatches = true, BiomeShowcase = true, Shop = true, Pit = true }
 
 local function units(): { { name: string, cframe: CFrame, size: Vector3, instance: Instance } }
 	local list = {}

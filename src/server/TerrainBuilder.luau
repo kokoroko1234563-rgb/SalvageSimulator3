@@ -198,6 +198,9 @@ function TerrainBuilder.buildRange(fromZ: number, toZ: number)
 		local region = Region3.new(slabLo, slabHi)
 		terrain:WriteVoxels(region, VOXEL, materials, occupancy)
 		z0 = z1
+		-- A breath between slabs: the whole beach takes seconds to work out, and a script that
+		-- runs that long without a pause is stopped (and holds everything else up meanwhile).
+		task.wait()
 	end
 end
 

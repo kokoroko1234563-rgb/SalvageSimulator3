@@ -15,6 +15,7 @@ local Beach = require(Shared.Beach)
 local Gear = require(Shared.Gear)
 local Hazards = require(Shared.Hazards)
 local Layouts = require(Shared.Layouts)
+local Looks = require(Shared.Looks)
 local Palette = require(Shared.Palette)
 local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
@@ -364,103 +365,385 @@ local function spotsFor(tile: number, kind: string, settings): { { x: number, z:
 	return spots
 end
 
--- Sink: sinking sand. A patch of darker, wet sand that slows you; stand still in it and it
--- swallows you (HazardController).
+-- Sink: sinking sand. An irregular patch of dark, wet sand (a blob of round lobes, each a hazard
+-- part) that slows you, stops you jumping and swallows you (HazardController), with the odd
+-- bubble rising out of it.
 function builders.Sink(tile, settings, folder)
 	for _, spot in spotsFor(tile, "Sink", settings) do
 		local radius = spot.placement.Radius or settings.Radius
-		local part = makePart({
-			Name = "SinkingSand",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.2, radius * 2, radius * 2),
-			CFrame = CFrame.new(spot.x, Beach.groundAt(spot.x, spot.z) + 0.06, spot.z)
-				* CFrame.Angles(0, 0, math.pi / 2),
-			Color = settings.Color,
-			Material = Enum.Material.Mud,
-			Reflectance = 0.08, -- a wet sheen: the tell
-		})
-		arm(part, settings)
-		part:SetAttribute("HitRadius", radius)
-		part:SetAttribute("Factor", settings.Factor)
-		part:SetAttribute("SinkTime", settings.SinkTime)
-		part:SetAttribute("MovingShare", settings.MovingShare)
-		part.Parent = folder
+		local shape = Random.new(math.floor(spot.x * 31 + spot.z * 17))
+		local lobes = { { 0, 0, radius * 0.7 } }
+		for k = 1, settings.Lobes do
+			local angle = (k / settings.Lobes + shape:NextNumber(-0.12, 0.12)) * math.pi * 2
+			local reach = radius * shape:NextNumber(0.4, 0.55)
+			table.insert(
+				lobes,
+				{ math.cos(angle) * reach, math.sin(angle) * reach, radius * shape:NextNumber(0.4, 0.55) }
+			)
+		end
+		for index, lobe in lobes do
+			local x, z, r = spot.x + lobe[1], spot.z + lobe[2], lobe[3]
+			local part = makePart({
+				Name = "SinkingSand",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.2, r * 2, r * 2),
+				CFrame = CFrame.new(x, Beach.groundAt(x, z) + 0.06 + index * 0.005, z)
+					* CFrame.Angles(0, 0, math.pi / 2),
+				Color = settings.Color,
+				Material = Enum.Material.Mud,
+				Reflectance = 0.12, -- a wet sheen: the tell
+			})
+			arm(part, settings)
+			part:SetAttribute("HitRadius", r)
+			part:SetAttribute("Factor", settings.Factor)
+			part:SetAttribute("SinkTime", settings.SinkTime)
+			part:SetAttribute("MovingShare", settings.MovingShare)
+			if index == 1 then
+				local bubbles = Instance.new("ParticleEmitter")
+				bubbles.Color = ColorSequence.new(settings.Color:Lerp(Color3.new(1, 1, 1), 0.25))
+				bubbles.Size = NumberSequence.new(0.35, 0)
+				bubbles.Lifetime = NumberRange.new(0.4, 0.8)
+				bubbles.Rate = 3
+				bubbles.Speed = NumberRange.new(0.5, 1.5)
+				bubbles.EmissionDirection = Enum.NormalId.Right -- up, for a cylinder lying on its side
+				bubbles.Shape = Enum.ParticleEmitterShape.Cylinder
+				bubbles.Parent = part
+			end
+			part.Parent = folder
+		end
 	end
 end
 
--- Rockfall: under a roof, dust and pebbles trickle down for Warning seconds, then a rock
--- drops and knocks over anyone under it. Not all in step.
+-- Rockfall: a stretch of roof that's coming down (see Hazards.luau). Old rubble strews the
+-- area: that's the tell that it's dangerous. Rocks fall at random in it, more often than not
+-- aimed at someone inside, now and then several at once; each is warned by trickling dust and a
+-- shadow that grows where it will land, then harms whoever is right there.
+local ROCK_SLOTS = 6 -- rocks that can be in the air at once, per area
+
 function builders.Rockfall(tile, settings, folder)
-	local falls = {}
+	local areas = {}
 	for _, spot in spotsFor(tile, "Rockfall", settings) do
+		local radius = spot.placement.Radius or settings.Radius
 		local ground = Beach.groundAt(spot.x, spot.z)
-		local roofBottom = Beach.roofAt(spot.x, spot.z)
-		local top = roofBottom or ground + 14
-		local target = makePart({
-			Name = "RockfallSpot",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.15, settings.Radius * 1.6, settings.Radius * 1.6),
-			CFrame = CFrame.new(spot.x, ground + 0.05, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
-			Color = settings.Color,
-			Material = Palette.Material.Rock,
-			Transparency = 0.4, -- a scatter of old rubble on the floor: where rock has fallen before
-		})
-		arm(target, settings)
-		target:SetAttribute("Active", false)
-		target.Parent = folder
-		local rock = makePart({
-			Name = "FallingRock",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(3.4, 3, 3.4),
-			CFrame = CFrame.new(spot.x, top - 1.5, spot.z),
-			Color = settings.Color,
-			Material = Palette.Material.Rock,
-			Transparency = 1,
-		})
-		rock.Parent = folder
-		local dust = Instance.new("ParticleEmitter")
-		dust.Color = ColorSequence.new(settings.Color:Lerp(Color3.new(1, 1, 1), 0.4))
-		dust.Size = NumberSequence.new(0.25, 0.1)
-		dust.Lifetime = NumberRange.new(0.8, 1.2)
-		dust.Rate = 30
-		dust.Speed = NumberRange.new(4, 7)
-		dust.SpreadAngle = Vector2.new(12, 12)
-		dust.EmissionDirection = Enum.NormalId.Bottom
-		dust.Enabled = false
-		dust.Parent = rock
-		table.insert(falls, {
-			target = target,
-			rock = rock,
-			dust = dust,
-			top = top - 1.5,
-			ground = ground + 1.5,
+		local scatter = Random.new(math.floor(spot.x * 13 + spot.z * 7))
+		-- The rubble: what has fallen before.
+		for _ = 1, math.floor(radius * 0.9) do
+			local angle, reach = scatter:NextNumber() * math.pi * 2, math.sqrt(scatter:NextNumber()) * radius
+			local x, z = spot.x + math.cos(angle) * reach, spot.z + math.sin(angle) * reach
+			local size = scatter:NextNumber(0.6, 1.8)
+			makePart({
+				Name = "Rubble",
+				Size = Vector3.new(size, size * 0.6, size * scatter:NextNumber(0.7, 1.3)),
+				CFrame = CFrame.new(x, Beach.groundAt(x, z) + size * 0.2, z) * CFrame.Angles(
+					scatter:NextNumber(-0.4, 0.4),
+					scatter:NextNumber() * math.pi,
+					scatter:NextNumber(-0.4, 0.4)
+				),
+				Color = settings.Color,
+				Material = Palette.Material.Rock,
+			}).Parent =
+				folder
+		end
+		local slots = {}
+		for _ = 1, ROCK_SLOTS do
+			local shadow = makePart({
+				Name = "RockfallShadow",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.12, 1, 1),
+				CFrame = CFrame.new(spot.x, ground - 20, spot.z),
+				Color = Color3.new(0, 0, 0),
+				Material = Enum.Material.SmoothPlastic,
+				Transparency = 1,
+			})
+			arm(shadow, settings)
+			shadow:SetAttribute("HitRadius", settings.RockRadius)
+			shadow:SetAttribute("Active", false)
+			shadow.Parent = folder
+			local rock = makePart({
+				Name = "FallingRock",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(3.6, 3.2, 3.6),
+				CFrame = CFrame.new(spot.x, ground - 20, spot.z),
+				Color = settings.Color,
+				Material = Palette.Material.Rock,
+				Transparency = 1,
+			})
+			local dust = Instance.new("ParticleEmitter")
+			dust.Color = ColorSequence.new(settings.Color:Lerp(Color3.new(1, 1, 1), 0.4))
+			dust.Size = NumberSequence.new(0.3, 0.1)
+			dust.Lifetime = NumberRange.new(0.8, 1.2)
+			dust.Rate = 40
+			dust.Speed = NumberRange.new(5, 8)
+			dust.SpreadAngle = Vector2.new(10, 10)
+			dust.EmissionDirection = Enum.NormalId.Bottom
+			dust.Enabled = false
+			dust.Parent = rock
+			rock.Parent = folder
+			table.insert(slots, { shadow = shadow, rock = rock, dust = dust, start = nil })
+		end
+		table.insert(areas, {
 			x = spot.x,
 			z = spot.z,
-			offset = rng:NextNumber(0, settings.Period),
+			radius = radius,
+			slots = slots,
+			nextFall = 0,
+			nextBurst = 0,
 		})
 	end
+	if #areas == 0 then
+		return
+	end
+	-- Where a rock will land: on someone inside (a little off them) or anywhere in the area.
+	local function pick(area): Vector2
+		if rng:NextNumber() < settings.Aimed then
+			local inside = {}
+			for _, player in Players:GetPlayers() do
+				local root = player.Character
+					and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+				if
+					root
+					and (Vector2.new(root.Position.X, root.Position.Z) - Vector2.new(area.x, area.z)).Magnitude
+						<= area.radius + 2
+				then
+					table.insert(inside, root)
+				end
+			end
+			if #inside > 0 then
+				local root = inside[rng:NextInteger(1, #inside)]
+				-- Lead them a little: where they'll be when it lands.
+				local lead = root.AssemblyLinearVelocity * settings.Warning * rng:NextNumber(0.3, 0.9)
+				local angle = rng:NextNumber() * math.pi * 2
+				return Vector2.new(
+					root.Position.X + lead.X + math.cos(angle) * 1.5,
+					root.Position.Z + lead.Z + math.sin(angle) * 1.5
+				)
+			end
+		end
+		local angle, reach = rng:NextNumber() * math.pi * 2, math.sqrt(rng:NextNumber()) * area.radius
+		return Vector2.new(area.x + math.cos(angle) * reach, area.z + math.sin(angle) * reach)
+	end
+	local function drop(area, now: number, delay: number)
+		for _, slot in area.slots do
+			if not slot.start then
+				local at = pick(area)
+				local ground = Beach.groundAt(at.X, at.Y)
+				slot.start = now + delay
+				slot.ground = ground
+				slot.top = (Beach.roofAt(at.X, at.Y) or ground + 16) - 1.6
+				slot.at = at
+				return
+			end
+		end
+	end
+	local landing = settings.Warning + settings.Active
 	table.insert(running, {
 		folder = folder,
 		step = function(now)
-			for _, f in falls do
-				local t = (now + f.offset) % settings.Period
-				local active = t >= settings.Period - settings.Active
-				local warned = not active and t >= settings.Period - settings.Active - settings.Warning
-				if f.target:GetAttribute("Active") ~= active then
-					f.target:SetAttribute("Active", active)
+			for _, area in areas do
+				if now >= area.nextFall then
+					drop(area, now, 0)
+					area.nextFall = now + settings.Interval * rng:NextNumber(0.5, 1.5)
 				end
-				f.dust.Enabled = warned
-				if active then
-					local k = (t - (settings.Period - settings.Active)) / settings.Active
-					f.rock.Transparency = 0
-					f.rock.CFrame = CFrame.new(f.x, f.top + (f.ground - f.top) * math.min(1, k * 1.6), f.z)
-				elseif f.rock.Transparency ~= 1 then
-					f.rock.Transparency = 1
-					f.rock.CFrame = CFrame.new(f.x, f.top, f.z)
+				if now >= area.nextBurst then
+					if area.nextBurst > 0 then
+						for k = 1, settings.Burst do
+							drop(area, now, k * 0.15)
+						end
+					end
+					area.nextBurst = now + settings.BurstEvery * rng:NextNumber(0.6, 1.4)
+				end
+				for _, slot in area.slots do
+					local start = slot.start
+					if not start then
+						continue
+					end
+					local t = now - start
+					local at, ground = slot.at, slot.ground
+					if t < 0 then
+						continue
+					elseif t < settings.Warning then
+						-- The warning: dust trickling from above, a shadow growing where it lands.
+						local k = t / settings.Warning
+						local size = settings.RockRadius * 2 * (0.4 + 0.6 * k)
+						slot.shadow.Size = Vector3.new(0.12, size, size)
+						slot.shadow.CFrame = CFrame.new(at.X, ground + 0.08, at.Y)
+							* CFrame.Angles(0, 0, math.pi / 2)
+						slot.shadow.Transparency = 0.75 - 0.4 * k
+						slot.rock.CFrame = CFrame.new(at.X, slot.top, at.Y)
+						slot.dust.Enabled = true
+					elseif t < landing then
+						-- The fall, and the moment it harms.
+						local k = math.min(1, (t - settings.Warning) / (settings.Active * 0.6))
+						slot.dust.Enabled = false
+						slot.rock.Transparency = 0
+						slot.rock.CFrame = CFrame.new(at.X, slot.top + (ground + 1.6 - slot.top) * k, at.Y)
+						if slot.shadow:GetAttribute("Active") ~= true then
+							slot.shadow:SetAttribute("Active", true)
+						end
+					elseif t < landing + 0.6 then
+						-- Lying there a moment.
+						if slot.shadow:GetAttribute("Active") ~= false then
+							slot.shadow:SetAttribute("Active", false)
+							slot.shadow.Transparency = 1
+						end
+					else
+						slot.rock.Transparency = 1
+						slot.rock.CFrame = CFrame.new(at.X, ground - 20, at.Y)
+						slot.shadow.CFrame = CFrame.new(at.X, ground - 20, at.Y)
+						slot.start = nil
+					end
 				end
 			end
 		end,
 	})
+end
+
+-- Empties every terrain cell whose middle is within `radius` of (x, z), between heights y0 and
+-- y1. (The engine's own FillCylinder leaves cells half full near a small hole's floor.)
+local function carve(terrain: Terrain, x: number, z: number, radius: number, y0: number, y1: number)
+	local cell = 4
+	local low = Vector3.new(
+		math.floor((x - radius) / cell) * cell,
+		math.floor(y0 / cell) * cell,
+		math.floor((z - radius) / cell) * cell
+	)
+	local high = Vector3.new(
+		math.ceil((x + radius) / cell) * cell,
+		math.ceil(y1 / cell) * cell,
+		math.ceil((z + radius) / cell) * cell
+	)
+	local region = Region3.new(low, high)
+	local materials, occupancy = terrain:ReadVoxels(region, cell)
+	for ix = 1, #materials do
+		local cx = low.X + (ix - 0.5) * cell
+		for iz = 1, #materials[ix][1] do
+			local cz = low.Z + (iz - 0.5) * cell
+			if (cx - x) ^ 2 + (cz - z) ^ 2 <= radius * radius then
+				for iy = 1, #materials[ix] do
+					materials[ix][iy][iz] = Enum.Material.Air
+					occupancy[ix][iy][iz] = 0
+				end
+			end
+		end
+	end
+	terrain:WriteVoxels(region, cell, materials, occupancy)
+end
+
+-- Pit: a spike pit cut into the ground (see Hazards.luau), open or under a false floor that
+-- gives way when someone steps on it.
+function builders.Pit(tile, settings, folder)
+	local terrain = Workspace:FindFirstChildOfClass("Terrain")
+	local reader = Looks.terrainReader()
+	for _, spot in spotsFor(tile, "Pit", settings) do
+		-- Its own folder: the Test Range leaves pits out of its props-on-the-ground check.
+		local pit = Instance.new("Folder")
+		pit.Name = "Pit"
+		pit.Parent = folder
+		local placement = spot.placement
+		local radius = placement.Radius or settings.Radius
+		-- (No deeper than the ground's crust under the deepest cut, or it opens onto nothing.)
+		local depth = math.min(placement.Depth or settings.Depth, 12)
+		local covered = if placement.Covered ~= nil then placement.Covered else settings.Covered
+		local ground = Beach.groundAt(spot.x, spot.z)
+		local bottom = ground - depth
+		-- The hole: air from just above the ground down to its floor. Terrain is made of 4-stud
+		-- cells, so it's cut a little wider than the pit for the cells to really empty; whatever
+		-- falls into it lands on the spikes.
+		local hole = radius + 1.5
+		if terrain then
+			-- (From a cell below its floor, so the floor's own cells empty too: the spiked floor
+			-- plate is what you land on.)
+			carve(terrain, spot.x, spot.z, hole, bottom - 4, ground + 2)
+		end
+		-- The spikes, all over its floor, and what they do.
+		local scatter = Random.new(math.floor(spot.x * 11 + spot.z * 5))
+		for _ = 1, math.max(5, math.floor(hole * hole * 0.5)) do
+			local angle, reach =
+				scatter:NextNumber() * math.pi * 2, math.sqrt(scatter:NextNumber()) * (hole - 1)
+			local x, z = spot.x + math.cos(angle) * reach, spot.z + math.sin(angle) * reach
+			local height = scatter:NextNumber(2.2, 3.4)
+			makePart({
+				Name = "Spike",
+				Size = Vector3.new(0.35, height, 0.35),
+				CFrame = CFrame.new(x, bottom + height / 2, z) * CFrame.Angles(
+					scatter:NextNumber(-0.2, 0.2),
+					scatter:NextNumber() * math.pi,
+					scatter:NextNumber(-0.2, 0.2)
+				),
+				Color = settings.Color,
+				Material = Palette.Material.Metal,
+			}).Parent =
+				pit
+		end
+		local floor = makePart({
+			Name = "SpikePit",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.2, hole * 2, hole * 2),
+			CFrame = CFrame.new(spot.x, bottom + 0.1, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = Color3.fromRGB(30, 26, 22),
+			Material = Enum.Material.Slate,
+			CanCollide = true,
+		})
+		arm(floor, settings)
+		floor:SetAttribute("HitRadius", hole)
+		floor.Parent = pit
+		if not covered then
+			continue
+		end
+		-- The false floor: the ground's own sand, a little darker, with a few cracks.
+		local floorMaterial = reader(spot.x, spot.z)
+		local color = if terrain then terrain:GetMaterialColor(floorMaterial) else settings.Color
+		local lid = makePart({
+			Name = "PitCover",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1, hole * 2 + 1, hole * 2 + 1),
+			CFrame = CFrame.new(spot.x, ground - 0.4, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = color:Lerp(Color3.new(0, 0, 0), 0.06),
+			Material = floorMaterial,
+			CanCollide = true,
+			CanTouch = true,
+			CanQuery = true,
+		})
+		local cracks = {}
+		for k = 1, 3 do
+			local crack = makePart({
+				Name = "Crack",
+				Size = Vector3.new(0.15, 0.05, radius * scatter:NextNumber(0.6, 1.2)),
+				CFrame = CFrame.new(spot.x, ground + 0.11, spot.z)
+					* CFrame.Angles(0, k * 1.1 + scatter:NextNumber(-0.3, 0.3), 0),
+				Color = color:Lerp(Color3.new(0, 0, 0), 0.45),
+				Material = Enum.Material.SmoothPlastic,
+			})
+			crack.Parent = pit
+			table.insert(cracks, crack)
+		end
+		local broken = false
+		lid.Touched:Connect(function(hit)
+			if broken then
+				return
+			end
+			local model = hit:FindFirstAncestorOfClass("Model")
+			if not (model and model:FindFirstChildOfClass("Humanoid")) then
+				return
+			end
+			broken = true
+			-- It gives way: gone from under them, and back later.
+			lid.CanCollide = false
+			lid.Transparency = 1
+			for _, crack in cracks do
+				crack.Transparency = 1
+			end
+			task.delay(settings.Reset, function()
+				lid.CanCollide = true
+				lid.Transparency = 0
+				for _, crack in cracks do
+					crack.Transparency = 0
+				end
+				broken = false
+			end)
+		end)
+		lid.Parent = pit
+	end
 end
 
 -- Undertow: while the sea covers a ford or channel, a current along it drags you seaward.
@@ -751,11 +1034,9 @@ function builders.Hunter(tile, settings, folder)
 	})
 end
 
--- Gloom: a living darkness, drawn as an inky fog over its area, drifting back and forth along
--- its Path (or lying still), swelling once the tide turns. The dread it causes is each
--- client's to feel (HazardController); the server only moves it and takes whoever it fills.
-local GLOOM_SMOKE = "rbxasset://textures/particles/smoke_main.dds"
-
+-- Gloom: something unseen roams the halls (see Hazards.luau). All that shows of it is its
+-- shadow on the floor, which it drags along its path; whoever it touches is Benighted, each
+-- player's own client darkening their world (HazardController).
 function builders.Gloom(tile, settings, folder)
 	local z0 = Beach.tileRange(tile)
 	local glooms = {}
@@ -768,41 +1049,37 @@ function builders.Gloom(tile, settings, folder)
 			continue
 		end
 		local radius = placement.Radius or settings.Radius
-		local part = makePart({
-			Name = "Gloom",
-			Size = Vector3.new(radius * 2, 10, radius * 2),
-			CFrame = CFrame.new(path[1].X, Beach.groundAt(path[1].X, path[1].Y) + 5, path[1].Y),
-			Transparency = 1,
+		local shadow = makePart({
+			Name = "GloomShadow",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.1, radius * 2, radius * 2),
+			Color = settings.Color,
+			Material = Enum.Material.SmoothPlastic,
+			Transparency = 0.15,
 		})
-		arm(part, settings)
-		part:SetAttribute("HitRadius", radius)
-		part:SetAttribute("Fill", settings.Fill)
-		part:SetAttribute("LightFill", settings.LightFill)
-		part:SetAttribute("Drain", settings.Drain)
-		local smoke = Instance.new("ParticleEmitter")
-		smoke.Texture = GLOOM_SMOKE
-		smoke.Color = ColorSequence.new(settings.Color)
-		smoke.Size = NumberSequence.new(9, 14)
-		smoke.Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.3, 0.15),
-			NumberSequenceKeypoint.new(1, 1),
+		arm(shadow, settings)
+		shadow:SetAttribute("HitRadius", radius)
+		shadow:SetAttribute("Duration", settings.Duration)
+		shadow:SetAttribute("WardCure", settings.WardCure)
+		shadow.Parent = folder
+		-- A soft edge: a fainter ring round it.
+		local fringe = makePart({
+			Name = "GloomFringe",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.08, radius * 2.6, radius * 2.6),
+			Color = settings.Color,
+			Material = Enum.Material.SmoothPlastic,
+			Transparency = 0.6,
 		})
-		smoke.Lifetime = NumberRange.new(3, 5)
-		smoke.Rate = 30
-		smoke.Speed = NumberRange.new(0.2, 0.8)
-		smoke.Rotation = NumberRange.new(0, 360)
-		smoke.RotSpeed = NumberRange.new(-10, 10)
-		smoke.LightInfluence = 0
-		smoke.Shape = Enum.ParticleEmitterShape.Box
-		smoke.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
-		smoke.Parent = part
-		part.Parent = folder
+		fringe.Parent = folder
 		local length = 0
 		for i = 1, #path - 1 do
 			length += (path[i + 1] - path[i]).Magnitude
 		end
-		table.insert(glooms, { part = part, path = path, length = length, radius = radius, smoke = smoke })
+		table.insert(
+			glooms,
+			{ shadow = shadow, fringe = fringe, path = path, length = length, phase = rng:NextNumber(0, 100) }
+		)
 	end
 	if #glooms == 0 then
 		return
@@ -810,22 +1087,19 @@ function builders.Gloom(tile, settings, folder)
 	table.insert(running, {
 		folder = folder,
 		step = function(now)
-			local swell = if Tide.getState().Phase == "In" then settings.Swell else 1
 			for _, g in glooms do
 				local at = g.path[1]
 				if g.length > 0 then
-					-- Back and forth along its path.
-					local travelled = (now * settings.Speed) % (g.length * 2)
-					local along = if travelled > g.length then g.length * 2 - travelled else travelled
-					at = HazardService.alongPath(g.path, along)
+					at = HazardService.alongPath(g.path, (now + g.phase) * settings.Speed)
 				end
-				local radius = g.radius * swell
-				if g.part:GetAttribute("HitRadius") ~= radius then
-					g.part:SetAttribute("HitRadius", radius)
-					g.part.Size = Vector3.new(radius * 2, 10, radius * 2)
-					g.smoke.Rate = 30 * swell * swell
-				end
-				g.part.CFrame = CFrame.new(at.X, Beach.groundAt(at.X, at.Y) + 5, at.Y)
+				local ground = Beach.groundAt(at.X, at.Y)
+				local flat = CFrame.Angles(0, 0, math.pi / 2)
+				-- It breathes a little, so the shadow never quite sits still.
+				local wobble = 1 + 0.06 * math.sin(now * 1.7 + g.phase)
+				g.shadow.CFrame = CFrame.new(at.X, ground + 0.1, at.Y) * flat
+				g.fringe.CFrame = CFrame.new(at.X, ground + 0.08, at.Y) * flat
+				local r = g.shadow:GetAttribute("HitRadius")
+				g.fringe.Size = Vector3.new(0.08, r * 2.6 * wobble, r * 2.6 * wobble)
 			end
 		end,
 	})
@@ -861,10 +1135,7 @@ function HazardService.init()
 			return
 		end
 		local effect = part:GetAttribute("Effect")
-		if
-			(effect ~= "Harm" and effect ~= "Sink" and effect ~= "Gloom")
-			or part:GetAttribute("Active") == false
-		then
+		if (effect ~= "Harm" and effect ~= "Sink") or part:GetAttribute("Active") == false then
 			return
 		end
 		local character = player.Character
@@ -911,7 +1182,11 @@ end
 function HazardService._step(now: number, dt: number)
 	for i = #running, 1, -1 do
 		-- (A hazard whose folder an earlier test destroyed fails: drop it.)
-		if not pcall(running[i].step, now, dt) then
+		local ok, err = pcall(running[i].step, now, dt)
+		if not ok then
+			if HazardService._debug then
+				print(err)
+			end
 			table.remove(running, i)
 		end
 	end

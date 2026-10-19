@@ -149,6 +149,7 @@ Config.Zones = {
 			{ Type = "Rockfall", Scatter = false },
 			{ Type = "Undertow", Scatter = false },
 			{ Type = "Gloom", Scatter = false }, -- its own: a living darkness, held back by light
+			{ Type = "Pit", Scatter = false },
 		},
 	},
 	{ Name = "The Far Sandbar", Multiplier = 25, Rarity = { Rare = 60, VeryRare = 40 } },

@@ -1993,7 +1993,7 @@ local function sinks(def, spots)
 	def.Decor = def.Decor or {}
 	for _, spot in spots do
 		local x, z = spot[1], spot[2]
-		table.insert(def.Hazards, { Type = "Sink", At = { x, z }, Radius = 9 })
+		table.insert(def.Hazards, { Type = "Sink", At = { x, z }, Radius = 12 })
 		table.insert(
 			def.Primitives,
 			mud({ { x - 14, z - 14 }, { x + 14, z - 14 }, { x + 14, z + 14 }, { x - 14, z + 14 } })
@@ -2077,6 +2077,25 @@ local function undertows(def)
 			table.insert(def.Hazards, { Type = "Undertow", Path = item.Path, Width = item.Width })
 		end
 	end
+end
+
+-- Spike pits: the best find of each crossing lies on a covered pit. Its false floor's cracks
+-- are the only tell: a regular learns to look before stepping on the prize.
+local function pits(def)
+	def.Hazards = def.Hazards or {}
+	local best
+	for _, find in def.Loot or {} do
+		if not best or (find.Weight or 1) > (best.Weight or 1) then
+			best = find
+		end
+	end
+	if best then
+		table.insert(def.Hazards, { Type = "Pit", At = best.At, Radius = 4, Covered = true })
+	end
+end
+
+for _, crossing in { crossing1, crossing2, crossing3, crossing4, crossing5 } do
+	pits(crossing)
 end
 
 sinks(crossing1, { { -60, 552 }, { 100, 472 } })

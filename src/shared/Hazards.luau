@@ -11,12 +11,21 @@
 --           (vents, blowholes). Placement: At = {x, z}.
 --   Slow    a patch that slows you to Factor of your speed while you're in it (sea glass,
 --           tangled seagrass). Placement: At = {x, z}, Radius.
---   Sink    sinking sand: slows you to Factor, and you sink while you're in it: in SinkTime
---           seconds standing still (several times that if you keep moving), it swallows you
---           (Damage: 100 kills). Out of it you climb back up. Its tell is darker, wet-looking
---           sand. Placement: At = {x, z}, Radius.
---   Rockfall  rock falls from the roof every Period seconds, after Warning seconds of dust and
---           pebbles trickling down; it Harms whoever it lands on. Placement: At = {x, z}.
+--   Sink    sinking sand: an irregular patch (Radius, in Lobes) that slows you to Factor and
+--           stops you jumping, and you visibly sink while you're in it: in SinkTime seconds
+--           standing still it swallows you (Damage: 100 kills), moving you sink at MovingShare
+--           of that, so wading straight across is tight and stopping is death. Out of it you
+--           climb back up. Its tell is dark, wet sand with the odd bubble. Placement: At, Radius.
+--   Rockfall  a stretch of roof that's coming down: an area Radius studs across, strewn with
+--           old rubble (the tell). Every Interval seconds or so (now and then a Burst of several
+--           at once) a rock falls somewhere in it, more often than not (Aimed) on someone inside;
+--           each is warned Warning seconds ahead by trickling dust and a growing shadow where it
+--           will land, and Harms whoever is within RockRadius. Placement: At, Radius.
+--   Pit     a spike pit: a hole Radius across and Depth deep cut into the ground, spikes at the
+--           bottom (Harm, Damage: 100 kills). Open, you see it; Covered, a false floor of the
+--           ground's own sand hides it (a few cracks are its only tell) and gives way under
+--           whoever steps on it, coming back Reset seconds later. Placement: At, Radius,
+--           Depth, Covered (true or false; without it, the kind's Covered).
 --   Undertow  while the sea covers it (deeper than MinDepth), a current along a ford or
 --           channel drags you toward the sea at Strength studs/s. Placement: Path, Width.
 --   Hunter  a big creature (the giant hermit crab) that patrols its Path at Speed and hunts:
@@ -24,11 +33,12 @@
 --           in the way, chases at ChaseSpeed, gives up LoseTime seconds after losing sight of
 --           them or Leash studs from its route, and walks back the way it came. Placement:
 --           Path; without one it takes the layout's longest Patrol route.
---   Gloom   a living, magical darkness (the Drowned Reach's): an inky fog Radius studs across
---           that drifts along its Path at Speed (or lies still At a spot), and swells by Swell
---           once the tide turns. Inside it your dread rises: in Fill seconds it takes you
---           (Damage), in LightFill if you carry a light. Out of it, or within a GloomWard's
---           light (glowing decor), it drains. Placement: Path or At, Radius.
+--   Gloom   a living, magical darkness (the Drowned Reach's): something unseen that roams
+--           its Path at Speed (or lurks At a spot), casting a shadow Radius studs across on the
+--           floor under it. Step into the shadow and you're Benighted for Duration seconds:
+--           the world goes black, and you see only lights (a lantern or headlamp shows you your
+--           own surroundings). Within a GloomWard's light (glowing decor) it wears off
+--           WardCure times faster. Placement: Path or At, Radius.
 --
 -- What a hazard does to a player who gets within HitRadius of it is its Effect:
 --   Knockdown  knocked over (you drop what you hold) and thrown Push studs/s away from it.
@@ -37,7 +47,7 @@
 --   Sink       slowed, and swallowed if you stay in it (Sink hazards).
 --   Current    dragged along (Undertow hazards): into deep water, where you drown.
 --   Harm       Damage taken (100 kills), and thrown Push studs/s away from it.
---   Gloom      dread rising while you're in it (Gloom hazards); full, it takes you (Damage).
+--   Gloom      Benighted: the world goes dark around you for a while (Gloom hazards).
 -- Dangers are meant to be deadly: a hazard that only slows you is scenery.
 -- The server builds and moves the hazards (HazardService); each player's own client checks its
 -- character against them and applies the effect (HazardController), like the waves.
@@ -98,29 +108,47 @@ Hazards.Types = {
 	},
 	Sink = {
 		Count = 3,
-		Radius = 8,
-		Factor = 0.55,
-		SinkTime = 3, -- seconds standing still until it swallows you
-		MovingShare = 0.3, -- how fast you sink while moving, as a share of standing still
+		Radius = 12,
+		Lobes = 4, -- the patch is a blob of this many round lobes around its middle
+		Factor = 0.4,
+		SinkTime = 4, -- seconds standing still until it swallows you
+		MovingShare = 0.6, -- how fast you sink while moving, as a share of standing still
 		Damage = 100,
-		Color = Color3.fromRGB(120, 104, 78),
+		Color = Color3.fromRGB(84, 72, 54),
 		Effect = "Sink",
-		HitRadius = 8,
+		HitRadius = 12,
 		Push = 0,
 		HitText = "The sand swallowed you!",
 	},
 	Rockfall = {
 		Count = 3,
-		Period = 7,
-		Warning = 1.6,
-		Active = 0.5,
-		Radius = 4,
+		Radius = 12, -- the area the rock comes down on
+		Interval = 1.2, -- seconds between falls, on average
+		Burst = 4, -- now and then this many fall at once
+		BurstEvery = 9, -- seconds between bursts, on average
+		Aimed = 0.6, -- the share of falls aimed at someone inside it
+		Warning = 0.8, -- seconds of dust and a growing shadow before a rock lands
+		Active = 0.3,
+		RockRadius = 3.5, -- the rock harms whoever is this close to where it lands
 		Damage = 100,
 		Color = Color3.fromRGB(90, 88, 84),
 		Effect = "Harm",
-		HitRadius = 4,
+		HitRadius = 3.5,
 		Push = 20,
 		HitText = "Crushed by falling rock!",
+	},
+	Pit = {
+		Count = 2,
+		Radius = 5,
+		Depth = 12,
+		Covered = false,
+		Reset = 10, -- seconds before a broken cover is whole again
+		Damage = 100,
+		Color = Color3.fromRGB(150, 145, 135), -- the spikes
+		Effect = "Harm",
+		HitRadius = 5,
+		Push = 0,
+		HitText = "Impaled on the spikes!",
 	},
 	Undertow = {
 		Count = 2,
@@ -153,18 +181,15 @@ Hazards.Types = {
 	},
 	Gloom = {
 		Count = 2,
-		Radius = 22,
-		Speed = 2.5, -- studs/s along its Path
-		Swell = 1.5, -- its size once the tide is coming back in
-		Fill = 7, -- seconds inside it, without a light, until it takes you
-		LightFill = 16, -- with a light
-		Drain = 3, -- how much faster the dread drains than it rises
-		Damage = 100,
-		Color = Color3.fromRGB(12, 10, 20),
+		Radius = 9, -- its shadow
+		Speed = 7, -- studs/s along its Path: a slow walk, so it can be watched and dodged
+		Duration = 30, -- seconds you stay Benighted after its shadow touches you
+		WardCure = 4, -- how much faster it wears off in a ward's light
+		Color = Color3.fromRGB(6, 5, 12),
 		Effect = "Gloom",
-		HitRadius = 22,
+		HitRadius = 9,
 		Push = 0,
-		HitText = "The Gloom took you.",
+		HitText = "The Gloom's shadow fell on you: find the light!",
 	},
 }
 
@@ -180,7 +205,8 @@ Hazards.Placement = {
 	Pulse = { At = true },
 	Slow = { At = true, Radius = true },
 	Sink = { At = true, Radius = true },
-	Rockfall = { At = true },
+	Rockfall = { At = true, Radius = true },
+	Pit = { At = true, Radius = true, Depth = true, Covered = true },
 	Undertow = { Path = true, Width = true },
 	Gloom = { Path = true, At = true, Radius = true },
 	Hunter = { Path = true },

@@ -59,6 +59,7 @@ end
 -- Hazards (HazardController) slow you by this much while you're in them, and a current
 -- (an Undertow) drags you along this, studs/s.
 WaveController.hazardSlow = 1
+WaveController.hazardJump = 1 -- 0 in sinking sand (HazardController)
 WaveController.hazardPush = Vector3.zero
 
 -- Knocks this client's character over and throws it along `push` (a hazard hit). Does
@@ -100,6 +101,7 @@ function WaveController.init()
 				jumpBase = if humanoid.UseJumpPower then humanoid.JumpPower else humanoid.JumpHeight
 				humanoid:SetAttribute("BaseJump", jumpBase)
 			end
+			jumpScale *= WaveController.hazardJump
 			if humanoid.UseJumpPower then
 				humanoid.JumpPower = jumpBase * jumpScale
 			else

@@ -433,6 +433,15 @@ function Layouts.lab(): any
 	return require(script.Lab) :: any
 end
 
+-- The zone the lab is in (the attribute), kept here: activeDef is asked at every point of the
+-- ground, and asking the engine each time slows the terrain's building badly.
+local labTile: number? = Workspace:GetAttribute(Layouts.LabAttribute)
+pcall(function() -- (tools/tests' Workspace has no such signal)
+	Workspace:GetAttributeChangedSignal(Layouts.LabAttribute):Connect(function()
+		labTile = Workspace:GetAttribute(Layouts.LabAttribute)
+	end)
+end)
+
 -- The Workspace attribute holding a tile's choice.
 function Layouts.attributeFor(tile: number): string
 	return "TileLayout" .. tile
@@ -445,7 +454,7 @@ function Layouts.activeDef(tile: number): any
 		return forced and forced.def or nil
 	end
 	-- The water lab's test layout (Layouts/Lab), put in a zone from the review place.
-	if Workspace:GetAttribute(Layouts.LabAttribute) == tile then
+	if labTile == tile then
 		return Layouts.lab()
 	end
 	local zone = zoneOfTile(tile)
@@ -977,8 +986,13 @@ function Layouts.problems(layout: any): { string }
 				add(where .. ": Path needs at least two {x, z} points")
 			elseif key == "Lanes" and (type(value) ~= "table" or #value < 1) then
 				add(where .. ": Lanes is a list of X positions")
-			elseif (key == "Count" or key == "Radius") and (type(value) ~= "number" or value <= 0) then
+			elseif
+				(key == "Count" or key == "Radius" or key == "Depth")
+				and (type(value) ~= "number" or value <= 0)
+			then
 				add(where .. ": " .. key .. " must be a positive number")
+			elseif key == "Covered" and type(value) ~= "boolean" then
+				add(where .. ": Covered is true or false")
 			end
 		end
 	end

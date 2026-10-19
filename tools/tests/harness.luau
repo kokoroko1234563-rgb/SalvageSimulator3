@@ -109,6 +109,9 @@ local stubs = {
 		FillBlock = function() end,
 		FillBall = function() end,
 		FillCylinder = function() end,
+		ReadVoxels = function()
+			return {}, {}
+		end,
 	},
 	PhysicsService = {
 		RegisterCollisionGroup = function() end,

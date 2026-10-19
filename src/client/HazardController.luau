@@ -4,14 +4,15 @@
 --   Knockdown  knocked over (dropping what you hold) and thrown away from the hazard.
 --   Drop       what you hold is knocked out of your hands.
 --   Slow       slowed while you're in it.
---   Sink       slowed, and sinking while you're in it (fast standing still, slow moving); fully
---              sunk, the server is told (it kills). You climb back out of it outside.
+--   Sink       slowed, unable to jump, and visibly sinking while you're in it (fast standing
+--              still, slower moving); fully sunk, the server is told (it kills). You climb
+--              back out of it outside.
 --   Current    dragged along its Direction at Strength (into deep water, where you drown).
 --   Harm       the server is told you were hit (it applies the Damage), and you're thrown.
---   Gloom      dread rises while you're in it (slower if you carry a light), and drains out of
---              it or within a ward's light (Hazards.WardTag); full, the server is told (it
---              takes you). The screen darkens with it, and your own light gutters
---              (the LocalPlayer's "Gloom" attribute, read by GearEffects).
+--   Gloom      its shadow makes you Benighted for its Duration (renewed while you're in it):
+--              the world goes black around you (DayController.blind) and only lights show.
+--              Within a ward's light (Hazards.WardTag) it wears off WardCure times faster. The
+--              time left is the LocalPlayer's "Benighted" attribute, shown on screen.
 -- A hazard with an Active attribute only hits while it's set.
 
 local CollectionService = game:GetService("CollectionService")
@@ -19,10 +20,10 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
-local Gear = require(Shared.Gear)
 local Hazards = require(Shared.Hazards)
 local Remotes = require(Shared.Remotes)
 
+local DayController = require(script.Parent.DayController)
 local GrabController = require(script.Parent.GrabController)
 local HUD = require(script.Parent.HUD)
 local WaveController = require(script.Parent.WaveController)
@@ -39,16 +40,10 @@ local lastDrop: { [Instance]: number } = {}
 local lastHarm: { [Instance]: number } = {}
 local sunk = 0 -- seconds of sinking so far (standing-still seconds)
 local warned = false
-local dread = 0 -- the Gloom's hold on you, 0 to 1
-local dreadWarned = false
-local shade: Frame? = nil -- the screen darkening with the dread
-
--- Whether this player carries a light (a lamp accessory or a held lantern).
-local function carriesLight(): boolean
-	local worn = Gear.getAccessory(player:GetAttribute("Accessory"))
-	local tool = Gear.findTool(player:GetAttribute("Tool"))
-	return (worn ~= nil and worn.Light ~= nil) or (tool ~= nil and tool.Light ~= nil)
-end
+local benighted = 0 -- seconds left Benighted by the Gloom
+local benightedLabel: TextLabel? = nil
+local baseHip: number? = nil -- the character's own HipHeight, while the sand pulls it down
+local gloomCure: number? = nil -- how much faster Benighted wears off in a ward's light
 
 -- Whether a point is within a ward's light, where the Gloom can't reach.
 local function warded(position: Vector3): boolean
@@ -77,8 +72,11 @@ local function step(dt: number)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not root or not humanoid or humanoid.Health <= 0 then
 		WaveController.hazardSlow = 1
+		WaveController.hazardJump = 1
 		WaveController.hazardPush = Vector3.zero
-		sunk, warned = 0, false
+		sunk, warned, baseHip = 0, false, nil
+		benighted = 0
+		DayController.blind = 0
 		return
 	end
 	local position = root.Position
@@ -133,16 +131,17 @@ local function step(dt: number)
 		end
 	end
 	WaveController.hazardSlow = slow
+	WaveController.hazardJump = if sinking then 0 else 1 -- no jumping out of sinking sand
 	WaveController.hazardPush = push
 
-	-- Sinking sand: deeper while you're in it (much slower if you keep moving), back out of
-	-- it once you're clear.
+	-- Sinking sand: deeper while you're in it (slower if you keep moving), back out of it once
+	-- you're clear. You see yourself go down: the sand pulls your hips toward the ground.
+	local limit = if sinking then sinking:GetAttribute("SinkTime") or 4 else 4
 	if sinking then
 		local velocity = root.AssemblyLinearVelocity
 		local moving = Vector3.new(velocity.X, 0, velocity.Z).Magnitude > 3
-		sunk += dt * (if moving then sinking:GetAttribute("MovingShare") or 0.3 else 1)
-		local limit = sinking:GetAttribute("SinkTime") or 3
-		if sunk >= limit * 0.4 and not warned then
+		sunk += dt * (if moving then sinking:GetAttribute("MovingShare") or 0.6 else 1)
+		if sunk >= limit * 0.35 and not warned then
 			warned = true
 			HUD.notify("You're sinking! Keep moving and get out!")
 		end
@@ -157,34 +156,38 @@ local function step(dt: number)
 			warned = false
 		end
 	end
-
-	-- The Gloom: dread rises inside it (slower with a light), drains outside or in a ward's light.
-	if gloom and not warded(position) then
-		local fill = if carriesLight()
-			then gloom:GetAttribute("LightFill") or 16
-			else gloom:GetAttribute("Fill") or 7
-		dread = math.min(1, dread + dt / fill)
-		if dread >= 0.5 and not dreadWarned then
-			dreadWarned = true
-			HUD.notify("The Gloom is closing in... find the light!")
-		end
-		if dread >= 1 then
-			dread, dreadWarned = 0, false
-			Remotes.get("HazardHarm"):FireServer(gloom)
-			HUD.notify(gloom:GetAttribute("HitText") or "The Gloom took you.")
-		end
-	else
-		local drain = if gloom then gloom:GetAttribute("Drain") or 3 else 3
-		dread = math.max(0, dread - dt * drain / 7)
-		if dread == 0 then
-			dreadWarned = false
-		end
+	if sunk > 0 then
+		baseHip = baseHip or humanoid.HipHeight
+		humanoid.HipHeight = (baseHip :: number) * (1 - 0.9 * math.min(1, sunk / limit))
+	elseif baseHip then
+		humanoid.HipHeight = baseHip
+		baseHip = nil
 	end
-	player:SetAttribute("Gloom", dread)
-	if shade then
-		-- Inside it at all, the light dims; the dread darkens it toward black.
-		local darkness = (if gloom then 0.25 else 0) + dread * 0.65
-		shade.BackgroundTransparency = 1 - darkness
+
+	-- The Gloom: its shadow Benights you; it wears off with time, faster in a ward's light.
+	local inWard = warded(position)
+	if gloom and not inWard then
+		local duration = gloom:GetAttribute("Duration") or 30
+		if benighted <= 0 then
+			HUD.notify(gloom:GetAttribute("HitText") or "The Gloom's shadow fell on you: find the light!")
+		end
+		benighted = math.max(benighted, duration)
+	elseif benighted > 0 then
+		local cure = if inWard then (gloomCure or 4) else 1
+		benighted = math.max(0, benighted - dt * cure)
+	end
+	if gloom then
+		gloomCure = gloom:GetAttribute("WardCure") or 4
+	end
+	DayController.blind = if benighted > 0 then 1 else 0
+	player:SetAttribute("Benighted", if benighted > 0 then math.ceil(benighted) else nil)
+	if benightedLabel then
+		benightedLabel.Visible = benighted > 0
+		benightedLabel.Text = string.format(
+			"Benighted: %ds%s",
+			math.ceil(benighted),
+			if inWard then "  (the light is driving it off)" else ""
+		)
 	end
 end
 
@@ -193,15 +196,20 @@ function HazardController.init()
 	gui.Name = "GloomShade"
 	gui.IgnoreGuiInset = true
 	gui.ResetOnSpawn = false
-	gui.DisplayOrder = -5 -- under the HUD
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.fromScale(1, 1)
-	frame.BackgroundColor3 = Color3.fromRGB(4, 3, 10)
-	frame.BackgroundTransparency = 1
-	frame.BorderSizePixel = 0
-	frame.Parent = gui
+	gui.DisplayOrder = 5
+	local label = Instance.new("TextLabel")
+	label.AnchorPoint = Vector2.new(0.5, 0)
+	label.Position = UDim2.new(0.5, 0, 0, 70)
+	label.Size = UDim2.fromOffset(420, 28)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 20
+	label.TextColor3 = Color3.fromRGB(200, 190, 255)
+	label.TextStrokeTransparency = 0.4
+	label.Visible = false
+	label.Parent = gui
 	gui.Parent = player:WaitForChild("PlayerGui")
-	shade = frame
+	benightedLabel = label
 	RunService.Heartbeat:Connect(step)
 	CollectionService:GetInstanceRemovedSignal(Hazards.Tag):Connect(function(part)
 		lastDrop[part] = nil
