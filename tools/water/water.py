@@ -353,6 +353,8 @@ CHECKS = [
     (4, "Lab", "1:", 1860), (4, "Lab", "1:", 2000), (4, "Lab", "1:", 2150), (4, "Lab", "1:", 2350),
     (1, "Base", "1:", 300), (2, "Base", "1:", 908), (3, "Base", "2:", 1500),
     (4, "Base", "1:", 2000), (5, "Base", "1:", 2700), (6, "Base", "1:", 3300),
+    (1, "Base", "1:", 61),  # high tide, at the shop
+    (6, "Base", "1:", 3747),  # low tide: the channel to the Far Sandbar holds water
 ]
 LIMITS = {
     "highest water above sea level": 0.7,  # it never climbs walls or banks
@@ -365,7 +367,7 @@ def check_all():
     failed = []
     for zone, layout, choice, line in CHECKS:
         args = argparse.Namespace(zone=zone, layout=layout, choice=choice, waterline=line,
-                                  region=[-358, line - 110, 358, line + 150], step=2, seconds=0)
+                                  region=[-358, line - 150, 358, line + 150], step=2, seconds=0)
         result = Scene(run_lab(args)).checks()
         wet = max(result["wet cells"], 1)
         bad = []

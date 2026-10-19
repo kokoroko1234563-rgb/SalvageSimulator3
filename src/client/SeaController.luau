@@ -145,16 +145,25 @@ local SEA_STEP = 8 -- studs between the sea surface's columns over the beach
 -- beach of the shore (the furthest a dip can flood, MaxDepth / Slope) to BAND_OUT studs out.
 -- The surface lies flat at the sea's height where the game's ground is wet and sinks into the
 -- sand where it's dry (seaPointY), so the drawn ground cuts the shoreline out of it: the rows
--- needn't be close for the shore to be a smooth curve. They're every BAND_NEAR studs up to
--- NEAR_OUT studs out, where the water first gets deep, and every BAND_FAR beyond. Out to sea
+-- needn't be close for the shore to be a smooth curve. They're every BAND_NEAR studs from
+-- NEAR_BACK up the beach to NEAR_OUT out, where the water first gets deep, and every BAND_FAR
+-- further up and out. Up the beach it reaches as far as a cut can flood: the deepest of the
+-- layouts' cuts and the channel to the Far Sandbar. Out to sea
 -- the band reaches past where the sea is deep enough to lose things on the plain slope, and
 -- then some, so the colour that shows the depth (depthColor) follows every bank and pit.
-local BAND_BACK = math.ceil(Config.Beach.Terrain.MaxDepth / Config.Beach.Slope) + 4
+local BAND_BACK = math.ceil(
+	math.max(Config.Beach.Terrain.MaxDepth, Config.Beach.FarSandbar.ChannelDepth) / Config.Beach.Slope
+) + 4
 local BAND_OUT = math.ceil((Config.Beach.LostDepth + 6) / Config.Beach.Slope)
-local BAND_NEAR, BAND_FAR, NEAR_OUT = 4, 8, 24
+local BAND_NEAR, BAND_FAR, NEAR_BACK, NEAR_OUT = 4, 8, 40, 24
 local BAND_OFFSETS: { number } = {} -- each row's offset from the shore
 do
 	local offset = -BAND_BACK
+	while offset < -NEAR_BACK do
+		table.insert(BAND_OFFSETS, offset)
+		offset += BAND_FAR
+	end
+	offset = -NEAR_BACK
 	while offset < NEAR_OUT do
 		table.insert(BAND_OFFSETS, offset)
 		offset += BAND_NEAR
