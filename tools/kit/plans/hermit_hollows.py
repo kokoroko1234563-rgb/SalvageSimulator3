@@ -572,6 +572,132 @@ c.decor("Shells", at=(52, 12), scale=1.8)  # the tell: a ring of shells, glowing
 c.decor("GlowShells", at=(28, 12))
 c.decor("GlowShells", at=(52, 24))
 
+# =================================================================================================
+# Zone 6: The Drowned Reach. The deepest, longest ways: the same Lair, longer tunnels.
+# =================================================================================================
+z6 = Zone(6, "The Drowned Reach", rock=ROCK)
+frame(z6, lair=True, entrance=(176, 424))
+slots(z6, lair=True)
+
+WR_LONG = [(-224, 264), (-224, 300), (-136, 300), (-136, 340), (-288, 340), (-288, 380),
+           (-136, 380), (-136, 420), (-288, 420), (-288, 460), (-136, 460), (-136, 500),
+           (-280, 500), (-280, 608)]
+CR_L = [(40, 0), (40, 48), (-88, 48), (-88, 104), (40, 104), (40, 160), (-88, 160), (-88, 216),
+        (40, 216), (40, 248)]
+EAST_BOTTOM = [(232, 424), (232, 452), (336, 452), (336, 500), (256, 500), (256, 548), (336, 548),
+               (336, 608)]
+WEST_CART = TW_L + [(-224, 264)] + WR_LONG[1:]
+
+# ---- crossing 1: Deep watch (2 paths) -----------------------------------------------------------
+# A: the cart's way, the whole west: the wiggle, the Midden Court, the long west rows.
+# B: foot: the east rows, across the giant's tunnel (north from the Lair, x 224), down the east.
+c = z6.crossing("Deep watch", paths=2)
+B = [(-40, 0), (-40, 60), (100, 60), (100, 100), (-40, 100), (-40, 150), (100, 150), (100, 200),
+     (336, 200), (336, 244), (262, 244), (262, 288), (336, 288),
+     (336, 452), (336, 500), (256, 500), (256, 548), (336, 548), (336, 608)]
+cart_way(c, WEST_CART)
+tunnel(c, B)
+giant_tunnel(c, [(224, 380), (224, 200)], [(224, 344), (224, 266), (224, 222), (224, 206)])
+rubble(c, (336, 400))
+rubble(c, (336, 570), "z")
+lair_links(c, court=False, west=False)
+tunnel(c, [(-72, 300), (-136, 300)], roofs=(), shells=False)
+patrols(c, WEST_CART, every=190, count=2, start=100)
+patrols(c, B, every=170, count=2, start=100)
+dead_end(c, [(-136, 480), (-80, 480)], weight=4)
+c.decor("Bones", at=(-188, 12), scale=1.8, yaw=20)  # the tell: a great claw of bones at the way in
+c.decor("Shells", at=(-210, 14), scale=2.0)
+
+# ---- crossing 2: Shell stair (3 paths) ----------------------------------------------------------
+# A: the cart's way, down the centre: the rows, the column east of the Hall, the bottom.
+# B: foot: the west, the long rows, a rockfall in them.
+# C: foot: the east rows, through the Lair, out its south mouth across the giant's tunnel.
+c = z6.crossing("Shell stair", paths=3)
+A = [(40, 0), (40, 48), (-88, 48), (-88, 104), (104, 104), (104, 160), (-88, 160), (-88, 216),
+     (104, 216), (104, 470), (-60, 470), (-60, 608)]
+cart_way(c, A)
+tunnel(c, TW_L)
+tunnel(c, WR_LONG)
+EAST_LONG = [(222, 0), (222, 60), (150, 60), (150, 100), (222, 100), (222, 140), (336, 140),
+             (336, 188)] + EAST_SNAKE[4:]
+tunnel(c, EAST_LONG)
+tunnel(c, EAST_BOTTOM)
+giant_tunnel(c, [(268, 400), (268, 592)], [(268, 450), (268, 500), (268, 540), (268, 576)])
+rubble(c, (-136, 480), "z")
+rubble(c, (336, 520), "z")
+lair_links(c, court=False, west=False)
+patrols(c, A, every=330, count=2, start=130)
+patrols(c, TW_L + [(-224, 264)] + WR_LONG[1:], every=330, count=2, start=130)
+patrols(c, EAST_LONG + EAST_BOTTOM, every=330, count=2, start=130)
+c.decor("Shells", at=(30, 12), scale=2.4)  # the tell: a great heap of shells, and bones, at the way in
+c.decor("Bones", at=(44, 10), scale=1.0, yaw=60)
+
+# ---- crossing 3: Fallen way (2 paths) -----------------------------------------------------------
+# A: the cart's way, the whole west again, the other way round the Hall.
+# B: foot: the centre rows, then east across the giant's tunnel (north from the Lair, x 188).
+c = z6.crossing("Fallen way", paths=2)
+B = [(40, 0), (40, 48), (-88, 48), (-88, 104), (100, 104), (100, 190), (336, 190), (336, 244),
+     (262, 244), (262, 288), (336, 288), (336, 452), (336, 500), (256, 500), (256, 548),
+     (336, 548), (336, 608)]
+cart_way(c, WEST_CART)
+tunnel(c, B)
+giant_tunnel(c, [(188, 380), (188, 120)], [(188, 340), (188, 262), (188, 210), (188, 140)])
+rubble(c, (336, 380))
+rubble(c, (-88, 80), "z")
+lair_links(c, court=False)
+patrols(c, WEST_CART, every=190, count=2, start=100)
+patrols(c, B, every=170, count=2, start=100)
+dead_end(c, [(-136, 480), (-80, 480)], weight=4)
+c.decor("Bones", at=(-150, 12), scale=1.6, yaw=0)  # the tell: an arch of bones at the way in
+c.decor("Bones", at=(-122, 12), scale=1.6, yaw=180)
+c.decor("Shells", at=(-136, 24), scale=1.6)
+
+# ---- crossing 4: The three gates (3 paths) ------------------------------------------------------
+# A: the cart's way: a long swing west and down.
+# B: foot: the east rows, crossing the giant's tunnel (north from the Lair, x 268) three
+#    times, through the Lair and out the bottom east.
+# C: foot: the centre rows, the Hall and the bottom centre.
+c = z6.crossing("The three gates", paths=3)
+A = [(-200, 0), (-200, 60), (0, 60), (0, 110), (-140, 110), (-140, 300), (-288, 300), (-288, 340),
+     (-140, 340), (-140, 380), (-288, 380), (-288, 420), (-140, 420), (-140, 480), (-280, 480),
+     (-280, 608)]
+cart_way(c, A)
+tunnel(c, EAST_LONG)
+EB6 = [(232, 424), (232, 450), (336, 450), (336, 486), (256, 486), (256, 522), (336, 522),
+       (336, 558), (256, 558), (256, 608)]
+tunnel(c, EB6)
+CR6 = [(100, 0), (100, 48)] + CR_L[2:]
+tunnel(c, CR6)
+tunnel(c, BC)
+giant_tunnel(c, [(268, 380), (268, 240)], [(268, 344), (268, 300), (268, 264), (268, 248)])
+rubble(c, (336, 468), "z")
+rubble(c, (-100, 400))
+lair_links(c, court=False, west=False)
+tunnel(c, [(-140, 220), (-176, 220)], roofs=(), shells=False)  # to the Midden Court
+patrols(c, A, every=300, count=2, start=100)
+patrols(c, EAST_LONG, every=300, count=1, start=100)
+patrols(c, CR6 + [(40, 336), (-72, 336)] + BC, every=300, count=1, start=100)
+c.decor("Shells", at=(-148, 12), scale=2.4)  # the tell: a great heap of shells, bones on it
+c.decor("Bones", at=(-122, 10), scale=1.0, yaw=60)
+
+# ---- crossing 5: Brood maze (2 paths) -----------------------------------------------------------
+# A: the cart's way, the whole west.
+# B: foot: the centre rows, the Hall (its east door onto the Lair's tunnel), the bottom centre.
+c = z6.crossing("Brood maze", paths=2)
+cart_way(c, WEST_CART)
+B = CR_L + [(40, 296), (54, 336)] + [(-72, 336)] + BC[1:]
+tunnel(c, CR_L)
+tunnel(c, BC)
+giant_tunnel(c, [(164, 380), (164, 126)], [(164, 340), (164, 270), (164, 210), (164, 150)])
+rubble(c, (-100, 400))
+rubble(c, (40, 180), "z")
+lair_links(c, court=False, west=False)
+patrols(c, WEST_CART, every=170, count=1, start=100)
+patrols(c, CR_L + [(40, 336), (-72, 336)] + BC, every=200, count=1, start=100)
+c.decor("Shells", at=(52, 12), scale=1.8)  # the tell: a ring of shells, glowing
+c.decor("GlowShells", at=(28, 12))
+c.decor("GlowShells", at=(52, 24))
+
 z4_comment = ("-- Hermit Hollows (zones 4 to 6): a giant hermit crab's warren, drawn with the layout kit from\n"
               "-- tools/kit/plans/hermit_hollows.py (edit the plan and re-run it, not this file).\n"
               "-- See docs/layouts/HermitHollows.md and docs/design/cards/hermit-hollows.md.")
@@ -586,5 +712,6 @@ def report(z):
 
 if __name__ == "__main__":
     report(z4)
-    write_zones(OUT, [z4, z5], z4_comment)
+    write_zones(OUT, [z4, z5, z6], z4_comment)
     report(z5)
+    report(z6)
