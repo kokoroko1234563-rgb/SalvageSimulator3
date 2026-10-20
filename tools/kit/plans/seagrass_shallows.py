@@ -1,8 +1,9 @@
 """Seagrass Shallows, a biome rolling in zones 1 to 4 (docs/design/cards/seagrass-shallows.md).
 
 Low green flats cut by shallow channels that flood in stages, and a collapsed jetty as the
-landmark (its entrance is under the jetty). Gentle: tangling seagrass patches (Slow) are the only
-danger, and they are easy to step round.
+landmark (its entrance is under the jetty). Dangers: tangling seagrass (Slow) in big overlapping
+thickets over much of the flats (and along the lanes in zone 4), and in zone 4 the channels'
+undertow along the foot way's fords.
 
 Run it with the quick check, once per zone:
     python3 tools/kit/quick.py 1 Biomes/SeagrassShallows --plan tools/kit/plans/seagrass_shallows.py
@@ -51,6 +52,43 @@ def patch(part, at, radius=10):
     """Tangling seagrass: slows you, easy to step round. Weed growing thick marks it."""
     part.hazard("Slow", at=at, radius=radius)
     part.decor("Weed", area=box(at[0], at[1], radius * 1.6, radius * 1.6), count=7)
+
+
+def clump(part, at, radius=32):
+    """A big stand of tangling seagrass: three overlapping patches, so it is a wide thicket."""
+    x, z = at
+    patch(part, at, radius)
+    patch(part, (x + radius * 1.0, z + radius * 0.3), radius * 0.85)
+    patch(part, (x + radius * 0.4, z - radius * 0.6), radius * 0.7)
+
+
+def thickets(part, rows, k, avoid=()):
+    """Seagrass over much of the flats: in each row (z, or (z, radius)), clumps across the zone,
+    staggered, shifted per crossing `k` so the crossings differ. Nothing near `avoid` points."""
+    for i, row in enumerate(rows):
+        zr, rad = row if isinstance(row, tuple) else (row, 32)
+        off = (i % 2) * 70 + k * 35
+        for j in range(5):
+            x = -300 + off + j * 135
+            if x > 320:
+                x -= 700
+            if any(abs(x - ax) < 45 and abs(zr - az) < 45 for ax, az in avoid):
+                continue
+            clump(part, (x, zr + ((j * 7 + i * 5 + k * 3) % 3 - 1) * 8), rad)
+
+
+def seed(part, pts, every, radius, skip=()):
+    """Tangling seagrass along a lane: a patch every `every` studs of its segments (not `skip`)."""
+    for i in range(len(pts) - 1):
+        if i in skip:
+            continue
+        (x0, z0), (x1, z1) = pts[i], pts[i + 1]
+        length = ((x1 - x0) ** 2 + (z1 - z0) ** 2) ** 0.5
+        n = int(length // every)
+        for m in range(n):
+            t = (m + 0.5) / n if n else 0.5
+            part.hazard("Slow", at=(round(x0 + (x1 - x0) * t), round(z0 + (z1 - z0) * t)), radius=radius)
+            part.decor("Weed", at=(round(x0 + (x1 - x0) * t), round(z0 + (z1 - z0) * t)), count=3)
 
 
 def jetty(part, x, z0, z1, side=8):
@@ -115,7 +153,7 @@ def shore(n, name, hmax, bank_w, depth, jx, loot_at, tide_z=(110, 300, 510), ban
     return z
 
 
-def crossing(z, name, start, g1, mid, g2, end, tell, patches, paths=1):
+def crossing(z, name, start, g1, mid, g2, end, tell, rows, jx, k, paths=1):
     """The cart's ramp: down from `start` (x on the top edge) through the gap `g1` in the first
     bank, `mid`, the gap `g2` in the second bank, out at `end`. Straight down over the banks is
     quicker on foot."""
@@ -123,8 +161,7 @@ def crossing(z, name, start, g1, mid, g2, end, tell, patches, paths=1):
     bank1, bank2 = 190, 410
     c.ramp([(start, 0), (start, 70), (g1, bank1 - 20), (g1, bank1 + 25), (mid, 300),
             (g2, bank2 - 30), (g2, bank2 + 25), ((g2 + end) / 2, 520), (end, 608)], width=16)
-    for at in patches:
-        patch(c, at)
+    thickets(c, rows, k, avoid=[(jx, 364)])
     # The tell at the way in: a heap of timber and a net buoy-chain, different at each.
     tell(c)
     return c
@@ -151,16 +188,21 @@ def tell_kelp(x):
     return tell
 
 
+ROWS1 = [55, 155, 250, 355, 460, 555]
+ROWS2 = [125, 245, 355, 460, 560]
+ROWS3 = [125, 245, 355, 460, 560]
+
+
 def zone1():
     z = shore(1, NAME, hmax=None, bank_w=0, depth=2.4, jx=-70, chan_w=8,
               tide_z=(110, 200, 300, 410, 510),
               loot_at=[((-290, 250), 1), ((280, 350), 2), ((-230, 480), 3), ((300, 556), 4)])
     crossing(z, "Seagrass trail", 0, -140, -30, 140, 0, tell_posts(0),
-             [(-70, 130), (60, 262), (110, 470)])
+             ROWS1, -70, 0)
     crossing(z, "Reed track", -150, 130, 40, -130, -20, tell_chain(-150),
-             [(120, 120), (-60, 340), (-130, 540)])
+             ROWS1, -70, 1)
     crossing(z, "Mud-flat way", 150, -60, -150, 70, 130, tell_kelp(150),
-             [(30, 60), (-120, 250), (80, 470)])
+             ROWS1, -70, 2)
     return z
 
 
@@ -171,11 +213,11 @@ def zone2():
     # channel passes under it).
     z.frame.add(Kind="Flat", Area=[[32, 0], [48, 0], [48, 156], [32, 156]])
     crossing(z, "Seagrass trail", 0, 140, 20, -140, 0, tell_posts(0),
-             [(-80, 140), (-60, 270), (100, 480)])
+             ROWS2, 90, 0)
     crossing(z, "Reed track", 140, -130, -50, 130, 20, tell_chain(140),
-             [(-100, 100), (130, 330), (-110, 560)])
+             ROWS2, 90, 1)
     crossing(z, "Mud-flat way", -150, 60, 150, -70, -120, tell_kelp(-150),
-             [(-30, 60), (210, 250), (-30, 480)])
+             ROWS2, 90, 2)
     return z
 
 
@@ -183,11 +225,11 @@ def zone3():
     z = shore(3, NAME, hmax=6.4, bank_w=18, depth=3, jx=-110,
               tide_z=(60, 300, 510), loot_at=[((290, 230), 1), ((60, 350), 2), ((-260, 470), 3), ((280, 560), 4)])
     crossing(z, "Seagrass trail", 0, 140, 0, -140, 0, tell_posts(0),
-             [(-120, 140), (120, 260), (60, 480)])
+             ROWS3, -110, 0)
     crossing(z, "Reed track", -140, 140, 60, -120, 40, tell_chain(-140),
-             [(-90, 110), (-30, 340), (110, 560)])
+             ROWS3, -110, 1)
     crossing(z, "Mud-flat way", 140, -40, -140, 60, 140, tell_kelp(140),
-             [(60, 60), (150, 260), (-60, 470)])
+             ROWS3, -110, 2)
     return z
 
 
@@ -224,6 +266,7 @@ def ford_way(part, pts, fords):
         a, b = pts[i], pts[i + 1]
         part.channel([a, b], depth=3, width=10, rough=0, material=MUD)
         part.decor("Kelp", path=[a, b], count=3)
+        part.hazard("Undertow", path=[a, b], width=12)
 
 
 def dead_end(part, pts, weight):
@@ -295,6 +338,8 @@ def zone4():
     c.ramp(a, width=16)
     b = serpentine(-96, -224, [148, 300, 448])
     ford_way(c, b, fords=[1, 5])
+    seed(c, a, 90, 11)  # the grass has grown over the lanes: thick on the cart way too
+    seed(c, b, 64, 12, skip=(1, 5))
     c.lane([(96, 300), (48, 300)], width=12)
     c.lane([(-96, 300), (-48, 300)], width=12)
     dead_end(c, [(224, 352), (292, 352)], 2)
@@ -313,6 +358,8 @@ def zone4():
     c.ramp(a, width=16)
     b = serpentine(96, 224, [132, 300, 468])
     ford_way(c, b, fords=[1, 5])
+    seed(c, a, 90, 11)  # the grass has grown over the lanes: thick on the cart way too
+    seed(c, b, 64, 12, skip=(1, 5))
     c.lane([(-96, 300), (-48, 300)], width=12)
     c.lane([(96, 300), (48, 300)], width=12)
     dead_end(c, [(-224, 352), (-292, 352)], 2)
