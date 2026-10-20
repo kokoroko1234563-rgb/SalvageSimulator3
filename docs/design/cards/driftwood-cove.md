@@ -22,3 +22,4 @@ the gaps (carts) or over the low logs (foot only, quicker).
 
 **Questions.**
 1. Any danger at all here (a shifting log stack in zone 4), or none?
+Answer: No unique one, but we should have open pits and quick sand on the fourth and third zone
