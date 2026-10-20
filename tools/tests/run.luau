@@ -3064,5 +3064,40 @@ test("a whirlwind circles its loop, a tall column of sand that flings but doesn'
 	Layouts.setActive(tile, nil)
 end)
 
+test("ice patches are flat, pale and slippery but leave you some grip, and harm nothing", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "berg",
+		Primitives = {},
+		Hazards = { { Type = "Ice", At = { 20, 150 }, Radius = 12 }, { Type = "Ice", At = { -60, 250 } } },
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, { Hazards = { { Type = "Ice" } } }, folder)
+	local settings = Hazards.settings({ Type = "Ice" })
+	local patches = {}
+	for _, part in folder:GetChildren() do
+		if part.Name == "IcePatch" then
+			table.insert(patches, part)
+		end
+	end
+	assert(#patches == 2, "a patch for each placement")
+	local first = patches[1]
+	assert(first:GetAttribute("Effect") == "Slide" and first:GetAttribute("HitRadius") == 12, "slides, as wide as placed")
+	assert(math.abs(first.CFrame.X - 20) < 1 and math.abs(first.CFrame.Z - (z0 + 150)) < 1, "where it was put")
+	assert(patches[2]:GetAttribute("HitRadius") == settings.Radius, "the kind's radius otherwise")
+	assert(first.Size.X < 0.5, "flat")
+	assert(first.Color.B > first.Color.R and first.Color.R > 0.6, "pale blue-white")
+	assert(settings.Grip > 0 and settings.Grip < 0.5, "slippery, but not out of control")
+	assert(first:GetAttribute("Grip") == settings.Grip, "the client reads its grip")
+	assert(first:GetAttribute("Damage") == nil and first:GetAttribute("Spill") == nil, "no harm, no cart spilling")
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)

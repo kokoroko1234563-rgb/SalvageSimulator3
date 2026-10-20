@@ -77,6 +77,8 @@
 --   Whirlwind  (Whirlwind Dunes) a column of lifted sand Height studs tall, Radius wide at its
 --           foot, circling its Path (a loop: round and round, not back and forth) at Speed.
 --           Whoever it catches is flung (effect Fling), not hurt. Placement: Path, Radius.
+--   Ice     (Stranded Iceberg) a patch (At, Radius) of slippery ice, flat, glossy and pale
+--           blue-white. On it you slide (effect Slide, Grip). Nothing else: no cart spilling.
 --
 -- What a hazard does to a player who gets within HitRadius of it is its Effect:
 --   Knockdown  knocked over (you drop what you hold) and thrown Push studs/s away from it.
@@ -90,6 +92,10 @@
 --              zones StunZone and deeper you're stunned Stun seconds (can't move).
 --   Fling      thrown Push studs/s up and away from the hazard, tumbling, dropping what you
 --              hold; not deadly itself (Whirlwind).
+--   Slide      slippery (Ice): your movement keeps its momentum and turns slowly; Grip is the
+--              share of control you keep (the less, the slipperier).
+--   Fog        the mist thickens to Sight studs while you're on the tile (Fog); a foghorn
+--              pulse lifts it for Clear seconds every Period.
 -- Dangers are meant to be deadly: a hazard that only slows you is scenery.
 -- The server builds and moves the hazards (HazardService); each player's own client checks its
 -- character against them and applies the effect (HazardController), like the waves.

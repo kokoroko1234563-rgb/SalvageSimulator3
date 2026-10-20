@@ -1994,6 +1994,47 @@ function builders.Whirlwind(tile, settings, folder)
 	})
 end
 
+-- Ice: slippery patches, flat, pale blue-white and glossy, with a few lighter frost streaks. On
+-- one you slide (HazardController reads its Grip). Nothing else happens on it: a cart doesn't
+-- spill.
+function builders.Ice(tile, settings, folder)
+	for _, spot in spotsFor(tile, "Ice", settings) do
+		local radius = spot.placement.Radius or settings.Radius
+		local ground = Beach.groundAt(spot.x, spot.z)
+		local ice = makePart({
+			Name = "IcePatch",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.2, radius * 2, radius * 2),
+			CFrame = CFrame.new(spot.x, ground + 0.1, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = settings.Color,
+			Material = Enum.Material.Ice,
+			Reflectance = 0.2,
+			Transparency = 0.1,
+		})
+		arm(ice, settings)
+		ice:SetAttribute("HitRadius", radius)
+		ice:SetAttribute("Grip", settings.Grip)
+		ice.Parent = folder
+		local scatter = Random.new(math.floor(spot.x * 19 + spot.z * 23))
+		for k = 1, math.clamp(math.floor(radius / 3), 2, 8) do
+			local length = scatter:NextNumber(0.4, 0.9) * radius
+			local angle = scatter:NextNumber() * math.pi
+			local reach = scatter:NextNumber(0, radius * 0.4)
+			local x = spot.x + math.cos(k * 2.1) * reach
+			local z = spot.z + math.sin(k * 2.1) * reach
+			makePart({
+				Name = "Frost",
+				Size = Vector3.new(0.25, 0.05, length),
+				CFrame = CFrame.new(x, Beach.groundAt(x, z) + 0.24, z) * CFrame.Angles(0, angle, 0),
+				Color = Color3.fromRGB(245, 250, 255),
+				Material = Enum.Material.SmoothPlastic,
+				Transparency = 0.35,
+			}).Parent =
+				folder
+		end
+	end
+end
+
 HazardService.Builders = builders
 
 -- Builds a source's hazards on a tile into its folder: a biome's, or a plain zone's
