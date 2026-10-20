@@ -90,8 +90,8 @@ def shore(n, bank, hollow_depth):
     ring = ellipse(cx, cz, 250, 190, 28)
     f.ridge(closed(ring), height=bank, width=16, rock=False, rough=1)
     # Two causeways across, north to south: one with a ford cut in it (foot only).
-    f.ridge([(-70, 165), (-72, 340), (-70, 515)], height=bank - 0.6, width=12, rough=0)
-    f.ridge([(96, 165), (98, 340), (96, 510)], height=bank - 0.6, width=12, rough=0)
+    f.ridge([(-70, 165), (-72, 340), (-70, 515)], height=bank - 0.6, width=16, rough=0)
+    f.ridge([(96, 165), (98, 340), (96, 510)], height=bank - 0.6, width=16, rough=0)
     f.add(Kind="Channel", Path=[(98, 360), (98, 396)], Depth=2.4, Width=8, Rough=0, Material=MUD)
     f.decor("Weed", area=box(0, 340, 400, 300), count=10)
     f.decor(GLOW, area=box(0, 340, 400, 300), count=8)
@@ -160,13 +160,15 @@ def rows_down(first, count, step=36):
 def lagoon_hall(z, cz, rz, roof, pillars):
     f = z.frame
     poly = ellipse(0, cz, RX, rz, 36)
-    f.hall(poly, roof=roof, pillars=pillars)
+    f.hall(poly, roof=False, pillars=pillars)
     # The lagoon itself: hollows filling the cavern's middle, the seaward ones deeper.
     r = min(70, rz - 60)  # kept off the ring, where the cart ramp runs
     for x in (-85, 0, 85):
         f.hollow((x, cz - 10), radius=r, depth=3, rough=2, material=MUD)
         f.hollow((x, cz + 15), radius=r, depth=4, rough=2, material=MUD)
     f.paint(poly, SAND)
+    if roof:
+        f.roof_area(poly)
     f.decor("Weed", area=box(0, cz, 300, rz * 1.4), count=12)
     f.decor(GLOW, area=box(0, cz, 300, rz * 1.4), count=8)
     f.decor("Shells", area=box(0, cz, 2 * RX - 20, rz * 1.8), count=6)
