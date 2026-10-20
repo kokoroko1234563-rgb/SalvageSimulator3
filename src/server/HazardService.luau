@@ -1561,6 +1561,178 @@ function builders.Gloom(tile, settings, folder)
 	})
 end
 
+-- Jelly: translucent, glowing jellyfish (see Hazards.luau). Stranded on the sand (At) one lies
+-- still with a ring of glow on the sand round it, as wide as its sting's reach (Radius); in the
+-- water (Path) it drifts along its route at Speed, a little under the surface. Both pulse. What
+-- stings is the glow ring (stranded) or the bell (drifting), tagged with the sting's Damage,
+-- Stun and StunZone: the client does the rest (HazardController).
+local JELLY_COLORS = {
+	Color3.fromRGB(190, 140, 255),
+	Color3.fromRGB(255, 130, 200),
+	Color3.fromRGB(150, 160, 255),
+	Color3.fromRGB(210, 120, 255),
+}
+local TENTACLES = 5
+
+function builders.Jelly(tile, settings, folder)
+	local z0 = Beach.tileRange(tile)
+	local list = {}
+	for _, placement in Layouts.hazardPlacements(tile, "Jelly") do
+		if placement.Path then
+			local path = {}
+			for _, point in placement.Path do
+				table.insert(path, Vector2.new(point[1], z0 + point[2]))
+			end
+			if #path >= 1 then
+				table.insert(list, { path = path, placement = placement })
+			end
+		elseif placement.At then
+			table.insert(list, { at = Vector2.new(placement.At[1], z0 + placement.At[2]), placement = placement })
+		end
+	end
+	if #list == 0 and settings.Scatter then
+		for _ = 1, settings.Count do
+			local x, z = randomSpot(tile)
+			table.insert(list, { at = Vector2.new(x, z), placement = {} })
+		end
+	end
+	local jellies = {}
+	for index, entry in list do
+		local stranded = entry.at ~= nil
+		local placement = entry.placement
+		local look = Random.new(index * 97 + math.floor((entry.at or entry.path[1]).X))
+		local color = JELLY_COLORS[look:NextInteger(1, #JELLY_COLORS)]
+		local scale = look:NextNumber(0.9, 1.3)
+		local bellSize = Vector3.new(3.2, if stranded then 1.8 else 2.4, 3.2) * scale
+		local bell = makePart({
+			Name = "JellyBell",
+			Shape = Enum.PartType.Ball,
+			Size = bellSize,
+			Color = color,
+			Material = Enum.Material.Neon,
+			Transparency = 0.4,
+		})
+		local core = makePart({
+			Name = "JellyCore",
+			Shape = Enum.PartType.Ball,
+			Size = bellSize * 0.55,
+			Color = color:Lerp(Color3.new(1, 1, 1), 0.5),
+			Material = Enum.Material.Neon,
+			Transparency = 0.15,
+		})
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 14
+		light.Brightness = 1.5
+		light.Parent = bell
+		local tentacles = {}
+		for k = 1, TENTACLES do
+			local angle = k / TENTACLES * math.pi * 2
+			local length = look:NextNumber(2.5, 4) * scale
+			table.insert(tentacles, {
+				offset = Vector3.new(
+					math.cos(angle) * 0.9 * scale,
+					-bellSize.Y * 0.5 - length / 2 + 0.3,
+					math.sin(angle) * 0.9 * scale
+				),
+				part = makePart({
+					Name = "JellyTentacle",
+					Size = Vector3.new(0.18, length, 0.18),
+					Color = color,
+					Material = Enum.Material.Neon,
+					Transparency = 0.5,
+				}),
+			})
+		end
+		local jelly = {
+			bell = bell,
+			core = core,
+			tentacles = tentacles,
+			bellSize = bellSize,
+			stranded = stranded,
+			at = entry.at,
+			path = entry.path,
+			phase = look:NextNumber(0, 100),
+		}
+		if stranded then
+			local radius = placement.Radius or settings.Radius
+			-- The glow on the sand: as far as the sting reaches.
+			local ring = makePart({
+				Name = "JellyGlow",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.15, radius * 2, radius * 2),
+				Color = color,
+				Material = Enum.Material.Neon,
+				Transparency = 0.75,
+			})
+			arm(ring, settings)
+			ring:SetAttribute("HitRadius", radius)
+			jelly.hit, jelly.ring = ring, ring
+			ring.Parent = folder
+		else
+			arm(bell, settings)
+			bell:SetAttribute("HitRadius", placement.Radius or settings.HitRadius)
+			jelly.hit = bell
+			jelly.length = 0
+			for i = 1, #entry.path - 1 do
+				jelly.length += (entry.path[i + 1] - entry.path[i]).Magnitude
+			end
+		end
+		jelly.hit:SetAttribute("Damage", placement.Damage or settings.Damage)
+		jelly.hit:SetAttribute("Stun", settings.Stun)
+		jelly.hit:SetAttribute("StunZone", settings.StunZone)
+		bell.Parent = folder
+		core.Parent = folder
+		for _, t in tentacles do
+			t.part.Parent = folder
+		end
+		table.insert(jellies, jelly)
+	end
+	if #jellies == 0 then
+		return
+	end
+	local function place(j, now: number)
+		local pulse = math.sin(now * 2.2 + j.phase)
+		local at = j.at
+		local y
+		if j.stranded then
+			y = Beach.groundAt(at.X, at.Y) + j.bellSize.Y * 0.4
+		else
+			at = if j.length > 0
+				then HazardService.alongPath(j.path, (now + j.phase) * settings.Speed)
+				else j.path[1]
+			-- A little under the water's surface, and bobbing with its pulse.
+			local ground = Beach.groundAt(at.X, at.Y)
+			local surface = Beach.waterYAt(Tide.sea(), at.X)
+			y = math.max(ground + 1.5, surface - 1.5) + pulse * 0.25
+		end
+		local squash = 1 + 0.12 * pulse
+		j.bell.Size = Vector3.new(j.bellSize.X * (2 - squash), j.bellSize.Y * squash, j.bellSize.Z * (2 - squash))
+		j.bell.CFrame = CFrame.new(at.X, y, at.Y)
+		j.core.CFrame = CFrame.new(at.X, y, at.Y)
+		j.bell.Transparency = 0.4 + 0.12 * pulse
+		for _, t in j.tentacles do
+			t.part.CFrame = CFrame.new(at.X + t.offset.X, y + t.offset.Y * squash, at.Y + t.offset.Z)
+		end
+		if j.ring then
+			j.ring.CFrame = CFrame.new(at.X, Beach.groundAt(at.X, at.Y) + 0.1, at.Y)
+				* CFrame.Angles(0, 0, math.pi / 2)
+			j.ring.Transparency = 0.75 + 0.1 * pulse
+		end
+	end
+	for _, j in jellies do
+		place(j, 0)
+	end
+	table.insert(running, {
+		folder = folder,
+		step = function(now)
+			for _, j in jellies do
+				place(j, now)
+			end
+		end,
+	})
+end
+
 HazardService.Builders = builders
 
 -- Builds a source's hazards on a tile into its folder: a biome's, or a plain zone's
@@ -1592,7 +1764,7 @@ function HazardService.init()
 		end
 		local effect = part:GetAttribute("Effect")
 		if
-			(effect ~= "Harm" and effect ~= "Sink")
+			(effect ~= "Harm" and effect ~= "Sink" and effect ~= "Sting")
 			or part:GetAttribute("Active") == false
 			or part:GetAttribute("Lethal") == false
 		then

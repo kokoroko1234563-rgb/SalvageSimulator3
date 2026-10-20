@@ -13,6 +13,9 @@
 --              the world goes black around you (DayController.blind) and only lights show,
 --              until you die or leave the deep (zones 5 and 6). The LocalPlayer's "Benighted"
 --              attribute says so, shown on screen.
+--   Sting      (jellyfish) the server is told (it applies the Damage, checked like Harm), you drop
+--              what you hold, are pushed a little, and in StunZone and deeper you're stunned
+--              (can't move or jump) for Stun seconds.
 -- A hazard with an Active attribute only hits while it's set.
 
 local CollectionService = game:GetService("CollectionService")
@@ -38,6 +41,9 @@ local BODY = 1.5 -- studs of the character's own width counted in a hit
 local REACH_Y = 6 -- a hazard this far above or below you can't reach you
 local DROP_COOLDOWN = 1.5 -- seconds before the same hazard can knock something out of your hands again
 local HOLD_DEPTH = 0.6 -- how far down sand that holds (Lethal = false) takes you, as a share of swallowed
+
+local STING_COOLDOWN = 2 -- seconds before the same jelly can sting you again
+local stunnedUntil = 0 -- stunned by a sting (can't move) until then
 
 local lastDrop: { [Instance]: number } = {}
 local lastHarm: { [Instance]: number } = {}
@@ -86,6 +92,7 @@ local function step(dt: number)
 		WaveController.hazardSlow = 1
 		WaveController.hazardJump = 1
 		WaveController.hazardPush = Vector3.zero
+		stunnedUntil = 0
 		sunk, warned, baseHip = 0, false, nil
 		benighted = false -- (dying lifts it)
 		DayController.blind = 0
@@ -128,6 +135,24 @@ local function step(dt: number)
 				WaveController.hit(direction * (part:GetAttribute("Push") or 0))
 				HUD.notify(part:GetAttribute("HitText") or "Ouch!")
 			end
+		elseif effect == "Sting" then
+			-- A sting: the server applies the Damage, what you hold is dropped, a small push, and
+			-- from StunZone down you can't move for Stun seconds.
+			if now - (lastHarm[part] or -math.huge) > STING_COOLDOWN then
+				lastHarm[part] = now
+				Remotes.get("HazardHarm"):FireServer(part)
+				if GrabController.isHolding() then
+					GrabController.release()
+				end
+				local away = Vector3.new(position.X - part.Position.X, 0, position.Z - part.Position.Z)
+				local direction = if across > 0.1 then away.Unit else root.CFrame.LookVector * -1
+				local velocity = root.AssemblyLinearVelocity
+				root.AssemblyLinearVelocity = velocity + direction * (part:GetAttribute("Push") or 0)
+				if (Beach.zoneAt(position.Z) or 0) >= (part:GetAttribute("StunZone") or math.huge) then
+					stunnedUntil = now + (part:GetAttribute("Stun") or 0)
+				end
+				HUD.notify(part:GetAttribute("HitText") or "Stung!")
+			end
 		elseif effect == "Knockdown" then
 			local away = Vector3.new(position.X - part.Position.X, 0, position.Z - part.Position.Z)
 			local direction = if across > 0.1 then away.Unit else root.CFrame.LookVector * -1
@@ -142,8 +167,9 @@ local function step(dt: number)
 			end
 		end
 	end
-	WaveController.hazardSlow = slow
-	WaveController.hazardJump = if sinking then 0 else 1 -- no jumping out of sinking sand
+	local stunned = now < stunnedUntil -- a sting in the deep: rooted to the spot
+	WaveController.hazardSlow = if stunned then 0 else slow
+	WaveController.hazardJump = if sinking or stunned then 0 else 1 -- no jumping out of sinking sand
 	WaveController.hazardPush = push
 
 	-- Sinking sand: deeper while you're in it (slower if you keep moving), back out of it once

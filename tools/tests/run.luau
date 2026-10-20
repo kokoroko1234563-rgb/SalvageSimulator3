@@ -2896,5 +2896,46 @@ test("cart ramps keep clear of the rock pools' rocks", function()
 	assert(#problems == 0, table.concat(problems, "\n      "))
 end)
 
+test("jellyfish: stranded ones glow as far as they sting, drifting ones follow their path", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "lagoon",
+		Primitives = {},
+		Hazards = {
+			{ Type = "Jelly", At = { 50, 100 }, Radius = 5, Damage = 10 },
+			{ Type = "Jelly", Path = { { -100, 200 }, { -40, 200 } } },
+		},
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, { Hazards = { { Type = "Jelly" } } }, folder)
+	local settings = Hazards.settings({ Type = "Jelly" })
+	local glow, bell
+	for _, part in folder:GetChildren() do
+		if part.Name == "JellyGlow" then
+			glow = part
+		elseif part.Name == "JellyBell" and part:GetAttribute("Effect") then
+			bell = part
+		end
+	end
+	assert(glow and glow:GetAttribute("Effect") == "Sting", "a stranded jelly stings")
+	assert(glow:GetAttribute("HitRadius") == 5 and glow.Size.Y == 10, "its glow shows its reach")
+	assert(glow:GetAttribute("Damage") == 10, "the placement's Damage")
+	assert(math.abs(glow.CFrame.Z - (z0 + 100)) < 1, "on the sand where it was put")
+	assert(glow:GetAttribute("Stun") == settings.Stun and settings.Stun > 0, "a stun in the deep")
+	assert(settings.StunZone >= 5 and settings.Damage < 100, "not deadly itself, stuns only deep")
+	assert(bell and bell:GetAttribute("Damage") == settings.Damage, "a drifting jelly stings too")
+	local before = bell.CFrame.X
+	HazardService._step(os.clock() + 4, 0.1)
+	assert(bell.CFrame.X ~= before and bell.CFrame.X >= -101 and bell.CFrame.X <= -39, "it drifts along its path")
+	assert(bell.Transparency > 0 and bell.Material == roblox.Enum.Material.Neon, "translucent and glowing")
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)

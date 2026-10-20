@@ -63,6 +63,10 @@
 --           and you're Benighted until you die or leave the deep (zones 5 and 6): the world goes
 --           black, and you see only lights (a lantern or headlamp shows you your own
 --           surroundings, and the wards light the way). Placement: Path or At, Radius.
+--   Jelly   (Jellyfish Lagoon) translucent glowing jellies, pulsing. Placement At: one stranded
+--           on the sand, its glow ring on the sand showing how far its sting reaches (Radius);
+--           Path: one drifting along it in the water at Speed (HitRadius round it). Placement
+--           Damage overrides the setting. Effect Sting.
 --
 -- What a hazard does to a player who gets within HitRadius of it is its Effect:
 --   Knockdown  knocked over (you drop what you hold) and thrown Push studs/s away from it.
@@ -72,6 +76,8 @@
 --   Current    dragged along (Undertow hazards): into deep water, where you drown.
 --   Harm       Damage taken (100 kills), and thrown Push studs/s away from it.
 --   Gloom      Benighted: the world goes dark around you until you die or leave the deep.
+--   Sting      Damage taken (checked like Harm), you drop what you hold, a small push, and in
+--              zones StunZone and deeper you're stunned Stun seconds (can't move).
 -- Dangers are meant to be deadly: a hazard that only slows you is scenery.
 -- The server builds and moves the hazards (HazardService); each player's own client checks its
 -- character against them and applies the effect (HazardController), like the waves.
