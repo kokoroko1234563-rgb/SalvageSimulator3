@@ -9,7 +9,9 @@
 --           Path = { {x, z}, ... }; without one, each wanders around where it starts. With
 --           Calls, one that sees someone within CallRange ahead (CallAngle across) stops and
 --           drums its claws, a ring pulsing round it, for CallTime seconds: still seen then, it
---           calls the tile's Hunter, which digs to the burrow nearest it.
+--           calls the tile's Hunter, which digs to the burrow nearest the caller (only CallChance
+--           of sightings, none while the Hunter is already hunting, and one call per tile every
+--           CallShared seconds).
 --   Pulse   a spot erupts for Active seconds every Period, after Warning seconds of warning
 --           (vents, blowholes). Placement: At = {x, z}.
 --   Slow    a patch that slows you to Factor of your speed while you're in it (sea glass,
@@ -44,6 +46,12 @@
 --           DigAway along its route, or called by a patrol crab: it burrows in a cloud of dust
 --           for DigTime seconds and comes out of the burrow hole nearest them after UnderTime
 --           more, the hole shaking and spurting sand all that while). Placement: Path, and
+--           Hunting no one, every RoamEvery seconds it digs to the burrow nearest the latest
+--           sighting its patrol crabs passed on (any crab that sees someone tells it; within
+--           Hunch seconds), or another burrow if there's none: it's never far from players.
+--           It knows only what it sees: out of sight, it heads for where they were going
+--           (Predict seconds on from where it last saw them), and someone it can see but not
+--           reach (off its route) it gives up on after GiveUp seconds, for Ignore seconds.
 --           Burrows = { {x, z}, ... } (on its route); without Burrows, its route's ends and
 --           middle; without a Path, the layout's longest Patrol route.
 --   Gloom   a living, magical darkness (the Drowned Reach's): something unseen that roams
@@ -100,6 +108,8 @@ Hazards.Types = {
 		CallAngle = 100, -- degrees across the cone it watches, ahead of it
 		CallTime = 2, -- seconds of drumming before the call goes out
 		CallCooldown = 10,
+		CallChance = 0.5, -- the share of sightings it drums for at all
+		CallShared = 25, -- seconds after a call before any crab on the tile calls again
 		HitText = "You got knocked over!",
 	},
 	Pulse = {
@@ -203,6 +213,11 @@ Hazards.Types = {
 		EmergeTime = 0.6,
 		DigEvery = 15,
 		DigAway = 40, -- studs along its route someone must be for it to dig after them
+		Predict = 1.5, -- seconds on from where it last saw someone that it guesses they went
+		GiveUp = 4, -- seconds it waits on someone it can see but can't reach (off its route)
+		Ignore = 10, -- seconds it then leaves them be
+		RoamEvery = 10, -- hunting no one, it digs to a new spot this often...
+		Hunch = 20, -- ...near the latest sighting the patrol crabs passed on, if this recent
 		Size = Vector3.new(12, 6, 10),
 		Color = Color3.fromRGB(176, 72, 52),
 		Damage = 100,

@@ -183,8 +183,13 @@ local function creature(settings, at: Vector3): (Model, BasePart)
 	return model, body
 end
 
--- The calls patrol crabs make to their tile's Hunter: where, and when.
+-- The calls patrol crabs make to their tile's Hunter (where, and when), when the next may be
+-- made, and whether the tile's Hunter is already hunting (then nobody calls).
 local calls: { [number]: { at: Vector2, time: number } } = {}
+local nextCall: { [number]: number } = {}
+local hunting: { [number]: boolean } = {}
+-- What patrol crabs have seen (someone near them, and when), passed on to the Hunter.
+local sightings: { [number]: { at: Vector2, time: number } } = {}
 
 -- Whether anything solid is between two points (players and the hazards' own parts aside).
 local sightParams = RaycastParams.new()
@@ -288,6 +293,14 @@ function builders.Patrol(tile, settings, folder)
 		folder = folder,
 		step = function(now, dt)
 			for _, walker in walkers do
+				-- Every crab that can call also tells what it sees, now and then.
+				if settings.Calls and walker.path and now >= (walker.nextLook or 0) then
+					walker.nextLook = now + 0.5
+					local seen = spots(walker)
+					if seen then
+						sightings[tile] = { at = Vector2.new(seen.X, seen.Z), time = now }
+					end
+				end
 				if settings.Calls and walker.path then
 					if walker.callUntil then
 						-- Drumming: it stands, claws going, a ring pulsing out round it.
@@ -316,9 +329,19 @@ function builders.Patrol(tile, settings, folder)
 							r.Transparency = 1
 						end
 						continue
-					elseif now >= (walker.nextCall or 0) and spots(walker) then
-						walker.callUntil = now + settings.CallTime
-						continue
+					elseif
+						now >= (walker.nextCall or 0)
+						and now >= (nextCall[tile] or 0)
+						and not hunting[tile]
+						and spots(walker)
+					then
+						-- Not every crab that sees you drums.
+						if rng:NextNumber() < settings.CallChance then
+							walker.callUntil = now + settings.CallTime
+							nextCall[tile] = now + settings.CallTime + settings.CallShared
+							continue
+						end
+						walker.nextCall = now + settings.CallCooldown
 					end
 				end
 				if walker.path then
@@ -1216,7 +1239,7 @@ function builders.Hunter(tile, settings, folder)
 		if not best then
 			return false
 		end
-		h.mode, h.burrow, h.due = "dig", best, now + settings.DigTime
+		h.mode, h.burrow, h.due, h.toward = "dig", best, now + settings.DigTime, toward
 		h.dig.CFrame = CFrame.new(h.at.X, Beach.groundAt(h.at.X, h.at.Y), h.at.Y)
 		h.digDust.Enabled = true
 		best.spurt.Enabled = true
@@ -1243,18 +1266,21 @@ function builders.Hunter(tile, settings, folder)
 			end
 			local call = calls[tile]
 			for _, h in hunters do
-				-- A patrol crab's call: it digs to the burrow nearest the caller.
-				if call and call.time > h.heard and (h.mode == "patrol" or h.mode == "chase") then
+				-- A patrol crab's call: it digs to the burrow nearest the caller (not to you: it
+				-- has to find you itself when it's up).
+				if call and call.time > h.heard and h.mode == "patrol" then
 					h.heard = call.time
+					h.target = nil
 					startDig(h, call.at, now)
 				end
+				h.ignore = h.ignore or {}
 				if h.mode == "patrol" then
 					-- Looking out: the nearest player it can see.
 					for _, player in Players:GetPlayers() do
 						local character = player.Character
 						local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 						local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-						if root and humanoid and humanoid.Health > 0 then
+						if root and humanoid and humanoid.Health > 0 and now >= (h.ignore[player] or 0) then
 							local range = if carriesLight(player)
 								then settings.LightRange
 								else settings.SightRange
@@ -1266,6 +1292,8 @@ function builders.Hunter(tile, settings, folder)
 								or (across > 0 and offset.Unit:Dot(h.heading) >= viewCos)
 							if across <= range and ahead and sees(h, root.Position) then
 								h.mode, h.target, h.lost, h.home = "chase", player, 0, h.s
+								h.lastSeen = Vector2.new(root.Position.X, root.Position.Z)
+								h.going, h.stuck = Vector2.zero, 0
 								h.nextDig = now + settings.DigEvery
 								break
 							end
@@ -1283,18 +1311,31 @@ function builders.Hunter(tile, settings, folder)
 					if not root or not humanoid or humanoid.Health <= 0 then
 						h.mode, h.target = "patrol", nil
 					else
+						-- It knows only what it sees: out of sight, it guesses where they went.
 						local seen = sees(h, root.Position)
 						if seen then
-							h.lost, h.lastSeen = 0, where
+							local v = root.AssemblyLinearVelocity
+							h.lost, h.lastSeen, h.going = 0, where, Vector2.new(v.X, v.Z)
 						else
 							h.lost += dt
 						end
-						local along = h.rail.nearest(where)
-						local offset = where - h.at
-						if h.lost > settings.LoseTime then
-							-- Lost them: it digs after them, or gives up.
-							if not startDig(h, h.lastSeen or where, now) then
-								h.mode = "patrol"
+						local guess = if seen
+							then where
+							else h.lastSeen + h.going * math.min(h.lost, settings.Predict)
+						local along = h.rail.nearest(guess)
+						local offset = guess - h.at
+						local leashed = math.clamp(along, h.home - settings.Leash, h.home + settings.Leash)
+						-- Someone it can see but can't reach (off its route): it waits a while,
+						-- then leaves them be.
+						local off = (h.rail.at(h.rail.nearest(where)) - where).Magnitude
+						h.stuck = if seen and off > size.X * 0.5 + 6 then h.stuck + dt else 0
+						if h.stuck > settings.GiveUp then
+							h.ignore[h.target] = now + settings.Ignore
+							h.mode, h.target = "patrol", nil
+						elseif h.lost > settings.LoseTime then
+							-- Lost them: it digs to where it guesses they went, or gives up.
+							if not startDig(h, guess, now) then
+								h.mode, h.target = "patrol", nil
 							end
 						elseif
 							seen
@@ -1312,25 +1353,13 @@ function builders.Hunter(tile, settings, folder)
 								h.s + settings.DashDistance
 							)
 							eyes(h, angry)
-						elseif now >= h.nextDig and math.abs(along - h.s) > settings.DigAway then
+						elseif seen and now >= h.nextDig and math.abs(along - h.s) > settings.DigAway then
 							h.nextDig = now + settings.DigEvery
-							if not startDig(h, where, now) then
-								slide(
-									h,
-									math.clamp(along, h.home - settings.Leash, h.home + settings.Leash),
-									settings.ChaseSpeed,
-									dt,
-									where
-								)
+							if not startDig(h, guess, now) then
+								slide(h, leashed, settings.ChaseSpeed, dt, guess)
 							end
 						else
-							slide(
-								h,
-								math.clamp(along, h.home - settings.Leash, h.home + settings.Leash),
-								settings.ChaseSpeed,
-								dt,
-								where
-							)
+							slide(h, leashed, settings.ChaseSpeed, dt, guess)
 						end
 					end
 				elseif h.mode == "rear" then
@@ -1363,23 +1392,35 @@ function builders.Hunter(tile, settings, folder)
 					if now >= h.due then
 						h.s = h.burrow.s
 						h.at = h.burrow.at
-						if where then
-							h.heading = if (where - h.at).Magnitude > 0.1
-								then (where - h.at).Unit
-								else h.heading
-						end
+						-- Up facing where it dug toward (where it guessed you'd be, or the caller).
+						local toward = h.toward or h.at
+						h.heading = if (toward - h.at).Magnitude > 0.1
+							then (toward - h.at).Unit
+							else h.heading
 						h.body:SetAttribute("Active", true)
 						h.mode, h.due = "emerge", now + settings.EmergeTime
 					end
 				elseif h.mode == "emerge" then
 					h.sink = math.max(0, h.sink - dt * (size.Y + 1) / settings.EmergeTime)
 					if now >= h.due then
+						-- Up, it looks for you again: only what it sees now.
 						h.sink = 0
-						h.mode = if h.target then "chase" else "patrol"
+						h.mode, h.target = "patrol", nil
 						h.home, h.lost = h.s, 0
 						h.nextDig = now + settings.DigEvery
 					end
 				else
+					-- Hunting no one, it doesn't wait: every so often it digs to where the patrol
+					-- crabs last saw someone, or to another burrow.
+					if now >= (h.nextRoam or now + settings.RoamEvery) then
+						h.nextRoam = now + settings.RoamEvery
+						local hunch = sightings[tile]
+						local toward = if hunch and now - hunch.time <= settings.Hunch
+							then hunch.at
+							else h.burrows[rng:NextInteger(1, #h.burrows)].at
+						startDig(h, toward, now)
+					end
+					h.nextRoam = h.nextRoam or now + settings.RoamEvery
 					-- Patrolling: back and forth along its route.
 					local goal = if h.dir > 0 then h.rail.length else 0
 					slide(h, goal, settings.Speed, dt)
@@ -1388,6 +1429,11 @@ function builders.Hunter(tile, settings, folder)
 					end
 					h.pitch = 0
 				end
+				-- Up out of the sand whenever it isn't digging.
+				if h.mode ~= "dig" and h.mode ~= "under" and h.mode ~= "emerge" then
+					h.sink = 0
+				end
+				hunting[tile] = h.mode ~= "patrol"
 				place(h)
 			end
 		end,
