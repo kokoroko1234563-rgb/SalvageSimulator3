@@ -16,6 +16,8 @@
 --   Sting      (jellyfish) the server is told (it applies the Damage, checked like Harm), you drop
 --              what you hold, are pushed a little, and in StunZone and deeper you're stunned
 --              (can't move or jump) for Stun seconds.
+--   Fling      (whirlwind) thrown Push studs/s away and up (Push x FLING_LIFT), tumbling for
+--              FLING_TIME, dropping what you hold; not deadly itself.
 -- A hazard with an Active attribute only hits while it's set.
 
 local CollectionService = game:GetService("CollectionService")
@@ -44,6 +46,10 @@ local HOLD_DEPTH = 0.6 -- how far down sand that holds (Lethal = false) takes yo
 
 local STING_COOLDOWN = 2 -- seconds before the same jelly can sting you again
 local stunnedUntil = 0 -- stunned by a sting (can't move) until then
+local FLING_TIME = 1.6 -- seconds tumbling after a whirlwind throws you
+local FLING_LIFT = 0.6 -- the throw's upward speed, as a share of its Push
+local FLING_COOLDOWN = 3.5 -- seconds before a whirlwind can throw you again
+local lastFling = -math.huge
 
 local lastDrop: { [Instance]: number } = {}
 local lastHarm: { [Instance]: number } = {}
@@ -152,6 +158,29 @@ local function step(dt: number)
 					stunnedUntil = now + (part:GetAttribute("Stun") or 0)
 				end
 				HUD.notify(part:GetAttribute("HitText") or "Stung!")
+			end
+		elseif effect == "Fling" then
+			-- Caught in a whirlwind: thrown up and away, tumbling, dropping what you hold. Not
+			-- deadly itself; the landing is what you make of it.
+			if now - lastFling > FLING_COOLDOWN then
+				lastFling = now
+				if GrabController.isHolding() then
+					GrabController.release()
+				end
+				local away = Vector3.new(position.X - part.Position.X, 0, position.Z - part.Position.Z)
+				local direction = if across > 0.1 then away.Unit else root.CFrame.LookVector * -1
+				local speed = part:GetAttribute("Push") or 0
+				humanoid.PlatformStand = true
+				root.AssemblyLinearVelocity = direction * speed + Vector3.new(0, speed * FLING_LIFT, 0)
+				root.AssemblyAngularVelocity =
+					Vector3.new(math.random() * 12 - 6, math.random() * 12 - 6, math.random() * 12 - 6)
+				task.delay(FLING_TIME, function()
+					if humanoid.Parent and humanoid.Health > 0 then
+						humanoid.PlatformStand = false
+						humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+					end
+				end)
+				HUD.notify(part:GetAttribute("HitText") or "You were thrown!")
 			end
 		elseif effect == "Knockdown" then
 			local away = Vector3.new(position.X - part.Position.X, 0, position.Z - part.Position.Z)

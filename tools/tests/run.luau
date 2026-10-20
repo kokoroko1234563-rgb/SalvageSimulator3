@@ -3013,5 +3013,56 @@ test("spearstone fields glow and crack first, then shoot up, in the pattern they
 	folder:Destroy()
 end)
 
+test("a whirlwind circles its loop, a tall column of sand that flings but doesn't harm", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local z0 = Beach.tileRange(tile)
+	local loop = { { -40, 100 }, { 40, 100 }, { 40, 180 }, { -40, 180 } }
+	Layouts.setActive(tile, {
+		Name = "dunes",
+		Primitives = {},
+		Hazards = { { Type = "Whirlwind", Path = loop, Radius = 8 } },
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, { Hazards = { { Type = "Whirlwind" } } }, folder)
+	local settings = Hazards.settings({ Type = "Whirlwind" })
+	local foot = folder:FindFirstChild("Whirlwind")
+	assert(foot and foot:GetAttribute("Effect") == "Fling", "a whirlwind that flings")
+	assert(foot:GetAttribute("HitRadius") == 8, "the placement's radius")
+	assert(foot:GetAttribute("Damage") == nil and settings.Push > 0, "flung, not hurt")
+	local tops, layers = 0, 0
+	for _, part in folder:GetChildren() do
+		if part.Name == "WhirlwindSand" then
+			layers += 1
+			tops = math.max(tops, part.CFrame.Y - foot.CFrame.Y)
+		end
+	end
+	assert(layers >= 4 and tops >= 30, "a column of sand you can see from far off")
+	-- It goes round the loop (never off it) and comes back to where it began.
+	local perimeter = 80 + 80 + 80 + 80
+	local now = os.clock()
+	for t = 0, 40, 1 do
+		HazardService._step(now + t, 0.1)
+		local x, z = foot.CFrame.X, foot.CFrame.Z - z0
+		assert(
+			math.abs(x) <= 41 and z >= 99 and z <= 181 and (math.abs(math.abs(x) - 40) < 1 or math.abs(z - 140) > 39),
+			"on its loop at " .. t
+		)
+	end
+	local startX, startZ = nil, nil
+	HazardService._step(now, 0.1)
+	startX, startZ = foot.CFrame.X, foot.CFrame.Z
+	HazardService._step(now + perimeter / settings.Speed, 0.1)
+	assert(
+		math.abs(foot.CFrame.X - startX) < 1 and math.abs(foot.CFrame.Z - startZ) < 1,
+		"round and round, not back and forth"
+	)
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)

@@ -1883,6 +1883,117 @@ function builders.Spears(tile, settings, folder)
 	})
 end
 
+-- Whirlwind: a column of lifted sand circling its Path (a loop) at Speed (see Hazards.luau),
+-- tall enough to be seen from far off. Whoever the Radius at its foot catches is flung
+-- (HazardController). Without a placement, a loop is scattered round a spot on the tile.
+local WHIRL_LAYERS = 8
+
+function builders.Whirlwind(tile, settings, folder)
+	local z0 = Beach.tileRange(tile)
+	local loops = {}
+	for _, placement in Layouts.hazardPlacements(tile, "Whirlwind") do
+		local path = {}
+		for _, point in placement.Path or {} do
+			table.insert(path, Vector2.new(point[1], z0 + point[2]))
+		end
+		if #path >= 2 then
+			table.insert(loops, { path = path, radius = placement.Radius or settings.Radius })
+		end
+	end
+	if #loops == 0 and settings.Scatter then
+		for _ = 1, settings.Count do
+			local x, z = randomSpot(tile)
+			local path = {}
+			for k = 0, 7 do
+				local angle = k / 8 * math.pi * 2
+				table.insert(path, Vector2.new(x + math.cos(angle) * 25, z + math.sin(angle) * 25))
+			end
+			table.insert(loops, { path = path, radius = settings.Radius })
+		end
+	end
+	local winds = {}
+	for _, loop in loops do
+		local closed = table.clone(loop.path)
+		table.insert(closed, loop.path[1]) -- round and round, not back and forth
+		local length = 0
+		for i = 1, #closed - 1 do
+			length += (closed[i + 1] - closed[i]).Magnitude
+		end
+		if length <= 0 then
+			continue
+		end
+		local foot = makePart({
+			Name = "Whirlwind",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.3, loop.radius * 2, loop.radius * 2),
+			Color = settings.Color,
+			Transparency = 1,
+		})
+		arm(foot, settings)
+		foot:SetAttribute("HitRadius", loop.radius)
+		local dust = Instance.new("ParticleEmitter")
+		dust.Color = ColorSequence.new(settings.Color)
+		dust.Size = NumberSequence.new(2.5, 5)
+		dust.Transparency = NumberSequence.new(0.4, 1)
+		dust.Lifetime = NumberRange.new(0.8, 1.4)
+		dust.Rate = 40
+		dust.Speed = NumberRange.new(6, 14)
+		dust.SpreadAngle = Vector2.new(180, 180)
+		dust.Parent = foot
+		foot.Parent = folder
+		-- The column: layers of swirling sand, wider the higher they go.
+		local layers = {}
+		for k = 1, WHIRL_LAYERS do
+			local t = (k - 0.5) / WHIRL_LAYERS
+			local width = loop.radius * (0.5 + 1.3 * t)
+			local layer = makePart({
+				Name = "WhirlwindSand",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(settings.Height / WHIRL_LAYERS, width, width),
+				Color = settings.Color:Lerp(Color3.new(1, 1, 1), 0.15 * t),
+				Material = Enum.Material.Sand,
+				Transparency = 0.55 + 0.25 * t,
+			})
+			layer.Parent = folder
+			table.insert(layers, { part = layer, t = t })
+		end
+		table.insert(winds, {
+			foot = foot,
+			layers = layers,
+			closed = closed,
+			length = length,
+			radius = loop.radius,
+			phase = rng:NextNumber(0, length),
+		})
+	end
+	if #winds == 0 then
+		return
+	end
+	local function place(w, now: number)
+		local at = HazardService.alongPath(w.closed, (w.phase + now * settings.Speed) % w.length)
+		local ground = Beach.groundAt(at.X, at.Y)
+		w.foot.CFrame = CFrame.new(at.X, ground + 0.15, at.Y) * CFrame.Angles(0, 0, math.pi / 2)
+		for _, layer in w.layers do
+			-- Each layer swings round the axis, the higher the further: a leaning, twisting column.
+			local swing = math.sin(now * 2.5 - layer.t * 3) * w.radius * 0.25 * layer.t
+			local swirl = math.cos(now * 2.5 - layer.t * 3) * w.radius * 0.25 * layer.t
+			layer.part.CFrame = CFrame.new(at.X + swing, ground + layer.t * settings.Height, at.Y + swirl)
+				* CFrame.Angles(0, now * (1 + layer.t), math.pi / 2)
+		end
+	end
+	for _, w in winds do
+		place(w, 0)
+	end
+	table.insert(running, {
+		folder = folder,
+		step = function(now)
+			for _, w in winds do
+				place(w, now)
+			end
+		end,
+	})
+end
+
 HazardService.Builders = builders
 
 -- Builds a source's hazards on a tile into its folder: a biome's, or a plain zone's

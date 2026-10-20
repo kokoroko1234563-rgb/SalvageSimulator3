@@ -74,6 +74,9 @@
 --           for Warning seconds, then a stone spear shoots up for Active seconds and Harms
 --           (Damage; a placement's Damage overrides it: less in the near zones). Placement: At,
 --           Radius, Pattern, Damage.
+--   Whirlwind  (Whirlwind Dunes) a column of lifted sand Height studs tall, Radius wide at its
+--           foot, circling its Path (a loop: round and round, not back and forth) at Speed.
+--           Whoever it catches is flung (effect Fling), not hurt. Placement: Path, Radius.
 --
 -- What a hazard does to a player who gets within HitRadius of it is its Effect:
 --   Knockdown  knocked over (you drop what you hold) and thrown Push studs/s away from it.
@@ -85,6 +88,8 @@
 --   Gloom      Benighted: the world goes dark around you until you die or leave the deep.
 --   Sting      Damage taken (checked like Harm), you drop what you hold, a small push, and in
 --              zones StunZone and deeper you're stunned Stun seconds (can't move).
+--   Fling      thrown Push studs/s up and away from the hazard, tumbling, dropping what you
+--              hold; not deadly itself (Whirlwind).
 -- Dangers are meant to be deadly: a hazard that only slows you is scenery.
 -- The server builds and moves the hazards (HazardService); each player's own client checks its
 -- character against them and applies the effect (HazardController), like the waves.
@@ -294,6 +299,7 @@ Hazards.Types = {
 	Whirlwind = { -- Whirlwind Dunes: a whirlwind circling its Path, flinging whoever it catches
 		Count = 1,
 		Radius = 10,
+		Height = 45, -- the column of sand: tall enough to see from far off
 		Speed = 9,
 		Color = Color3.fromRGB(220, 190, 140),
 		Effect = "Fling",
