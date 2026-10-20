@@ -1733,6 +1733,156 @@ function builders.Jelly(tile, settings, folder)
 	})
 end
 
+-- Spears: a field of stone plates that glow and crack, then shoot a spear up, on a rhythm set by
+-- the field's Pattern (see Hazards.luau). Each spot is on the same Period; the pattern only sets
+-- when in the cycle a spot fires, so a wave can be run behind, a checkerboard hopped between,
+-- rings stepped across. The plate is what hits (Active only while the spear is up).
+local SPEAR_HEIGHT = 6
+local SPEAR_RISE = 0.12 -- seconds a spear takes to shoot up
+local SWEEP_SHARE = 0.75 -- the share of a Period a wave or ring takes to cross the field
+
+-- When in the cycle (0-1 of the Period) a spot at (dx, dz) from the middle of a field fires.
+local function spearFire(pattern: string, dx: number, dz: number, radius: number, spacing: number): number
+	if pattern == "All" then
+		return 0
+	elseif pattern == "Checker" then
+		local parity = (math.round(dx / spacing) + math.round(dz / spacing)) % 2
+		return parity * 0.5
+	elseif pattern == "Ring" then
+		local rings = math.max(1, math.round(radius / spacing))
+		return math.min(1, math.round(math.sqrt(dx * dx + dz * dz) / spacing) / rings) * SWEEP_SHARE
+	end
+	return math.clamp((dx + radius) / (2 * radius), 0, 1) * SWEEP_SHARE
+end
+
+function builders.Spears(tile, settings, folder)
+	local spears = {}
+	for _, spot in spotsFor(tile, "Spears", settings) do
+		local placement = spot.placement
+		local radius = placement.Radius or settings.Radius
+		local pattern = placement.Pattern or settings.Pattern
+		local damage = placement.Damage or settings.Damage
+		local spacing = settings.Spacing
+		local n = math.floor(radius / spacing)
+		local scatter = Random.new(math.floor(spot.x * 7 + spot.z * 3))
+		for i = -n, n do
+			for j = -n, n do
+				local dx, dz = i * spacing, j * spacing
+				local x, z = spot.x + dx, spot.z + dz
+				if dx * dx + dz * dz > radius * radius or Beach.feature(x, z) >= 2 then
+					continue
+				end
+				local ground = Beach.groundAt(x, z)
+				local hitRadius = settings.HitRadius
+				local plate = makePart({
+					Name = "SpearPlate",
+					Shape = Enum.PartType.Cylinder,
+					Size = Vector3.new(0.2, hitRadius * 2, hitRadius * 2),
+					CFrame = CFrame.new(x, ground + 0.1, z) * CFrame.Angles(0, 0, math.pi / 2),
+					Color = settings.Color,
+					Material = Palette.Material.Rock,
+				})
+				arm(plate, settings)
+				plate:SetAttribute("Damage", damage)
+				plate:SetAttribute("Active", false)
+				plate.Parent = folder
+				local cracks = {}
+				for k = 1, 2 do
+					local crack = makePart({
+						Name = "SpearCrack",
+						Size = Vector3.new(0.18, 0.05, hitRadius * 1.9),
+						CFrame = CFrame.new(x, ground + 0.24, z)
+							* CFrame.Angles(0, k * 1.2 + scatter:NextNumber(-0.3, 0.3), 0),
+						Color = Color3.fromRGB(255, 120, 50),
+						Material = Enum.Material.Neon,
+						Transparency = 1,
+					})
+					crack.Parent = folder
+					table.insert(cracks, crack)
+				end
+				local shaft = makePart({
+					Name = "Spear",
+					Size = Vector3.new(0.9, SPEAR_HEIGHT - 1, 0.9),
+					CFrame = CFrame.new(x, ground - SPEAR_HEIGHT, z),
+					Color = settings.Color:Lerp(Color3.new(1, 1, 1), 0.2),
+					Material = Palette.Material.Rock,
+					Transparency = 1,
+				})
+				shaft.Parent = folder
+				local tip = makePart({
+					Name = "SpearTip",
+					Size = Vector3.new(0.9, 0.9, 0.9),
+					CFrame = CFrame.new(x, ground - SPEAR_HEIGHT, z),
+					Color = settings.Color:Lerp(Color3.new(1, 1, 1), 0.45),
+					Material = Palette.Material.Rock,
+					Transparency = 1,
+				})
+				tip.Parent = folder
+				table.insert(spears, {
+					plate = plate,
+					cracks = cracks,
+					shaft = shaft,
+					tip = tip,
+					x = x,
+					z = z,
+					ground = ground,
+					fire = spearFire(pattern, dx, dz, radius, spacing) * settings.Period,
+					state = 0,
+				})
+			end
+		end
+	end
+	if #spears == 0 then
+		return
+	end
+	local idle = settings.Color
+	table.insert(running, {
+		folder = folder,
+		step = function(now)
+			for _, s in spears do
+				local phase = (now - s.fire) % settings.Period
+				local state = if phase < settings.Active
+					then 2
+					elseif phase >= settings.Period - settings.Warning then 1
+					else 0
+				if state == 1 then
+					-- Glowing and cracking, flickering faster as it nears.
+					local near = (phase - (settings.Period - settings.Warning)) / settings.Warning
+					local flicker = 0.5 + 0.5 * math.sin(now * (8 + 14 * near))
+					s.plate.Material = Enum.Material.Neon
+					s.plate.Color = idle:Lerp(Color3.fromRGB(255, 110, 40), 0.5 + 0.5 * flicker)
+					for _, crack in s.cracks do
+						crack.Transparency = 0.1
+					end
+				elseif state ~= s.state then
+					s.plate.Material = Palette.Material.Rock
+					s.plate.Color = idle
+					for _, crack in s.cracks do
+						crack.Transparency = if state == 2 then 0.1 else 1
+					end
+				end
+				if state == 2 then
+					-- Up it shoots, quickly.
+					local k = math.min(1, phase / SPEAR_RISE)
+					local rise = SPEAR_HEIGHT * k
+					local top = s.ground - 0.5 + rise
+					s.shaft.CFrame = CFrame.new(s.x, top - (SPEAR_HEIGHT - 1) / 2, s.z)
+					s.tip.CFrame = CFrame.new(s.x, top + 0.2, s.z) * CFrame.Angles(0.8, 0.8, 0)
+					s.shaft.Transparency, s.tip.Transparency = 0, 0
+				elseif s.state == 2 then
+					s.shaft.Transparency, s.tip.Transparency = 1, 1
+					s.shaft.CFrame = CFrame.new(s.x, s.ground - SPEAR_HEIGHT, s.z)
+					s.tip.CFrame = s.shaft.CFrame
+				end
+				if state ~= s.state then
+					s.state = state
+					s.plate:SetAttribute("Active", state == 2)
+				end
+			end
+		end,
+	})
+end
+
 HazardService.Builders = builders
 
 -- Builds a source's hazards on a tile into its folder: a biome's, or a plain zone's

@@ -2937,5 +2937,81 @@ test("jellyfish: stranded ones glow as far as they sting, drifting ones follow t
 	Layouts.setActive(tile, nil)
 end)
 
+test("spearstone fields glow and crack first, then shoot up, in the pattern they're given", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local settings = Hazards.settings({ Type = "Spears" })
+	assert(settings.Warning >= 0.8 and settings.Warning + settings.Active < settings.Period, "a fair rhythm")
+	-- How many plates are live (spear up) / warned (cracks showing) at a time, for a pattern.
+	local function field(pattern: string, damage: number?)
+		Layouts.setActive(tile, {
+			Name = "reef",
+			Primitives = {},
+			Hazards = { { Type = "Spears", At = { 0, 200 }, Radius = 12, Pattern = pattern, Damage = damage } },
+		})
+		local folder = Harness.wrap(roblox.Instance.new("Folder"))
+		HazardService.start(tile, { Hazards = { { Type = "Spears" } } }, folder)
+		local plates = {}
+		for _, part in folder:GetChildren() do
+			if part.Name == "SpearPlate" then
+				table.insert(plates, part)
+			end
+		end
+		Layouts.setActive(tile, nil)
+		return folder, plates
+	end
+	local function live(plates, now: number): number
+		HazardService._step(now, 0.1)
+		local count = 0
+		for _, plate in plates do
+			if plate:GetAttribute("Active") == true then
+				count += 1
+			end
+		end
+		return count
+	end
+	local base = 400 -- (a multiple of every Period)
+	local folder, plates = field("Wave", 30)
+	assert(#plates > 10 and plates[1]:GetAttribute("Effect") == "Harm", "a field of harming plates")
+	assert(plates[1]:GetAttribute("Damage") == 30, "the placement's Damage overrides the setting")
+	local z0 = Beach.tileRange(tile)
+	assert(math.abs(plates[1].CFrame.Z - (z0 + 200)) <= 13, "where the field was put")
+	-- Telegraph: before a spot fires it glows and its cracks show; it's harmless till then.
+	local warned = false
+	HazardService._step(base + settings.Period - settings.Warning + 0.1, 0.1)
+	for _, crack in folder:GetChildren() do
+		if crack.Name == "SpearCrack" and crack.Transparency < 1 then
+			warned = true
+			break
+		end
+	end
+	assert(warned, "cracks show before a spear shoots up")
+	assert(live(plates, base + settings.Period - settings.Warning + 0.1) < #plates, "not all at once in a wave")
+	local seen, most = 0, 0
+	for t = 0, settings.Period, 0.1 do
+		local n = live(plates, base + t)
+		seen += if n > 0 then 1 else 0
+		most = math.max(most, n)
+	end
+	assert(seen > 0 and most < #plates, "a wave rolls across: a few live at a time")
+	folder:Destroy()
+	-- Checker: half the squares, then the other half.
+	folder, plates = field("Checker")
+	local first = live(plates, base)
+	local second = live(plates, base + settings.Period / 2)
+	assert(first > 0 and second > 0 and first + second == #plates, "alternating squares")
+	folder:Destroy()
+	-- All: every spot together. Ring: not.
+	folder, plates = field("All")
+	assert(live(plates, base) == #plates, "all together")
+	folder:Destroy()
+	folder, plates = field("Ring")
+	assert(live(plates, base) > 0 and live(plates, base) < #plates, "rings from the middle out")
+	folder:Destroy()
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)

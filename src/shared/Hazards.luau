@@ -67,6 +67,13 @@
 --           on the sand, its glow ring on the sand showing how far its sting reaches (Radius);
 --           Path: one drifting along it in the water at Speed (HitRadius round it). Placement
 --           Damage overrides the setting. Effect Sting.
+--   Spears  (Spearstone Reef) a field (At, Radius) of spots Spacing studs apart, on a rhythm of
+--           Period seconds set by Pattern: Wave (a wave rolling across the field, west to east:
+--           run behind it), Checker (alternate squares, half a Period apart: hop between), Ring
+--           (rings from the middle out), All (every spot together). Each spot glows and cracks
+--           for Warning seconds, then a stone spear shoots up for Active seconds and Harms
+--           (Damage; a placement's Damage overrides it: less in the near zones). Placement: At,
+--           Radius, Pattern, Damage.
 --
 -- What a hazard does to a player who gets within HitRadius of it is its Effect:
 --   Knockdown  knocked over (you drop what you hold) and thrown Push studs/s away from it.
@@ -297,6 +304,8 @@ Hazards.Types = {
 	Spears = { -- Spearstone Reef: fields of spears shooting up from the floor on a rhythm
 		Count = 2,
 		Radius = 12, -- a field
+		Pattern = "Wave", -- Wave (rolls across the field), Checker (alternating squares), Ring (outward from the middle), All
+		Spacing = 5, -- studs between the spots of a field
 		Period = 4,
 		Warning = 1, -- seconds a spot glows and cracks before its spear shoots up
 		Active = 0.6,
