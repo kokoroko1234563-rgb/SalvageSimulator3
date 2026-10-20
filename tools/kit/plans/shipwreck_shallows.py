@@ -146,7 +146,7 @@ def ramp_through(c, gaps, start, end):
 
 
 def zone2():
-    z, f = open_zone(2, 5, 14)
+    z, f = open_zone(2, 5, 22)
     strip_stuff(f, [(-250, 240), (250, 250), (-60, 340), (200, 440), (-240, 440), (60, 540)], 5)
     # Gullies from the hull's deck down the first strip, a scour channel across the next.
     g_w = [(-180, 198), (-180, 240), (-200, 282)]
@@ -181,7 +181,7 @@ def zone2():
 
 
 def zone3():
-    z, f = open_zone(3, 7, 18)
+    z, f = open_zone(3, 7, 24)
     strip_stuff(f, [(-260, 240), (280, 250), (30, 340), (-150, 440), (260, 440), (-60, 540)], 7)
     g_w = [(-110, 198), (-110, 240), (-140, 282)]
     g_e = [(210, 198), (210, 240), (190, 282)]
