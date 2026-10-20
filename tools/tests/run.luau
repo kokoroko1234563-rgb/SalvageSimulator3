@@ -3099,5 +3099,57 @@ test("ice patches are flat, pale and slippery but leave you some grip, and harm 
 	Layouts.setActive(tile, nil)
 end)
 
+test("a foghorn pulses on its Period: the fog is thick, blinks a warning, then lifts for a while", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local z0, z1 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "fogbank",
+		Primitives = {},
+		Hazards = { { Type = "Fog", At = { 30, 120 } } },
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, { Hazards = { { Type = "Fog" } } }, folder)
+	local settings = Hazards.settings({ Type = "Fog" })
+	local horn, lamp, ring, tower
+	for _, part in folder:GetChildren() do
+		if part.Name == "Foghorn" then
+			horn = part
+		elseif part.Name == "FoghornLamp" then
+			lamp = part
+		elseif part.Name == "FoghornRing" then
+			ring = part
+		elseif part.Name == "FoghornTower" then
+			tower = part
+		end
+	end
+	assert(horn and horn:GetAttribute("Effect") == "Fog", "a foghorn the client can find")
+	assert(tower and math.abs(tower.CFrame.X - 30) < 1 and math.abs(tower.CFrame.Z - (z0 + 120)) < 1, "where it was put")
+	assert(horn:GetAttribute("ZMin") == z0 and horn:GetAttribute("ZMax") == z1, "it covers its tile")
+	assert(horn:GetAttribute("Sight") == settings.Sight and settings.Sight <= 20, "the fog closes in to a few studs")
+	assert(settings.Clear >= 3 and settings.Clear < settings.Period / 2, "a pulse clears it for a while, not for good")
+	assert(settings.Effect == "Fog" and settings.HitRadius == 0 and not settings.Lantern, "it hits no one; no lantern")
+	local base = settings.Period * 40 -- (a multiple of the Period: a pulse starts)
+	HazardService._step(base + 0.1, 0.1)
+	assert(horn:GetAttribute("Clearing") == true and ring.Transparency < 1, "the pulse: a ring of light, the fog lifting")
+	HazardService._step(base + settings.Clear + 0.5, 0.1)
+	assert(horn:GetAttribute("Clearing") == false and ring.Transparency == 1, "then the fog closes in again")
+	-- The lamp blinks before the next pulse.
+	local lit, dark = false, false
+	for t = 0, 1.9, 0.05 do
+		HazardService._step(base + settings.Period - 1.9 + t, 0.05)
+		lit = lit or lamp.Transparency < 0.5
+		dark = dark or lamp.Transparency > 0.5
+	end
+	assert(lit and dark, "the lamp blinks as the horn is about to sound")
+	HazardService._step(base + settings.Period + 0.1, 0.1)
+	assert(horn:GetAttribute("Clearing") == true, "and the next pulse comes on time")
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)

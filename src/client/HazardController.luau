@@ -21,6 +21,8 @@
 --   Slide      (ice) your velocity follows where you want to go at only Grip x SLIDE_RATE per
 --              second: you keep the momentum you came with and turn slowly (the slide is
 --              carried as WaveController.hazardPush on top of the Humanoid's own walking).
+--   Fog        (foghorn) nothing here: MistController thickens the mist while you're on the
+--              hazard's tile (its ZMin/ZMax) and lifts it while its Clearing attribute is set.
 -- A hazard with an Active attribute only hits while it's set.
 
 local CollectionService = game:GetService("CollectionService")

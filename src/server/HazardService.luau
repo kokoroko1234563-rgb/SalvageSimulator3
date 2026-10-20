@@ -2035,6 +2035,115 @@ function builders.Ice(tile, settings, folder)
 	end
 end
 
+-- Fog: a foghorn (a lighthouse) at each spot (see Hazards.luau). The fog itself is the client's
+-- (MistController): every player on the tile sees it close in to Sight studs, except while the
+-- horn is pulsing. The horn part is tagged with the tile's range (ZMin, ZMax), Sight, Period and
+-- Clear, and its Clearing attribute is true for Clear seconds from each pulse, on the server's
+-- clock, so everyone sees the fog lift together. The lamp blinks faster for the last
+-- FOG_WARN seconds before a pulse (the tell), and at the pulse a ring of light rolls out from
+-- the tower.
+local FOG_WARN = 2 -- seconds the lamp blinks before a pulse
+local FOG_RING = 2.5 -- seconds the ring takes to roll out
+local FOG_RING_REACH = 90 -- studs it rolls out to
+
+function builders.Fog(tile, settings, folder)
+	local z0, z1 = Beach.tileRange(tile)
+	local horns = {}
+	for _, spot in spotsFor(tile, "Fog", settings) do
+		local ground = Beach.groundAt(spot.x, spot.z)
+		local height = 30
+		local tower = makePart({
+			Name = "FoghornTower",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(height, 6, 6),
+			CFrame = CFrame.new(spot.x, ground + height / 2, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = Color3.fromRGB(235, 235, 230),
+			Material = Palette.Material.Smooth,
+			CanCollide = true,
+			CanQuery = true,
+		})
+		tower.Parent = folder
+		local band = makePart({
+			Name = "FoghornBand",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(6, 6.4, 6.4),
+			CFrame = CFrame.new(spot.x, ground + height * 0.55, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = Color3.fromRGB(190, 60, 55),
+			Material = Palette.Material.Smooth,
+		})
+		band.Parent = folder
+		local lamp = makePart({
+			Name = "FoghornLamp",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(5, 5, 5),
+			CFrame = CFrame.new(spot.x, ground + height + 2, spot.z),
+			Color = Color3.fromRGB(255, 240, 180),
+			Material = Enum.Material.Neon,
+		})
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 240, 180)
+		light.Range = 40
+		light.Brightness = 3
+		light.Parent = lamp
+		lamp.Parent = folder
+		local ring = makePart({
+			Name = "FoghornRing",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.4, 2, 2),
+			CFrame = CFrame.new(spot.x, ground + 1.5, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = Color3.fromRGB(255, 250, 220),
+			Material = Enum.Material.Neon,
+			Transparency = 1,
+		})
+		ring.Parent = folder
+		-- What the client reads: it's armed like any hazard but hits no one (HitRadius 0).
+		local horn = makePart({
+			Name = "Foghorn",
+			Size = Vector3.new(1, 1, 1),
+			CFrame = CFrame.new(spot.x, ground + height, spot.z),
+			Transparency = 1,
+		})
+		arm(horn, settings)
+		horn:SetAttribute("Sight", settings.Sight)
+		horn:SetAttribute("Period", settings.Period)
+		horn:SetAttribute("Clear", settings.Clear)
+		horn:SetAttribute("ZMin", z0)
+		horn:SetAttribute("ZMax", z1)
+		horn:SetAttribute("Clearing", false)
+		horn.Parent = folder
+		table.insert(horns, { horn = horn, lamp = lamp, ring = ring, x = spot.x, z = spot.z, ground = ground })
+	end
+	if #horns == 0 then
+		return
+	end
+	table.insert(running, {
+		folder = folder,
+		step = function(now)
+			-- (Phase 0 of each Period is the pulse; the clock is the same for every horn.)
+			local phase = now % settings.Period
+			local clearing = phase < settings.Clear
+			local untilPulse = settings.Period - phase
+			for _, h in horns do
+				if h.horn:GetAttribute("Clearing") ~= clearing then
+					h.horn:SetAttribute("Clearing", clearing)
+				end
+				-- The lamp: steady, blinking faster before a pulse, flaring at it.
+				local blink = if untilPulse < FOG_WARN then math.sin(now * 18) > 0 else true
+				h.lamp.Transparency = if clearing then 0 elseif blink then 0.15 else 0.8
+				-- The ring of light rolling out, fading as it goes.
+				if phase < FOG_RING then
+					local k = phase / FOG_RING
+					local size = 4 + k * FOG_RING_REACH * 2
+					h.ring.Size = Vector3.new(0.4, size, size)
+					h.ring.Transparency = 0.2 + 0.8 * k
+				elseif h.ring.Transparency < 1 then
+					h.ring.Transparency = 1
+				end
+			end
+		end,
+	})
+end
+
 HazardService.Builders = builders
 
 -- Builds a source's hazards on a tile into its folder: a biome's, or a plain zone's
