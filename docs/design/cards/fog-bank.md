@@ -23,3 +23,5 @@ other dangers: covered pits, and the tide coming in.
 
 **Questions.**
 1. Should a lantern push the fog back a little round you?
+
+Answer: No it doesn't do anything for the fog, since its fog rather than darkness.
