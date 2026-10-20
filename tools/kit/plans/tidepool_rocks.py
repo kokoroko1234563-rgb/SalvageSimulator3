@@ -29,18 +29,19 @@ WOBBLE = [0, 6, -4, 8, -7, 3, -5, 7, -2]
 
 
 # ---- helpers: the rocks' vocabulary -------------------------------------------------------------
-def bench(part, zc, depth, height, rw, shift=0):
-    """A bench: a flat-topped slate bank right across the beach, its edges worn irregular. It is
-    three overlapping banks side by side (each `rw` wide), so its top is broad and level and its
-    two faces steep (a cart can't climb them, a walker can)."""
-    xs = [-370 + 92.5 * i for i in range(9)]
+def bench(part, zc, depth, height, rw, shift=0, x0=-370, x1=370):
+    """A bench: a flat-topped slate bank, its edges worn irregular. It is three overlapping banks
+    side by side (each `rw` wide), so its top is broad and level and its two faces steep (a cart
+    can't climb them, a walker can). x0 to x1: how far it runs (right across the beach, or a part)."""
+    n = max(2, round((x1 - x0) / 92.5) + 1)
+    xs = [x0 + (x1 - x0) * i / (n - 1) for i in range(n)]
     gap = (depth - rw) / 2
     for off in (-gap, 0, gap):
         part.ridge([(x, zc + off + WOBBLE[(i + shift) % 9] * 0.5) for i, x in enumerate(xs)],
                    height=height, width=rw, rough=2)
     part.add(Kind="Paint", Path=[[x, zc + WOBBLE[(i + shift) % 9] * 0.5] for i, x in enumerate(xs)],
              Width=depth, Material="Slate", Rough=2)
-    part.decor("Rocks", path=[(x, zc) for x in xs], count=6, scale=0.8)
+    part.decor("Rocks", path=[(x, zc) for x in xs], count=max(2, n - 1), scale=0.8)
 
 
 def pool_on_bench(part, at, radius, depth):
@@ -75,8 +76,11 @@ def gully(part, gaps, benches, width=16):
 # them (centre, radius), loot (the deepest is the best), the entrance, and each crossing: its
 # name, its gully through each bench, and its tell at the way in.
 OPEN = {
+    # Zone 1 may not hide the beach from the top (a bank right across it would), so its crossings
+    # are tide channels, dark with silt, with short benches beside them.
     1: dict(
-        name="Shopside Shore", h=2.4, band=16, benches=[(170, 36), (400, 36)],
+        name="Shopside Shore", h=2.4, band=16, benches=[], channels=[170, 400],
+        pieces=[(110, 30, -340, -220), (250, 30, 200, 320), (470, 30, -300, -180)],
         pools=[((-250, 172), 10), ((-110, 170), 9), ((70, 168), 10), ((240, 172), 9),
                ((-260, 402), 10), ((-70, 398), 9), ((120, 404), 10), ((270, 400), 9)],
         loot=[((-250, 172), 1), ((240, 172), 1), ((270, 400), 2), ((-70, 398), 4)],
@@ -86,28 +90,39 @@ OPEN = {
                    ("Shell gully", (0, 210), "Shells")],
     ),
     2: dict(
-        name="Sunny Stretch", h=4.6, band=20, benches=[(130, 44), (300, 44), (460, 44)],
-        pools=[((-270, 132), 11), ((-90, 130), 10), ((90, 128), 11), ((260, 132), 10),
-               ((-260, 302), 11), ((-60, 298), 10), ((140, 302), 11), ((290, 298), 10),
-               ((-250, 462), 11), ((-70, 458), 10), ((110, 462), 11), ((270, 458), 10)],
-        loot=[((-270, 132), 1), ((290, 298), 2), ((-60, 298), 2), ((270, 458), 4)],
-        entrance=(-60, 380),
+        name="Sunny Stretch", h=4.6, band=20, benches=[(210, 44), (350, 44), (490, 44)],
+        channels=[], pieces=[],
+        pools=[((-270, 212), 11), ((-90, 210), 10), ((90, 208), 11), ((260, 212), 10),
+               ((-260, 352), 11), ((-60, 348), 10), ((140, 352), 11), ((290, 348), 10),
+               ((-250, 492), 11), ((-70, 488), 10), ((110, 492), 11), ((270, 488), 10)],
+        loot=[((-270, 212), 1), ((290, 348), 2), ((-60, 348), 2), ((270, 488), 4)],
+        entrance=(-60, 280),
         crossings=[("Starfish gully", (-140, 100, -90), "Starfish"),
-                   ("Urchin gully", (160, -110, 130), "Urchins"),
+                   ("Urchin gully", (180, -80, 110), "Urchins"),
                    ("Shell gully", (-30, 200, 20), "Shells")],
     ),
     3: dict(
-        name="Middle Banks", h=6.4, band=28, benches=[(120, 62), (290, 62), (450, 62)],
-        pools=[((-280, 122), 12), ((-100, 120), 11), ((80, 118), 12), ((270, 122), 11),
-               ((-270, 292), 12), ((-70, 288), 11), ((150, 292), 12), ((300, 288), 11),
-               ((-260, 452), 12), ((-60, 448), 11), ((120, 452), 12), ((280, 448), 11)],
-        loot=[((-280, 122), 1), ((300, 288), 2), ((-70, 288), 2), ((280, 448), 4)],
-        entrance=(40, 372),
+        name="Middle Banks", h=6.4, band=28, benches=[(200, 62), (340, 62), (480, 62)],
+        channels=[], pieces=[],
+        pools=[((-280, 202), 12), ((-100, 200), 11), ((80, 198), 12), ((270, 202), 11),
+               ((-270, 342), 12), ((-70, 338), 11), ((150, 342), 12), ((300, 338), 11),
+               ((-260, 482), 12), ((-60, 478), 11), ((120, 482), 12), ((280, 478), 11)],
+        loot=[((-280, 202), 1), ((300, 338), 2), ((-70, 338), 2), ((280, 478), 4)],
+        entrance=(40, 410),
         crossings=[("Starfish gully", (-150, 110, -100), "Starfish"),
                    ("Urchin gully", (170, -120, 140), "Urchins"),
                    ("Shell gully", (-20, 210, 10), "Shells")],
     ),
 }
+
+# The beach's own rock pools, in each zone's coordinates (x, z, radius): kept clear of by every
+# ridge and cart route (tools/tests checks it).
+POOLS = {2: [(-280, 20, 9), (140, 120, 12)], 3: [(-60, 130, 10)], 4: [(260, 70, 8)]}
+
+
+def clear_of_pools(n, ramp, half=8):
+    for x, z, r in POOLS.get(n, []):
+        assert not near_path(ramp, x, z, r + 2 + half + 1), f"zone {n}: ramp near the pool at {x}, {z}"
 
 
 def open_zone(n):
@@ -116,6 +131,12 @@ def open_zone(n):
     f = z.frame
     for i, (zc, depth) in enumerate(s["benches"]):
         bench(f, zc, depth, s["h"], s["band"], shift=i * 3 + n)
+    for i, zt in enumerate(s["channels"]):
+        line = [(-370 + 92.5 * k, zt + WOBBLE[(k + i * 3 + n) % 9]) for k in range(9)]
+        f.channel(line, depth=3, width=14, rough=2, material="Limestone")
+        f.decor("Rocks", path=[(x, zz - 14) for x, zz in line], count=6, scale=0.8)
+    for zc, depth, x0, x1 in s["pieces"]:
+        bench(f, zc, depth, s["h"], 14, shift=n, x0=x0, x1=x1)
     for at, r in s["pools"]:
         pool_on_bench(f, at, r, depth=3)
     for at, weight in s["loot"]:
@@ -130,11 +151,13 @@ def open_zone(n):
             count=3)
     # Scatter in the gullies between, so no stretch is bare.
     f.decor("Pebbles", area=[(-330, 20), (330, 20), (330, 70), (-330, 70)], count=10)
-    f.decor("Shells", area=[(-330, 230), (330, 230), (330, 340), (-330, 340)], count=10)
-    f.decor("Starfish", area=[(-300, 520), (300, 520), (300, 590), (-300, 590)], count=5)
+    f.decor("Shells", area=[(-330, 240), (330, 240), (330, 330), (-330, 330)], count=10)
+    f.decor("Starfish", area=[(-300, 540), (300, 540), (300, 600), (-300, 600)], count=5)
+    crosses = s["benches"] or [(zt, 14) for zt in s["channels"]]
     for k, (name, gaps, tell) in enumerate(s["crossings"], 1):
         c = z.crossing(name, paths=1)
-        ramp = gully(c, gaps, s["benches"])
+        ramp = gully(c, gaps, crosses)
+        clear_of_pools(n, ramp)
         slow_pools(c, s["pools"], ramp)
         # The tell, at the way in: beside the first gully.
         gx = gaps[0]
@@ -217,7 +240,7 @@ def zone4():
     r.decor("Rocks", area=[(14, 14), (66, 14), (66, 46), (14, 46)], count=3)
     r.decor("Barnacles", at=(40, 20))
     r.loot((40, 36), radius=6, weight=1)
-    s = z.slot("East shelter", at=(260, 36), size=(80, 60), door=(40, 0))
+    s = z.slot("East shelter", at=(276, 36), size=(80, 60), door=(40, 0))
     side_pool(s, "Twin pool", 2)
     r = s.room("Overhang")
     r.hall([(8, 8), (72, 8), (72, 52), (8, 52)], roof=True, pillars=[(40, 30)])

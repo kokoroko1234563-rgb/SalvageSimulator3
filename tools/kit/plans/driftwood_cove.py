@@ -84,41 +84,52 @@ def cart_gap(part, gaps, jams, width=16):
 # jams (centre, radius), loot (the deepest is the best), the entrance, and each crossing: its
 # name, its gap in each jam, and the landmark that is its tell at the way in.
 OPEN = {
+    # Zone 1 may not hide the beach from the top (a low bank would), so its "jams" are dark trenches
+    # across the beach, where the water pools behind the logs, with short stacks of logs beside them.
     1: dict(
-        name="Shopside Shore", h=2.4, w=14, jams=[170, 400],
+        name="Shopside Shore", h=2.4, w=14, jams=[], trench=[170, 400],
         stubs=[((-330, 90), (-230, 96)), ((200, 300), (320, 292)), ((-300, 500), (-190, 506))],
-        dips=[((-250, 205), 14), ((60, 200), 12), ((240, 438), 14), ((-90, 436), 12)],
-        loot=[((-300, 214), 1), ((260, 450), 2), ((-60, 548), 4)],
+        dips=[((-250, 172), 12), ((60, 170), 12), ((240, 402), 12), ((-90, 400), 12)],
+        loot=[((-300, 210), 1), ((260, 440), 2), ((-60, 548), 4)],
         entrance=(-270, 290),
         crossings=[("Anchor gap", (-150, 150), "Anchor"),
                    ("Crate gap", (150, -130), "Crate"),
                    ("Chain gap", (0, 210), "Chain")],
     ),
     2: dict(
-        name="Sunny Stretch", h=4.6, w=20, jams=[130, 300, 460],
-        stubs=[((-320, 60), (-220, 66)), ((180, 215), (310, 222)), ((-330, 380), (-200, 374)),
-               ((120, 540), (260, 546))],
-        dips=[((-270, 172), 16), ((90, 168), 14), ((250, 346), 16), ((-110, 342), 14),
-              ((200, 504), 14), ((-250, 506), 16)],
-        loot=[((-300, 182), 1), ((270, 356), 2), ((-260, 520), 3), ((230, 540), 4)],
-        entrance=(-60, 390),
+        name="Sunny Stretch", h=4.6, w=20, jams=[210, 350, 490], trench=[],
+        stubs=[((-320, 70), (-220, 76)), ((180, 150), (310, 158)), ((-330, 420), (-200, 414)),
+               ((120, 560), (260, 566))],
+        dips=[((-270, 248), 16), ((90, 246), 14), ((250, 388), 16), ((-110, 386), 14),
+              ((200, 528), 14), ((-250, 530), 16)],
+        loot=[((-300, 248), 1), ((270, 388), 2), ((-260, 530), 3), ((230, 552), 4)],
+        entrance=(-60, 280),
         crossings=[("Anchor gap", (-140, 100, -90), "Anchor"),
-                   ("Crate gap", (160, -110, 130), "Crate"),
+                   ("Crate gap", (180, -80, 110), "Crate"),
                    ("Ribs gap", (-30, 200, 20), "Bones")],
     ),
     3: dict(
-        name="Middle Banks", h=6.4, w=26, jams=[120, 290, 450],
-        stubs=[((-330, 50), (-210, 56)), ((150, 205), (310, 212)), ((-340, 372), (-190, 366)),
-               ((100, 540), (270, 548))],
-        dips=[((-280, 168), 16), ((80, 164), 14), ((260, 340), 16), ((-90, 336), 14),
-              ((210, 498), 14), ((-260, 500), 16)],
-        loot=[((-310, 178), 1), ((290, 350), 2), ((-270, 514), 3), ((240, 536), 4)],
-        entrance=(40, 372),
+        name="Middle Banks", h=6.4, w=26, jams=[200, 340, 480], trench=[],
+        stubs=[((-330, 60), (-210, 66)), ((150, 140), (310, 148)), ((-340, 410), (-190, 404)),
+               ((100, 560), (270, 568))],
+        dips=[((-280, 238), 16), ((80, 236), 14), ((260, 378), 16), ((-90, 376), 14),
+              ((210, 518), 14), ((-260, 520), 16)],
+        loot=[((-310, 238), 1), ((290, 378), 2), ((-270, 520), 3), ((240, 556), 4)],
+        entrance=(40, 410),
         crossings=[("Anchor gap", (-150, 110, -100), "Anchor"),
                    ("Crate gap", (170, -120, 140), "Crate"),
                    ("Ribs gap", (-20, 210, 10), "Bones")],
     ),
 }
+
+# The beach's own rock pools, in each zone's coordinates (x, z, radius): kept clear of by every
+# ridge and cart route (tools/tests checks it).
+POOLS = {2: [(-280, 20, 9), (140, 120, 12)], 3: [(-60, 130, 10)], 4: [(260, 70, 8)]}
+
+
+def clear_of_pools(n, ramp, half=8):
+    for x, z, r in POOLS.get(n, []):
+        assert not near_path(ramp, x, z, r + 2 + half + 1), f"zone {n}: ramp near the pool at {x}, {z}"
 
 
 def open_zone(n):
@@ -127,6 +138,11 @@ def open_zone(n):
     f = z.frame
     for i, zj in enumerate(s["jams"]):
         jam(f, zj, s["h"], s["w"], shift=i * 3 + n)
+    for i, zt in enumerate(s["trench"]):
+        line = jam_line(zt, i * 3 + n)
+        f.channel(line, depth=3, width=14, rough=2, material="Ground")
+        f.decor("Driftwood", path=[(x, zz - 12) for x, zz in line], count=12)
+        f.decor("Timber", path=[(x, zz + 12) for x, zz in line], count=5)
     for a, b in s["stubs"]:
         stub(f, a, b, s["h"] * 0.75, s["w"] * 0.8)
     for at, r in s["dips"]:
@@ -141,11 +157,13 @@ def open_zone(n):
     f.decor("Driftwood", at=(ex - 16, ez + 14), scale=2, yaw=140)
     # Scatter between the jams, so no stretch is bare.
     f.decor("DuneGrass", area=[(-340, 20), (340, 20), (340, 80), (-340, 80)], count=10)
-    f.decor("Pebbles", area=[(-330, 230), (330, 230), (330, 370), (-330, 370)], count=10)
-    f.decor("Starfish", area=[(-300, 520), (300, 520), (300, 590), (-300, 590)], count=4)
+    f.decor("Pebbles", area=[(-330, 230), (330, 230), (330, 330), (-330, 330)], count=10)
+    f.decor("Starfish", area=[(-300, 560), (300, 560), (300, 600), (-300, 600)], count=4)
+    crosses = s["jams"] or s["trench"]
     for k, (name, gaps, tell) in enumerate(s["crossings"], 1):
         c = z.crossing(name, paths=1)
-        ramp = cart_gap(c, gaps, s["jams"])
+        ramp = cart_gap(c, gaps, crosses)
+        clear_of_pools(n, ramp)
         slow_dips(c, s["dips"], ramp)
         # The tell, at the way in: the landmark beside the first gap.
         gx = gaps[0]
@@ -216,7 +234,7 @@ def zone4():
     r.hollow((40, 32), radius=14, depth=2, material="Ground")
     r.decor("Weed", at=(40, 32))
     r.loot((40, 32), radius=6, weight=1)
-    s = z.slot("East hollow", at=(260, 36), size=(80, 60), door=(40, 0))
+    s = z.slot("East hollow", at=(276, 36), size=(80, 60), door=(40, 0))
     r = s.room("Boot-heap")
     r.hall([(8, 8), (72, 8), (72, 52), (8, 52)])
     r.decor("Crate", at=(30, 34))
