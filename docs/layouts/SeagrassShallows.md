@@ -2,8 +2,11 @@
 
 Drawn with the kit from `tools/kit/plans/seagrass_shallows.py` (edit the plan and re-run it),
 written to `src/shared/Layouts/Biomes/SeagrassShallows.luau`. Card:
-`docs/design/cards/seagrass-shallows.md`. Gentle choices taken: only tangling seagrass (`Slow`,
-radius 8 to 10, easy to step round), no undertow.
+`docs/design/cards/seagrass-shallows.md`. Dangers (the designer's answer): tangling seagrass
+(`Slow`) now covers far more: in zones 1 to 3, rows of big overlapping thickets (three patches
+of radius 22 to 32 each) across the flats, shifted per crossing, on the cart ramp too; in zone 4,
+patches along both lanes (every 60 studs on the cart way, 45 on the foot way) as well as the
+bulges. Zone 4 also gets `Undertow` (width 12) along the foot way's channel fords.
 
 ## What was built
 

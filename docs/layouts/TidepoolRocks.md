@@ -2,9 +2,10 @@
 
 Drawn with the layout kit from `tools/kit/plans/tidepool_rocks.py` (edit the plan and run it, not
 the layout). It writes `src/shared/Layouts/Biomes/TidepoolRocks.luau`, one layout per
-zone. The card is `docs/design/cards/tidepool-rocks.md`. No deadly dangers: the card's question
-(a spouting blowhole) is answered gently, so the blowhole is only the entrance's look; the only
-hazard is `Slow` wading in the pools.
+zone. The card is `docs/design/cards/tidepool-rocks.md`. Dangers (the designer's answer): blowhole
+spouts, the existing `Pulse` kind with a Knockdown (Period 9 s, 2 s warning, 1.2 s spout, Push
+40), a few per zone at blowholes in the benches (rimmed with rock and barnacles) and, in zone 4,
+five along each crossing's foot lane; none on the cart gully. `Slow` wading in the pools stays.
 
 Check it:  `python3 tools/kit/quick.py <zone> Biomes/TidepoolRocks --plan tools/kit/plans/tidepool_rocks.py`
 

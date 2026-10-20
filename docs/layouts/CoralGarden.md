@@ -2,8 +2,11 @@
 
 Drawn with the kit from `tools/kit/plans/coral_garden.py` (edit the plan and re-run it), written
 to `src/shared/Layouts/Biomes/CoralGarden.luau`. Card: `docs/design/cards/coral-garden.md`.
-Gentle choices taken: sharp coral beds are `Slow` patches (radius 8 to 9, coral and urchins
-marking them), nothing that knocks you back.
+Dangers (the designer's answer): sharp coral only slows (`Slow`), but is
+much more common: in zones 1 to 3, four bands of overlapping beds (radius 26) right across the
+zone between the spine pairs, so they cannot be avoided, on the cart ramp too; in zone 4, beds
+wall to wall along both lanes (every 60 studs on the cart way, 45 on the foot way) as well as
+the bulges.
 
 ## What was built
 

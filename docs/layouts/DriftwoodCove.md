@@ -2,8 +2,12 @@
 
 Drawn with the layout kit from `tools/kit/plans/driftwood_cove.py` (edit the plan and run it, not
 the layout). It writes `src/shared/Layouts/Biomes/DriftwoodCove.luau`, one layout per
-zone. The card is `docs/design/cards/driftwood-cove.md`. No deadly dangers (the card's question,
-answered gently): the only hazard is `Slow` wading in the dips.
+zone. The card is `docs/design/cards/driftwood-cove.md`. No unique danger, but (the designer's
+answer) open spike pits and quicksand in zones 3 and 4: `Pit` (radius 4, open) and `Sink`
+(radius 10), off the cart route and in view. Zone 3: eight pits and six sinks across the flats
+between the jams, those near a crossing's cart ramp left out. Zone 4: pits and sinks in the top
+and bottom bands, and in each crossing's foot lane a quicksand and an open pit beside it (a gap
+left to squeeze by). `Slow` wading in the dips stays.
 
 Check it:  `python3 tools/kit/quick.py <zone> Biomes/DriftwoodCove --plan tools/kit/plans/driftwood_cove.py`
 
