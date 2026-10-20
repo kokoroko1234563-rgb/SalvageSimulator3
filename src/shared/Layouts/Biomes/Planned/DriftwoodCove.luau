@@ -1,117 +1,2238 @@
--- Driftwood Cove (planned, draft): a log jam. Logs piled across the zone, each stretch with a gap to
--- squeeze through, and a dip behind them where the logs catch the water. A bank across the zone gives
--- players on foot a shortcut that carts can't take. Heights follow the zone's limit: 2, 4.5, 6.5 and 9
--- studs. Rock only in zone 4.
-local LIMIT = { 2, 4.5, 6.5, 9 }
-
--- The bank across the zone: foot-only in zones 1 to 3 (carts take the ramps), rock with a gap in zone 4.
-local function bank(zone: number)
-	if zone == 1 then
-		return {
+-- Driftwood Cove (planned): a log jam, drawn with the layout kit from
+-- tools/kit/plans/driftwood_cove.py. Edit that plan and run it again, not this file.
+-- Zones 1 to 3: open sand, low jams across the beach with a cart gap in each (a walker
+-- climbs the logs). Zone 4: walled drift-rock, a cart way and a quicker foot-only way.
+return {
+	[1] = {
+		Primitives = {
 			{
 				Kind = "Ridge",
-				Path = { { -360, 138 }, { -200, 144 }, { 0, 138 }, { 200, 144 }, { 360, 138 } },
-				Height = 2,
-				Width = 12,
+				Path = {
+					{ -370, 177 },
+					{ -280, 165 },
+					{ -190, 179 },
+					{ -100, 162 },
+					{ -10, 174 },
+					{ 80, 164 },
+					{ 170, 178 },
+					{ 260, 167 },
+					{ 350, 170 },
+				},
+				Height = 2.4,
+				Width = 14,
+				Rough = 3,
 			},
-		}
-	elseif zone == 2 then
-		return {
+			{
+				Kind = "Paint",
+				Path = {
+					{ -370, 191 },
+					{ -280, 179 },
+					{ -190, 193 },
+					{ -100, 176 },
+					{ -10, 188 },
+					{ 80, 178 },
+					{ 170, 192 },
+					{ 260, 181 },
+					{ 350, 184 },
+				},
+				Width = 22.4,
+				Material = "Ground",
+				Rough = 3,
+			},
 			{
 				Kind = "Ridge",
-				Path = { { -360, 44 }, { -180, 50 }, { 0, 42 }, { 180, 50 }, { 360, 44 } },
+				Path = {
+					{ -370, 392 },
+					{ -280, 404 },
+					{ -190, 394 },
+					{ -100, 408 },
+					{ -10, 397 },
+					{ 80, 400 },
+					{ 170, 407 },
+					{ 260, 395 },
+					{ 350, 409 },
+				},
+				Height = 2.4,
+				Width = 14,
+				Rough = 3,
+			},
+			{
+				Kind = "Paint",
+				Path = {
+					{ -370, 406 },
+					{ -280, 418 },
+					{ -190, 408 },
+					{ -100, 422 },
+					{ -10, 411 },
+					{ 80, 414 },
+					{ 170, 421 },
+					{ 260, 409 },
+					{ 350, 423 },
+				},
+				Width = 22.4,
+				Material = "Ground",
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -330, 90 },
+					{ -230, 96 },
+				},
+				Height = 1.8,
+				Width = 11.2,
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ 200, 300 },
+					{ 320, 292 },
+				},
+				Height = 1.8,
+				Width = 11.2,
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -300, 500 },
+					{ -190, 506 },
+				},
+				Height = 1.8,
+				Width = 11.2,
+				Rough = 3,
+			},
+			{
+				Kind = "Hollow",
+				At = { -250, 205 },
+				Radius = 14,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+			{ Kind = "Hollow", At = { 60, 200 }, Radius = 12, Depth = 2, Rough = 3, Material = "Ground" },
+			{
+				Kind = "Hollow",
+				At = { 240, 438 },
+				Radius = 14,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+			{
+				Kind = "Hollow",
+				At = { -90, 436 },
+				Radius = 12,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+		},
+		Loot = {
+			{ At = { -300, 214 }, Radius = 8, Weight = 1 },
+			{ At = { 260, 450 }, Radius = 8, Weight = 2 },
+			{ At = { -60, 548 }, Radius = 8, Weight = 4 },
+		},
+		Entrances = {
+			{ -270, 290 },
+		},
+		Decor = {
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -370, 177 },
+					{ -280, 165 },
+					{ -190, 179 },
+					{ -100, 162 },
+					{ -10, 174 },
+					{ 80, 164 },
+					{ 170, 178 },
+					{ 260, 167 },
+					{ 350, 170 },
+				},
+				Count = 14,
+			},
+			{
+				Kind = "Timber",
+				Path = {
+					{ -370, 177 },
+					{ -280, 165 },
+					{ -190, 179 },
+					{ -100, 162 },
+					{ -10, 174 },
+					{ 80, 164 },
+					{ 170, 178 },
+					{ 260, 167 },
+					{ 350, 170 },
+				},
+				Count = 6,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -370, 392 },
+					{ -280, 404 },
+					{ -190, 394 },
+					{ -100, 408 },
+					{ -10, 397 },
+					{ 80, 400 },
+					{ 170, 407 },
+					{ 260, 395 },
+					{ 350, 409 },
+				},
+				Count = 14,
+			},
+			{
+				Kind = "Timber",
+				Path = {
+					{ -370, 392 },
+					{ -280, 404 },
+					{ -190, 394 },
+					{ -100, 408 },
+					{ -10, 397 },
+					{ 80, 400 },
+					{ 170, 407 },
+					{ 260, 395 },
+					{ 350, 409 },
+				},
+				Count = 6,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -330, 90 },
+					{ -230, 96 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ 200, 300 },
+					{ 320, 292 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -300, 500 },
+					{ -190, 506 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Weed",
+				Area = {
+					{ -260, 195 },
+					{ -240, 195 },
+					{ -240, 215 },
+					{ -260, 215 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { -245, 200 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ 52, 192 },
+					{ 68, 192 },
+					{ 68, 208 },
+					{ 52, 208 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { 64, 196 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ 230, 428 },
+					{ 250, 428 },
+					{ 250, 448 },
+					{ 230, 448 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { 245, 433 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ -98, 428 },
+					{ -82, 428 },
+					{ -82, 444 },
+					{ -98, 444 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { -86, 432 } },
+			{ Kind = "Driftwood", At = { -270, 290 }, Scale = 3.2, Yaw = 70 },
+			{ Kind = "Timber", At = { -252, 278 }, Scale = 1.6, Yaw = 20 },
+			{ Kind = "Driftwood", At = { -286, 304 }, Scale = 2, Yaw = 140 },
+			{
+				Kind = "DuneGrass",
+				Area = {
+					{ -340, 20 },
+					{ 340, 20 },
+					{ 340, 80 },
+					{ -340, 80 },
+				},
+				Count = 10,
+			},
+			{
+				Kind = "Pebbles",
+				Area = {
+					{ -330, 230 },
+					{ 330, 230 },
+					{ 330, 370 },
+					{ -330, 370 },
+				},
+				Count = 10,
+			},
+			{
+				Kind = "Starfish",
+				Area = {
+					{ -300, 520 },
+					{ 300, 520 },
+					{ 300, 590 },
+					{ -300, 590 },
+				},
+				Count = 4,
+			},
+		},
+		Name = "Shopside Shore",
+		Crossings = {
+			{
+				Name = "Anchor gap",
+				Paths = 1,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -150, 0 },
+							{ -150, 144 },
+							{ -150, 196 },
+							{ 150, 374 },
+							{ 150, 426 },
+							{ 150, 608 },
+						},
+						Width = 16,
+					},
+				},
+				Hazards = {
+					{ Type = "Slow", At = { -250, 205 }, Radius = 12 },
+					{ Type = "Slow", At = { 60, 200 }, Radius = 12 },
+					{ Type = "Slow", At = { 240, 438 }, Radius = 12 },
+					{ Type = "Slow", At = { -90, 436 }, Radius = 12 },
+				},
+				Decor = {
+					{ Kind = "Anchor", At = { -124, 22 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Driftwood", At = { -174, 30 }, Scale = 1.4, Yaw = 100 },
+				},
+			},
+			{
+				Name = "Crate gap",
+				Paths = 1,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 150, 0 },
+							{ 150, 144 },
+							{ 150, 196 },
+							{ -130, 374 },
+							{ -130, 426 },
+							{ -130, 608 },
+						},
+						Width = 16,
+					},
+				},
+				Hazards = {
+					{ Type = "Slow", At = { -250, 205 }, Radius = 12 },
+					{ Type = "Slow", At = { 60, 200 }, Radius = 12 },
+					{ Type = "Slow", At = { 240, 438 }, Radius = 12 },
+					{ Type = "Slow", At = { -90, 436 }, Radius = 12 },
+				},
+				Decor = {
+					{ Kind = "Crate", At = { 176, 22 }, Scale = 1.2, Yaw = 80 },
+					{ Kind = "Driftwood", At = { 126, 30 }, Scale = 1.4, Yaw = 200 },
+				},
+			},
+			{
+				Name = "Chain gap",
+				Paths = 1,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 0, 0 },
+							{ 0, 144 },
+							{ 0, 196 },
+							{ 210, 374 },
+							{ 210, 426 },
+							{ 210, 608 },
+						},
+						Width = 16,
+					},
+				},
+				Hazards = {
+					{ Type = "Slow", At = { -250, 205 }, Radius = 12 },
+					{ Type = "Slow", At = { 60, 200 }, Radius = 12 },
+					{ Type = "Slow", At = { -90, 436 }, Radius = 12 },
+				},
+				Decor = {
+					{ Kind = "Chain", At = { 26, 22 }, Scale = 1.2, Yaw = 120 },
+					{ Kind = "Driftwood", At = { -24, 30 }, Scale = 1.4, Yaw = 300 },
+				},
+			},
+		},
+	},
+	[2] = {
+		Primitives = {
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -370, 125 },
+					{ -280, 139 },
+					{ -190, 122 },
+					{ -100, 134 },
+					{ -10, 124 },
+					{ 80, 138 },
+					{ 170, 127 },
+					{ 260, 130 },
+					{ 350, 137 },
+				},
+				Height = 4.6,
+				Width = 20,
+				Rough = 3,
+			},
+			{
+				Kind = "Paint",
+				Path = {
+					{ -370, 145 },
+					{ -280, 159 },
+					{ -190, 142 },
+					{ -100, 154 },
+					{ -10, 144 },
+					{ 80, 158 },
+					{ 170, 147 },
+					{ 260, 150 },
+					{ 350, 157 },
+				},
+				Width = 32,
+				Material = "Ground",
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -370, 304 },
+					{ -280, 294 },
+					{ -190, 308 },
+					{ -100, 297 },
+					{ -10, 300 },
+					{ 80, 307 },
+					{ 170, 295 },
+					{ 260, 309 },
+					{ 350, 292 },
+				},
+				Height = 4.6,
+				Width = 20,
+				Rough = 3,
+			},
+			{
+				Kind = "Paint",
+				Path = {
+					{ -370, 324 },
+					{ -280, 314 },
+					{ -190, 328 },
+					{ -100, 317 },
+					{ -10, 320 },
+					{ 80, 327 },
+					{ 170, 315 },
+					{ 260, 329 },
+					{ 350, 312 },
+				},
+				Width = 32,
+				Material = "Ground",
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -370, 457 },
+					{ -280, 460 },
+					{ -190, 467 },
+					{ -100, 455 },
+					{ -10, 469 },
+					{ 80, 452 },
+					{ 170, 464 },
+					{ 260, 454 },
+					{ 350, 468 },
+				},
+				Height = 4.6,
+				Width = 20,
+				Rough = 3,
+			},
+			{
+				Kind = "Paint",
+				Path = {
+					{ -370, 477 },
+					{ -280, 480 },
+					{ -190, 487 },
+					{ -100, 475 },
+					{ -10, 489 },
+					{ 80, 472 },
+					{ 170, 484 },
+					{ 260, 474 },
+					{ 350, 488 },
+				},
+				Width = 32,
+				Material = "Ground",
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -320, 60 },
+					{ -220, 66 },
+				},
+				Height = 3.45,
+				Width = 16,
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ 180, 215 },
+					{ 310, 222 },
+				},
+				Height = 3.45,
+				Width = 16,
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -330, 380 },
+					{ -200, 374 },
+				},
+				Height = 3.45,
+				Width = 16,
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ 120, 540 },
+					{ 260, 546 },
+				},
+				Height = 3.45,
+				Width = 16,
+				Rough = 3,
+			},
+			{
+				Kind = "Hollow",
+				At = { -270, 172 },
+				Radius = 16,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+			{ Kind = "Hollow", At = { 90, 168 }, Radius = 14, Depth = 2, Rough = 3, Material = "Ground" },
+			{
+				Kind = "Hollow",
+				At = { 250, 346 },
+				Radius = 16,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+			{
+				Kind = "Hollow",
+				At = { -110, 342 },
+				Radius = 14,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+			{
+				Kind = "Hollow",
+				At = { 200, 504 },
+				Radius = 14,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+			{
+				Kind = "Hollow",
+				At = { -250, 506 },
+				Radius = 16,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+		},
+		Loot = {
+			{ At = { -300, 182 }, Radius = 8, Weight = 1 },
+			{ At = { 270, 356 }, Radius = 8, Weight = 2 },
+			{ At = { -260, 520 }, Radius = 8, Weight = 3 },
+			{ At = { 230, 540 }, Radius = 8, Weight = 4 },
+		},
+		Entrances = {
+			{ -60, 390 },
+		},
+		Decor = {
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -370, 125 },
+					{ -280, 139 },
+					{ -190, 122 },
+					{ -100, 134 },
+					{ -10, 124 },
+					{ 80, 138 },
+					{ 170, 127 },
+					{ 260, 130 },
+					{ 350, 137 },
+				},
+				Count = 14,
+			},
+			{
+				Kind = "Timber",
+				Path = {
+					{ -370, 125 },
+					{ -280, 139 },
+					{ -190, 122 },
+					{ -100, 134 },
+					{ -10, 124 },
+					{ 80, 138 },
+					{ 170, 127 },
+					{ 260, 130 },
+					{ 350, 137 },
+				},
+				Count = 6,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -370, 304 },
+					{ -280, 294 },
+					{ -190, 308 },
+					{ -100, 297 },
+					{ -10, 300 },
+					{ 80, 307 },
+					{ 170, 295 },
+					{ 260, 309 },
+					{ 350, 292 },
+				},
+				Count = 14,
+			},
+			{
+				Kind = "Timber",
+				Path = {
+					{ -370, 304 },
+					{ -280, 294 },
+					{ -190, 308 },
+					{ -100, 297 },
+					{ -10, 300 },
+					{ 80, 307 },
+					{ 170, 295 },
+					{ 260, 309 },
+					{ 350, 292 },
+				},
+				Count = 6,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -370, 457 },
+					{ -280, 460 },
+					{ -190, 467 },
+					{ -100, 455 },
+					{ -10, 469 },
+					{ 80, 452 },
+					{ 170, 464 },
+					{ 260, 454 },
+					{ 350, 468 },
+				},
+				Count = 14,
+			},
+			{
+				Kind = "Timber",
+				Path = {
+					{ -370, 457 },
+					{ -280, 460 },
+					{ -190, 467 },
+					{ -100, 455 },
+					{ -10, 469 },
+					{ 80, 452 },
+					{ 170, 464 },
+					{ 260, 454 },
+					{ 350, 468 },
+				},
+				Count = 6,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -320, 60 },
+					{ -220, 66 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ 180, 215 },
+					{ 310, 222 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -330, 380 },
+					{ -200, 374 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ 120, 540 },
+					{ 260, 546 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Weed",
+				Area = {
+					{ -282, 160 },
+					{ -258, 160 },
+					{ -258, 184 },
+					{ -282, 184 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { -264, 166 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ 80, 158 },
+					{ 100, 158 },
+					{ 100, 178 },
+					{ 80, 178 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { 95, 163 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ 238, 334 },
+					{ 262, 334 },
+					{ 262, 358 },
+					{ 238, 358 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { 256, 340 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ -120, 332 },
+					{ -100, 332 },
+					{ -100, 352 },
+					{ -120, 352 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { -105, 337 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ 190, 494 },
+					{ 210, 494 },
+					{ 210, 514 },
+					{ 190, 514 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { 205, 499 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ -262, 494 },
+					{ -238, 494 },
+					{ -238, 518 },
+					{ -262, 518 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { -244, 500 } },
+			{ Kind = "Driftwood", At = { -60, 390 }, Scale = 3.2, Yaw = 70 },
+			{ Kind = "Timber", At = { -42, 378 }, Scale = 1.6, Yaw = 20 },
+			{ Kind = "Driftwood", At = { -76, 404 }, Scale = 2, Yaw = 140 },
+			{
+				Kind = "DuneGrass",
+				Area = {
+					{ -340, 20 },
+					{ 340, 20 },
+					{ 340, 80 },
+					{ -340, 80 },
+				},
+				Count = 10,
+			},
+			{
+				Kind = "Pebbles",
+				Area = {
+					{ -330, 230 },
+					{ 330, 230 },
+					{ 330, 370 },
+					{ -330, 370 },
+				},
+				Count = 10,
+			},
+			{
+				Kind = "Starfish",
+				Area = {
+					{ -300, 520 },
+					{ 300, 520 },
+					{ 300, 590 },
+					{ -300, 590 },
+				},
+				Count = 4,
+			},
+		},
+		Name = "Sunny Stretch",
+		Crossings = {
+			{
+				Name = "Anchor gap",
+				Paths = 1,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -140, 0 },
+							{ -140, 104 },
+							{ -140, 156 },
+							{ 100, 274 },
+							{ 100, 326 },
+							{ -90, 434 },
+							{ -90, 486 },
+							{ -90, 608 },
+						},
+						Width = 16,
+					},
+				},
+				Hazards = {
+					{ Type = "Slow", At = { -270, 172 }, Radius = 12 },
+					{ Type = "Slow", At = { 90, 168 }, Radius = 12 },
+					{ Type = "Slow", At = { 250, 346 }, Radius = 12 },
+					{ Type = "Slow", At = { -110, 342 }, Radius = 12 },
+					{ Type = "Slow", At = { 200, 504 }, Radius = 12 },
+					{ Type = "Slow", At = { -250, 506 }, Radius = 12 },
+				},
+				Decor = {
+					{ Kind = "Anchor", At = { -114, 22 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Driftwood", At = { -164, 30 }, Scale = 1.4, Yaw = 100 },
+				},
+			},
+			{
+				Name = "Crate gap",
+				Paths = 1,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 160, 0 },
+							{ 160, 104 },
+							{ 160, 156 },
+							{ -110, 274 },
+							{ -110, 326 },
+							{ 130, 434 },
+							{ 130, 486 },
+							{ 130, 608 },
+						},
+						Width = 16,
+					},
+				},
+				Hazards = {
+					{ Type = "Slow", At = { -270, 172 }, Radius = 12 },
+					{ Type = "Slow", At = { 250, 346 }, Radius = 12 },
+					{ Type = "Slow", At = { 200, 504 }, Radius = 12 },
+					{ Type = "Slow", At = { -250, 506 }, Radius = 12 },
+				},
+				Decor = {
+					{ Kind = "Crate", At = { 186, 22 }, Scale = 1.2, Yaw = 80 },
+					{ Kind = "Driftwood", At = { 136, 30 }, Scale = 1.4, Yaw = 200 },
+				},
+			},
+			{
+				Name = "Ribs gap",
+				Paths = 1,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -30, 0 },
+							{ -30, 104 },
+							{ -30, 156 },
+							{ 200, 274 },
+							{ 200, 326 },
+							{ 20, 434 },
+							{ 20, 486 },
+							{ 20, 608 },
+						},
+						Width = 16,
+					},
+				},
+				Hazards = {
+					{ Type = "Slow", At = { -270, 172 }, Radius = 12 },
+					{ Type = "Slow", At = { 90, 168 }, Radius = 12 },
+					{ Type = "Slow", At = { 250, 346 }, Radius = 12 },
+					{ Type = "Slow", At = { -110, 342 }, Radius = 12 },
+					{ Type = "Slow", At = { 200, 504 }, Radius = 12 },
+					{ Type = "Slow", At = { -250, 506 }, Radius = 12 },
+				},
+				Decor = {
+					{ Kind = "Bones", At = { -4, 22 }, Scale = 1.2, Yaw = 120 },
+					{ Kind = "Driftwood", At = { -54, 30 }, Scale = 1.4, Yaw = 300 },
+				},
+			},
+		},
+	},
+	[3] = {
+		Primitives = {
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -370, 129 },
+					{ -280, 112 },
+					{ -190, 124 },
+					{ -100, 114 },
+					{ -10, 128 },
+					{ 80, 117 },
+					{ 170, 120 },
+					{ 260, 127 },
+					{ 350, 115 },
+				},
+				Height = 6.4,
+				Width = 26,
+				Rough = 3,
+			},
+			{
+				Kind = "Paint",
+				Path = {
+					{ -370, 155 },
+					{ -280, 138 },
+					{ -190, 150 },
+					{ -100, 140 },
+					{ -10, 154 },
+					{ 80, 143 },
+					{ 170, 146 },
+					{ 260, 153 },
+					{ 350, 141 },
+				},
+				Width = 41.6,
+				Material = "Ground",
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -370, 284 },
+					{ -280, 298 },
+					{ -190, 287 },
+					{ -100, 290 },
+					{ -10, 297 },
+					{ 80, 285 },
+					{ 170, 299 },
+					{ 260, 282 },
+					{ 350, 294 },
+				},
+				Height = 6.4,
+				Width = 26,
+				Rough = 3,
+			},
+			{
+				Kind = "Paint",
+				Path = {
+					{ -370, 310 },
+					{ -280, 324 },
+					{ -190, 313 },
+					{ -100, 316 },
+					{ -10, 323 },
+					{ 80, 311 },
+					{ 170, 325 },
+					{ 260, 308 },
+					{ 350, 320 },
+				},
+				Width = 41.6,
+				Material = "Ground",
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -370, 450 },
+					{ -280, 457 },
+					{ -190, 445 },
+					{ -100, 459 },
+					{ -10, 442 },
+					{ 80, 454 },
+					{ 170, 444 },
+					{ 260, 458 },
+					{ 350, 447 },
+				},
+				Height = 6.4,
+				Width = 26,
+				Rough = 3,
+			},
+			{
+				Kind = "Paint",
+				Path = {
+					{ -370, 476 },
+					{ -280, 483 },
+					{ -190, 471 },
+					{ -100, 485 },
+					{ -10, 468 },
+					{ 80, 480 },
+					{ 170, 470 },
+					{ 260, 484 },
+					{ 350, 473 },
+				},
+				Width = 41.6,
+				Material = "Ground",
+				Rough = 3,
+			},
+			{
+				Kind = "Ridge",
+				Path = {
+					{ -330, 50 },
+					{ -210, 56 },
+				},
 				Height = 4.8,
-				Width = 18,
+				Width = 20.8,
+				Rough = 3,
 			},
-		}
-	elseif zone == 3 then
-		return {
 			{
 				Kind = "Ridge",
-				Path = { { -360, 40 }, { -200, 46 }, { 0, 38 }, { 200, 46 }, { 360, 40 } },
+				Path = {
+					{ 150, 205 },
+					{ 310, 212 },
+				},
 				Height = 4.8,
-				Width = 18,
-			},
-		}
-	end
-	return {
-		{
-			Kind = "Ridge",
-			Path = { { -360, 40 }, { -200, 36 }, { -100, 42 } },
-			Height = 9,
-			Width = 12,
-			Rock = true,
-		},
-		{
-			Kind = "Ridge",
-			Path = { { -20, 42 }, { 120, 36 }, { 360, 40 } },
-			Height = 9,
-			Width = 12,
-			Rock = true,
-		},
-		{
-			Kind = "Ridge",
-			Path = { { -300, 96 }, { -120, 90 }, { 20, 98 } },
-			Height = 8,
-			Width = 16,
-			Rock = true,
-		},
-		{
-			Kind = "Ridge",
-			Path = { { 80, 92 }, { 220, 84 }, { 340, 96 } },
-			Height = 8,
-			Width = 16,
-			Rock = true,
-		},
-	}
-end
-
-local function ramps()
-	return {
-		{ Kind = "Ramp", Path = { { -200, 0 }, { -250, 40 }, { -225, 90 }, { -200, 150 } }, Width = 16 },
-		{ Kind = "Ramp", Path = { { 180, 0 }, { 215, 60 }, { 205, 110 }, { 180, 150 } }, Width = 16 },
-	}
-end
-
-local function concat(...)
-	local out = {}
-	for _, list in { ... } do
-		table.move(list, 1, #list, #out + 1, out)
-	end
-	return out
-end
-
-local function build(zone: number)
-	local top, rock = LIMIT[zone], zone == 4
-	return {
-		Name = "Driftwood Cove (zone " .. zone .. ", draft)",
-		Primitives = concat(bank(zone), ramps(), {
-			-- The log jam behind the bank, in stretches with gaps between them.
-			{
-				Kind = "Ridge",
-				Path = { { -320, 80 }, { -200, 86 }, { -120, 80 } },
-				Height = top * 0.5,
-				Width = 10,
-				Rock = rock,
+				Width = 20.8,
+				Rough = 3,
 			},
 			{
 				Kind = "Ridge",
-				Path = { { -40, 84 }, { 60, 90 }, { 160, 84 } },
-				Height = top * 0.5,
-				Width = 10,
-				Rock = rock,
+				Path = {
+					{ -340, 372 },
+					{ -190, 366 },
+				},
+				Height = 4.8,
+				Width = 20.8,
+				Rough = 3,
 			},
 			{
 				Kind = "Ridge",
-				Path = { { 200, 92 }, { 300, 88 } },
-				Height = top * 0.5,
-				Width = 10,
-				Rock = rock,
+				Path = {
+					{ 100, 540 },
+					{ 270, 548 },
+				},
+				Height = 4.8,
+				Width = 20.8,
+				Rough = 3,
 			},
-			{ Kind = "Hollow", At = { -80, 120 }, Radius = 9, Depth = 1.5 },
-		}),
-	}
-end
-
--- Drawn for the old 152-stud tiles: repeated down the zone (Layouts/Tiled).
-return require(script.Parent.Parent.Parent.Tiled)({ build(1), build(2), build(3), build(4) })
+			{
+				Kind = "Hollow",
+				At = { -280, 168 },
+				Radius = 16,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+			{ Kind = "Hollow", At = { 80, 164 }, Radius = 14, Depth = 2, Rough = 3, Material = "Ground" },
+			{
+				Kind = "Hollow",
+				At = { 260, 340 },
+				Radius = 16,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+			{
+				Kind = "Hollow",
+				At = { -90, 336 },
+				Radius = 14,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+			{
+				Kind = "Hollow",
+				At = { 210, 498 },
+				Radius = 14,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+			{
+				Kind = "Hollow",
+				At = { -260, 500 },
+				Radius = 16,
+				Depth = 2,
+				Rough = 3,
+				Material = "Ground",
+			},
+		},
+		Loot = {
+			{ At = { -310, 178 }, Radius = 8, Weight = 1 },
+			{ At = { 290, 350 }, Radius = 8, Weight = 2 },
+			{ At = { -270, 514 }, Radius = 8, Weight = 3 },
+			{ At = { 240, 536 }, Radius = 8, Weight = 4 },
+		},
+		Entrances = {
+			{ 40, 372 },
+		},
+		Decor = {
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -370, 129 },
+					{ -280, 112 },
+					{ -190, 124 },
+					{ -100, 114 },
+					{ -10, 128 },
+					{ 80, 117 },
+					{ 170, 120 },
+					{ 260, 127 },
+					{ 350, 115 },
+				},
+				Count = 14,
+			},
+			{
+				Kind = "Timber",
+				Path = {
+					{ -370, 129 },
+					{ -280, 112 },
+					{ -190, 124 },
+					{ -100, 114 },
+					{ -10, 128 },
+					{ 80, 117 },
+					{ 170, 120 },
+					{ 260, 127 },
+					{ 350, 115 },
+				},
+				Count = 6,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -370, 284 },
+					{ -280, 298 },
+					{ -190, 287 },
+					{ -100, 290 },
+					{ -10, 297 },
+					{ 80, 285 },
+					{ 170, 299 },
+					{ 260, 282 },
+					{ 350, 294 },
+				},
+				Count = 14,
+			},
+			{
+				Kind = "Timber",
+				Path = {
+					{ -370, 284 },
+					{ -280, 298 },
+					{ -190, 287 },
+					{ -100, 290 },
+					{ -10, 297 },
+					{ 80, 285 },
+					{ 170, 299 },
+					{ 260, 282 },
+					{ 350, 294 },
+				},
+				Count = 6,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -370, 450 },
+					{ -280, 457 },
+					{ -190, 445 },
+					{ -100, 459 },
+					{ -10, 442 },
+					{ 80, 454 },
+					{ 170, 444 },
+					{ 260, 458 },
+					{ 350, 447 },
+				},
+				Count = 14,
+			},
+			{
+				Kind = "Timber",
+				Path = {
+					{ -370, 450 },
+					{ -280, 457 },
+					{ -190, 445 },
+					{ -100, 459 },
+					{ -10, 442 },
+					{ 80, 454 },
+					{ 170, 444 },
+					{ 260, 458 },
+					{ 350, 447 },
+				},
+				Count = 6,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -330, 50 },
+					{ -210, 56 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ 150, 205 },
+					{ 310, 212 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ -340, 372 },
+					{ -190, 366 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Driftwood",
+				Path = {
+					{ 100, 540 },
+					{ 270, 548 },
+				},
+				Count = 5,
+			},
+			{
+				Kind = "Weed",
+				Area = {
+					{ -292, 156 },
+					{ -268, 156 },
+					{ -268, 180 },
+					{ -292, 180 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { -274, 162 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ 70, 154 },
+					{ 90, 154 },
+					{ 90, 174 },
+					{ 70, 174 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { 85, 159 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ 248, 328 },
+					{ 272, 328 },
+					{ 272, 352 },
+					{ 248, 352 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { 266, 334 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ -100, 326 },
+					{ -80, 326 },
+					{ -80, 346 },
+					{ -100, 346 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { -85, 331 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ 200, 488 },
+					{ 220, 488 },
+					{ 220, 508 },
+					{ 200, 508 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { 215, 493 } },
+			{
+				Kind = "Weed",
+				Area = {
+					{ -272, 488 },
+					{ -248, 488 },
+					{ -248, 512 },
+					{ -272, 512 },
+				},
+				Count = 4,
+			},
+			{ Kind = "Shells", At = { -254, 494 } },
+			{ Kind = "Driftwood", At = { 40, 372 }, Scale = 3.2, Yaw = 70 },
+			{ Kind = "Timber", At = { 58, 360 }, Scale = 1.6, Yaw = 20 },
+			{ Kind = "Driftwood", At = { 24, 386 }, Scale = 2, Yaw = 140 },
+			{
+				Kind = "DuneGrass",
+				Area = {
+					{ -340, 20 },
+					{ 340, 20 },
+					{ 340, 80 },
+					{ -340, 80 },
+				},
+				Count = 10,
+			},
+			{
+				Kind = "Pebbles",
+				Area = {
+					{ -330, 230 },
+					{ 330, 230 },
+					{ 330, 370 },
+					{ -330, 370 },
+				},
+				Count = 10,
+			},
+			{
+				Kind = "Starfish",
+				Area = {
+					{ -300, 520 },
+					{ 300, 520 },
+					{ 300, 590 },
+					{ -300, 590 },
+				},
+				Count = 4,
+			},
+		},
+		Name = "Middle Banks",
+		Crossings = {
+			{
+				Name = "Anchor gap",
+				Paths = 1,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -150, 0 },
+							{ -150, 94 },
+							{ -150, 146 },
+							{ 110, 264 },
+							{ 110, 316 },
+							{ -100, 424 },
+							{ -100, 476 },
+							{ -100, 608 },
+						},
+						Width = 16,
+					},
+				},
+				Hazards = {
+					{ Type = "Slow", At = { -280, 168 }, Radius = 12 },
+					{ Type = "Slow", At = { 80, 164 }, Radius = 12 },
+					{ Type = "Slow", At = { 260, 340 }, Radius = 12 },
+					{ Type = "Slow", At = { -90, 336 }, Radius = 12 },
+					{ Type = "Slow", At = { 210, 498 }, Radius = 12 },
+					{ Type = "Slow", At = { -260, 500 }, Radius = 12 },
+				},
+				Decor = {
+					{ Kind = "Anchor", At = { -124, 22 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Driftwood", At = { -174, 30 }, Scale = 1.4, Yaw = 100 },
+				},
+			},
+			{
+				Name = "Crate gap",
+				Paths = 1,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 170, 0 },
+							{ 170, 94 },
+							{ 170, 146 },
+							{ -120, 264 },
+							{ -120, 316 },
+							{ 140, 424 },
+							{ 140, 476 },
+							{ 140, 608 },
+						},
+						Width = 16,
+					},
+				},
+				Hazards = {
+					{ Type = "Slow", At = { -280, 168 }, Radius = 12 },
+					{ Type = "Slow", At = { 260, 340 }, Radius = 12 },
+					{ Type = "Slow", At = { 210, 498 }, Radius = 12 },
+					{ Type = "Slow", At = { -260, 500 }, Radius = 12 },
+				},
+				Decor = {
+					{ Kind = "Crate", At = { 196, 22 }, Scale = 1.2, Yaw = 80 },
+					{ Kind = "Driftwood", At = { 146, 30 }, Scale = 1.4, Yaw = 200 },
+				},
+			},
+			{
+				Name = "Ribs gap",
+				Paths = 1,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -20, 0 },
+							{ -20, 94 },
+							{ -20, 146 },
+							{ 210, 264 },
+							{ 210, 316 },
+							{ 10, 424 },
+							{ 10, 476 },
+							{ 10, 608 },
+						},
+						Width = 16,
+					},
+				},
+				Hazards = {
+					{ Type = "Slow", At = { -280, 168 }, Radius = 12 },
+					{ Type = "Slow", At = { 260, 340 }, Radius = 12 },
+					{ Type = "Slow", At = { -90, 336 }, Radius = 12 },
+					{ Type = "Slow", At = { 210, 498 }, Radius = 12 },
+					{ Type = "Slow", At = { -260, 500 }, Radius = 12 },
+				},
+				Decor = {
+					{ Kind = "Bones", At = { 6, 22 }, Scale = 1.2, Yaw = 120 },
+					{ Kind = "Driftwood", At = { -44, 30 }, Scale = 1.4, Yaw = 300 },
+				},
+			},
+		},
+	},
+	[4] = {
+		Primitives = {
+			{
+				Kind = "Wall",
+				Area = {
+					{ -380, -12 },
+					{ 380, -12 },
+					{ 380, 620 },
+					{ -380, 620 },
+				},
+				Height = 12,
+				Material = "Ground",
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -360, -12 },
+					{ 360, -12 },
+					{ 360, 20 },
+					{ -360, 20 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -360, 592 },
+					{ 360, 592 },
+					{ 360, 620 },
+					{ -360, 620 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -32, 20 },
+					{ 32, 20 },
+					{ 32, 68 },
+					{ -32, 68 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -294, 44 },
+					{ -294, 20 },
+					{ -306, 20 },
+					{ -306, 44 },
+				},
+			},
+			{ Kind = "Flat", At = { -300, 44 }, Radius = 6 },
+			{ Kind = "Flat", At = { -300, 20 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 306, 44 },
+					{ 306, 20 },
+					{ 294, 20 },
+					{ 294, 44 },
+				},
+			},
+			{ Kind = "Flat", At = { 300, 44 }, Radius = 6 },
+			{ Kind = "Flat", At = { 300, 20 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ -6, 568 },
+					{ -6, 592 },
+					{ 6, 592 },
+					{ 6, 568 },
+				},
+			},
+			{ Kind = "Flat", At = { 0, 568 }, Radius = 6 },
+			{ Kind = "Flat", At = { 0, 592 }, Radius = 6 },
+		},
+		Entrances = {
+			{ 0, 48 },
+		},
+		Decor = {
+			{
+				Kind = "DuneGrass",
+				Area = {
+					{ -340, 4 },
+					{ 340, 4 },
+					{ 340, 16 },
+					{ -340, 16 },
+				},
+				Count = 8,
+			},
+			{
+				Kind = "Pebbles",
+				Area = {
+					{ -340, 598 },
+					{ 340, 598 },
+					{ 340, 614 },
+					{ -340, 614 },
+				},
+				Count = 6,
+			},
+			{ Kind = "Driftwood", At = { 0, 48 }, Scale = 3.4, Yaw = 80 },
+			{ Kind = "Timber", At = { -20, 36 }, Scale = 1.5, Yaw = 30 },
+			{ Kind = "Timber", At = { 22, 60 }, Scale = 1.5, Yaw = 120 },
+			{
+				Kind = "Shells",
+				Area = {
+					{ -24, 28 },
+					{ 24, 28 },
+					{ 24, 62 },
+					{ -24, 62 },
+				},
+				Count = 3,
+			},
+		},
+		Name = "Outer Shore",
+		Crossings = {
+			{
+				Name = "West cart way",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Flat",
+						Area = {
+							{ -90, 0 },
+							{ -90, 140 },
+							{ -70, 140 },
+							{ -70, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -80, 130 },
+							{ -280, 130 },
+							{ -280, 150 },
+							{ -80, 150 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -290, 140 },
+							{ -290, 300 },
+							{ -270, 300 },
+							{ -270, 140 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -280, 310 },
+							{ -80, 310 },
+							{ -80, 290 },
+							{ -280, 290 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -90, 300 },
+							{ -90, 460 },
+							{ -70, 460 },
+							{ -70, 300 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -80, 450 },
+							{ -280, 450 },
+							{ -280, 470 },
+							{ -80, 470 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -290, 460 },
+							{ -290, 608 },
+							{ -270, 608 },
+							{ -270, 460 },
+						},
+					},
+					{ Kind = "Flat", At = { -80, 0 }, Radius = 10 },
+					{ Kind = "Flat", At = { -80, 140 }, Radius = 10 },
+					{ Kind = "Flat", At = { -280, 140 }, Radius = 10 },
+					{ Kind = "Flat", At = { -280, 300 }, Radius = 10 },
+					{ Kind = "Flat", At = { -80, 300 }, Radius = 10 },
+					{ Kind = "Flat", At = { -80, 460 }, Radius = 10 },
+					{ Kind = "Flat", At = { -280, 460 }, Radius = 10 },
+					{ Kind = "Flat", At = { -280, 608 }, Radius = 10 },
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -80, 0 },
+							{ -80, 140 },
+							{ -280, 140 },
+							{ -280, 300 },
+							{ -80, 300 },
+							{ -80, 460 },
+							{ -280, 460 },
+							{ -280, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 74, 0 },
+							{ 74, 152 },
+							{ 86, 152 },
+							{ 86, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 80, 158 },
+							{ 280, 158 },
+							{ 280, 146 },
+							{ 80, 146 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 274, 152 },
+							{ 274, 328 },
+							{ 286, 328 },
+							{ 286, 152 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 280, 322 },
+							{ 80, 322 },
+							{ 80, 334 },
+							{ 280, 334 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 74, 328 },
+							{ 74, 608 },
+							{ 86, 608 },
+							{ 86, 328 },
+						},
+					},
+					{ Kind = "Flat", At = { 80, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 152 }, Radius = 6 },
+					{ Kind = "Flat", At = { 280, 152 }, Radius = 6 },
+					{ Kind = "Flat", At = { 280, 328 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 328 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 608 }, Radius = 6 },
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 200, 142 },
+							{ 200, 158 },
+						},
+						Height = 3,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 140, 322 },
+							{ 140, 338 },
+						},
+						Height = 3,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 72, 470 },
+							{ 88, 470 },
+						},
+						Height = 3,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Hollow",
+						At = { -180, 300 },
+						Radius = 10,
+						Depth = 1,
+						Rough = 3,
+						Material = "Ground",
+						Over = true,
+					},
+					{
+						Kind = "Hollow",
+						At = { 260, 240 },
+						Radius = 8,
+						Depth = 2,
+						Rough = 3,
+						Material = "Ground",
+						Over = true,
+					},
+				},
+				Loot = {
+					{ At = { -180, 460 }, Radius = 6, Weight = 1 },
+					{ At = { 280, 260 }, Radius = 6, Weight = 3 },
+				},
+				Hazards = {
+					{ Type = "Slow", At = { -180, 300 }, Radius = 9 },
+					{ Type = "Slow", At = { 260, 240 }, Radius = 7 },
+				},
+				Decor = {
+					{ Kind = "Driftwood", At = { 200, 150 }, Scale = 1.1, Yaw = 90 },
+					{ Kind = "Driftwood", At = { 140, 330 }, Scale = 1.1, Yaw = 90 },
+					{ Kind = "Driftwood", At = { 80, 470 }, Scale = 1.1, Yaw = 0 },
+					{ Kind = "Weed", At = { -177, 303 } },
+					{ Kind = "Weed", At = { 263, 243 } },
+					{ Kind = "Anchor", At = { -104, 12 }, Scale = 1.2, Yaw = 56 },
+					{ Kind = "Driftwood", At = { -60, 14 }, Scale = 1.4, Yaw = 100 },
+				},
+			},
+			{
+				Name = "East cart way",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Flat",
+						Area = {
+							{ 70, 0 },
+							{ 70, 152 },
+							{ 90, 152 },
+							{ 90, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 80, 162 },
+							{ 280, 162 },
+							{ 280, 142 },
+							{ 80, 142 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 270, 152 },
+							{ 270, 320 },
+							{ 290, 320 },
+							{ 290, 152 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 280, 310 },
+							{ 80, 310 },
+							{ 80, 330 },
+							{ 280, 330 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 70, 320 },
+							{ 70, 472 },
+							{ 90, 472 },
+							{ 90, 320 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 80, 482 },
+							{ 280, 482 },
+							{ 280, 462 },
+							{ 80, 462 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 270, 472 },
+							{ 270, 608 },
+							{ 290, 608 },
+							{ 290, 472 },
+						},
+					},
+					{ Kind = "Flat", At = { 80, 0 }, Radius = 10 },
+					{ Kind = "Flat", At = { 80, 152 }, Radius = 10 },
+					{ Kind = "Flat", At = { 280, 152 }, Radius = 10 },
+					{ Kind = "Flat", At = { 280, 320 }, Radius = 10 },
+					{ Kind = "Flat", At = { 80, 320 }, Radius = 10 },
+					{ Kind = "Flat", At = { 80, 472 }, Radius = 10 },
+					{ Kind = "Flat", At = { 280, 472 }, Radius = 10 },
+					{ Kind = "Flat", At = { 280, 608 }, Radius = 10 },
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 80, 0 },
+							{ 80, 150 },
+							{ 280, 150 },
+							{ 280, 320 },
+							{ 80, 320 },
+							{ 80, 470 },
+							{ 280, 470 },
+							{ 280, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -86, 0 },
+							{ -86, 128 },
+							{ -74, 128 },
+							{ -74, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -80, 122 },
+							{ -280, 122 },
+							{ -280, 134 },
+							{ -80, 134 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -286, 128 },
+							{ -286, 312 },
+							{ -274, 312 },
+							{ -274, 128 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -280, 318 },
+							{ -80, 318 },
+							{ -80, 306 },
+							{ -280, 306 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -86, 312 },
+							{ -86, 608 },
+							{ -74, 608 },
+							{ -74, 312 },
+						},
+					},
+					{ Kind = "Flat", At = { -80, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { -80, 128 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 128 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 312 }, Radius = 6 },
+					{ Kind = "Flat", At = { -80, 312 }, Radius = 6 },
+					{ Kind = "Flat", At = { -80, 608 }, Radius = 6 },
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -190, 122 },
+							{ -190, 138 },
+						},
+						Height = 3,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -140, 302 },
+							{ -140, 318 },
+						},
+						Height = 3,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -88, 470 },
+							{ -72, 470 },
+						},
+						Height = 3,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Hollow",
+						At = { 180, 150 },
+						Radius = 10,
+						Depth = 1,
+						Rough = 3,
+						Material = "Ground",
+						Over = true,
+					},
+					{
+						Kind = "Hollow",
+						At = { -260, 220 },
+						Radius = 8,
+						Depth = 2,
+						Rough = 3,
+						Material = "Ground",
+						Over = true,
+					},
+				},
+				Loot = {
+					{ At = { 200, 470 }, Radius = 6, Weight = 1 },
+					{ At = { -280, 250 }, Radius = 6, Weight = 3 },
+				},
+				Hazards = {
+					{ Type = "Slow", At = { 180, 150 }, Radius = 9 },
+					{ Type = "Slow", At = { -260, 220 }, Radius = 7 },
+				},
+				Decor = {
+					{ Kind = "Driftwood", At = { -190, 130 }, Scale = 1.1, Yaw = 90 },
+					{ Kind = "Driftwood", At = { -140, 310 }, Scale = 1.1, Yaw = 90 },
+					{ Kind = "Driftwood", At = { -80, 470 }, Scale = 1.1, Yaw = 0 },
+					{ Kind = "Weed", At = { 183, 153 } },
+					{ Kind = "Weed", At = { -257, 223 } },
+					{ Kind = "Crate", At = { 104, 12 }, Scale = 1.2, Yaw = 104 },
+					{ Kind = "Chain", At = { 60, 14 }, Scale = 1, Yaw = 60 },
+				},
+			},
+		},
+		Slots = {
+			{
+				Name = "West hollow",
+				At = { -340, 36 },
+				Size = { 80, 60 },
+				Rooms = {
+					{
+						Name = "Under the root-ball",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 34, 0 },
+									{ 34, 32 },
+									{ 46, 32 },
+									{ 46, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 40, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 40, 32 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 72, 8 },
+									{ 72, 52 },
+									{ 8, 52 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 40, 36 }, Radius = 6, Weight = 2 },
+						},
+						Decor = {
+							{
+								Kind = "Timber",
+								Area = {
+									{ 14, 14 },
+									{ 66, 14 },
+									{ 66, 46 },
+									{ 14, 46 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Flooded hollow",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 34, 0 },
+									{ 34, 32 },
+									{ 46, 32 },
+									{ 46, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 40, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 40, 32 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 72, 8 },
+									{ 72, 52 },
+									{ 8, 52 },
+								},
+							},
+							{
+								Kind = "Hollow",
+								At = { 40, 32 },
+								Radius = 14,
+								Depth = 2,
+								Rough = 3,
+								Material = "Ground",
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 40, 32 }, Radius = 6, Weight = 1 },
+						},
+						Decor = {
+							{ Kind = "Weed", At = { 40, 32 } },
+						},
+					},
+				},
+			},
+			{
+				Name = "East hollow",
+				At = { 260, 36 },
+				Size = { 80, 60 },
+				Rooms = {
+					{
+						Name = "Boot-heap",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 34, 0 },
+									{ 34, 32 },
+									{ 46, 32 },
+									{ 46, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 40, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 40, 32 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 72, 8 },
+									{ 72, 52 },
+									{ 8, 52 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 40, 36 }, Radius = 6, Weight = 2 },
+						},
+						Decor = {
+							{ Kind = "Crate", At = { 30, 34 } },
+							{ Kind = "Driftwood", At = { 52, 24 }, Scale = 1.2 },
+						},
+					},
+					{
+						Name = "Log cave",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 34, 0 },
+									{ 34, 32 },
+									{ 46, 32 },
+									{ 46, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 40, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 40, 32 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 26 },
+									{ 8, 8 },
+									{ 72, 8 },
+									{ 72, 26 },
+								},
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 38 },
+									{ 8, 26 },
+									{ 34, 26 },
+									{ 34, 38 },
+								},
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 38 },
+									{ 46, 26 },
+									{ 72, 26 },
+									{ 72, 38 },
+								},
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 38 },
+									{ 72, 38 },
+									{ 72, 52 },
+									{ 8, 52 },
+								},
+							},
+							{
+								Kind = "Roof",
+								Area = {
+									{ 4.7, 5.73 },
+									{ 75.3, 5.73 },
+									{ 75.3, 54.27 },
+									{ 4.7, 54.27 },
+								},
+								Clearance = 10,
+								Thickness = 6,
+							},
+						},
+						Loot = {
+							{ At = { 22, 38 }, Radius = 6, Weight = 1 },
+						},
+					},
+				},
+			},
+			{
+				Name = "Deep hollow",
+				At = { -40, 524 },
+				Size = { 80, 52 },
+				Rooms = {
+					{
+						Name = "Silted pool",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 52 },
+									{ 46, 24 },
+									{ 34, 24 },
+									{ 34, 52 },
+								},
+							},
+							{ Kind = "Flat", At = { 40, 52 }, Radius = 6 },
+							{ Kind = "Flat", At = { 40, 24 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 72, 8 },
+									{ 72, 44 },
+									{ 8, 44 },
+								},
+							},
+							{
+								Kind = "Hollow",
+								At = { 40, 26 },
+								Radius = 14,
+								Depth = 2,
+								Rough = 3,
+								Material = "Ground",
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 40, 26 }, Radius = 6, Weight = 5 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 40, 26 } },
+						},
+					},
+					{
+						Name = "Wedged hull",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 52 },
+									{ 46, 24 },
+									{ 34, 24 },
+									{ 34, 52 },
+								},
+							},
+							{ Kind = "Flat", At = { 40, 52 }, Radius = 6 },
+							{ Kind = "Flat", At = { 40, 24 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 72, 8 },
+									{ 72, 44 },
+									{ 8, 44 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 40, 26 }, Radius = 6, Weight = 4 },
+						},
+						Decor = {
+							{
+								Kind = "Timber",
+								Area = {
+									{ 14, 14 },
+									{ 66, 14 },
+									{ 66, 38 },
+									{ 14, 38 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+}
