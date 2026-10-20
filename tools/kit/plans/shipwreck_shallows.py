@@ -94,107 +94,117 @@ def hull_ribs(part, at, scale=1.5, yaw=0):
 
 
 # ---- zones 2 and 3: open sand --------------------------------------------------------------------
-def open_zone(n, cap, ridge_w):
+# Full-width banks of sand-buried wreckage (the hull first, at z 190, then three more) with a
+# strip between each; the strips are where the gullies, scour channels, mounds and pits are.
+# Carts can't climb a bank (the ramp opens a gap where it passes, a different x in each
+# crossing); feet go straight over. Heights stay under the zone's cap.
+RIDGES = (190, 290, 390, 490)  # clear of the rock pools at (140, 120) and (-60, 130)
+
+
+def bank(part, zz, k, height, width):
+    part.add(Kind="Ridge", Path=[(-364, zz), (-180, zz + 6 * k), (0, zz - 5 * k),
+                                 (180, zz + 6 * k), (364, zz)],
+             Height=height, Width=width, Rough=1, Material=TAR)
+    part.decor("Timber", path=[(-330, zz + 4 * k), (330, zz + 2 * k)], count=7)
+
+
+def open_zone(n, cap, width):
     z = Zone(n, NAME, rock=0)
     f = z.frame
-    # The wreck lies low across the top: a hull of sand-buried timber, a bow and a stern.
-    f.add(Kind="Ridge", Path=[(-330, 84), (-200, 96), (-60, 88), (60, 100), (160, 86)],
-          Height=cap - 0.6, Width=ridge_w, Rough=1, Material=TAR)
-    hull_ribs(f, (-120, 92), 1.8, 90)
-    hull_ribs(f, (20, 94), 1.5, 80)
-    f.decor("Timber", path=[(-320, 80), (150, 84)], count=9)
-    f.decor("Anchor", at=(-250, 70), yaw=30)
-    f.decor("Chain", path=[(-90, 110), (-60, 118)], count=2)
+    for i, zz in enumerate(RIDGES):
+        bank(f, zz, 1 if i % 2 == 0 else -1, cap - 0.6, width)
+    # The wreck: the first bank is her hull, ribs standing up out of the sand.
+    hull_ribs(f, (-150, 196), 1.8, 90)
+    hull_ribs(f, (30, 190), 1.5, 80)
+    hull_ribs(f, (210, 196), 1.4, 100)
+    f.decor("Anchor", at=(-260, 170), yaw=30)
+    f.decor("Chain", path=[(-90, 170), (-40, 172)], count=3)
     # The entrance flats (the biome's EntranceSpots), the hatch at the bow's foot.
     for x in SPOTS:
         f.add(Kind="Flat", At=[x, 30], Radius=10)
     f.entrance((-20, 30))
     f.decor("Crate", at=(-20, 46), yaw=10)
     f.decor("Chain", at=(-8, 40))
+    f.decor("Rocks", area=box(0, 570, 600, 40), count=5)
+    f.decor("Pebbles", area=box(0, 600, 640, 30), count=5)
     return z, f
+
+
+def strip_stuff(f, spots, cap):
+    for x, zz in spots:
+        f.mound((x, zz), radius=11, height=cap - 2.4, rock=False)
+        debris(f, x + 14, zz + 12)
+
+
+def ramp_through(c, gaps, start, end):
+    """The cart's ramp: down from the top at `start`, through a gap in each bank, out at `end`."""
+    pts = [(start, 0), (start, 150)]
+    for g, zz in zip(gaps, RIDGES):
+        pts += [(g, zz - 22), (g, zz + 22)]
+    pts += [(end, 540), (end, 608)]
+    c.ramp(pts, width=20)
 
 
 def zone2():
     z, f = open_zone(2, 5, 14)
-    # Gullies from the deck (the barrels' ways), a scour channel across the middle, mounds.
-    g_w = [(-180, 100), (-180, 200), (-210, 300), (-210, 420)]
-    g_e = [(110, 106), (110, 210), (140, 330), (140, 430)]
+    strip_stuff(f, [(-250, 240), (250, 250), (-60, 340), (200, 440), (-240, 440), (60, 540)], 5)
+    # Gullies from the hull's deck down the first strip, a scour channel across the next.
+    g_w = [(-180, 198), (-180, 240), (-200, 282)]
+    g_e = [(150, 198), (150, 240), (170, 282)]
     gully(f, g_w)
     gully(f, g_e)
-    scour = [(-330, 360), (-150, 372), (20, 356), (200, 372), (340, 360)]
-    f.channel(scour, depth=2, width=10, rough=1, material="Mud")
-    for x, zz, h in ((-60, 220, 2.4), (60, 250, 2.8), (-250, 160, 2.4), (250, 190, 2.8),
-                     (-40, 480, 2.6), (220, 500, 2.6), (-280, 520, 2.4)):
-        f.mound((x, zz), radius=11, height=h, rock=False)
-        debris(f, x + 14, zz + 12)
-    f.decor("Rocks", area=box(0, 570, 600, 40), count=5)
-    f.decor("Driftwood", at=(-300, 440), yaw=60)
-    f.decor("Pebbles", area=box(0, 600, 640, 30), count=5)
-
-    # 1: the east loop, the west gully's barrels.
+    f.channel([(-340, 340), (-150, 350), (20, 336), (200, 350), (340, 340)], depth=2, width=10,
+              rough=1, material="Mud")
     c = z.crossing("Gully run", paths=1)
-    c.ramp([(130, 0), (130, 120), (-100, 250), (-100, 420), (90, 500), (90, 608)], width=20)
+    ramp_through(c, (-40, 90, -110, 60), 30, 60)
     barrels(c, g_w)
-    undertow(c, [(-60, 366), (60, 360)])
-    pit(c, (-30, 190), True)
-    pit(c, (200, 440), False)
+    undertow(c, [(-120, 345), (-40, 342)])
+    pit(c, (-120, 240), True)
+    pit(c, (210, 420), False)
     c.decor("Crate", at=(120, 12), yaw=10)
-    c.decor("Chain", path=[(140, 10), (150, 20)], count=2)
-    # 2: down the west.
     c = z.crossing("Port side", paths=1)
-    c.ramp([(-170, 0), (-170, 120), (0, 230), (0, 440), (-140, 520), (-140, 608)], width=20)
+    ramp_through(c, (200, 100, 220, -80), -170, -120)
     barrels(c, g_e)
-    undertow(c, [(120, 366), (190, 366)])
-    pit(c, (90, 200), True)
-    pit(c, (-250, 380), False)
-    c.decor("Timber", at=(-160, 12), yaw=80)
+    undertow(c, [(110, 345), (180, 350)])
+    pit(c, (-30, 240), True)
+    pit(c, (-250, 420), False)
     c.decor("Anchor", at=(-190, 14), yaw=200)
-    # 3: through the middle.
     c = z.crossing("Under the stern", paths=1)
-    c.ramp([(10, 0), (10, 150), (-160, 260), (-160, 450), (40, 510), (40, 608)], width=20)
+    ramp_through(c, (10, -160, 10, 150), 20, 150)
     barrels(c, g_w)
     barrels(c, g_e)
-    undertow(c, [(-300, 366), (-230, 366)])
-    pit(c, (150, 260), True)
-    pit(c, (-80, 300), False)
+    undertow(c, [(-300, 345), (-230, 343)])
+    pit(c, (100, 330), True)
+    pit(c, (-60, 520), False)
     c.decor("Chain", path=[(-4, 12), (24, 12)], count=3)
-    c.decor("Crate", at=(30, 16), yaw=60)
     return z
 
 
 def zone3():
     z, f = open_zone(3, 7, 18)
-    g_w = [(-100, 106), (-100, 220), (-140, 320), (-140, 440)]
-    g_e = [(190, 110), (190, 230), (160, 340), (160, 450)]
+    strip_stuff(f, [(-260, 240), (280, 250), (30, 340), (-150, 440), (260, 440), (-60, 540)], 7)
+    g_w = [(-110, 198), (-110, 240), (-140, 282)]
+    g_e = [(210, 198), (210, 240), (190, 282)]
     gully(f, g_w, depth=3)
     gully(f, g_e, depth=3)
-    scour = [(-330, 330), (-120, 344), (60, 326), (240, 344), (340, 330)]
-    f.channel(scour, depth=2.4, width=10, rough=1, material="Mud")
-    for x, zz, h in ((-20, 210, 3.4), (-260, 200, 3.2), (300, 220, 3.4), (30, 440, 3.6),
-                     (-240, 480, 3.4), (260, 500, 3.2)):
-        f.mound((x, zz), radius=12, height=h, rock=False)
-        debris(f, x + 14, zz + 12)
-    f.decor("Rocks", area=box(0, 570, 600, 40), count=5)
-    f.decor("Driftwood", at=(300, 420), yaw=100)
-    f.decor("Pebbles", area=box(0, 600, 640, 30), count=5)
-
+    f.channel([(-340, 340), (-120, 352), (60, 336), (240, 352), (340, 340)], depth=2.4, width=10,
+              rough=1, material="Mud")
     c = z.crossing("Deck run", paths=1)
-    c.ramp([(-180, 0), (-180, 140), (50, 240), (50, 440), (-200, 520), (-200, 608)], width=20)
+    ramp_through(c, (-200, -60, 120, -120), -180, -60)
     barrels(c, g_w)
     barrels(c, g_e)
-    undertow(c, [(-60, 336), (30, 332)])
-    pit(c, (-20, 120), True)
-    pit(c, (-260, 400), False)
+    undertow(c, [(-60, 345), (30, 342)])
+    pit(c, (-30, 250), True)
+    pit(c, (-260, 420), False)
     pit(c, (270, 380), True)
     c.decor("Anchor", at=(-190, 14), yaw=10)
-    c.decor("Crate", at=(-170, 12), yaw=40)
     c = z.crossing("Starboard way", paths=1)
-    c.ramp([(240, 0), (240, 150), (10, 250), (10, 450), (230, 520), (230, 608)], width=20)
+    ramp_through(c, (240, 120, -40, 160), 240, 100)
     barrels(c, g_w)
-    undertow(c, [(120, 336), (200, 340)])
-    pit(c, (-60, 290), True)
-    pit(c, (100, 200), False)
-    pit(c, (-260, 400), True)
+    undertow(c, [(120, 345), (200, 348)])
+    pit(c, (-60, 300), True)
+    pit(c, (100, 250), False)
+    pit(c, (-260, 470), True)
     c.decor("Timber", at=(230, 12), yaw=70)
     c.decor("Chain", path=[(250, 10), (262, 22)], count=2)
     return z
