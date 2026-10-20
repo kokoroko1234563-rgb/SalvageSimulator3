@@ -17,10 +17,13 @@
 --           of that, so wading straight across is tight and stopping is death. Out of it you
 --           climb back up. Its tell is dark, wet sand with the odd bubble. Placement: At, Radius.
 --   Rockfall  a stretch of roof that's coming down: an area Radius studs across, strewn with
---           old rubble (the tell). Every Interval seconds or so (now and then a Burst of several
---           at once) a rock falls somewhere in it, more often than not (Aimed) on someone inside;
---           each is warned Warning seconds ahead by trickling dust and a growing shadow where it
---           will land, and Harms whoever is within RockRadius. Placement: At, Radius.
+--           old rubble (the tell). On a rhythm a regular can learn: every Interval seconds a
+--           boulder falls, sweeping along the area's open ground and back, or now and then
+--           (Aimed) where someone inside is standing; every BurstEvery seconds, after Rumble
+--           seconds of dust pouring over the whole area, a Burst falls along the sweep. Each is
+--           warned Warning seconds ahead by trickling dust and a dark shadow, full size, where
+--           it will land (it never follows you: moving away always works); it Harms whoever is
+--           within RockRadius, then lies there Lie seconds. Placement: At, Radius.
 --   Pit     a spike pit: a hole Radius across and Depth deep cut into the ground, spikes at the
 --           bottom (Harm, Damage: 100 kills). Open, you see it; Covered, a false floor of the
 --           ground's own sand hides it (a few cracks are its only tell) and gives way under
@@ -124,17 +127,19 @@ Hazards.Types = {
 	Rockfall = {
 		Count = 3,
 		Radius = 12, -- the area the rock comes down on
-		Interval = 1.2, -- seconds between falls, on average
-		Burst = 4, -- now and then this many fall at once
-		BurstEvery = 9, -- seconds between bursts, on average
-		Aimed = 0.6, -- the share of falls aimed at someone inside it
-		Warning = 0.8, -- seconds of dust and a growing shadow before a rock lands
+		Interval = 1.6, -- seconds between falls (a steady beat)
+		Burst = 3, -- this many fall one after another along the sweep...
+		BurstEvery = 12, -- ...every this many seconds
+		Rumble = 2, -- seconds of dust pouring over the whole area before a burst
+		Aimed = 0.35, -- the share of falls dropped where someone inside is standing
+		Warning = 1.8, -- seconds of dust and a full-size shadow before a rock lands
 		Active = 0.3,
-		RockRadius = 3.5, -- the rock harms whoever is this close to where it lands
+		Lie = 3, -- seconds a fallen boulder lies there before it crumbles
+		RockRadius = 5.5, -- the boulder harms whoever is this close to where it lands
 		Damage = 100,
 		Color = Color3.fromRGB(90, 88, 84),
 		Effect = "Harm",
-		HitRadius = 3.5,
+		HitRadius = 5.5,
 		Push = 20,
 		HitText = "Crushed by falling rock!",
 	},

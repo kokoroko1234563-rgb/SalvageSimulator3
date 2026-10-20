@@ -53,16 +53,49 @@ def along(points, every):
     return out
 
 
-def lit_way(part, points, width=16):
+def near(point, a, b):
+    """How far a point is from the segment a-b."""
+    (x, zz), (ax, az), (bx, bz) = point, a, b
+    dx, dz = bx - ax, bz - az
+    l2 = dx * dx + dz * dz
+    t = 0 if l2 == 0 else max(0, min(1, ((x - ax) * dx + (zz - az) * dz) / l2))
+    return ((ax + dx * t - x) ** 2 + (az + dz * t - zz) ** 2) ** 0.5
+
+
+def lit_way(part, points, width=16, dark=()):
     """The lit path: the cart's ramp with lantern posts along it, at its side (wards against
-    the Gloom)."""
+    the Gloom), except along its `dark` stretches (segments), where the Gloom gets in."""
     part.ramp(points, width=width)
     side = width / 2 + 1
     for (ax, az), (bx, bz) in zip(points, points[1:]):
         length = ((bx - ax) ** 2 + (bz - az) ** 2) ** 0.5
         for x, zz in along([(ax, az), (bx, bz)], 72) if length > 40 else []:
+            if any(near((x, zz), a, b) < 40 for a, b in dark):
+                continue  # a lantern's light (18) would hold the Gloom (9) off its stretch
             nx, nz = -(bz - az) / length * side, (bx - ax) / length * side
             part.decor(LIT, at=(round(x + nx), round(zz + nz)))
+
+
+# What makes the lit path more than slow: each crossing's has all three.
+def dark_stretch(part, a, b, width=16):
+    """A stretch of the lit path under broken roof with no lanterns: the Gloom walks it."""
+    part.roof_lane([a, b], width)
+    part.hazard("Gloom", path=[a, b], radius=9)
+
+
+def low_ground(part, a, b, width=16):
+    """A long, gentle dip in the lit path (a cart still climbs out): it floods first when the
+    tide turns, and the undertow runs in it. Safe going down, deadly coming back late."""
+    from kit import segment_box, rounded
+    part.add(Kind="Hollow", Area=rounded(segment_box(a, b, width + 32)), Width=16, Depth=3,
+             Over=True, Material="Mud")
+    part.hazard("Undertow", path=[a, b], width=width)
+
+
+def falling_roof(part, at, radius=14):
+    """A stretch of the lit path where the roof is coming down: a fair, rhythmic rockfall (time
+    it, cart and all)."""
+    part.hazard("Rockfall", at=at, radius=radius)
 
 
 def dark_way(part, points, roofed=(), gloom=None, width=12):
@@ -142,8 +175,12 @@ f.decor("Chain", path=[(-328, 300), (-328, 484)], count=3)
 #    the Wreck Court and down the east side.
 # Link: the Hall's east door onto B.
 c = z.crossing("Lantern way", paths=2)
+DARK = [((-140, 340), (-140, 420))]
 lit_way(c, [(-200, 0), (-200, 60), (184, 60), (184, 128), (-140, 128), (-140, 456), (88, 456),
-            (88, 530), (-60, 530), (-60, 608)])
+            (88, 530), (-60, 530), (-60, 608)], dark=DARK)
+dark_stretch(c, *DARK[0])
+falling_roof(c, (20, 128))
+low_ground(c, (-100, 456), (40, 456))
 spur(c, [(-140, 220), (-176, 220)])  # to the West Court
 spur(c, [(-140, 296), (-72, 296)])  # to the Hall's west door
 dark = [(224, 0), (224, 132), (340, 132), (340, 188), (104, 188), (104, 244), (336, 244),
@@ -177,10 +214,14 @@ BOTTOM_EAST = [(228, 424), (228, 452), (336, 452), (336, 500), (256, 500), (256,
 # C: the centre: rows above the Hall, through the Hall (rockfall), the flooding bottom snake.
 # Link: the Hall's east door to the Wreck Court.
 c = z.crossing("The falling hall", paths=3)
+DARK = [((288, 190), (288, 280))]
 lit_way(c, [(120, 0), (120, 72), (224, 72), (224, 128), (336, 128), (336, 296), (288, 296),
             (288, 168), (240, 168), (240, 296), (192, 296), (192, 168), (144, 168), (144, 376),
-            (176, 376)])
+            (176, 376)], dark=DARK)
 lit_way(c, BOTTOM_EAST)
+dark_stretch(c, *DARK[0])
+falling_roof(c, (240, 232))
+low_ground(c, (256, 500), (336, 500))
 dark_way(c, TOP_WEST)
 dark_way(c, WEST_ROWS, roofed=(4, 6, 8), gloom=[(-288, 336), (-288, 372), (-136, 372), (-136, 408),
                                                 (-288, 408)])
@@ -198,9 +239,13 @@ c.decor("WreckRibs", at=(130, 12), scale=0.8, yaw=90)  # the tell: a hull's ribs
 # B: foot only and dark: the top-west wiggle, the West Court, down past the rows and back up
 #    them (the Gloom's), then down the Stair.
 c = z.crossing("The Stair", paths=2)
+DARK = [((-60, 124), (-60, 196))]
 lit_way(c, [(40, 0), (40, 56), (200, 56), (200, 120), (-60, 120), (-60, 200), (330, 200),
-            (330, 296), (140, 296), (140, 376), (176, 376)])
+            (330, 296), (140, 296), (140, 376), (176, 376)], dark=DARK)
 lit_way(c, [(228, 424), (228, 470), (-60, 470), (-60, 608)])
+dark_stretch(c, *DARK[0])
+falling_roof(c, (100, 200))
+low_ground(c, (-20, 470), (160, 470))
 spur(c, [(72, 320), (140, 320)])  # the Hall's east door
 dark_way(c, TOP_WEST, roofed=(1, 3), gloom=[(-136, 48), (-224, 48), (-224, 100), (-152, 100)])
 dark_way(c, [(-176, 240), (-120, 240), (-120, 480), (-288, 480), (-288, 420), (-160, 420),
@@ -217,7 +262,7 @@ c.decor("Bones", at=(-136, 12), scale=1.3, yaw=0)  # the tell: an arch of bones 
 # (one floods, with an undertow).
 c = z.crossing("The long dark", paths=1)
 lit_way(c, [(200, 0), (200, 128), (336, 128), (336, 296), (288, 296), (288, 168), (240, 168),
-            (240, 328)])
+            (240, 328)], dark=[((336, 136), (336, 288)), ((288, 288), (288, 176))])
 c.roof_lane([(336, 160), (336, 264)], 16)
 c.roof_lane([(288, 200), (288, 264)], 16)
 c.hazard("Gloom", path=[(336, 136), (336, 288), (288, 288), (288, 176)], radius=9)
@@ -225,6 +270,7 @@ lit_way(c, [(176, 376), (120, 376), (120, 336), (-104, 336), (-104, 220), (-176,
 c.hazard("Rockfall", at=(0, 330), radius=16)
 lit_way(c, [(-224, 264), (-224, 300), (-144, 300), (-144, 360), (-280, 360), (-280, 420),
             (-144, 420), (-144, 480), (-280, 480), (-280, 608)])
+low_ground(c, (-280, 488), (-280, 572))
 dead_end(c, [(200, 128), (40, 128), (40, 200)], weight=2)
 dead_end(c, [(228, 424), (228, 470), (60, 470)], weight=3)
 spur(c, [(-280, 540), (-252, 540)])
@@ -244,8 +290,12 @@ c.decor(LIT, at=(212, 10))
 # B: the dark west: the top-west wiggle, the West Court, the rows.
 # C: the east rows (the Gloom's), the Wreck Court, the bottom-east snake.
 c = z.crossing("The courts", paths=3)
-lit_way(c, CENTRE_ROWS[:-1] + [(100, 216), (100, 376), (176, 376)])
+DARK = [((-80, 104), (72, 104))]
+lit_way(c, CENTRE_ROWS[:-1] + [(100, 216), (100, 376), (176, 376)], dark=DARK)
 lit_way(c, [(228, 424), (228, 470), (-60, 470), (-60, 608)])
+dark_stretch(c, *DARK[0])
+falling_roof(c, (100, 270))
+low_ground(c, (-20, 470), (160, 470))
 spur(c, [(72, 320), (100, 320)])  # the Hall's east door
 dark_way(c, TOP_WEST)
 dark_way(c, WEST_ROWS, roofed=(8,), gloom=[(-136, 408), (-288, 408)])

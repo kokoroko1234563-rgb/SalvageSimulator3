@@ -123,6 +123,7 @@ Layouts.Kinds = {
 		At = false,
 		Radius = false,
 		Area = false,
+		Width = false,
 		Depth = true,
 		Rough = false,
 		Material = false,

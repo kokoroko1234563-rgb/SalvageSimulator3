@@ -419,10 +419,12 @@ function builders.Sink(tile, settings, folder)
 end
 
 -- Rockfall: a stretch of roof that's coming down (see Hazards.luau). Old rubble strews the
--- area: that's the tell that it's dangerous. Rocks fall at random in it, more often than not
--- aimed at someone inside, now and then several at once; each is warned by trickling dust and a
--- shadow that grows where it will land, then harms whoever is right there.
-local ROCK_SLOTS = 6 -- rocks that can be in the air at once, per area
+-- area: that's the tell that it's dangerous. Boulders fall on a beat, sweeping along its open
+-- ground and back, now and then where someone is standing (never ahead of them), with a burst
+-- after a rumble; each is warned by trickling dust and its full-size shadow, then harms whoever
+-- is right there and lies a while as a boulder to step round.
+local ROCK_SLOTS = 10 -- boulders falling or lying at once, per area
+local SWEEP_STEP = 6 -- studs between the spots the sweep drops on
 
 function builders.Rockfall(tile, settings, folder)
 	local areas = {}
@@ -466,7 +468,7 @@ function builders.Rockfall(tile, settings, folder)
 			local rock = makePart({
 				Name = "FallingRock",
 				Shape = Enum.PartType.Ball,
-				Size = Vector3.new(3.6, 3.2, 3.6),
+				Size = Vector3.new(1.7, 1.5, 1.7) * settings.RockRadius,
 				CFrame = CFrame.new(spot.x, ground - 20, spot.z),
 				Color = settings.Color,
 				Material = Palette.Material.Rock,
@@ -485,21 +487,80 @@ function builders.Rockfall(tile, settings, folder)
 			rock.Parent = folder
 			table.insert(slots, { shadow = shadow, rock = rock, dust = dust, start = nil })
 		end
+		-- The sweep: the open ground in the area (not the rock round it), ordered along the area's
+		-- longer way, so falls walk along it and back.
+		local open = {}
+		local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+		for dx = -radius, radius, SWEEP_STEP do
+			for dz = -radius, radius, SWEEP_STEP do
+				local x, z = spot.x + dx, spot.z + dz
+				if dx * dx + dz * dz <= radius * radius and Beach.feature(x, z) < 2 then
+					table.insert(open, Vector2.new(x, z))
+					minX, maxX = math.min(minX, x), math.max(maxX, x)
+					minZ, maxZ = math.min(minZ, z), math.max(maxZ, z)
+				end
+			end
+		end
+		if #open == 0 then
+			open = { Vector2.new(spot.x, spot.z) }
+		end
+		local alongX = maxX - minX >= maxZ - minZ
+		table.sort(open, function(a, b)
+			if alongX then
+				return a.X < b.X or (a.X == b.X and a.Y < b.Y)
+			end
+			return a.Y < b.Y or (a.Y == b.Y and a.X < b.X)
+		end)
+		-- A haze of dust over the whole area: the rumble before a burst.
+		local haze = makePart({
+			Name = "RockfallRumble",
+			Size = Vector3.new(radius * 2, 0.2, radius * 2),
+			CFrame = CFrame.new(spot.x, (Beach.roofAt(spot.x, spot.z) or ground + 16) - 1, spot.z),
+			Transparency = 1,
+		})
+		local rumble = Instance.new("ParticleEmitter")
+		rumble.Color = ColorSequence.new(settings.Color:Lerp(Color3.new(1, 1, 1), 0.4))
+		rumble.Size = NumberSequence.new(0.6, 0.2)
+		rumble.Lifetime = NumberRange.new(1, 1.6)
+		rumble.Rate = 60
+		rumble.Speed = NumberRange.new(4, 7)
+		rumble.EmissionDirection = Enum.NormalId.Bottom
+		rumble.Enabled = false
+		rumble.Parent = haze
+		haze.Parent = folder
 		table.insert(areas, {
 			x = spot.x,
 			z = spot.z,
 			radius = radius,
 			slots = slots,
+			sweep = open,
+			sweepAt = 1,
+			sweepDir = 1,
+			rumble = rumble,
 			nextFall = 0,
-			nextBurst = 0,
+			nextBurst = settings.BurstEvery,
 		})
 	end
 	if #areas == 0 then
 		return
 	end
-	-- Where a rock will land: on someone inside (a little off them) or anywhere in the area.
-	local function pick(area): Vector2
-		if rng:NextNumber() < settings.Aimed then
+	-- The sweep's next spot: along the open ground and back again.
+	local function nextSweep(area): Vector2
+		local at = area.sweep[area.sweepAt]
+		if #area.sweep > 1 then
+			local nextAt = area.sweepAt + area.sweepDir
+			if nextAt < 1 or nextAt > #area.sweep then
+				area.sweepDir = -area.sweepDir
+				nextAt = area.sweepAt + area.sweepDir
+			end
+			area.sweepAt = nextAt
+		end
+		return at
+	end
+	-- Where a rock will land: where someone inside is standing now (never ahead of them: moving
+	-- away always works), or the sweep's next spot.
+	local function pick(area, aimed: boolean): Vector2
+		if aimed then
 			local inside = {}
 			for _, player in Players:GetPlayers() do
 				local root = player.Character
@@ -514,22 +575,15 @@ function builders.Rockfall(tile, settings, folder)
 			end
 			if #inside > 0 then
 				local root = inside[rng:NextInteger(1, #inside)]
-				-- Lead them a little: where they'll be when it lands.
-				local lead = root.AssemblyLinearVelocity * settings.Warning * rng:NextNumber(0.3, 0.9)
-				local angle = rng:NextNumber() * math.pi * 2
-				return Vector2.new(
-					root.Position.X + lead.X + math.cos(angle) * 1.5,
-					root.Position.Z + lead.Z + math.sin(angle) * 1.5
-				)
+				return Vector2.new(root.Position.X, root.Position.Z)
 			end
 		end
-		local angle, reach = rng:NextNumber() * math.pi * 2, math.sqrt(rng:NextNumber()) * area.radius
-		return Vector2.new(area.x + math.cos(angle) * reach, area.z + math.sin(angle) * reach)
+		return nextSweep(area)
 	end
-	local function drop(area, now: number, delay: number)
+	local function drop(area, now: number, delay: number, aimed: boolean)
 		for _, slot in area.slots do
 			if not slot.start then
-				local at = pick(area)
+				local at = pick(area, aimed)
 				local ground = Beach.groundAt(at.X, at.Y)
 				slot.start = now + delay
 				slot.ground = ground
@@ -545,16 +599,16 @@ function builders.Rockfall(tile, settings, folder)
 		step = function(now)
 			for _, area in areas do
 				if now >= area.nextFall then
-					drop(area, now, 0)
-					area.nextFall = now + settings.Interval * rng:NextNumber(0.5, 1.5)
+					drop(area, now, 0, rng:NextNumber() < settings.Aimed)
+					area.nextFall = now + settings.Interval
 				end
+				-- The rumble, then the burst along the sweep.
+				area.rumble.Enabled = now >= area.nextBurst - settings.Rumble and now < area.nextBurst
 				if now >= area.nextBurst then
-					if area.nextBurst > 0 then
-						for k = 1, settings.Burst do
-							drop(area, now, k * 0.15)
-						end
+					for k = 1, settings.Burst do
+						drop(area, now, (k - 1) * 0.35, false)
 					end
-					area.nextBurst = now + settings.BurstEvery * rng:NextNumber(0.6, 1.4)
+					area.nextBurst = now + settings.BurstEvery
 				end
 				for _, slot in area.slots do
 					local start = slot.start
@@ -567,12 +621,13 @@ function builders.Rockfall(tile, settings, folder)
 						continue
 					elseif t < settings.Warning then
 						-- The warning: dust trickling from above, a shadow growing where it lands.
+						-- Full size from the start (where it lands is never in doubt), darkening.
 						local k = t / settings.Warning
-						local size = settings.RockRadius * 2 * (0.4 + 0.6 * k)
+						local size = settings.RockRadius * 2
 						slot.shadow.Size = Vector3.new(0.12, size, size)
 						slot.shadow.CFrame = CFrame.new(at.X, ground + 0.08, at.Y)
 							* CFrame.Angles(0, 0, math.pi / 2)
-						slot.shadow.Transparency = 0.75 - 0.4 * k
+						slot.shadow.Transparency = 0.7 - 0.45 * k
 						slot.rock.CFrame = CFrame.new(at.X, slot.top, at.Y)
 						slot.dust.Enabled = true
 					elseif t < landing then
@@ -580,17 +635,23 @@ function builders.Rockfall(tile, settings, folder)
 						local k = math.min(1, (t - settings.Warning) / (settings.Active * 0.6))
 						slot.dust.Enabled = false
 						slot.rock.Transparency = 0
-						slot.rock.CFrame = CFrame.new(at.X, slot.top + (ground + 1.6 - slot.top) * k, at.Y)
+						slot.rock.CFrame = CFrame.new(
+							at.X,
+							slot.top + (ground + slot.rock.Size.Y * 0.4 - slot.top) * k,
+							at.Y
+						)
 						if slot.shadow:GetAttribute("Active") ~= true then
 							slot.shadow:SetAttribute("Active", true)
 						end
-					elseif t < landing + 0.6 then
-						-- Lying there a moment.
+					elseif t < landing + settings.Lie then
+						-- Lying there a while: a boulder to step round.
 						if slot.shadow:GetAttribute("Active") ~= false then
 							slot.shadow:SetAttribute("Active", false)
 							slot.shadow.Transparency = 1
+							slot.rock.CanCollide = true
 						end
 					else
+						slot.rock.CanCollide = false
 						slot.rock.Transparency = 1
 						slot.rock.CFrame = CFrame.new(at.X, ground - 20, at.Y)
 						slot.shadow.CFrame = CFrame.new(at.X, ground - 20, at.Y)

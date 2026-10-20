@@ -363,6 +363,30 @@ return {
 					Width = 16,
 				},
 				{
+					Kind = "Roof",
+					Area = {
+						{ -152, 340 },
+						{ -152, 420 },
+						{ -128, 420 },
+						{ -128, 340 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Hollow",
+					Area = {
+						{ -100, 480 },
+						{ 40, 480 },
+						{ 40, 432 },
+						{ -100, 432 },
+					},
+					Width = 16,
+					Depth = 3,
+					Over = true,
+					Material = "Mud",
+				},
+				{
 					Kind = "Flat",
 					Area = {
 						{ -140, 214 },
@@ -578,6 +602,23 @@ return {
 				{
 					Type = "Gloom",
 					Path = {
+						{ -140, 340 },
+						{ -140, 420 },
+					},
+					Radius = 9,
+				},
+				{ Type = "Rockfall", At = { 20, 128 }, Radius = 14 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -100, 456 },
+						{ 40, 456 },
+					},
+					Width = 16,
+				},
+				{
+					Type = "Gloom",
+					Path = {
 						{ 340, 188 },
 						{ 104, 188 },
 						{ 104, 244 },
@@ -601,9 +642,6 @@ return {
 				{ Kind = "LanternPost", At = { -68, 119 } },
 				{ Kind = "LanternPost", At = { -149, 164 } },
 				{ Kind = "LanternPost", At = { -149, 236 } },
-				{ Kind = "LanternPost", At = { -149, 308 } },
-				{ Kind = "LanternPost", At = { -149, 380 } },
-				{ Kind = "LanternPost", At = { -149, 452 } },
 				{ Kind = "LanternPost", At = { -104, 465 } },
 				{ Kind = "LanternPost", At = { -32, 465 } },
 				{ Kind = "LanternPost", At = { 40, 465 } },
@@ -664,6 +702,30 @@ return {
 						{ 336, 608 },
 					},
 					Width = 16,
+				},
+				{
+					Kind = "Roof",
+					Area = {
+						{ 276, 190 },
+						{ 276, 280 },
+						{ 300, 280 },
+						{ 300, 190 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Hollow",
+					Area = {
+						{ 256, 524 },
+						{ 336, 524 },
+						{ 336, 476 },
+						{ 256, 476 },
+					},
+					Width = 16,
+					Depth = 3,
+					Over = true,
+					Material = "Mud",
 				},
 				{
 					Kind = "Flat",
@@ -1091,6 +1153,23 @@ return {
 				{
 					Type = "Gloom",
 					Path = {
+						{ 288, 190 },
+						{ 288, 280 },
+					},
+					Radius = 9,
+				},
+				{ Type = "Rockfall", At = { 240, 232 }, Radius = 14 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ 256, 500 },
+						{ 336, 500 },
+					},
+					Width = 16,
+				},
+				{
+					Type = "Gloom",
+					Path = {
 						{ -288, 336 },
 						{ -288, 372 },
 						{ -136, 372 },
@@ -1117,9 +1196,6 @@ return {
 				{ Kind = "LanternPost", At = { 332, 137 } },
 				{ Kind = "LanternPost", At = { 327, 164 } },
 				{ Kind = "LanternPost", At = { 327, 236 } },
-				{ Kind = "LanternPost", At = { 300, 287 } },
-				{ Kind = "LanternPost", At = { 297, 260 } },
-				{ Kind = "LanternPost", At = { 297, 188 } },
 				{ Kind = "LanternPost", At = { 252, 159 } },
 				{ Kind = "LanternPost", At = { 231, 204 } },
 				{ Kind = "LanternPost", At = { 231, 276 } },
@@ -1190,6 +1266,30 @@ return {
 						{ -60, 608 },
 					},
 					Width = 16,
+				},
+				{
+					Kind = "Roof",
+					Area = {
+						{ -72, 124 },
+						{ -72, 196 },
+						{ -48, 196 },
+						{ -48, 124 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Hollow",
+					Area = {
+						{ -20, 494 },
+						{ 160, 494 },
+						{ 160, 446 },
+						{ -20, 446 },
+					},
+					Width = 16,
+					Depth = 3,
+					Over = true,
+					Material = "Mud",
 				},
 				{
 					Kind = "Flat",
@@ -1447,6 +1547,23 @@ return {
 				{
 					Type = "Gloom",
 					Path = {
+						{ -60, 124 },
+						{ -60, 196 },
+					},
+					Radius = 9,
+				},
+				{ Type = "Rockfall", At = { 100, 200 }, Radius = 14 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -20, 470 },
+						{ 160, 470 },
+					},
+					Width = 16,
+				},
+				{
+					Type = "Gloom",
+					Path = {
 						{ -136, 48 },
 						{ -224, 48 },
 						{ -224, 100 },
@@ -1472,9 +1589,6 @@ return {
 				{ Kind = "LanternPost", At = { 164, 111 } },
 				{ Kind = "LanternPost", At = { 92, 111 } },
 				{ Kind = "LanternPost", At = { 20, 111 } },
-				{ Kind = "LanternPost", At = { -52, 111 } },
-				{ Kind = "LanternPost", At = { -69, 156 } },
-				{ Kind = "LanternPost", At = { -24, 209 } },
 				{ Kind = "LanternPost", At = { 48, 209 } },
 				{ Kind = "LanternPost", At = { 120, 209 } },
 				{ Kind = "LanternPost", At = { 192, 209 } },
@@ -1572,6 +1686,19 @@ return {
 						{ -280, 608 },
 					},
 					Width = 16,
+				},
+				{
+					Kind = "Hollow",
+					Area = {
+						{ -304, 488 },
+						{ -304, 572 },
+						{ -256, 572 },
+						{ -256, 488 },
+					},
+					Width = 16,
+					Depth = 3,
+					Over = true,
+					Material = "Mud",
 				},
 				{
 					Kind = "Flat",
@@ -1700,6 +1827,14 @@ return {
 					Radius = 9,
 				},
 				{ Type = "Rockfall", At = { 0, 330 }, Radius = 16 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -280, 488 },
+						{ -280, 572 },
+					},
+					Width = 16,
+				},
 				{ Type = "Sink", At = { 40, 164 }, Radius = 10 },
 				{ Type = "Sink", At = { 144, 470 }, Radius = 10 },
 				{
@@ -1715,13 +1850,6 @@ return {
 				{ Kind = "LanternPost", At = { 191, 36 } },
 				{ Kind = "LanternPost", At = { 191, 108 } },
 				{ Kind = "LanternPost", At = { 236, 137 } },
-				{ Kind = "LanternPost", At = { 308, 137 } },
-				{ Kind = "LanternPost", At = { 327, 164 } },
-				{ Kind = "LanternPost", At = { 327, 236 } },
-				{ Kind = "LanternPost", At = { 300, 287 } },
-				{ Kind = "LanternPost", At = { 297, 260 } },
-				{ Kind = "LanternPost", At = { 297, 188 } },
-				{ Kind = "LanternPost", At = { 252, 159 } },
 				{ Kind = "LanternPost", At = { 231, 204 } },
 				{ Kind = "LanternPost", At = { 231, 276 } },
 				{ Kind = "LanternPost", At = { 140, 367 } },
@@ -1778,6 +1906,30 @@ return {
 						{ -60, 608 },
 					},
 					Width = 16,
+				},
+				{
+					Kind = "Roof",
+					Area = {
+						{ -80, 116 },
+						{ 72, 116 },
+						{ 72, 92 },
+						{ -80, 92 },
+					},
+					Clearance = 18,
+					Thickness = 6,
+				},
+				{
+					Kind = "Hollow",
+					Area = {
+						{ -20, 494 },
+						{ 160, 494 },
+						{ 160, 446 },
+						{ -20, 446 },
+					},
+					Width = 16,
+					Depth = 3,
+					Over = true,
+					Material = "Mud",
 				},
 				{
 					Kind = "Flat",
@@ -2195,6 +2347,23 @@ return {
 				{
 					Type = "Gloom",
 					Path = {
+						{ -80, 104 },
+						{ 72, 104 },
+					},
+					Radius = 9,
+				},
+				{ Type = "Rockfall", At = { 100, 270 }, Radius = 14 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -20, 470 },
+						{ 160, 470 },
+					},
+					Width = 16,
+				},
+				{
+					Type = "Gloom",
+					Path = {
 						{ -136, 408 },
 						{ -288, 408 },
 					},
@@ -2214,10 +2383,6 @@ return {
 				{ Kind = "LanternPost", At = { 31, 36 } },
 				{ Kind = "LanternPost", At = { 4, 39 } },
 				{ Kind = "LanternPost", At = { -68, 39 } },
-				{ Kind = "LanternPost", At = { -97, 84 } },
-				{ Kind = "LanternPost", At = { -52, 113 } },
-				{ Kind = "LanternPost", At = { 20, 113 } },
-				{ Kind = "LanternPost", At = { 71, 140 } },
 				{ Kind = "LanternPost", At = { 44, 151 } },
 				{ Kind = "LanternPost", At = { -28, 151 } },
 				{ Kind = "LanternPost", At = { -97, 196 } },
