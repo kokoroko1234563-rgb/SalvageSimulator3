@@ -137,8 +137,23 @@ Biomes.List = {
 	},
 	TidepoolRocks = {
 		Id = "TidepoolRocks",
-		-- The pools slow you where its layout puts them (gentle: a common biome).
-		Hazards = { { Type = "Slow", Scatter = false, Factor = 0.7, Color = Color3.fromRGB(80, 130, 150) } },
+		-- The pools slow you where its layout puts them; blowholes in the benches spout on a timer
+		-- (a knockback, a warning first).
+		Hazards = {
+			{ Type = "Slow", Scatter = false, Factor = 0.7, Color = Color3.fromRGB(80, 130, 150) },
+			{
+				Type = "Pulse",
+				Scatter = false,
+				Period = 9,
+				Warning = 2,
+				Active = 1.2,
+				Radius = 5,
+				Effect = "Knockdown",
+				Push = 40,
+				HitText = "A blowhole spouted under you!",
+				Color = Color3.fromRGB(200, 225, 235),
+			},
+		},
 		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
 		LootShare = 0.6,
 		Decor = Color3.fromRGB(120, 140, 150),

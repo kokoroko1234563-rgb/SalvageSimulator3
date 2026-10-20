@@ -61,6 +61,13 @@ def slow_pools(part, pools, ramp):
             part.hazard("Slow", at=at, radius=r - 1)
 
 
+def blowholes(part, ramp, holes):
+    """Blowhole spouts in the benches (a knockback on a timer), kept off the cart gully."""
+    for at in holes:
+        if not near_path(ramp, at[0], at[1], 8 + 5 + 6):
+            part.hazard("Pulse", at=at)
+
+
 def gully(part, gaps, benches, width=16):
     """The cart route: straight through each bench at its gully, slanting across the sand between."""
     pts = [(gaps[0], 0)]
@@ -85,6 +92,7 @@ OPEN = {
                ((-260, 402), 10), ((-70, 398), 9), ((120, 404), 10), ((270, 400), 9)],
         loot=[((-250, 172), 1), ((240, 172), 1), ((270, 400), 2), ((-70, 398), 4)],
         entrance=(-250, 290),
+        holes=[(-280, 112), (262, 250), (-240, 470), (-20, 172), (200, 402)],
         crossings=[("Starfish gully", (-150, 150), "Starfish"),
                    ("Urchin gully", (150, -130), "Urchins"),
                    ("Shell gully", (0, 210), "Shells")],
@@ -97,6 +105,8 @@ OPEN = {
                ((-250, 492), 11), ((-70, 488), 10), ((110, 492), 11), ((270, 488), 10)],
         loot=[((-270, 212), 1), ((290, 348), 2), ((-60, 348), 2), ((270, 488), 4)],
         entrance=(-60, 280),
+        holes=[(-190, 210), (30, 212), (230, 208), (-120, 350), (60, 352), (230, 350),
+               (-200, 490), (20, 492), (200, 488)],
         crossings=[("Starfish gully", (-140, 100, -90), "Starfish"),
                    ("Urchin gully", (180, -80, 110), "Urchins"),
                    ("Shell gully", (-30, 200, 20), "Shells")],
@@ -109,6 +119,8 @@ OPEN = {
                ((-260, 482), 12), ((-60, 478), 11), ((120, 482), 12), ((280, 478), 11)],
         loot=[((-280, 202), 1), ((300, 338), 2), ((-70, 338), 2), ((280, 478), 4)],
         entrance=(40, 410),
+        holes=[(-200, 200), (30, 202), (230, 198), (-170, 340), (10, 342), (210, 340),
+               (-210, 480), (20, 482), (190, 478)],
         crossings=[("Starfish gully", (-150, 110, -100), "Starfish"),
                    ("Urchin gully", (170, -120, 140), "Urchins"),
                    ("Shell gully", (-20, 210, 10), "Shells")],
@@ -139,6 +151,9 @@ def open_zone(n):
         bench(f, zc, depth, s["h"], 14, shift=n, x0=x0, x1=x1)
     for at, r in s["pools"]:
         pool_on_bench(f, at, r, depth=3)
+    for hx, hz in s["holes"]:
+        f.decor("Rocks", at=(hx + 6, hz - 5), scale=0.8, yaw=hx % 90)
+        f.decor("Barnacles", at=(hx - 6, hz + 5))
     for at, weight in s["loot"]:
         f.loot(at, radius=8, weight=weight)
     # The entrance: a blowhole in the rocks, on flat sand at a bench's foot, rimmed with rock.
@@ -159,6 +174,7 @@ def open_zone(n):
         ramp = gully(c, gaps, crosses)
         clear_of_pools(n, ramp)
         slow_pools(c, s["pools"], ramp)
+        blowholes(c, ramp, s["holes"])
         # The tell, at the way in: beside the first gully.
         gx = gaps[0]
         c.decor(tell, at=(gx + 26, 22), scale=1.2, yaw=40 * k)
@@ -187,13 +203,16 @@ def pool(part, at, radius=8, depth=2):
     part.decor("Starfish", at=(at[0] - radius + 2, at[1]))
 
 
-def way(part, cart, foot, ledges, cart_pool, foot_pools, tell, loots):
+def way(part, cart, foot, ledges, cart_pool, foot_pools, tell, loots, blowhole_spots=()):
     """A crossing: the cart's gully (lane 20, ramp 16) and the foot way (lane 12, ledges, pools)."""
     part.lane(cart, width=20)
     part.ramp(cart, width=16)
     part.lane(foot, width=12)
     for x, zz, along in ledges:
         ledge(part, x, zz, along)
+    for at in blowhole_spots:
+        part.hazard("Pulse", at=at)
+        part.decor("Barnacles", at=(at[0] + 6, at[1] + 5))
     pool(part, cart_pool, radius=10, depth=1)
     for at in foot_pools:
         pool(part, at)
@@ -263,7 +282,8 @@ def zone4():
         ledges=[(-190, 140, "x"), (-150, 330, "x"), (-80, 470, "z")],
         cart_pool=(180, 320), foot_pools=[(-250, 235), (-80, 400), (-80, 540)],
         tell=[("Starfish", (104, 12), 1.4), ("Rocks", (60, 14), 1.4)],
-        loots=[((200, 470), 1), ((-280, 260), 3)])
+        loots=[((200, 470), 1), ((-280, 260), 3)],
+        blowhole_spots=[(-80, 80), (-180, 140), (-280, 240), (-80, 430), (-80, 520)])
     # Crossing 2: the cart gully in the west, the foot way in the east.
     c = z.crossing("West gully", paths=2)
     way(c,
@@ -273,7 +293,8 @@ def zone4():
         ledges=[(190, 150, "x"), (150, 330, "x"), (80, 470, "z")],
         cart_pool=(-180, 300), foot_pools=[(250, 240), (80, 400), (80, 540)],
         tell=[("Urchins", (-104, 12), 1.4), ("Rocks", (-60, 14), 1.4)],
-        loots=[((-200, 460), 1), ((280, 260), 3)])
+        loots=[((-200, 460), 1), ((280, 260), 3)],
+        blowhole_spots=[(80, 80), (180, 150), (280, 240), (80, 430), (80, 520)])
     return z
 
 
