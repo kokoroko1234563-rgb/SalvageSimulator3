@@ -433,9 +433,11 @@ Config.Water = {
 
 -- Biomes: each tide cycle, every zone rolls whether it becomes a biome (see Biomes.luau).
 Config.Biomes = {
-	-- Each cycle every tile rolls a biome from those that can turn up in its zone (each biome's
-	-- Zones weights, in Biomes.luau), or none, with this weight. Rare biomes are never announced.
-	NoneWeight = 40,
+	-- Each tide every zone first rolls whether it gets a biome at all (this chance, by zone:
+	-- about 1.5 biomes a tide in all, usually 1 or 2), then which, by the Zones weights of the
+	-- biomes that can turn up there (Biomes.luau). Each biome turns up at most once a tide.
+	-- Rare biomes are never announced.
+	Chance = { 0.2, 0.22, 0.25, 0.28, 0.3, 0.3 },
 }
 
 -- Rare unlock items for secrets.

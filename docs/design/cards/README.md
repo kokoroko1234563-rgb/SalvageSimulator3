@@ -35,9 +35,13 @@ The biomes to build before launch (decided with the designer):
   and 6**; Sea-Glass Shore and Black Sand Vents wait. Which of the planned Common, Uncommon and
   Rare biomes join it: to decide.
 
+Each biome turns up **at most once a tide**, and a tide usually has **1 or 2 biomes** in all:
+each zone rolls whether it gets one (`Config.Biomes.Chance`, about 25%), and the weights below
+only decide which (decided).
+
 Where each biome rolls, by tier (VeryRare decided; the rest proposed):
 
-| Tier | Zones | Weight each (against no biome: 40) |
+| Tier | Zones | Weight each (which biome, when a zone gets one) |
 |---|---|---|
 | Common | 1 to 4 | 20 to 45 |
 | Uncommon | 2 to 6 | 12 to 15 |

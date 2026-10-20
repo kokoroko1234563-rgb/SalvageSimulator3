@@ -2793,7 +2793,7 @@ test("biomes roll only in their zones", function()
 	for tile = 1, Beach.ActiveTiles do
 		local zone = Beach.zoneOfTile(tile)
 		local weights = BiomeService.weightsFor(tile)
-		assert(weights.None == Config.Biomes.NoneWeight, "none can always roll")
+		assert(Config.Biomes.Chance[zone] < 1, "a zone can always come up without a biome")
 		for id, biome in Biomes.List do
 			local expected = biome.Zones[zone]
 			assert(weights[id] == expected, id .. " in zone " .. zone)
@@ -2801,6 +2801,28 @@ test("biomes roll only in their zones", function()
 	end
 	assert(BiomeService.weightsFor(1).HermitHollows == nil, "no hermit crabs by the shop")
 	assert(BiomeService.weightsFor(Beach.ActiveTiles).HermitHollows, "but out in the Drowned Reach")
+	-- A tide: each biome at most once, and usually one or two in all.
+	-- (A stand-in for Roblox's Random, which Lune hasn't got.)
+	math.randomseed(7)
+	local random = {
+		NextNumber = function()
+			return math.random()
+		end,
+		NextInteger = function(_, low, high)
+			return math.random(low, high)
+		end,
+	} :: any
+	local total, tides = 0, 2000
+	for _ = 1, tides do
+		local seen = {}
+		for _, id in BiomeService.pick(random) do
+			assert(not seen[id], "each biome at most once a tide")
+			seen[id] = true
+			total += 1
+		end
+	end
+	local average = total / tides
+	assert(average >= 1 and average <= 2, "about one or two biomes a tide, not " .. average)
 end)
 
 test("cart ramps keep clear of the rock pools' rocks", function()

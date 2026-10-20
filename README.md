@@ -107,7 +107,7 @@ node tools/preview/render.cjs /tmp/out /tmp/png            # needs `playwright` 
 
 ## Biomes and their hazards
 
-Every tile of the beach rolls a biome each tide cycle, from those that can turn up in its zone (`Biomes.List[id].Zones`, against `Config.Biomes.NoneWeight`). A biome is data:
+Each tide cycle, every zone rolls whether it gets a biome (`Config.Biomes.Chance`: about 1 or 2 biomes a tide in all), then which, from those that can turn up in it (`Biomes.List[id].Zones` weights); each biome turns up at most once a tide. A biome is data:
 
 - **Where it rolls:** `Zones = { [zone] = weight }`. Rarer biomes roll further out.
 - **Its ground:** its layout (`src/shared/Layouts/Biomes/<Id>`), which can also place its hazards, its loot spots and its entrance.

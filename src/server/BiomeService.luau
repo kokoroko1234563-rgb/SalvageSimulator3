@@ -286,10 +286,10 @@ function BiomeService.set(tile: number, biomeId: string?, choice: any?)
 	end
 end
 
--- The roll weights on a tile: each biome that can roll in its zone, and None.
+-- The roll weights on a tile: each biome that can roll in its zone.
 function BiomeService.weightsFor(tile: number): { [string]: number }
 	local zone = Beach.zoneOfTile(tile)
-	local weights = { None = Config.Biomes.NoneWeight }
+	local weights = {}
 	for id, biome in Biomes.List do
 		local weight = biome.Zones and biome.Zones[zone]
 		if weight and weight > 0 then
@@ -299,24 +299,45 @@ function BiomeService.weightsFor(tile: number): { [string]: number }
 	return weights
 end
 
--- Rolls every tile from the biomes that can turn up in its zone.
-function BiomeService.reroll()
+-- One tide's biomes: { [tile] = biome id } (tiles without one left out). Each zone rolls
+-- whether it gets one (Config.Biomes.Chance), then which, from those that can turn up there
+-- and haven't already this tide: each biome at most once. The zones roll in a random order, so
+-- a biome that can turn up in several isn't always taken by the nearest.
+function BiomeService.pick(random: Random): { [number]: string }
+	local order = {}
 	for tile = 1, Beach.ActiveTiles do
-		local weights = BiomeService.weightsFor(tile)
-		local total = 0
-		for _, weight in weights do
-			total += weight
+		table.insert(order, random:NextInteger(1, #order + 1), tile)
+	end
+	local picked, used = {}, {}
+	for _, tile in order do
+		local chance = Config.Biomes.Chance[Beach.zoneOfTile(tile)] or 0
+		if random:NextNumber() >= chance then
+			continue
 		end
-		local roll = rng:NextNumber() * total
-		local picked: string? = nil
+		local weights, total = {}, 0
+		for id, weight in BiomeService.weightsFor(tile) do
+			if not used[id] then
+				weights[id] = weight
+				total += weight
+			end
+		end
+		local roll = random:NextNumber() * total
 		for id, weight in weights do
 			roll -= weight
 			if roll <= 0 then
-				picked = id
+				picked[tile], used[id] = id, true
 				break
 			end
 		end
-		BiomeService.set(tile, if picked and Biomes.List[picked] then picked else nil)
+	end
+	return picked
+end
+
+-- Rolls every tile's biome for the new tide.
+function BiomeService.reroll()
+	local picked = BiomeService.pick(rng)
+	for tile = 1, Beach.ActiveTiles do
+		BiomeService.set(tile, picked[tile])
 	end
 	for _, callback in rerollCallbacks do
 		task.spawn(callback)

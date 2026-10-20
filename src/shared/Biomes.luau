@@ -9,7 +9,8 @@ local Biomes = {}
 
 -- Each biome in the list rolls on the beach. Its fields:
 --   Zones        { [zone] = weight }: the zones it can roll in, and how often (against the
---                other biomes there and Config.Biomes.NoneWeight).
+--                other biomes there, once a zone has rolled to get a biome at all:
+--                Config.Biomes.Chance). Each biome turns up at most once a tide.
 --   Loot, LootShare  the zone's surf spawns: this share comes from Loot.
 --   Hazards      a list of hazard entries (see Hazards.luau): { Type = "Patrol", ... }.
 --   Secret, UnlockItem, Entrance, EntranceSpots  its secret and the entrance to it. A biome

@@ -326,10 +326,13 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 	end
 
 	-- Biomes
-	check(
-		type(Config.Biomes.NoneWeight) == "number" and Config.Biomes.NoneWeight >= 0,
-		"Config.Biomes.NoneWeight must be a number"
-	)
+	for zone = 1, Config.Beach.ActiveZones do
+		local chance = Config.Biomes.Chance[zone]
+		check(
+			type(chance) == "number" and chance >= 0 and chance < 1,
+			"Config.Biomes.Chance[" .. zone .. "] must be a chance under 1"
+		)
+	end
 	for id, biome in Biomes.List do
 		local where = "Biome " .. id
 		check(biome.Id == id, where .. ": Id doesn't match its key")
