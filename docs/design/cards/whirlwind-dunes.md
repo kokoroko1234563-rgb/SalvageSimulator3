@@ -20,3 +20,5 @@ you hold, and a loaded cart is spilled. Not deadly itself; flung into a pit or t
 
 **Questions.**
 1. Flung only, or should the whirlwind be deadly in zone 6?
+
+Answer: We should introduce spike pits on zone 6, but otherwise no
