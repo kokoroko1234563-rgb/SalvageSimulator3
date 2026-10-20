@@ -13,6 +13,15 @@ it. The rules every zone follows are in `docs/design/layouts.md`.
 | [Shipwreck Shallows](shipwreck-shallows.md) | 2 to 6 | approved; the barrels' tumble first |
 | [Sandcastle Flats](sandcastle-flats.md) | 1 to 4 | on hold: upper floors and traps to discuss |
 | [The shore](shore.md) | 1 to 3 | approved; targets lowered |
+| [Driftwood Cove](driftwood-cove.md) | 1 to 4 | draft |
+| [Tidepool Rocks](tidepool-rocks.md) | 1 to 4 | draft |
+| [Seagrass Shallows](seagrass-shallows.md) | 1 to 4 | draft |
+| [Coral Garden](coral-garden.md) | 1 to 4 | draft |
+| [Jellyfish Lagoon](jellyfish-lagoon.md) | 2 to 6 | draft |
+| [Fog Bank](fog-bank.md) | 2 to 6 | draft |
+| [Whirlwind Dunes](whirlwind-dunes.md) | 4 to 6 | draft |
+| [Spearstone Reef](spearstone-reef.md) | 4 to 6 | draft |
+| [Stranded Iceberg](stranded-iceberg.md) | 5 and 6 | draft |
 
 Each card says:
 
@@ -32,14 +41,14 @@ The biomes to build before launch (decided with the designer):
 - **Rebuilt with the kit** (zone 6 is the model): zones 4 and 5, Hermit Hollows, Shipwreck
   Shallows (its own zones 2 to 6).
 - **New:** one VeryRare biome, **Stranded Iceberg** (Pip the penguin's), rolling **only in zones 5
-  and 6**; Sea-Glass Shore and Black Sand Vents wait. Which of the planned Common, Uncommon and
-  Rare biomes join it: to decide.
+  and 6**; Sea-Glass Shore and Black Sand Vents wait. All the planned Common, Uncommon and Rare
+  biomes join it (decided).
 
 Each biome turns up **at most once a tide**, and a tide usually has **1 or 2 biomes** in all:
 each zone rolls whether it gets one (`Config.Biomes.Chance`, about 25%), and the weights below
 only decide which (decided).
 
-Where each biome rolls, by tier (VeryRare decided; the rest proposed):
+Where each biome rolls, by tier (decided):
 
 | Tier | Zones | Weight each (which biome, when a zone gets one) |
 |---|---|---|
