@@ -141,7 +141,164 @@ def zone3():
     return z
 
 
+# ---- zones 4 to 6: the lagoon in a rock cavern --------------------------------------------------
+RX = 215  # the cavern's half width
+
+
+def serp(xin, xfar, rows):
+    """Lane points snaking from (xin, rows[0]) out to xfar and back, one pair of rows at a time."""
+    pts = []
+    for i in range(0, len(rows), 2):
+        pts += [(xin, rows[i]), (xfar, rows[i]), (xfar, rows[i + 1]), (xin, rows[i + 1])]
+    return pts
+
+
+def rows_down(first, count, step=36):
+    return [first + step * i for i in range(2 * count)]
+
+
+def lagoon_hall(z, cz, rz, roof, pillars):
+    f = z.frame
+    poly = ellipse(0, cz, RX, rz, 36)
+    f.hall(poly, roof=roof, pillars=pillars)
+    # The lagoon itself: hollows filling the cavern's middle, the seaward ones deeper.
+    for x, dz in ((-80, -30), (80, -30), (0, -50)):
+        f.hollow((x, cz + dz), radius=80, depth=3, rough=3, material=MUD)
+    for x, dz in ((-80, 40), (80, 40), (0, 60)):
+        f.hollow((x, cz + dz), radius=80, depth=4, rough=3, material=MUD)
+    f.paint(poly, SAND)
+    f.decor("Weed", area=box(0, cz, 300, rz * 1.4), count=12)
+    f.decor(GLOW, area=box(0, cz, 300, rz * 1.4), count=8)
+    f.decor("Shells", area=box(0, cz, 2 * RX - 20, rz * 1.8), count=6)
+    f.decor("Starfish", area=box(0, cz + rz - 20, 300, 30), count=4)
+    return poly
+
+
+def coves(z, cz, rz, sites):
+    """Loot coves off the cavern's rim: a small chamber at the end of a short lane through the rock."""
+    f = z.frame
+    for x, dz, weight in sites:
+        side = 1 if x > 0 else -1
+        zz = cz + dz
+        f.hall(box(x, zz, 44, 40))
+        hw = RX * math.sqrt(max(0.0, 1 - (dz / rz) ** 2))
+        f.lane([(side * (hw - 16), zz), (x, zz)], width=12)
+        cove(f, (x, zz), weight)
+
+
+def hall_z(cz, rz, x, side):
+    """Where the cavern's rim is at x: its north (side -1) or south (+1) edge."""
+    return cz + side * rz * math.sqrt(max(0.0, 1 - (x / RX) ** 2))
+
+
+def walled(n, rock, roof, cz, rz, plan, jellies, tells, arc_end):
+    """`plan`: pairs of rows each path winds through above and below the cavern, as
+    {"p1": (top, bottom), "p2": ..., "p3": ...} (cut down to what fits); `arc_end`: the angle the
+    ring path leaves the rim at (-215: west, -325: east, the long way round)."""
+    z = Zone(n, NAME, rock=rock)
+    f = z.frame
+    pillars = [(x, y) for x in (-130, 0, 130) for y in (cz - 80, cz, cz + 80)] if roof else ()
+    lagoon_hall(z, cz, rz, roof, pillars)
+    q = max(48, int(rz * 0.32))
+    sites = ((-283, -q, 1), (283, -q, 2), (-283, q, 4), (283, q, 3))
+    coves(z, cz, rz, sites)
+    f.entrance((283, cz - q + 12))
+    f.decor("Driftwood", at=(272, cz - q - 10), yaw=30)
+    for x in (-110, 110):
+        f.decor("Starfish", at=(x, 8))
+
+    def top_rows(x, want, step=36):
+        room = int((hall_z(cz, rz, x, -1) - 30 - 30) // step) + 1  # rows that fit above the cavern
+        return rows_down(30, min(want, room // 2), step)
+
+    def bottom_rows(x, want, step=36):
+        first = int(hall_z(cz, rz, x, 1)) + 46
+        fit = int((584 - first) // step) + 1
+        return rows_down(first, min(want, fit // 2), step)
+
+    ring_z = rz - 20
+    east_exit = arc_end < -270
+    for spec in (0, 1):
+        s = 1 if spec == 0 else -1
+        c = z.crossing(("East", "West")[spec] + " way", paths=3)
+
+        # P1, the ring: top snake in the east, round the rim (north, west and, the long way, south),
+        # bottom snake.
+        t1 = top_rows(190, plan["p1"][0], 44)
+        ring = [(round(188 * math.cos(math.radians(t))), round(cz + ring_z * math.sin(math.radians(t))))
+                for t in range(-35, arc_end - 1, -15)]
+        ex = 190 if east_exit else ring[-1][0]
+        b1 = bottom_rows(ex, plan["p1"][1], 44)
+        pts = [(190, -12)]
+        if t1:
+            pts += serp(190, 350, t1)
+            pts += [(190, t1[-1] + 30)]
+        pts += ring
+        pts += [(ex, ring[-1][1])] if not east_exit else []
+        if b1:
+            pts += [(ex, b1[0])] + serp(ex, 350 if east_exit else -300, b1)[1:]
+        pts += [(ex, 620)]
+        c.ramp([(s * x, zz) for x, zz in pts], width=16)
+
+        # P2, the causeway: top snake in the west, across the water on a causeway, down.
+        t2 = top_rows(-60, plan["p2"][0])
+        p2 = [(-60, -12)] + (serp(-60, -230, t2) if t2 else [])
+        p2 += [(-60, hall_z(cz, rz, -60, -1) + 10)]
+        c.lane([(s * x, zz) for x, zz in p2], width=12)
+        b2 = bottom_rows(-60, plan["p2"][1])
+        p2b = [(-60, hall_z(cz, rz, -60, 1) - 10)] + ([(-60, b2[0])] + serp(-60, -230, b2)[1:] if b2 else []) + [(-60, 620)]
+        c.lane([(s * x, zz) for x, zz in p2b], width=12)
+        c.ridge([(s * -60, hall_z(cz, rz, -60, -1) + 4), (s * -61, cz), (s * -60, hall_z(cz, rz, -60, 1) - 4)],
+                height=3.4, width=12, rough=0)
+        c.add(Kind="Channel", Path=[(s * -60, cz + 40), (s * -60, cz + 80)], Depth=2.4, Width=8,
+              Rough=0, Material=MUD)
+
+        # P3, through the lagoon at low tide: a snake in the middle above and below the floor.
+        t3 = top_rows(-24, plan["p3"][0])
+        p3 = [(-24, -12)] + (serp(-24, 150, t3) if t3 else []) + [(-24, hall_z(cz, rz, -24, -1) + 10)]
+        c.lane([(s * x, zz) for x, zz in p3], width=12)
+        b3 = bottom_rows(-24, plan["p3"][1])
+        p3b = [(-24, hall_z(cz, rz, -24, 1) - 10)] + ([(-24, b3[0])] + serp(-24, 150, b3)[1:] if b3 else []) + [(-24, 620)]
+        c.lane([(s * x, zz) for x, zz in p3b], width=12)
+
+        # The jellies: drifting in the water, stranded on the rim and the causeway.
+        drifting(c, [(s * -100, cz - 90), (s * 0, cz - 50), (s * 60, cz - 80), (s * 120, cz - 30)])
+        drifting(c, [(s * 20, cz + 20), (s * 40, cz + 70), (s * -10, cz + 100), (s * 30, cz + 130)])
+        for k in range(jellies):
+            ang = math.radians(-190 + k * 360 / jellies)
+            stranded(c, (s * round(170 * math.cos(ang)), round(cz + (rz - 36) * math.sin(ang))))
+        for dz in (-70, -20, 50, 100):
+            stranded(c, (s * -60, cz + dz))
+        tells[spec](c)
+    return z
+
+
+def tell_a(c):
+    c.decor(GLOW, path=[(180, 16), (220, 16)], count=3)
+    c.decor("Shells", at=(200, 26))
+
+
+def tell_b(c):
+    c.decor("Timber", path=[(-80, 16), (-40, 16)], count=3)
+    c.decor("Starfish", at=(-60, 26))
+
+
+def zone4():
+    return walled(4, 14, False, 330, 160, {"p1": (1, 1), "p2": (1, 0), "p3": (2, 1)}, 8,
+                  (tell_a, tell_a), -215)
+
+
+def zone5():
+    return walled(5, 18, True, 340, 150, {"p1": (2, 1), "p2": (2, 0), "p3": (2, 1)}, 10,
+                  (tell_a, tell_a), -325)
+
+
+def zone6():
+    return walled(6, 20, True, 330, 120, {"p1": (3, 2), "p2": (3, 2), "p3": (3, 2)}, 12,
+                  (tell_a, tell_a), -325)
+
+
 COMMENT = ("-- Jellyfish Lagoon (planned): drawn with the layout kit from tools/kit/plans/jellyfish_lagoon.py\n"
            "-- (edit the plan and re-run it, not this file). The card: docs/design/cards/jellyfish-lagoon.md.")
 if __name__ == "__main__":
-    write_zones(OUT, [zone2(), zone3()], COMMENT)
+    write_zones(OUT, [zone2(), zone3(), zone4(), zone5(), zone6()], COMMENT)
