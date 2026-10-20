@@ -420,8 +420,10 @@ c.decor("Bones", at=(-122, 12), scale=1.6, yaw=180)
 # B: foot: the east snake into the Shell Court, down the bottom east.
 # Link: the Hall's east door to both.
 c = z4.crossing("Moult run", paths=2)
-A = [(40, 0), (40, 48), (-88, 48), (-88, 104), (104, 104), (104, 470), (60, 470), (60, 608)]
+A = [(40, 0), (40, 48), (-88, 48), (-88, 104), (104, 104), (104, 160), (-88, 160), (-88, 216),
+     (104, 216), (104, 470), (60, 470), (60, 608)]
 cart_way(c, A)
+scramble(c, (40, 48), (40, 104))  # a shortcut for feet: rubble a cart can't climb
 B = [(224, 0), (224, 132), (336, 132), (336, 188), (104 + 40, 188), (144, 244), (336, 244), (336, 300),
      (140, 300), (140, 376), (176, 376)]
 tunnel(c, B)
