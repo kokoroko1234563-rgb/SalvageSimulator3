@@ -1105,13 +1105,178 @@ local function rail(path: { Vector2 })
 end
 HazardService._rail = rail
 
+-- The giant's tunnels as a graph: junctions (nodes) joined by straight runs (edges). Routes
+-- that share a point, or where one route's corner lies on another's run, are joined there.
+-- A place on it is { e = edge, d = distance along it from its first node }.
+local JOIN = 4 -- studs within which two routes' points are the same junction
+local function tunnels(routes: { { Vector2 } })
+	local nodes: { Vector2 } = {}
+	local edges: { { a: number, b: number, len: number } } = {}
+	local function node(p: Vector2): number
+		for i, n in nodes do
+			if (n - p).Magnitude <= JOIN then
+				return i
+			end
+		end
+		table.insert(nodes, p)
+		return #nodes
+	end
+	for _, path in routes do
+		for i = 1, #path - 1 do
+			local a, b = node(path[i]), node(path[i + 1])
+			if a ~= b then
+				table.insert(edges, { a = a, b = b, len = (nodes[b] - nodes[a]).Magnitude })
+			end
+		end
+	end
+	-- Two runs crossing in their middles make a junction there.
+	local crossed = true
+	while crossed do
+		crossed = false
+		for i = 1, #edges do
+			for j = i + 1, #edges do
+				local e1, e2 = edges[i], edges[j]
+				if e1.a ~= e2.a and e1.a ~= e2.b and e1.b ~= e2.a and e1.b ~= e2.b then
+					local p, r = nodes[e1.a], nodes[e1.b] - nodes[e1.a]
+					local q, u = nodes[e2.a], nodes[e2.b] - nodes[e2.a]
+					local den = r.X * u.Y - r.Y * u.X
+					if math.abs(den) > 1e-6 then
+						local t = ((q - p).X * u.Y - (q - p).Y * u.X) / den
+						local v = ((q - p).X * r.Y - (q - p).Y * r.X) / den
+						if t > 0.01 and t < 0.99 and v > 0.01 and v < 0.99 then
+							table.insert(nodes, p + r * t)
+							local n = #nodes
+							edges[i] = { a = e1.a, b = n, len = (r * t).Magnitude }
+							edges[j] = { a = e2.a, b = n, len = (u * v).Magnitude }
+							table.insert(edges, { a = n, b = e1.b, len = (r * (1 - t)).Magnitude })
+							table.insert(edges, { a = n, b = e2.b, len = (u * (1 - v)).Magnitude })
+							crossed = true
+							break
+						end
+					end
+				end
+			end
+			if crossed then
+				break
+			end
+		end
+	end
+	-- A junction lying on another run splits that run there.
+	local split = true
+	while split do
+		split = false
+		for n, p in nodes do
+			for ei, e in edges do
+				if e.a ~= n and e.b ~= n then
+					local A, B = nodes[e.a], nodes[e.b]
+					local t = (p - A):Dot(B - A) / (e.len * e.len)
+					if t > 0.01 and t < 0.99 and (A + (B - A) * t - p).Magnitude <= JOIN then
+						table.insert(edges, { a = n, b = e.b, len = (nodes[e.b] - p).Magnitude })
+						edges[ei] = { a = e.a, b = n, len = (p - A).Magnitude }
+						split = true
+						break
+					end
+				end
+			end
+			if split then
+				break
+			end
+		end
+	end
+	local links: { { number } } = {}
+	for i in nodes do
+		links[i] = {}
+	end
+	for ei, e in edges do
+		table.insert(links[e.a], ei)
+		table.insert(links[e.b], ei)
+	end
+	local g = { nodes = nodes, edges = edges, links = links }
+	function g.at(pt): (Vector2, Vector2)
+		local e = edges[pt.e]
+		local A, B = nodes[e.a], nodes[e.b]
+		local dir = if e.len > 0 then (B - A).Unit else Vector2.new(0, 1)
+		return A + dir * math.clamp(pt.d, 0, e.len), dir
+	end
+	-- The place on the tunnels nearest a point, and how far it is.
+	function g.nearest(p: Vector2)
+		local best, bestDistance = { e = 1, d = 0 }, math.huge
+		for ei, e in edges do
+			local A, B = nodes[e.a], nodes[e.b]
+			local t = if e.len > 0 then math.clamp((p - A):Dot(B - A) / (e.len * e.len), 0, 1) else 0
+			local distance = (A + (B - A) * t - p).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = { e = ei, d = t * e.len }, distance
+			end
+		end
+		return best, bestDistance
+	end
+	-- Which end of its run to head for, going from one place to another the shortest way
+	-- through the tunnels (nil: it's on the same run, head straight for it), and how far.
+	function g.toward(from, to): (number?, number)
+		if from.e == to.e then
+			return nil, math.abs(to.d - from.d)
+		end
+		local cost, first = {}, {}
+		local fe, te = edges[from.e], edges[to.e]
+		cost[fe.a], first[fe.a] = from.d, fe.a
+		if (cost[fe.b] or math.huge) > fe.len - from.d then
+			cost[fe.b], first[fe.b] = fe.len - from.d, fe.b
+		end
+		local done = {}
+		while true do
+			local n, c = nil, math.huge
+			for k, v in cost do
+				if not done[k] and v < c then
+					n, c = k, v
+				end
+			end
+			if not n then
+				break
+			end
+			done[n] = true
+			for _, ei in links[n] do
+				local e = edges[ei]
+				local m = if e.a == n then e.b else e.a
+				if c + e.len < (cost[m] or math.huge) then
+					cost[m], first[m] = c + e.len, first[n]
+				end
+			end
+		end
+		local viaA = (cost[te.a] or math.huge) + to.d
+		local viaB = (cost[te.b] or math.huge) + (te.len - to.d)
+		if viaA <= viaB then
+			return first[te.a], viaA
+		end
+		return first[te.b], viaB
+	end
+	return g
+end
+HazardService._tunnels = tunnels
+
 function builders.Hunter(tile, settings, folder)
 	local z0 = Beach.tileRange(tile)
-	local routes = {}
-	for _, placement in Layouts.hazardPlacements(tile, "Hunter") do
-		table.insert(routes, { path = placement.Path, burrows = placement.Burrows })
+	local function world(path)
+		local out = {}
+		for _, point in path do
+			table.insert(out, Vector2.new(point[1], z0 + point[2]))
+		end
+		return out
 	end
-	if #routes == 0 then
+	local giants = {}
+	for _, placement in Layouts.hazardPlacements(tile, "Hunter") do
+		local routes = {}
+		for _, path in placement.Routes or {} do
+			table.insert(routes, world(path))
+		end
+		if placement.Path then
+			table.insert(routes, world(placement.Path))
+		end
+		if #routes > 0 then
+			table.insert(giants, { routes = routes, burrows = placement.Burrows })
+		end
+	end
+	if #giants == 0 then
 		-- The longest crab route the layout has (the Test Range checks those stay in corridors).
 		local best, bestLength = nil, 0
 		for _, placement in Layouts.hazardPlacements(tile, "Patrol") do
@@ -1125,21 +1290,19 @@ function builders.Hunter(tile, settings, folder)
 			end
 		end
 		if best then
-			table.insert(routes, { path = best })
+			table.insert(giants, { routes = { world(best) } })
 		end
 	end
 	local size: Vector3 = settings.Size
 	local calm, angry = Color3.fromRGB(255, 230, 120), Color3.fromRGB(255, 40, 30)
 	local hunters = {}
-	for index, route in routes do
+	for index, giant in giants do
 		if index > settings.Count then
 			break
 		end
-		local path = {}
-		for _, point in route.path do
-			table.insert(path, Vector2.new(point[1], z0 + point[2]))
-		end
-		local model, body = creature(settings, Vector3.new(path[1].X, 0, path[1].Y))
+		local g = tunnels(giant.routes)
+		local start = giant.routes[1][1]
+		local model, body = creature(settings, Vector3.new(start.X, 0, start.Y))
 		model.Name = "Hunter"
 		local eyes = {}
 		for _, side in { -1, 1 } do
@@ -1168,38 +1331,36 @@ function builders.Hunter(tile, settings, folder)
 		digDust.Parent = dig
 		dig.Parent = folder
 		model.Parent = folder
-		local track = rail(path)
-		-- Its burrow holes: on its route, where it can come up. Churned sand marks each.
+		-- Its burrow holes: on its tunnels, where it can come up. A churned patch flush with the
+		-- floor marks each (it shakes and spurts sand before the giant comes up through it).
 		local burrows = {}
-		local points = route.burrows
+		local points = giant.burrows
 		if not points then
-			local middle = track.at(track.length / 2)
-			points = {
-				{ path[1].X, path[1].Y - z0 },
-				{ middle.X, middle.Y - z0 },
-				{ path[#path].X, path[#path].Y - z0 },
-			}
+			points = {}
+			for _, n in g.nodes do
+				if #g.links[table.find(g.nodes, n) :: number] ~= 2 then
+					table.insert(points, { n.X, n.Y - z0 }) -- its tunnels' ends and junctions
+				end
+			end
 		end
 		for _, point in points do
-			local s = track.nearest(Vector2.new(point[1], z0 + point[2]))
-			local at = track.at(s)
+			local pt = g.nearest(Vector2.new(point[1], z0 + point[2]))
+			local at = g.at(pt)
 			local ground = Beach.groundAt(at.X, at.Y)
 			local hole = makePart({
 				Name = "BurrowHole",
 				Shape = Enum.PartType.Cylinder,
-				Size = Vector3.new(1.4, size.X * 0.9, size.X * 0.9),
+				Size = Vector3.new(1.4, size.X * 0.7, size.X * 0.7),
 				CFrame = CFrame.new(at.X, ground + 0.1, at.Y) * CFrame.Angles(0, 0, math.pi / 2),
 				Color = Color3.fromRGB(120, 100, 74),
 				Material = Enum.Material.Sand,
 			})
 			hole.Parent = folder
-			local mound = makePart({
-				Name = "BurrowMound",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.new(size.X * 0.6, 2.2, size.X * 0.6),
+			local spout = makePart({
+				Name = "BurrowSpout",
+				Size = Vector3.new(size.X * 0.5, 0.2, size.X * 0.5),
 				CFrame = CFrame.new(at.X, ground + 0.3, at.Y),
-				Color = Color3.fromRGB(150, 128, 96),
-				Material = Enum.Material.Sand,
+				Transparency = 1,
 			})
 			local spurt = Instance.new("ParticleEmitter")
 			spurt.Color = ColorSequence.new(Color3.fromRGB(206, 186, 150))
@@ -1210,24 +1371,24 @@ function builders.Hunter(tile, settings, folder)
 			spurt.SpreadAngle = Vector2.new(25, 25)
 			spurt.EmissionDirection = Enum.NormalId.Top
 			spurt.Enabled = false
-			spurt.Parent = mound
-			mound.Parent = folder
-			table.insert(burrows, { s = s, at = at, mound = mound, base = mound.CFrame, spurt = spurt })
+			spurt.Parent = spout
+			spout.Parent = folder
+			table.insert(burrows, { pt = pt, at = at, hole = hole, base = hole.CFrame, spurt = spurt })
 		end
+		local home = g.nearest(start)
 		table.insert(hunters, {
 			model = model,
 			body = body,
 			eyes = eyes,
 			dig = dig,
 			digDust = digDust,
-			rail = track,
+			g = g,
 			burrows = burrows,
-			s = 0, -- how far along its route it is
-			dir = 1, -- which way it's patrolling
-			at = path[1],
+			pt = home, -- where on its tunnels it is
+			came = nil, -- the junction it last left (wandering, it doesn't turn straight back)
+			at = start,
 			heading = Vector2.new(0, 1),
 			mode = "patrol",
-			home = 0, -- where along the route the chase began (its leash runs from there)
 			lost = 0,
 			sink = 0, -- how far down in the sand it is
 			pitch = 0, -- how far it's reared up
@@ -1262,27 +1423,97 @@ function builders.Hunter(tile, settings, folder)
 		local from = Vector3.new(h.at.X, Beach.groundAt(h.at.X, h.at.Y) + size.Y * 0.6, h.at.Y)
 		return clearSight(from, target, folder)
 	end
-	-- Moves a hunter along its route toward `goal` (a distance along it) at `speed`. It turns to
-	-- face the way it goes, or, standing still, toward `face`.
-	local function slide(h, goal: number, speed: number, dt: number, face: Vector2?)
-		local step = math.clamp(goal - h.s, -speed * dt, speed * dt)
-		h.s += step
-		local at, tangent = h.rail.at(h.s)
+	-- Moves a hunter `step` studs along its run toward `d` on it (clamped to the run's ends).
+	local function along(h, d: number, step: number)
+		local e = h.g.edges[h.pt.e]
+		local moved = math.clamp(d - h.pt.d, -step, step)
+		h.pt = { e = h.pt.e, d = math.clamp(h.pt.d + moved, 0, e.len) }
+		local at, dir = h.g.at(h.pt)
 		h.at = at
-		if math.abs(step) > 1e-4 then
-			h.heading = tangent * math.sign(step)
-		elseif face and (face - at).Magnitude > 0.1 then
-			h.heading = (face - at).Unit
+		if math.abs(moved) > 1e-4 then
+			h.heading = dir * math.sign(moved)
+		end
+		return step - math.abs(moved)
+	end
+	-- Steps onto another run from the junction it's standing on.
+	local function onto(h, n: number, ei: number)
+		local e = h.g.edges[ei]
+		h.came = n
+		h.pt = { e = ei, d = if e.a == n then 0 else e.len }
+	end
+	-- Goes toward a place on its tunnels, the shortest way, `speed` studs a second, turning at
+	-- junctions and back along its run as it needs (a ghost in a maze: it knows the tunnels,
+	-- not where you are). Faces `face` when it's there.
+	local function chase(h, goal, speed: number, dt: number, face: Vector2?)
+		local left = speed * dt
+		for _ = 1, 8 do
+			if left <= 1e-4 then
+				break
+			end
+			local endNode = h.g.toward(h.pt, goal)
+			if not endNode then
+				along(h, goal.d, left)
+				break
+			end
+			local e = h.g.edges[h.pt.e]
+			local target = if endNode == e.a then 0 else e.len
+			left = along(h, target, left)
+			if math.abs(h.pt.d - target) < 1e-3 then
+				-- At the junction: onto the run the shortest way continues by.
+				local best, bestCost = nil, math.huge
+				for _, ei in h.g.links[endNode] do
+					local nextE = h.g.edges[ei]
+					local trial = { e = ei, d = if nextE.a == endNode then 0 else nextE.len }
+					local _, cost = h.g.toward(trial, goal)
+					if cost < bestCost then
+						best, bestCost = ei, cost
+					end
+				end
+				if best then
+					onto(h, endNode, best)
+				end
+			end
+		end
+		if
+			face
+			and (face - h.at).Magnitude > 0.1
+			and speed * dt > 0
+			and h.pt.e == goal.e
+			and math.abs(h.pt.d - goal.d) < 0.5
+		then
+			h.heading = (face - h.at).Unit
+		end
+	end
+	-- Wanders its tunnels: along its run, then at a junction any other way (back only at a dead end).
+	local function wander(h, dt: number)
+		local e = h.g.edges[h.pt.e]
+		h.dir = h.dir or 1
+		local target = if h.dir > 0 then e.len else 0
+		along(h, target, settings.Speed * dt)
+		if math.abs(h.pt.d - target) < 1e-3 then
+			local n = if h.dir > 0 then e.b else e.a
+			local options = {}
+			for _, ei in h.g.links[n] do
+				if ei ~= h.pt.e then
+					table.insert(options, ei)
+				end
+			end
+			if #options == 0 then
+				h.dir = -h.dir -- a dead end: back the way it came
+			else
+				local ei = options[rng:NextInteger(1, #options)]
+				onto(h, n, ei)
+				h.dir = if h.g.edges[ei].a == n then 1 else -1
+			end
 		end
 	end
 	-- The dig: down where it is (dust), up at the burrow nearest `toward` (its hole shaking and
 	-- spurting sand from now until it's up). False if there's no burrow worth digging to.
 	local function startDig(h, toward: Vector2, now: number): boolean
-		local want = h.rail.nearest(toward)
 		local best, bestGap = nil, math.huge
 		for _, burrow in h.burrows do
-			local gap = math.abs(burrow.s - want)
-			if math.abs(burrow.s - h.s) > 20 and gap < bestGap then
+			local gap = (burrow.at - toward).Magnitude
+			if (burrow.at - h.at).Magnitude > 30 and gap < bestGap then
 				best, bestGap = burrow, gap
 			end
 		end
@@ -1303,19 +1534,20 @@ function builders.Hunter(tile, settings, folder)
 				for _, burrow in h.burrows do
 					-- A hole about to give up the crab shakes.
 					if burrow.shakeUntil and now < burrow.shakeUntil then
-						burrow.mound.CFrame = burrow.base
+						burrow.hole.CFrame = burrow.base
 							+ Vector3.new(
 								rng:NextNumber(-0.4, 0.4),
-								rng:NextNumber(0, 0.5),
+								rng:NextNumber(0, 0.4),
 								rng:NextNumber(-0.4, 0.4)
 							)
 					elseif burrow.shakeUntil then
-						burrow.mound.CFrame, burrow.spurt.Enabled, burrow.shakeUntil = burrow.base, false, nil
+						burrow.hole.CFrame, burrow.spurt.Enabled, burrow.shakeUntil = burrow.base, false, nil
 					end
 				end
 			end
 			local call = calls[tile]
 			for _, h in hunters do
+				h.ignore = h.ignore or {}
 				-- A patrol crab's call: it digs to the burrow nearest the caller (not to you: it
 				-- has to find you itself when it's up).
 				if call and call.time > h.heard and h.mode == "patrol" then
@@ -1323,7 +1555,6 @@ function builders.Hunter(tile, settings, folder)
 					h.target = nil
 					startDig(h, call.at, now)
 				end
-				h.ignore = h.ignore or {}
 				if h.mode == "patrol" then
 					-- Looking out: the nearest player it can see.
 					for _, player in Players:GetPlayers() do
@@ -1336,12 +1567,11 @@ function builders.Hunter(tile, settings, folder)
 								else settings.SightRange
 							local offset = Vector2.new(root.Position.X, root.Position.Z) - h.at
 							local across = offset.Magnitude
-							-- It sees ahead of it, in a cone; behind it, only someone close
-							-- enough to feel.
+							-- It sees ahead of it, in a cone; behind it, only someone close enough to feel.
 							local ahead = across <= settings.FeelRange
 								or (across > 0 and offset.Unit:Dot(h.heading) >= viewCos)
 							if across <= range and ahead and sees(h, root.Position) then
-								h.mode, h.target, h.lost, h.home = "chase", player, 0, h.s
+								h.mode, h.target, h.lost = "chase", player, 0
 								h.lastSeen = Vector2.new(root.Position.X, root.Position.Z)
 								h.going, h.stuck = Vector2.zero, 0
 								h.nextDig = now + settings.DigEvery
@@ -1355,9 +1585,6 @@ function builders.Hunter(tile, settings, folder)
 				local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 				local where = root and Vector2.new(root.Position.X, root.Position.Z)
 				if h.mode == "chase" then
-					-- It hunts along its route, never off it: to the point of its route
-					-- nearest the player, no further than its leash from where it began. In a
-					-- tunnel it fills the way, so it can't be run round.
 					if not root or not humanoid or humanoid.Health <= 0 then
 						h.mode, h.target = "patrol", nil
 					else
@@ -1372,13 +1599,13 @@ function builders.Hunter(tile, settings, folder)
 						local guess = if seen
 							then where
 							else h.lastSeen + h.going * math.min(h.lost, settings.Predict)
-						local along = h.rail.nearest(guess)
+						local goal, off = h.g.nearest(guess)
 						local offset = guess - h.at
-						local leashed = math.clamp(along, h.home - settings.Leash, h.home + settings.Leash)
-						-- Someone it can see but can't reach (off its route): it waits a while,
+						-- Someone it can see but can't reach (off its tunnels): it waits a while,
 						-- then leaves them be.
-						local off = (h.rail.at(h.rail.nearest(where)) - where).Magnitude
-						h.stuck = if seen and off > size.X * 0.5 + 6 then h.stuck + dt else 0
+						h.stuck = if seen and select(2, h.g.nearest(where)) > size.X * 0.5 + 6
+							then h.stuck + dt
+							else 0
 						if h.stuck > settings.GiveUp then
 							h.ignore[h.target] = now + settings.Ignore
 							h.mode, h.target = "patrol", nil
@@ -1395,21 +1622,21 @@ function builders.Hunter(tile, settings, folder)
 							and offset.Unit:Dot(h.heading) > 0.5
 						then
 							-- The dash: it rears up first, eyes gone red.
-							local way = math.sign(along - h.s)
-							h.mode, h.due = "rear", now + settings.DashWarn
-							h.dashGoal = math.clamp(
-								along + way * 8,
-								h.s - settings.DashDistance,
-								h.s + settings.DashDistance
-							)
+							h.mode, h.due, h.dashGoal, h.dashLeft =
+								"rear", now + settings.DashWarn, goal, settings.DashDistance
 							eyes(h, angry)
-						elseif seen and now >= h.nextDig and math.abs(along - h.s) > settings.DigAway then
+						elseif
+							seen
+							and now >= h.nextDig
+							and select(2, h.g.toward(h.pt, goal)) > settings.DigAway
+						then
 							h.nextDig = now + settings.DigEvery
 							if not startDig(h, guess, now) then
-								slide(h, leashed, settings.ChaseSpeed, dt, guess)
+								chase(h, goal, settings.ChaseSpeed, dt, guess)
 							end
 						else
-							slide(h, leashed, settings.ChaseSpeed, dt, guess)
+							local _ = off
+							chase(h, goal, settings.ChaseSpeed, dt, guess)
 						end
 					end
 				elseif h.mode == "rear" then
@@ -1419,8 +1646,10 @@ function builders.Hunter(tile, settings, folder)
 					end
 				elseif h.mode == "dash" then
 					h.pitch = math.max(0, h.pitch - dt * 3)
-					slide(h, h.dashGoal, settings.DashSpeed, dt)
-					if math.abs(h.s - h.dashGoal) < 0.5 or now >= h.due then
+					local before = h.at
+					chase(h, h.dashGoal, math.min(settings.DashSpeed, h.dashLeft / math.max(dt, 1e-3)), dt)
+					h.dashLeft -= (h.at - before).Magnitude
+					if h.dashLeft <= 0.5 or now >= h.due or (h.at - before).Magnitude < 1e-3 then
 						h.mode, h.due = "recover", now + settings.DashRecover
 						h.nextDash = now + settings.DashRecover + settings.DashCooldown
 					end
@@ -1429,7 +1658,7 @@ function builders.Hunter(tile, settings, folder)
 					if now >= h.due then
 						eyes(h, calm)
 						h.mode = if h.target then "chase" else "patrol"
-						h.home = h.s
+						h.lost = 0
 					end
 				elseif h.mode == "dig" then
 					h.sink = math.min(size.Y + 1, h.sink + dt * (size.Y + 1) / settings.DigTime)
@@ -1440,8 +1669,9 @@ function builders.Hunter(tile, settings, folder)
 					end
 				elseif h.mode == "under" then
 					if now >= h.due then
-						h.s = h.burrow.s
+						h.pt = h.burrow.pt
 						h.at = h.burrow.at
+						h.came = nil
 						-- Up facing where it dug toward (where it guessed you'd be, or the caller).
 						local toward = h.toward or h.at
 						h.heading = if (toward - h.at).Magnitude > 0.1
@@ -1456,13 +1686,14 @@ function builders.Hunter(tile, settings, folder)
 						-- Up, it looks for you again: only what it sees now.
 						h.sink = 0
 						h.mode, h.target = "patrol", nil
-						h.home, h.lost = h.s, 0
+						h.lost = 0
 						h.nextDig = now + settings.DigEvery
 					end
 				else
 					-- Hunting no one, it doesn't wait: every so often it digs to where the patrol
 					-- crabs last saw someone, or to another burrow.
-					if now >= (h.nextRoam or now + settings.RoamEvery) then
+					h.nextRoam = h.nextRoam or now + settings.RoamEvery
+					if now >= h.nextRoam and #h.burrows > 0 then
 						h.nextRoam = now + settings.RoamEvery
 						local hunch = sightings[tile]
 						local toward = if hunch and now - hunch.time <= settings.Hunch
@@ -1470,12 +1701,8 @@ function builders.Hunter(tile, settings, folder)
 							else h.burrows[rng:NextInteger(1, #h.burrows)].at
 						startDig(h, toward, now)
 					end
-					h.nextRoam = h.nextRoam or now + settings.RoamEvery
-					-- Patrolling: back and forth along its route.
-					local goal = if h.dir > 0 then h.rail.length else 0
-					slide(h, goal, settings.Speed, dt)
-					if math.abs(h.s - goal) < 0.01 then
-						h.dir = -h.dir
+					if h.mode == "patrol" then
+						wander(h, dt)
 					end
 					h.pitch = 0
 				end

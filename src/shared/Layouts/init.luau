@@ -1059,6 +1059,16 @@ function Layouts.problems(layout: any): { string }
 				add(where .. ": Pattern is Wave, Checker, Ring or All")
 			elseif key == "Damage" and (type(value) ~= "number" or value <= 0) then
 				add(where .. ": Damage must be a positive number")
+			elseif
+				key == "Routes"
+				and (
+					type(value) ~= "table"
+					or #value < 1
+					or type(value[1]) ~= "table"
+					or not isPoint(value[1][1])
+				)
+			then
+				add(where .. ": Routes is a list of paths, each { {x, z}, ... }")
 			elseif key == "Burrows" and (type(value) ~= "table" or #value < 1 or not isPoint(value[1])) then
 				add(where .. ": Burrows is a list of {x, z} points")
 			elseif

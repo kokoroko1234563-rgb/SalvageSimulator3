@@ -39,24 +39,25 @@
 --           Depth, Covered (true or false; without it, the kind's Covered).
 --   Undertow  while the sea covers it (deeper than MinDepth), a current along a ford or
 --           channel drags you toward the sea at Strength studs/s. Placement: Path, Width.
---   Hunter  a big creature (the giant hermit crab) that patrols its Path at Speed and hunts,
---           always on its route, like a rail: it sees a player ahead within SightRange
---           (LightRange if they carry a light) with nothing in the way, and chases at
---           ChaseSpeed, no further than Leash from where it began. Two moves, both telegraphed:
---           the dash (someone within DashRange ahead: it rears up, eyes red, for DashWarn
---           seconds, charges at DashSpeed up to DashDistance, then stands DashRecover seconds),
---           and the dig (losing sight of them, or every DigEvery seconds while they're more than
---           DigAway along its route, or called by a patrol crab: it burrows in a cloud of dust
---           for DigTime seconds and comes out of the burrow hole nearest them after UnderTime
---           more, the hole shaking and spurting sand all that while). Placement: Path, and
---           Hunting no one, every RoamEvery seconds it digs to the burrow nearest the latest
---           sighting its patrol crabs passed on (any crab that sees someone tells it; within
---           Hunch seconds), or another burrow if there's none: it's never far from players.
---           It knows only what it sees: out of sight, it heads for where they were going
---           (Predict seconds on from where it last saw them), and someone it can see but not
---           reach (off its route) it gives up on after GiveUp seconds, for Ignore seconds.
---           Burrows = { {x, z}, ... } (on its route); without Burrows, its route's ends and
---           middle; without a Path, the layout's longest Patrol route.
+--   Hunter  a big creature (the giant hermit crab) that keeps to its tunnels and hunts in them
+--           like a ghost in a maze: its Routes (paths that meet at junctions, or one Path) are
+--           the only ground it walks; at each junction it takes the shortest way through them
+--           toward where it thinks you are (it knows the tunnels, not where you are: only what
+--           it sees, or where it guesses you went, Predict seconds on from where it last saw
+--           you), turning back along a run when it must; hunting no one, it wanders them. It
+--           sees a player ahead within SightRange (LightRange if they carry a light) with
+--           nothing in the way and chases at ChaseSpeed; someone it can see but can't reach it
+--           gives up on after GiveUp seconds, for Ignore seconds. Two moves, both telegraphed:
+--           the dash (someone within DashRange ahead: it rears up, eyes red, DashWarn seconds,
+--           charges at DashSpeed up to DashDistance, then stands DashRecover seconds), and the
+--           dig (losing sight of them, every DigEvery seconds while they're more than DigAway
+--           along its tunnels, every RoamEvery seconds hunting no one (toward the latest
+--           sighting its patrol crabs passed on, within Hunch seconds), or called by a patrol
+--           crab: it burrows in a cloud of dust for DigTime seconds and comes up at the burrow
+--           nearest where it's going UnderTime later, the hole shaking and spurting sand all
+--           that while). Placement: Routes = { path, ... } or Path, and Burrows = { {x, z}, ... }
+--           (on its tunnels, flush churned patches); without Burrows, its tunnels' ends and
+--           junctions; without a Path, the layout's longest Patrol route.
 --   Gloom   a living, magical darkness (the Drowned Reach's): something unseen that roams
 --           its Path at Speed (or lurks At a spot), casting a shadow Radius studs across on the
 --           floor under it. Step into the shadow (outside a GloomWard's light: glowing decor)
@@ -356,7 +357,7 @@ Hazards.Placement = {
 	Pit = { At = true, Radius = true, Depth = true, Covered = true },
 	Undertow = { Path = true, Width = true },
 	Gloom = { Path = true, At = true, Radius = true },
-	Hunter = { Path = true, Burrows = true },
+	Hunter = { Path = true, Routes = true, Burrows = true },
 	Jelly = { At = true, Path = true, Radius = true, Damage = true },
 	Fog = { At = true },
 	Whirlwind = { Path = true, Radius = true },

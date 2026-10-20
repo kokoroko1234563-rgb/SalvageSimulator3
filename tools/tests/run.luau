@@ -2659,7 +2659,20 @@ test("the giant crab takes the longest crab route, and is deadly but can be outr
 			holes += 1
 		end
 	end
-	assert(holes == 3, "burrow holes: its route's ends and middle, without Burrows of its own")
+	assert(holes == 2, "burrow holes: its tunnels' ends (and junctions), without Burrows of its own")
+	-- Its tunnels are a maze it knows: a cross of two runs meeting in the middle, and the way
+	-- from one arm to another goes through the junction, turning there.
+	local V2 = roblox.Vector2.new
+	local maze = HazardService._tunnels({
+		{ V2(0, 0), V2(100, 0) },
+		{ V2(50, -50), V2(50, 50) },
+	})
+	assert(#maze.nodes == 5 and #maze.edges == 4, "two runs crossing make a junction and four arms")
+	local from = maze.nearest(V2(10, 0))
+	local to = maze.nearest(V2(50, 40))
+	local endNode, cost = maze.toward(from, to)
+	assert((maze.nodes[endNode] - V2(50, 0)).Magnitude < 1e-6, "it heads for the junction")
+	assert(math.abs(cost - 80) < 1e-6, "40 to the junction, 40 up the other arm")
 	-- It keeps to its route like a rail: an L-shaped route, 100 along X then 50 along Z.
 	local V2 = roblox.Vector2.new
 	local route = HazardService._rail({ V2(0, 0), V2(100, 0), V2(100, 50) })
