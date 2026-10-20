@@ -232,7 +232,7 @@ def dead_end(part, pts, weight, open_pit=True):
     pit(part, end, True)
     if open_pit:
         (ax, az), (bx, bz) = pts[-2], pts[-1]
-        part.hall(box((ax + bx) / 2, (az + bz) / 2, 28, 28))
+        part.hall(box((ax + bx) / 2, (az + bz) / 2, 20, 20))
         pit(part, (round((ax + bx) / 2), round((az + bz) / 2)), False)
     debris(part, end[0], end[1] - 12, 30, 20, 3)
 
@@ -458,7 +458,7 @@ def hatch_through(c, HZ, z_to):
     c.roof_lane([(-20, 126), (-20, HZ - 4)], 12)
 
 
-def scupper(c, s, HZ):
+def scupper(c, s, HZ, n=2):
     """The stern's deck edge where a gully starts: broken planking (pits), ribs, the barrels'
     crates stacked ready."""
     DM = HZ + 22
@@ -468,6 +468,8 @@ def scupper(c, s, HZ):
     c.decor("Crate", at=(s * (G + 14), DM + 10), yaw=30)
     pit(c, (s * (G + 14), DM - 8), True)
     pit(c, (s * (G - 16), DM + 14), False)
+    for k, (dx, dz, cov) in enumerate([(-18, -12, True), (18, 16, False)][:max(0, n - 2)]):
+        pit(c, (s * (G + dx), DM + dz), cov)
 
 
 def tell(part, x, kind):
@@ -484,7 +486,14 @@ def tell(part, x, kind):
         part.decor("Timber", path=[(x - 14, 12), (x + 14, 12)], count=3)
 
 
-def crossings(z, HZ, flank_rows, scour_rows, mound_rows, centre_rows):
+def pockets(c, n, x, d):
+    """Spurs off a chute (x) into the wreckage, d = +1 or -1 the way out: each ends in a find
+    on a covered pit, an open pit in its mouth."""
+    for k, zz in enumerate((520,)[:n]):
+        dead_end(c, [(x, zz), (x + d * 38, zz)], 2 + k)
+
+
+def crossings(z, HZ, flank_rows, scour_rows, mound_rows, centre_rows, n_pockets=1, n_pits=2):
     flank, gully, mounds, centre, DM = sector(HZ, flank_rows, scour_rows, mound_rows, centre_rows)
     to = centre_rows[0]
 
@@ -493,10 +502,12 @@ def crossings(z, HZ, flank_rows, scour_rows, mound_rows, centre_rows):
     c = z.crossing("Gully run", paths=2)
     pts, rolls = gully(-1)
     wide(c, pts)
-    scupper(c, -1, HZ)
+    scupper(c, -1, HZ, n_pits)
     barrels(c, rolls)
     narrow(c, mounds(1))
-    ford(c, 190, 540)
+    ford(c, 190, 560)
+    pockets(c, n_pockets, -G, -1)
+    pockets(c, n_pockets, 190, -1)
     tell(c, -300, "anchor")
     tell(c, 300, "timber")
 
@@ -504,12 +515,13 @@ def crossings(z, HZ, flank_rows, scour_rows, mound_rows, centre_rows):
     c = z.crossing("Through the hatch", paths=2)
     pts, rolls = gully(1)
     wide(c, pts)
-    scupper(c, 1, HZ)
+    scupper(c, 1, HZ, n_pits)
     barrels(c, rolls)
     hatch_through(c, HZ, to)
     path = centre()
     narrow(c, path)
-    ford(c, path[-1][0], 540)
+    ford(c, path[-1][0], 560)
+    pockets(c, n_pockets, G, 1)
     tell(c, 300, "ribs")
     tell(c, -20, "crates")
 
@@ -521,11 +533,11 @@ def crossings(z, HZ, flank_rows, scour_rows, mound_rows, centre_rows):
     wide(c, west)
     wide(c, [west[-1], (G, DM)])
     wide(c, pts[len(flank(1)[0]):])
-    scupper(c, 1, HZ)
+    scupper(c, 1, HZ, n_pits)
     barrels(c, rolls)
-    c.lane([(G, 540), (G + 36, 540)], width=12)  # a side spur with the scour's ford in it
-    ford(c, G + 26, 540)
-    c.loot((G + 36, 540), radius=3, weight=1)
+    c.lane([(G, 560), (G + 36, 560)], width=12)  # a side spur with the scour's ford in it
+    ford(c, G + 26, 560)
+    c.loot((G + 36, 560), radius=3, weight=1)
     tell(c, -300, "anchor")
     tell(c, -280, "crates")
 
@@ -533,25 +545,28 @@ def crossings(z, HZ, flank_rows, scour_rows, mound_rows, centre_rows):
     c = z.crossing("Three ways", paths=3)
     pts, rolls = gully(-1)
     wide(c, pts)
-    scupper(c, -1, HZ)
+    scupper(c, -1, HZ, n_pits)
     barrels(c, rolls)
     hatch_through(c, HZ, to)
     path = centre()
     narrow(c, path)
-    ford(c, path[-1][0], 540)
+    ford(c, path[-1][0], 560)
     narrow(c, mounds(1))
-    ford(c, 190, 540)
+    ford(c, 190, 560)
+    pockets(c, n_pockets, -G, -1)
     tell(c, -300, "timber")
     tell(c, 300, "ribs")
 
     # 5: Scour round (2): A the west mounds, B the east gully.
     c = z.crossing("Scour round", paths=2)
     wide(c, mounds(-1))
+    pockets(c, n_pockets, -190, 1)
     pts, rolls = gully(1)
     narrow(c, pts)
-    scupper(c, 1, HZ)
+    scupper(c, 1, HZ, n_pits)
     barrels(c, rolls)
-    ford(c, G, 540)
+    ford(c, G, 560)
+    pockets(c, n_pockets, G, 1)
     tell(c, -300, "crates")
     tell(c, 300, "anchor")
 
@@ -562,18 +577,18 @@ def rows_from(z0, last, step=40):
 
 def zone4():
     return walled(4, 14, 170, lambda z, HZ: crossings(
-        z, HZ, [84, 132], [262, 302], [258, 298, 338, 378, 418], rows_from(214, 454)))
+        z, HZ, [100], [262, 302], [258, 298, 338, 378, 418], rows_from(214, 374), 1, 2))
 
 
 def zone5():
     return walled(5, 16, 200, lambda z, HZ: crossings(
-        z, HZ, [84, 126, 168], [310, 350, 390, 430], [288, 328, 368, 408, 448], rows_from(244, 484)))
+        z, HZ, [110, 160], [330, 370], [288, 328, 368, 408], rows_from(244, 444), 1, 3))
 
 
 def zone6():
     return walled(6, 20, 230, lambda z, HZ: crossings(
         z, HZ, [84, 124, 164, 204], [358, 398, 438, 478], [318, 358, 398, 438, 478],
-        rows_from(274, 474)))
+        rows_from(274, 474), 1, 4))
 
 
 ZONES = [zone2, zone3, zone4, zone5, zone6]
