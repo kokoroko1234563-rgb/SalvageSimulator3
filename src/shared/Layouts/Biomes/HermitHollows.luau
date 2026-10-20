@@ -1,1571 +1,15479 @@
--- Hermit Hollows. Zone 4 is drawn as a whole: a giant hermit crab's warren, a lattice of
--- rock-walled corridors 16 studs wide, almost all of it roofed. Zones 5 and 6 are still the old
--- 152-stud layouts, repeated down the zone. See docs/layouts/HermitHollows.md.
---
--- Zone 4's warren is a grid of 24 x 21 cells. A cell is a 16 x 16 floor; the walls between
--- cells are 12 thick, so cells are 28 apart. Node lines (where walls cross) run at
--- x = -336 + 28 i and z = 12 + 28 j, all on the 4-stud grid, so every wall face lands on 4k + 2.
--- Mazes are drawn as text: 2 n + 1 lines of 2 m + 1 characters. Nodes sit at even positions
--- ('+'); between two nodes a wall is '-' (across) or '|' (down), 'r' is a rubble pile in a
--- doorway (a scramble for players on foot, too steep for a cart), and a blank is a door.
--- Cells sit at odd positions: 'c' is a chamber and 'S' a side-room slot (both unroofed), '.' a
--- gap in the roof, and a blank is a roofed corridor.
-local Tiled = require(script.Parent.Parent.Tiled)
-
-local PITCH = 28
-local WALL_HEIGHT = 22
-local ZONE_DEPTH = 608
-
-local function parse(rows)
-	local nodeRows = (#rows - 1) // 2
-	local nodeCols = (#rows[1] - 1) // 2
-	local lattice = { cols = nodeCols, rows = nodeRows, H = {}, V = {}, cell = {} }
-	for j = 0, nodeRows do
-		local line = rows[2 * j + 1]
-		lattice.H[j] = {}
-		for c = 0, nodeCols - 1 do
-			lattice.H[j][c] = string.sub(line, 2 * c + 2, 2 * c + 2)
-		end
-	end
-	for r = 0, nodeRows - 1 do
-		local line = rows[2 * r + 2]
-		lattice.V[r] = {}
-		lattice.cell[r] = {}
-		for i = 0, nodeCols do
-			lattice.V[r][i] = string.sub(line, 2 * i + 1, 2 * i + 1)
-		end
-		for c = 0, nodeCols - 1 do
-			lattice.cell[r][c] = string.sub(line, 2 * c + 2, 2 * c + 2)
-		end
-	end
-	return lattice
-end
-
--- The warren's coordinates, or a side room's (origin 0, 0).
-local function gridOf(ox, oz)
-	return {
-		nodeX = function(i)
-			return ox + PITCH * i
-		end,
-		nodeZ = function(j)
-			return oz + PITCH * j
-		end,
-		cellX = function(c)
-			return ox + 14 + PITCH * c
-		end,
-		cellZ = function(r)
-			return oz + 14 + PITCH * r
-		end,
-	}
-end
-
-local WARREN = gridOf(-336, 12)
-
-local function wall(path)
-	return { Kind = "Wall", Path = path, Height = WALL_HEIGHT, Width = 12 }
-end
-
--- The walls of a maze that the `base` maze doesn't already have. With `inner`, the maze's own
--- border is left to whoever drew it (a room's border is the frame's, with its door).
-local function wallsOf(lattice, grid, base, inner)
-	local list = {}
-	local function has(l, kind, a, b)
-		return l ~= nil and l[kind][a][b] == (if kind == "H" then "-" else "|")
-	end
-	for j = 0, lattice.rows do
-		if not (inner and (j == 0 or j == lattice.rows)) then
-			for c = 0, lattice.cols do
-				local here = c < lattice.cols and has(lattice, "H", j, c) and not has(base, "H", j, c)
-				if here then
-					table.insert(
-						list,
-						wall({ { grid.nodeX(c), grid.nodeZ(j) }, { grid.nodeX(c + 1), grid.nodeZ(j) } })
-					)
-				end
-			end
-		end
-	end
-	for i = 0, lattice.cols do
-		if not (inner and (i == 0 or i == lattice.cols)) then
-			for r = 0, lattice.rows do
-				local here = r < lattice.rows and has(lattice, "V", r, i) and not has(base, "V", r, i)
-				if here then
-					table.insert(
-						list,
-						wall({ { grid.nodeX(i), grid.nodeZ(r) }, { grid.nodeX(i), grid.nodeZ(r + 1) } })
-					)
-				end
-			end
-		end
-	end
-	return list
-end
-
--- Rubble in the doorways: a pile of sand across each 'r'.
-local function rubbleOf(lattice, grid)
-	local list = {}
-	local function pile(x1, z1, x2, z2)
-		table.insert(list, { Kind = "Ridge", Path = { { x1, z1 }, { x2, z2 } }, Height = 4.2, Width = 24 })
-	end
-	for j = 0, lattice.rows do
-		for c = 0, lattice.cols - 1 do
-			if lattice.H[j][c] == "r" then
-				pile(grid.nodeX(c), grid.nodeZ(j), grid.nodeX(c + 1), grid.nodeZ(j))
-			end
-		end
-	end
-	for r = 0, lattice.rows - 1 do
-		for i = 0, lattice.cols do
-			if lattice.V[r][i] == "r" then
-				pile(grid.nodeX(i), grid.nodeZ(r), grid.nodeX(i), grid.nodeZ(r + 1))
-			end
-		end
-	end
-	return list
-end
-
--- Roofs over every corridor cell: a slab resting on the walls, row by row. A cell stays open
--- where `lattice` or `frame` marks it (a chamber, a slot, a gap in the roof).
-local function roofsOf(lattice, grid, frame)
-	local list = {}
-	for r = 0, lattice.rows - 1 do
-		local start = nil
-		for c = 0, lattice.cols do
-			local roofed = c < lattice.cols
-				and lattice.cell[r][c] == " "
-				and (frame == nil or frame.cell[r][c] == " ")
-			if roofed and not start then
-				start = c
-			elseif not roofed and start then
-				local z = grid.cellZ(r)
-				local path = if start == c - 1
-					then { { grid.cellX(start), z } }
-					else { { grid.cellX(start), z }, { grid.cellX(c - 1), z } }
-				table.insert(list, { Kind = "Roof", Path = path, Width = 32, Clearance = 20, Thickness = 8 })
-				start = nil
-			end
-		end
-	end
-	return list
-end
-
-local function point(grid, cell)
-	return { grid.cellX(cell[1]), grid.cellZ(cell[2]) }
-end
-
-local function patrolsOf(grid, crabs)
-	local list = {}
-	for _, cells in crabs do
-		local path = {}
-		for _, cell in cells do
-			table.insert(path, point(grid, cell))
-		end
-		table.insert(list, { Type = "Patrol", Path = path, Count = 1 })
-	end
-	return list
-end
-
-local function lootOf(grid, spots)
-	local list = {}
-	for _, spot in spots do
-		local at = point(grid, spot)
-		table.insert(list, { At = at, Radius = 6, Weight = spot[3] })
-	end
-	return list
-end
-
-local function append(into, from)
-	for _, item in from do
-		table.insert(into, item)
-	end
-end
-
-local FRAME = {
-	"+-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+ +-+-+-+-+ +-+-+",
-	"|                                       |c c c| |",
-	"+ + + + + +-+ +-+ + + + + + + + + + + + + + + + +",
-	"|         |c c c                         c c c| |",
-	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
-	"|          c c c|                       |c c c  |",
-	"+-+-+-+ + + +-+ + + + + + + + + + + + + + +-+ + +",
-	"|S S S|                                         |",
-	"+ + + + + + + + + + + + + + + + + + + + + +-+-+-+",
-	"|S S S                                    |S S S|",
-	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
-	"|S S S|                                    S S S|",
-	"+-+-+-+ + + + + + + + + + + + + + + + + + + + + +",
-	"|                                         |S S S|",
-	"+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+",
-	"|                                               |",
-	"+-+-+-+-+ + + + + + + + + + + + + + + + +-+-+-+-+",
-	"|S S S S|                               |S S S S|",
-	"+ + + + + + + + + + +-+ +-+ + + + + + + + + + + +",
-	"|S S S S            |c c c               S S S S|",
-	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
-	"|S S S S|            c c c|             |S S S S|",
-	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
-	"|S S S S|           |c c c              |S S S S|",
-	"+-+-+-+-+ + + + + + + +-+ + + + + + + + +-+-+-+-+",
-	"|                                               |",
-	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
-	"|                                               |",
-	"+-+-+-+ +-+-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+ +-+-+",
-	"|                                               |",
-	"+ + + + + + + + + + + +-+ +-+ + + + + + + + + + +",
-	"|                     |c c c                    |",
-	"+-+-+-+ + +-+ +-+ + + + + + + + + + + + + +-+-+-+",
-	"|S S S|   |c c c       c c c|             |S S S|",
-	"+ + + + + + + + + + + + +-+ +-+ +-+ + + + + + + +",
-	"|S S S     c c c|           |S S S|       |S S S|",
-	"+ + + + + + +-+ + + + + + + + + + + + + + + + + +",
-	"|S S S|                     |S S S|        S S S|",
-	"+ + + + + + + + + + + + + + + + + + + + + + + + +",
-	"|S S S|                     |S S S|       |S S S|",
-	"+-+-+-+-+ +-+-+ +-+ +-+ +-+ +-+-+-+ +-+ +-+-+-+-+",
-}
-
-local CROSSINGS = {
-	{
-		Name = "Basin run",
-		Maze = {
-			"+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ +-+-+",
-			"|     |           |   |     |   |       |c c c| |",
-			"+-+-+ + +-+-+-+-+-+ + + +-+ + + +-+-+-+ + + + + +",
-			"|     |   |c c c    | | |     |   |      c c c| |",
-			"+ +-+-+-+ + + + +-+-+ + + + +-+-+ + +-+ + + + + +",
-			"|         |c c c|       | |       |   | |c c c  |",
-			"+-+-+-+-+ +-+-+ +-+-+-+ + +-+-+-+ + + +-+-+-+-+ +",
-			"|S S S|       | |     | | |   |     |   |       |",
-			"+ + + + +-+-+ +-+ +-+-+ + +-+ + +-+r+-+ + +-+-+-+",
-			"|S S S .  |   |      .| |   |   |     | | |S S S|",
-			"+ + + +-+ + +-+-+-+ + + + + + + + +-+ +-+ + + + +",
-			"|S S S| | |     |   | | | |   |   |     |  S S S|",
-			"+-+-+-+ + +-+-+ + + + + + +-+ +-+-+-+ + +-+ + + +",
-			"|   |     |   |   | | | | |   |       |   |S S S|",
-			"+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+",
-			"|           | |             |   | |   |         |",
-			"+-+-+-+-+ +-+ +-+ + +-+ +-+-+-+-+ + +-+ +-+-+-+-+",
-			"|S S S S|   |   |   |     |     |       |S S S S|",
-			"+ + + + +-+ +-+ +-+ +-+-+-+ + +-+ + +-+-+ + + + +",
-			"|S S S S    | |     |c c c|.| |   |      S S S S|",
-			"+ + + + + +-+ +-+-+ + + + + +-+-+-+-+-+ + + + + +",
-			"|S S S S| |  .|     |c c c|         |   |S S S S|",
-			"+ + + + + + + + + + + + + +-+ + +-+ +-+ + + + + +",
-			"|S S S S| | |   | | |c c c  | | | |     |S S S S|",
-			"+-+-+-+-+ +-+ +-+ +-+-+-+ + +-+ + +-+ +-+-+-+-+-+",
-			"|   |     |     |     |   |     |   |     |   | |",
-			"+ +-+ +-+-+-+-+-+ +-+ +-+ +-+-+-+ +-+ + +-+ + + +",
-			"|             |   |         |         |     |   |",
-			"+-+-+-+ +-+-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+-+-+",
-			"|       |               |   |.|           |   | |",
-			"+ + +-+-+ +-+ + + + + +-+ +-+ +-+ + + +-+ + + + +",
-			"| |       |   | | | | |c c c  |   | | | |   |   |",
-			"+-+-+-+-+ +-+ +-+-+ + + + + + +-+-+-+-+ + +-+-+-+",
-			"|S S S| | |c c c    | |c c c|         | | |S S S|",
-			"+ + + + + + + + +-+ +-+-+-+ +-+ +-+-+ + + + + + +",
-			"|S S S  | |c c c| |   |   | |S S S| | |   |S S S|",
-			"+ + + + + +-+-+ + + +-+-+ + + + + + + + +-+ + + +",
-			"|S S S| |     | |       |   |S S S| | |    S S S|",
-			"+ + + + + + + + +-+-+-+ + +-+ + + + +-+-+ + + + +",
-			"|S S S|       | |       |   |S S S|    .  |S S S|",
-			"+-+-+-+-+-+-+-+ +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+",
-		},
-		Ramp = {
-			{ 21, 0 },
-			{ 20, 0 },
-			{ 20, 1 },
-			{ 17, 1 },
-			{ 17, 3 },
-			{ 15, 3 },
-			{ 15, 5 },
-			{ 16, 5 },
-			{ 16, 4 },
-			{ 18, 4 },
-			{ 18, 5 },
-			{ 19, 5 },
-			{ 19, 8 },
-			{ 17, 8 },
-			{ 17, 9 },
-			{ 19, 9 },
-			{ 19, 11 },
-			{ 17, 11 },
-			{ 17, 10 },
-			{ 15, 10 },
-			{ 15, 12 },
-			{ 13, 12 },
-			{ 13, 11 },
-			{ 12, 11 },
-			{ 12, 13 },
-			{ 10, 13 },
-			{ 10, 12 },
-			{ 8, 12 },
-			{ 8, 14 },
-			{ 6, 14 },
-			{ 6, 17 },
-			{ 7, 17 },
-			{ 7, 19 },
-		},
-		Loot = { { 0, 0, 3 }, { 8, 0, 3 }, { 3, 5, 3 }, { 0, 7, 3 }, { 17, 17, 3 }, { 10, 3, 3 } },
-		Crabs = {
-			{ { 12, 12 }, { 11, 12 } },
-			{ { 19, 6 }, { 20, 6 } },
-			{ { 8, 13 }, { 7, 13 } },
-			{ { 18, 11 }, { 18, 12 }, { 18, 13 } },
-			{ { 19, 0 }, { 19, 1 }, { 19, 2 } },
-			{ { 17, 2 }, { 18, 2 } },
-			{ { 15, 4 }, { 14, 4 } },
-			{ { 6, 15 }, { 5, 15 } },
-			{ { 17, 9 }, { 18, 9 }, { 19, 9 } },
-			{ { 15, 10 }, { 15, 11 }, { 15, 12 } },
-		},
-	},
-	{
-		Name = "Antler descent",
-		Maze = {
-			"+-+-+-+-+-+-+-+-+ +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+",
-			"| |     |         |.|   |   | |         |c c c| |",
-			"+ + +-+ + +-+ +-+-+ + +-+ + + + +-+ +-+ + + + + +",
-			"| | | | | |c c c  |   |     | | |   | |  c c c| |",
-			"+ + + + +-+ + + + + + +-+ +-+ + +-+-+ + + + + + +",
-			"|   |      c c c|   |     |.|   |   | | |c c c  |",
-			"+-+-+-+ + +-+-+-+ +-+-+-+ + +-+ + + + + +-+-+ +-+",
-			"|S S S| |   |   |       |         |   | |       |",
-			"+ + + + +-+-+-+ + +-+-+ +-+-+-+ + + + + + +-+-+-+",
-			"|S S S        |       |   |   | | |.| | | |S S S|",
-			"+ + + + + +-+ +-+-+-+ +-+ + +-+-+-+-+ + +-+ + + +",
-			"|S S S| | |         | | |           | |    S S S|",
-			"+-+-+-+ + +-+-+-+-+-+-+ +-+-+-+ +-+-+ +-+ + + + +",
-			"|       |           |.        | |       | |S S S|",
-			"+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+-+-+-+-+ +-+-+-+-+",
-			"|           |           |   |     |             |",
-			"+-+-+-+-+-+ +-+-+-+ +-+-+ + + + + +-+ +-+-+-+-+-+",
-			"|S S S S| |       | |     |   | |   |   |S S S S|",
-			"+ + + + + +-+-+-+ + +-+ +-+-+-+-+-+-+-+ + + + + +",
-			"|S S S S            |c c c  |   |     |  S S S S|",
-			"+ + + + + + +-+-+-+-+ + + + + +-+-+ +-+ + + + + +",
-			"|S S S S| |          c c c|   |   |   | |S S S S|",
-			"+ + + + +-+ +-+-+-+ + + + +-+-+ +-+-+ + + + + + +",
-			"|S S S S| | |       |c c c      |     | |S S S S|",
-			"+-+-+-+-+ + +-+-+-+-+-+-+-+-+-+-+-+ +-+ +-+-+-+-+",
-			"| |   |   |         |         |     | |       | |",
-			"+ +-+ + + +-+-+-+-+ + + + +-+ + + +-+ +-+-+-+ + +",
-			"|                   |   |   |   |         | |   |",
-			"+-+-+-+ +-+-+-+-+ +-+-+-+-+ +-+-+-+-+-+-+-+ +-+-+",
-			"|       |   |   |     |   |       |     |     | |",
-			"+ +-+-+-+ + + + + + +-+-+ +-+ + +-+-+ +-+ + +-+ +",
-			"|         |   | |     |c c c  |   |       |.    |",
-			"+-+-+-+-+ +-+-+-+r+-+ + + + +-+ + + + + +-+-+-+-+",
-			"|S S S| | |c c c       c c c|   |   | | | |S S S|",
-			"+ + + + + + + + +-+-+-+-+-+ +-+ +-+-+-+ + + + + +",
-			"|S S S    |c c c| |       | |S S S|     | |S S S|",
-			"+ + + + + + +-+ + +-+-+-+ + + + + +-+ +-+ + + + +",
-			"|S S S| | | |   |       |.  |S S S| |      S S S|",
-			"+ + + + +-+ + + + +-+ + +-+-+ + + + +-+ + + + + +",
-			"|S S S|     | |     | |     |S S S|     | |S S S|",
-			"+-+-+-+-+-+-+-+-+-+-+-+-+-+ +-+-+-+-+-+-+-+-+-+-+",
-		},
-		Ramp = {
-			{ 8, 0 },
-			{ 6, 0 },
-			{ 6, 2 },
-			{ 3, 2 },
-			{ 3, 4 },
-			{ 4, 4 },
-			{ 4, 6 },
-			{ 6, 6 },
-			{ 6, 7 },
-			{ 9, 7 },
-			{ 9, 9 },
-			{ 5, 9 },
-			{ 5, 12 },
-			{ 9, 12 },
-			{ 9, 13 },
-			{ 8, 13 },
-			{ 8, 15 },
-			{ 10, 15 },
-			{ 10, 16 },
-			{ 7, 16 },
-			{ 7, 19 },
-			{ 8, 19 },
-			{ 8, 18 },
-			{ 11, 18 },
-			{ 11, 19 },
-			{ 13, 19 },
-		},
-		Loot = { { 23, 12, 3 }, { 20, 4, 3 }, { 23, 0, 3 }, { 23, 7, 3 }, { 17, 7, 3 }, { 17, 18, 3 } },
-		Crabs = {
-			{ { 9, 15 }, { 9, 14 } },
-			{ { 4, 2 }, { 4, 3 } },
-			{ { 7, 18 }, { 6, 18 } },
-			{ { 8, 9 }, { 8, 8 } },
-			{ { 10, 18 }, { 10, 19 } },
-			{ { 5, 10 }, { 6, 10 }, { 7, 10 } },
-			{ { 4, 6 }, { 5, 6 }, { 6, 6 } },
-			{ { 5, 12 }, { 6, 12 }, { 7, 12 }, { 8, 12 } },
-			{ { 6, 7 }, { 7, 7 }, { 8, 7 }, { 9, 7 } },
-		},
-	},
-	{
-		Name = "Throne road",
-		Maze = {
-			"+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ +-+-+-+-+-+-+-+",
-			"|   |     |             |     | | |     |c c c| |",
-			"+-+ + + +-+-+-+-+-+ +-+-+ +-+ + + +-+ + + + + + +",
-			"|   | |   |c c c| |       |   | |   | |  c c c| |",
-			"+ +-+ +-+ + + + + +-+ +-+-+ +-+ +-+ +-+ + + + + +",
-			"|     | |  c c c|   | |.    |     |   | |c c c  |",
-			"+-+-+-+ +-+-+-+ + + + +-+-+ + +-+ + + + +-+-+ +-+",
-			"|S S S| |       | | |     |   | |   |   |   |   |",
-			"+ + + + + + +-+-+ + +-+-+ +-+-+ +-+-+-+ + +-+-+-+",
-			"|S S S    |     | |   |           |     | |S S S|",
-			"+ + + + +-+-+-+ + + +-+-+r+-+ +-+ + +-+ + + + + +",
-			"|S S S| |     |   |   |   | | |   |   |    S S S|",
-			"+-+-+-+ +-+ + +-+ +-+ + + + + + +-+ +-+-+ + + + +",
-			"|           |   |   |   |     | |     |   |S S S|",
-			"+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+ +-+-+-+-+-+-+-+-+",
-			"|.  |       |             |     |            .  |",
-			"+-+-+-+-+-+ +-+-+ +-+-+-+-+ +-+ + +-+ +-+-+-+-+-+",
-			"|S S S S| |     |       |  .| | | |     |S S S S|",
-			"+ + + + + + +-+ +-+-+-+ +-+ + + + + +-+-+ + + + +",
-			"|S S S S  |  .| |   |c c c| |   | | |    S S S S|",
-			"+ + + + + + +-+ + + + + + + +-+-+ +-+-+ + + + + +",
-			"|S S S S| |   |   |  c c c|   |   |     |S S S S|",
-			"+ + + + + + +-+-+ +-+ + + +-+-+ +-+ + +-+ + + + +",
-			"|S S S S|     | |   |c c c      |   |   |S S S S|",
-			"+-+-+-+-+ +-+ + +-+-+-+-+ +-+-+-+ +-+-+ +-+-+-+-+",
-			"|   |   | | |       |   | |   |   |   |   |     |",
-			"+ +-+ + + + +-+-+ + + + + +-+ + +-+ + + + + + + +",
-			"|         |       | | |     |     | |   |   |   |",
-			"+-+-+-+ +-+-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+ +-+-+",
-			"|   | | |   |   | | |           | | |   |   |   |",
-			"+ + + + +-+ +-+ + + + +-+ +-+ + + + + + + +-+-+ +",
-			"|       |         | | |c c c| | |   | | |       |",
-			"+-+-+-+-+ +-+-+-+-+ + + + + +-+ + +-+ + + +-+-+-+",
-			"|S S S| | |c c c      |c c c|     |   |   |S S S|",
-			"+ + + + + + + + +-+-+ + +-+ +-+ +-+ +-+-+ + + + +",
-			"|S S S  | |c c c|   | | | | |S S S|       |S S S|",
-			"+ + + + + +-+-+ +-+ + +-+ + + + + +-+-+-+ + + + +",
-			"|S S S| |.|   | |   | |   | |S S S|   |    S S S|",
-			"+ + + + + +-+ + + +-+ + +-+ + + + + + + +-+ + + +",
-			"|S S S|         |     |     |S S S| |     |S S S|",
-			"+-+-+-+-+-+-+-+-+-+-+-+ +-+-+-+-+-+-+-+-+-+-+-+-+",
-		},
-		Ramp = {
-			{ 16, 0 },
-			{ 16, 1 },
-			{ 17, 1 },
-			{ 17, 3 },
-			{ 16, 3 },
-			{ 16, 2 },
-			{ 14, 2 },
-			{ 14, 3 },
-			{ 13, 3 },
-			{ 13, 1 },
-			{ 14, 1 },
-			{ 14, 0 },
-			{ 12, 0 },
-			{ 12, 1 },
-			{ 10, 1 },
-			{ 10, 3 },
-			{ 12, 3 },
-			{ 12, 4 },
-			{ 14, 4 },
-			{ 14, 6 },
-			{ 12, 6 },
-			{ 12, 5 },
-			{ 11, 5 },
-			{ 11, 6 },
-			{ 10, 6 },
-			{ 10, 7 },
-			{ 8, 7 },
-			{ 8, 8 },
-			{ 11, 8 },
-			{ 11, 11 },
-			{ 12, 11 },
-			{ 12, 13 },
-			{ 13, 13 },
-			{ 13, 14 },
-			{ 12, 14 },
-			{ 12, 16 },
-			{ 13, 16 },
-			{ 13, 19 },
-			{ 11, 19 },
-		},
-		Loot = { { 0, 0, 3 }, { 17, 19, 3 }, { 13, 12, 3 }, { 22, 14, 3 }, { 6, 14, 3 }, { 1, 12, 3 } },
-		Crabs = {
-			{ { 15, 2 }, { 15, 1 }, { 15, 0 } },
-			{ { 17, 2 }, { 18, 2 } },
-			{ { 13, 6 }, { 13, 5 } },
-			{ { 13, 2 }, { 12, 2 }, { 11, 2 } },
-			{ { 14, 0 }, { 13, 0 }, { 12, 0 } },
-			{ { 8, 8 }, { 9, 8 }, { 10, 8 }, { 11, 8 } },
-			{ { 12, 1 }, { 11, 1 }, { 10, 1 } },
-		},
-	},
-	{
-		Name = "East flank",
-		Maze = {
-			"+-+-+-+ +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+",
-			"|   | | |               |   | |   | |   |c c c| |",
-			"+-+ + + + +-+-+-+ +-+ + + +-+ + + + + + + + + + +",
-			"| |   | | |c c c    |.| |       | |      c c c| |",
-			"+ +-+ + +-+ + + + + +-+-+ +-+ + + +-+-+ + + + + +",
-			"|       |  c c c| |   |     | | | | |   |c c c  |",
-			"+-+-+-+ +-+-+-+ + + +-+ + + +-+-+-+ +-+ +-+-+-+ +",
-			"|S S S|       | | |   | | |     |.  |       |   |",
-			"+ + + +-+-+ + +-+ +-+ + + +-+-+-+-+ +-+ + +-+-+-+",
-			"|S S S      |   |   |   | | |     | |     |S S S|",
-			"+ + + +-+-+ + +-+ + +-+-+-+ + +-+-+ + +-+ + + + +",
-			"|S S S|     |    .|   |     | | | | | | |  S S S|",
-			"+-+-+-+-+-+-+-+-+ + +-+ +-+ + + + + + + + + + + +",
-			"|                 |       |   |         | |S S S|",
-			"+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+ +-+-+-+-+-+-+-+-+",
-			"|   |         | |   |         |     | |         |",
-			"+-+-+-+-+-+ + + + + +-+ +-+-+ + +-+ + + +-+-+-+-+",
-			"|S S S S|   |     |   |     |     |   | |S S S S|",
-			"+ + + + +-+ +-+ +-+ +-+-+-+-+ +-+ +-+ + + + + + +",
-			"|S S S S  | |   |   |c c c  |       | |  S S S S|",
-			"+ + + + + + + +-+ + + + + + +-+-+-+ +-+ + + + + +",
-			"|S S S S|   |   | | |c c c|         | | |S S S S|",
-			"+ + + + +-+-+-+ +-+-+ + + +-+ + +-+r+ + + + + + +",
-			"|S S S S| |     |   |c c c|   | | |     |S S S S|",
-			"+-+-+-+-+ +-+ + + + + +-+ + +-+ + + +-+ +-+-+-+-+",
-			"|   |   |   | | | | | |   |         | | |       |",
-			"+-+ + + + + +-+ + + + + +-+-+ +-+-+-+ + + + + + +",
-			"|     | | |     | | | |  .  |     |     | | | | |",
-			"+-+-+-+ +-+-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+ +-+-+",
-			"| |             |   |     |       |         |   |",
-			"+ +-+ +-+-+-+ + + + + +-+-+-+ +-+-+-+-+-+-+ + + +",
-			"|     |   |   |   |   |c c c      |   |       | |",
-			"+-+-+-+ + +-+-+-+-+-+ + + + + +-+ + +-+ + +-+-+-+",
-			"|S S S| | |c c c| |    c c c| |   |   | | |S S S|",
-			"+ + + + + + + + + +-+ +-+-+ +-+ +-+-+ + +-+ + + +",
-			"|S S S  |. c c c| |   |     |S S S| | |   |S S S|",
-			"+ + + +-+ +-+-+ + + +-+ + +-+ + + + + +-+ + + + +",
-			"|S S S| |       | | |   |   |S S S|     |  S S S|",
-			"+ + + + + +-+-+ + + + +-+ + + + + +-+-+ + + + + +",
-			"|S S S|             |   | |.|S S S|       |S S S|",
-			"+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ +-+-+-+-+",
-		},
-		Ramp = {
-			{ 3, 0 },
-			{ 3, 3 },
-			{ 6, 3 },
-			{ 6, 5 },
-			{ 8, 5 },
-			{ 8, 4 },
-			{ 9, 4 },
-			{ 9, 6 },
-			{ 10, 6 },
-			{ 10, 7 },
-			{ 14, 7 },
-			{ 14, 9 },
-			{ 17, 9 },
-			{ 17, 10 },
-			{ 15, 10 },
-			{ 15, 12 },
-			{ 17, 12 },
-			{ 17, 11 },
-			{ 19, 11 },
-			{ 19, 13 },
-			{ 17, 13 },
-			{ 17, 14 },
-			{ 21, 14 },
-			{ 21, 15 },
-			{ 19, 15 },
-			{ 19, 17 },
-			{ 20, 17 },
-			{ 20, 19 },
-			{ 19, 19 },
-		},
-		Loot = { { 0, 12, 3 }, { 3, 17, 3 }, { 9, 13, 3 }, { 11, 19, 3 }, { 16, 2, 3 }, { 23, 0, 3 } },
-		Crabs = {
-			{ { 16, 9 }, { 16, 8 } },
-			{ { 18, 13 }, { 18, 12 } },
-			{ { 16, 12 }, { 16, 11 } },
-			{ { 18, 11 }, { 18, 10 } },
-			{ { 14, 8 }, { 15, 8 }, { 16, 8 } },
-			{ { 20, 15 }, { 20, 16 } },
-			{ { 5, 3 }, { 5, 4 }, { 5, 5 } },
-			{ { 9, 5 }, { 10, 5 } },
-			{ { 11, 7 }, { 11, 8 } },
-			{ { 6, 5 }, { 7, 5 }, { 8, 5 } },
-		},
-	},
-	{
-		Name = "Cellar spiral",
-		Maze = {
-			"+-+-+-+-+-+-+-+-+-+-+-+-+ +-+-+-+-+-+-+-+-+-+-+-+",
-			"|     |     |       | |   |            .|c c c| |",
-			"+ + +-+ + +-+ +-+-+-+ +-+ +-+-+ +-+-+-+-+ + + + +",
-			"|.|     | |c c c  |.|   | |     |        c c c| |",
-			"+ +-+-+ +-+ + + + + + +-+ + +-+ + + + + + + + + +",
-			"|     | |  c c c|   |         |   | | | |c c c  |",
-			"+-+-+-+ + + +-+-+-+-+-+-+ +-+ +-+-+ + +-+-+-+-+ +",
-			"|S S S|   |     |     |     |           |     | |",
-			"+ + + + +-+-+-+ + +-+ + +-+ +-+ + +-+-+-+ +-+-+-+",
-			"|S S S  |       | | | |   | |   |   |     |S S S|",
-			"+ + + + + +-+ +-+ + + +-+-+ + + +-+ + +-+-+ + + +",
-			"|S S S| | | |     | |         |   |     |  S S S|",
-			"+-+-+-+-+ + +-+-+-+ +-+-+-+ +-+ + + +-+-+ + + + +",
-			"|          .  |             |   | | |     |S S S|",
-			"+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+-+",
-			"|           |       |         | |               |",
-			"+-+-+-+-+-+ + +-+-+ +-+-+-+ +-+ +-+ +-+-+-+-+-+-+",
-			"|S S S S|   |           |   |       | | |S S S S|",
-			"+ + + + + + +-+ +-+ +-+-+-+-+ +-+-+-+ + + + + + +",
-			"|S S S S  | | | |   |c c c|   |       |  S S S S|",
-			"+ + + + + + + + +-+-+ + + + +-+ +-+-+ + + + + + +",
-			"|S S S S| | | | |    c c c|     |   | | |S S S S|",
-			"+ + + + +-+ + + + + + + + +-+-+-+ + +-+ + + + + +",
-			"|S S S S|   |   | | |c c c|   | | |     |S S S S|",
-			"+-+-+-+-+ +-+ +-+ +-+ +-+ + +-+ + +-+-+-+-+-+-+-+",
-			"|           |   |   |   | |       |     |   |   |",
-			"+ +-+-+-+ + +-+ +-+ +-+ + +-+ +-+-+-+ + + + +-+ +",
-			"|     |   |   | |   |   |     |     |     |     |",
-			"+-+-+-+ +-+-+-+-+ +-+-+-+-+ +-+-+-+ +-+-+-+ +-+-+",
-			"|     |   |       |       |       |   |   |     |",
-			"+-+ + + +-+-+ +-+-+-+-+-+ +-+-+-+ +-+ + + +-+ + +",
-			"|   |  .    |         |c c c      |   | |     | |",
-			"+-+-+-+-+ +-+-+-+ +-+ + + + + +-+-+ +-+ + +-+-+-+",
-			"|S S S|   |c c c    | |c c c|           | |S S S|",
-			"+ + + + +-+ + + +-+-+ +-+-+ +-+ +-+-+ + + + + + +",
-			"|S S S     c c c|.| | |   | |S S S|     | |S S S|",
-			"+ + + + +-+-+-+-+ + + + +-+ + + + + +-+-+ + + + +",
-			"|S S S|         | |   |     |S S S| | |    S S S|",
-			"+ + + +-+r+-+-+ + +-+-+ +-+-+ + + + + +-+-+ + + +",
-			"|S S S|           |         |S S S|       |S S S|",
-			"+-+-+-+-+ +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+",
-		},
-		Ramp = {
-			{ 12, 0 },
-			{ 12, 3 },
-			{ 13, 3 },
-			{ 13, 5 },
-			{ 10, 5 },
-			{ 10, 3 },
-			{ 8, 3 },
-			{ 8, 5 },
-			{ 6, 5 },
-			{ 6, 4 },
-			{ 4, 4 },
-			{ 4, 6 },
-			{ 1, 6 },
-			{ 1, 7 },
-			{ 5, 7 },
-			{ 5, 11 },
-			{ 4, 11 },
-			{ 4, 13 },
-			{ 3, 13 },
-			{ 3, 15 },
-			{ 4, 15 },
-			{ 4, 16 },
-			{ 3, 16 },
-			{ 3, 18 },
-			{ 7, 18 },
-			{ 7, 19 },
-			{ 4, 19 },
-		},
-		Loot = { { 17, 12, 3 }, { 22, 12, 3 }, { 19, 18, 3 }, { 13, 19, 3 }, { 19, 8, 3 }, { 9, 14, 3 } },
-		Crabs = {
-			{ { 3, 12 }, { 4, 12 }, { 5, 12 } },
-			{ { 5, 8 }, { 4, 8 } },
-			{ { 3, 14 }, { 4, 14 } },
-			{ { 4, 6 }, { 3, 6 }, { 2, 6 }, { 1, 6 } },
-			{ { 13, 3 }, { 13, 4 }, { 13, 5 } },
-			{ { 10, 5 }, { 10, 4 }, { 10, 3 } },
-		},
-	},
-}
-
-local FRAME_LATTICE = parse(FRAME)
-
-local function mound(x, z, radius, height)
-	return { Kind = "Mound", At = { x, z }, Radius = radius, Height = height, Rock = true }
-end
-
-local frame = {
-	Name = "Hermit Hollows (zone 4)",
-	Primitives = {
-		-- Beyond the outer wall at x = +-336, two more walls fill the strip out to the cliffs, so
-		-- there's no way round the warren.
-		wall({ { -348, 12 }, { -348, 600 } }),
-		wall({ { -360, 12 }, { -360, 600 } }),
-		wall({ { 348, 12 }, { 348, 600 } }),
-		wall({ { 360, 12 }, { 360, 600 } }),
-		-- (Rock overhead, so they read as the cliffs' own foot.)
-		{ Kind = "Roof", Path = { { -348, 12 }, { -348, 600 } }, Width = 36, Clearance = 20, Thickness = 8 },
-		{ Kind = "Roof", Path = { { 348, 12 }, { 348, 600 } }, Width = 36, Clearance = 20, Thickness = 8 },
-		{ Kind = "Roof", Path = { { -336, 12 }, { 336, 12 } }, Width = 16, Clearance = 20, Thickness = 8 },
-		-- The Brood chamber: boulders round the flat where the secret's entrance goes.
-		mound(-36, 330, 8, 8),
-		mound(8, 282, 8, 8),
-		{ Kind = "Flat", At = { -14, 306 }, Radius = 10 },
-		-- The Antler hall.
-		mound(-170, 54, 8, 9),
-		-- The Throne.
-		mound(14, 452, 10, 12),
-		-- The Pearl court's pool.
-		{ Kind = "Hollow", At = { -154, 488 }, Radius = 10, Depth = 3 },
-		-- The Tide basin, round the rock pool (260, 70): just a boulder in the corner.
-		mound(294, 30, 8, 8),
-	},
-	Loot = {
-		{ At = { 6, 286 }, Radius = 6, Weight = 2 },
-		{ At = { -134, 80 }, Radius = 6, Weight = 2 },
-		{ At = { 42, 474 }, Radius = 6, Weight = 2 },
-		{ At = { -126, 502 }, Radius = 6, Weight = 2 },
-		{ At = { 294, 82 }, Radius = 6, Weight = 2 },
-	},
-	Entrances = { { -14, 306 } },
-	Hazards = {
-		{ Type = "Patrol", Path = { { -40, 306 }, { 12, 306 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -14, 282 }, { -14, 332 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -176, 78 }, { -128, 78 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { 238, 40 }, { 294, 40 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -8, 474 }, { 36, 474 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -182, 502 }, { -126, 502 } }, Count = 1 },
-	},
-}
-append(frame.Primitives, wallsOf(FRAME_LATTICE, WARREN, nil, false))
-
-local function crossingOf(spec)
-	local lattice = parse(spec.Maze)
-	local primitives = wallsOf(lattice, WARREN, FRAME_LATTICE, false)
-	append(primitives, rubbleOf(lattice, WARREN))
-	append(primitives, roofsOf(lattice, WARREN, FRAME_LATTICE))
-	-- The cart ramp follows the corridors: in at the top door, out at the bottom door.
-	local ramp = { { WARREN.cellX(spec.Ramp[1][1]), 0 } }
-	for _, cell in spec.Ramp do
-		table.insert(ramp, point(WARREN, cell))
-	end
-	table.insert(ramp, { WARREN.cellX(spec.Ramp[#spec.Ramp][1]), ZONE_DEPTH })
-	table.insert(primitives, { Kind = "Ramp", Path = ramp, Width = 14 })
-	return {
-		Name = spec.Name,
-		Primitives = primitives,
-		Loot = lootOf(WARREN, spec.Loot),
-		Hazards = patrolsOf(WARREN, spec.Crabs),
-	}
-end
-
-local crossings = {}
-for _, spec in CROSSINGS do
-	table.insert(crossings, crossingOf(spec))
-end
-
-local zone4 = {
-	Name = "Hermit Hollows (zone 4)",
-	Primitives = frame.Primitives,
-	Loot = frame.Loot,
-	Entrances = frame.Entrances,
-	Hazards = frame.Hazards,
-	Crossings = crossings,
-}
-
--- Side rooms ----------------------------------------------------------------------------------
--- Each slot is a block of cells the frame walls off, with one door. A room is drawn in the
--- slot's own coordinates (cell centres at 14 + 28 c, 14 + 28 r) and fills the block.
-local function cx(c)
-	return 14 + PITCH * c
-end
-local function cz(r)
-	return 14 + PITCH * r
-end
-local ROOM = gridOf(0, 0)
-
-local function sandMound(x, z, radius, height)
-	return { Kind = "Mound", At = { x, z }, Radius = radius, Height = height }
-end
-local function rockMound(x, z, radius, height)
-	return mound(x, z, radius, height)
-end
--- A solid block of rock through cell centres, exactly one cell (16) wide.
-local function wall16(path)
-	return { Kind = "Wall", Path = path, Height = WALL_HEIGHT, Width = 16 }
-end
-
-local function roomOf(spec)
-	local lattice = parse(spec.Maze)
-	local primitives = wallsOf(lattice, ROOM, nil, true)
-	append(primitives, rubbleOf(lattice, ROOM))
-	append(primitives, roofsOf(lattice, ROOM, nil))
-	append(primitives, spec.Extra or {})
-	return {
-		Name = spec.Name,
-		Primitives = primitives,
-		Loot = lootOf(ROOM, spec.Loot or {}),
-		Hazards = patrolsOf(ROOM, spec.Crabs or {}),
-	}
-end
-
-local SLOT_ROOMS = {
-	{
-		Name = "Northwest nest",
-		At = { -336, 96 },
-		Size = { 84, 84 },
-		Rooms = {
-			{
-				Name = "Crab nest",
-				Maze = {
-					"+ + + +",
-					"       ",
-					"+ +-+ +",
-					"  |.|  ",
-					"+ + +-+",
-					"       ",
-					"+ + + +",
-				},
-				Loot = { { 1, 1, 4 }, { 0, 2, 2 } },
-				Crabs = {
-					{ { 2, 0 }, { 0, 0 } },
-				},
-			},
-			{
-				Name = "Shell midden",
-				Maze = {
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-				},
-				Extra = {
-					sandMound(cx(0) + 6, cz(0) + 6, 9, 6),
-					sandMound(cx(1) + 0, cz(2) + 0, 9, 6),
-					rockMound(cx(0) + 0, cz(2) + -4, 7, 8),
-				},
-				Loot = { { 0, 0, 3 }, { 0, 2, 2 }, { 1, 0, 1 } },
-			},
-			{
-				Name = "Flooded pocket",
-				Maze = {
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-				},
-				Extra = {
-					{ Kind = "Hollow", At = { cx(1), cz(1) }, Radius = 18, Depth = 3 },
-				},
-				Loot = { { 0, 0, 3 }, { 0, 2, 2 } },
-			},
-		},
-	},
-	{
-		Name = "Western midden",
-		At = { -336, 236 },
-		Size = { 112, 112 },
-		Rooms = {
-			{
-				Name = "Shell midden",
-				Maze = {
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-				},
-				Extra = {
-					sandMound(cx(1) + 0, cz(1) + 0, 10, 7),
-					sandMound(cx(2) + 0, cz(2) + 0, 10, 7),
-					rockMound(cx(0) + 4, cz(3) + -4, 7, 9),
-					rockMound(cx(3) + 0, cz(0) + 0, 7, 9),
-				},
-				Loot = { { 0, 0, 3 }, { 0, 3, 2 }, { 2, 3, 1 } },
-				Crabs = {
-					{ { 1, 3 }, { 3, 3 } },
-				},
-			},
-			{
-				Name = "Boulder scramble",
-				Maze = {
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-				},
-				Extra = {
-					rockMound(cx(1) + 0, cz(0) + 0, 7, 11),
-					rockMound(cx(1) + 0, cz(2) + 0, 7, 11),
-					rockMound(cx(2) + -4, cz(1) + 0, 7, 11),
-					rockMound(cx(2) + 0, cz(3) + 0, 7, 11),
-					rockMound(cx(0) + -2, cz(1) + 0, 7, 10),
-				},
-				Loot = { { 0, 0, 3 }, { 0, 3, 4 }, { 3, 3, 2 } },
-			},
-			{
-				Name = "Tunnel loop",
-				Maze = {
-					"+ + + + +",
-					"         ",
-					"+ +-+-+ +",
-					"  | | |  ",
-					"+ +-+-+ +",
-					"  | | |  ",
-					"+ +-+-+ +",
-					"         ",
-					"+ + + + +",
-				},
-				Extra = {
-					wall16({ { cx(1), cz(1) }, { cx(2), cz(1) } }),
-					wall16({ { cx(1), cz(2) }, { cx(2), cz(2) } }),
-					wall16({ { cx(1), cz(1) }, { cx(1), cz(2) } }),
-					wall16({ { cx(2), cz(1) }, { cx(2), cz(2) } }),
-				},
-				Loot = { { 0, 2, 4 }, { 3, 3, 2 }, { 0, 0, 1 } },
-				Crabs = {
-					{ { 0, 0 }, { 3, 0 } },
-					{ { 0, 3 }, { 3, 3 } },
-				},
-			},
-		},
-	},
-	{
-		Name = "Southwest collapse",
-		At = { -336, 460 },
-		Size = { 84, 112 },
-		Rooms = {
-			{
-				Name = "Collapsed chamber",
-				Maze = {
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-				},
-				Extra = {
-					{
-						Kind = "Ridge",
-						Path = { { cx(0), cz(1) + 6 }, { cx(1), cz(1) + 6 } },
-						Height = 4,
-						Width = 16,
-					},
-					rockMound(cx(1) + 0, cz(2) + 0, 7, 9),
-					rockMound(cx(0) + 8, cz(3) + 0, 7, 8),
-				},
-				Loot = { { 0, 3, 4 }, { 2, 3, 2 }, { 0, 0, 1 } },
-				Crabs = {
-					{ { 0, 0 }, { 0, 1 } },
-				},
-			},
-			{
-				Name = "Sea cave",
-				Maze = {
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-				},
-				Extra = {
-					{ Kind = "Hollow", At = { cx(1), cz(2) }, Radius = 16, Depth = 3 },
-				},
-				Loot = { { 1, 3, 3 }, { 0, 0, 2 } },
-			},
-			{
-				Name = "Dead-end warren",
-				Maze = {
-					"+ + + +",
-					"    |  ",
-					"+ + + +",
-					"  |    ",
-					"+ +-+-+",
-					"  |    ",
-					"+ + +-+",
-					"       ",
-					"+ + + +",
-				},
-				Loot = { { 0, 3, 4 }, { 1, 0, 1 } },
-				Crabs = {
-					{ { 1, 1 }, { 1, 0 } },
-				},
-			},
-		},
-	},
-	{
-		Name = "Northeast nest",
-		At = { 252, 124 },
-		Size = { 84, 84 },
-		Rooms = {
-			{
-				Name = "Crab nest",
-				Maze = {
-					"+ + + +",
-					"       ",
-					"+ +-+ +",
-					"  |.|  ",
-					"+ + + +",
-					"  |    ",
-					"+ + + +",
-				},
-				Loot = { { 1, 1, 4 }, { 2, 2, 2 } },
-				Crabs = {
-					{ { 0, 0 }, { 2, 0 } },
-				},
-			},
-			{
-				Name = "Shell garden",
-				Maze = {
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-				},
-				Extra = {
-					sandMound(cx(1) + 0, cz(0) + 0, 9, 5),
-					sandMound(cx(1) + 0, cz(2) + 0, 9, 5),
-					rockMound(cx(2) + 0, cz(1) + 0, 7, 9),
-				},
-				Loot = { { 2, 0, 3 }, { 2, 2, 2 } },
-			},
-			{
-				Name = "Collapsed corner",
-				Maze = {
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-				},
-				Extra = {
-					{
-						Kind = "Ridge",
-						Path = { { cx(1) + 4, cz(0) - 10 }, { cx(1) + 4, cz(2) + 10 } },
-						Height = 4.2,
-						Width = 24,
-					},
-				},
-				Loot = { { 2, 1, 4 }, { 2, 0, 2 } },
-			},
-		},
-	},
-	{
-		Name = "Eastern midden",
-		At = { 224, 236 },
-		Size = { 112, 112 },
-		Rooms = {
-			{
-				Name = "Boulder scramble",
-				Maze = {
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-					" . . . . ",
-					"+ + + + +",
-				},
-				Extra = {
-					rockMound(cx(1) + 0, cz(0) + 0, 7, 11),
-					rockMound(cx(1) + 0, cz(2) + 0, 7, 11),
-					rockMound(cx(2) + 4, cz(1) + 0, 7, 11),
-					rockMound(cx(2) + 0, cz(3) + 0, 7, 11),
-					rockMound(cx(3) + 2, cz(1) + 0, 7, 10),
-				},
-				Loot = { { 3, 0, 3 }, { 3, 3, 4 }, { 0, 3, 2 } },
-			},
-			{
-				Name = "Crab warren",
-				Maze = {
-					"+ + + + +",
-					"    |    ",
-					"+-+ + +-+",
-					"         ",
-					"+-+-+-+ +",
-					"         ",
-					"+-+ +-+-+",
-					"         ",
-					"+ + + + +",
-				},
-				Loot = { { 3, 3, 4 }, { 0, 3, 1 }, { 3, 0, 2 } },
-				Crabs = {
-					{ { 0, 1 }, { 2, 1 } },
-					{ { 3, 2 }, { 1, 2 } },
-				},
-			},
-			{
-				Name = "Drowned hall",
-				Maze = {
-					"+ + + + +",
-					"         ",
-					"+ + + + +",
-					"         ",
-					"+ + + + +",
-					"         ",
-					"+ + + + +",
-					"         ",
-					"+ + + + +",
-				},
-				Extra = {
-					{
-						Kind = "Channel",
-						Path = { { cx(0), cz(2) }, { cx(3), cz(2) } },
-						Depth = 3,
-						Width = 16,
-					},
-				},
-				Loot = { { 3, 3, 3 }, { 3, 0, 2 } },
-			},
-		},
-	},
-	{
-		Name = "Southeast burrow",
-		At = { 252, 460 },
-		Size = { 84, 112 },
-		Rooms = {
-			{
-				Name = "Deep tunnel",
-				Maze = {
-					"+ + + +",
-					"  |    ",
-					"+ + +-+",
-					"  | |  ",
-					"+ + + +",
-					"       ",
-					"+-+-+ +",
-					"       ",
-					"+ + + +",
-				},
-				Loot = { { 0, 3, 4 }, { 2, 0, 3 } },
-				Crabs = {
-					{ { 1, 2 }, { 2, 2 } },
-				},
-			},
-			{
-				Name = "Collapsed gallery",
-				Maze = {
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-					" . . . ",
-					"+ + + +",
-				},
-				Extra = {
-					{ Kind = "Ridge", Path = { { cx(1), cz(1) }, { cx(2), cz(1) } }, Height = 4, Width = 16 },
-					rockMound(cx(1) + 0, cz(3) + 0, 7, 9),
-					rockMound(cx(2) + 0, cz(0) + 0, 7, 8),
-				},
-				Loot = { { 2, 3, 3 }, { 2, 0, 2 } },
-			},
-			{
-				Name = "Drowned gallery",
-				Maze = {
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-				},
-				Extra = {
-					{
-						Kind = "Channel",
-						Path = { { cx(1), cz(0) }, { cx(1), cz(3) } },
-						Depth = 3,
-						Width = 16,
-					},
-				},
-				Loot = { { 2, 0, 3 }, { 2, 3, 4 } },
-			},
-		},
-	},
-	{
-		Name = "South cellar",
-		At = { 56, 488 },
-		Size = { 84, 84 },
-		Rooms = {
-			{
-				Name = "Crab cellar",
-				Maze = {
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-				},
-				Extra = {
-					rockMound(cx(1) + 0, cz(1) + 0, 8, 10),
-				},
-				Loot = { { 0, 2, 3 }, { 2, 2, 3 } },
-				Crabs = {
-					{ { 0, 2 }, { 2, 2 } },
-				},
-			},
-			{
-				Name = "Shell hoard",
-				Maze = {
-					"+ + + +",
-					"  |    ",
-					"+ + +-+",
-					"  | |  ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-				},
-				Loot = { { 0, 0, 4 }, { 2, 1, 2 } },
-			},
-			{
-				Name = "Flooded cellar",
-				Maze = {
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-					"       ",
-					"+ + + +",
-				},
-				Extra = {
-					{ Kind = "Hollow", At = { cx(1), cz(1) }, Radius = 18, Depth = 3 },
-				},
-				Loot = { { 0, 2, 3 }, { 2, 2, 3 } },
-			},
-		},
-	},
-}
-
-local slots = {}
-for _, slot in SLOT_ROOMS do
-	local rooms = {}
-	for _, spec in slot.Rooms do
-		table.insert(rooms, roomOf(spec))
-	end
-	table.insert(slots, { Name = slot.Name, At = slot.At, Size = slot.Size, Rooms = rooms })
-end
-zone4.Slots = slots
-
--- Zones 5 and 6 share one frame with zone 4: five walls across the tile (z 20, 48, 76, 104
--- and 132, all on the 4-stud grid), lanes 16 wide between them (z 34, 62, 90 and 118), and
--- cells split by walls running down the beach. Each zone is a step deeper than the one above.
-
--- A wall of the given height, 12 wide.
-local function wallOf(height)
-	return function(path)
-		return { Kind = "Wall", Path = path, Height = height, Width = 12 }
-	end
-end
-
--- A roof resting on walls, with its underside at `clearance`.
-local function roofOf(clearance, thickness)
-	return function(path, width)
-		return { Kind = "Roof", Path = path, Width = width, Clearance = clearance, Thickness = thickness }
-	end
-end
-
--- A roof over a gap in the wall line at z, centred on x.
-local function gapRoof(makeRoof, x, z)
-	return makeRoof({ { x, z - 3 }, { x, z + 3 } }, 20)
-end
-
--- Zone 5: the sump. Lower and wetter: lower roofs, and the middle maze's lanes are sunk
--- 4 studs below the slope, so they flood long before the waterline reaches them.
-local w5 = wallOf(18)
-local r5 = roofOf(14, 8)
-
-local function sunk(path)
-	return { Kind = "Channel", Path = path, Depth = 4, Width = 16 }
-end
-
-local zone5 = {
-	Name = "Hermit Hollows (zone 5)",
-	Primitives = {
-		-- Cart ramps: each zig-zags 80 studs outward, away from the middle, in every lane.
-		{
-			Kind = "Ramp",
-			Path = {
-				{ -200, 0 },
-				{ -200, 34 },
-				{ -280, 34 },
-				{ -280, 62 },
-				{ -200, 62 },
-				{ -200, 90 },
-				{ -280, 90 },
-				{ -280, 118 },
-				{ -200, 118 },
-				{ -200, 150 },
-			},
-			Width = 14,
-		},
-		{
-			Kind = "Ramp",
-			Path = {
-				{ 180, 0 },
-				{ 180, 34 },
-				{ 260, 34 },
-				{ 260, 62 },
-				{ 180, 62 },
-				{ 180, 90 },
-				{ 260, 90 },
-				{ 260, 118 },
-				{ 180, 118 },
-				{ 180, 150 },
-			},
-			Width = 14,
-		},
-		-- Walls across the tile. The middle maze's way through: gaps at x -120, -40, the
-		-- chamber, 50 and -10.
-		w5({ { -360, 20 }, { -214, 20 } }),
-		w5({ { -186, 20 }, { -134, 20 } }),
-		w5({ { -106, 20 }, { 166, 20 } }),
-		w5({ { 194, 20 }, { 360, 20 } }),
-		w5({ { -360, 48 }, { -354, 48 } }),
-		w5({ { -326, 48 }, { -294, 48 } }),
-		w5({ { -266, 48 }, { -54, 48 } }),
-		w5({ { -26, 48 }, { 246, 48 } }),
-		w5({ { 274, 48 }, { 360, 48 } }),
-		w5({ { -360, 76 }, { -354, 76 } }),
-		w5({ { -326, 76 }, { -214, 76 } }),
-		w5({ { -186, 76 }, { -44, 76 } }),
-		w5({ { 54, 76 }, { 166, 76 } }),
-		w5({ { 194, 76 }, { 326, 76 } }),
-		w5({ { 354, 76 }, { 360, 76 } }),
-		w5({ { -360, 104 }, { -354, 104 } }),
-		w5({ { -326, 104 }, { -294, 104 } }),
-		w5({ { -266, 104 }, { 36, 104 } }),
-		w5({ { 64, 104 }, { 246, 104 } }),
-		w5({ { -360, 132 }, { -214, 132 } }),
-		w5({ { -186, 132 }, { -24, 132 } }),
-		w5({ { 4, 132 }, { 166, 132 } }),
-		w5({ { 194, 132 }, { 360, 132 } }),
-		-- Walls down the beach: the ramp cells' sides, with a door into the burrow (west) and
-		-- the gallery (east).
-		w5({ { -312, 20 }, { -312, 48 } }),
-		w5({ { -312, 76 }, { -312, 132 } }),
-		w5({ { -176, 20 }, { -176, 132 } }),
-		w5({ { 156, 20 }, { 156, 132 } }),
-		w5({ { 284, 48 }, { 284, 76 } }),
-		w5({ { 284, 104 }, { 284, 132 } }),
-		-- The middle maze's sunken lanes, and the cut through its last two gaps toward the sea.
-		sunk({ { -160, 34 }, { 140, 34 } }),
-		sunk({ { -160, 62 }, { 140, 62 } }),
-		sunk({ { -160, 90 }, { 140, 90 } }),
-		sunk({ { -160, 118 }, { 140, 118 } }),
-		sunk({ { 50, 90 }, { 50, 118 } }),
-		sunk({ { -10, 118 }, { -10, 146 } }),
-		-- The gallery's pool.
-		{ Kind = "Hollow", At = { 326, 106 }, Radius = 14, Depth = 3 },
-		-- Roofs: every lane but the chamber and the gallery.
-		r5({ { -366, 34 }, { 366, 34 } }, 28),
-		r5({ { -366, 62 }, { -52, 62 } }, 28),
-		r5({ { 62, 62 }, { 366, 62 } }, 28),
-		r5({ { -366, 90 }, { -52, 90 } }, 28),
-		r5({ { 62, 90 }, { 276, 90 } }, 28),
-		r5({ { -366, 118 }, { 276, 118 } }, 28),
-		gapRoof(r5, -200, 20),
-		gapRoof(r5, -120, 20),
-		gapRoof(r5, 180, 20),
-		gapRoof(r5, -340, 48),
-		gapRoof(r5, -280, 48),
-		gapRoof(r5, -40, 48),
-		gapRoof(r5, 260, 48),
-		gapRoof(r5, -340, 76),
-		gapRoof(r5, -200, 76),
-		gapRoof(r5, 180, 76),
-		gapRoof(r5, -340, 104),
-		gapRoof(r5, -280, 104),
-		gapRoof(r5, 50, 104),
-		gapRoof(r5, 260, 104),
-		gapRoof(r5, -200, 132),
-		gapRoof(r5, -10, 132),
-		gapRoof(r5, 180, 132),
-		-- The chamber: a dry shelf between the sunken lanes, open to the sky.
-		{ Kind = "Flat", At = { 5, 76 }, Radius = 12 },
-		{ Kind = "Mound", At = { 36, 66 }, Radius = 8, Height = 5, Rock = true },
-	},
-	Loot = {
-		{ At = { -340, 118 }, Radius = 6, Weight = 5 },
-		{ At = { -340, 34 }, Radius = 6, Weight = 3 },
-		{ At = { 330, 62 }, Radius = 6, Weight = 5 },
-		{ At = { 308, 92 }, Radius = 6, Weight = 3 },
-		{ At = { 336, 34 }, Radius = 6, Weight = 2 },
-		{ At = { 130, 34 }, Radius = 6, Weight = 3 },
-		{ At = { -150, 62 }, Radius = 6, Weight = 2 },
-		{ At = { 130, 62 }, Radius = 6, Weight = 2 },
-		{ At = { -150, 90 }, Radius = 6, Weight = 3 },
-		{ At = { 130, 90 }, Radius = 6, Weight = 2 },
-		{ At = { 130, 118 }, Radius = 6, Weight = 3 },
-		{ At = { -150, 118 }, Radius = 6, Weight = 2 },
-	},
-	Entrances = { { 5, 76 } },
-	Hazards = {
-		{ Type = "Patrol", Path = { { -270, 62 }, { -210, 62 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { 190, 34 }, { 250, 34 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { 190, 90 }, { 250, 90 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -130, 34 }, { -30, 34 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -10, 90 }, { 90, 90 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -30, 118 }, { 90, 118 } }, Count = 1 },
-	},
-}
-
--- Zone 6: the labyrinth. Taller walls, roofed all but one chamber, ramps that swing 120
--- studs a lane, and a middle maze of false doors and long dead ends.
-local w6 = wallOf(24)
-local r6 = roofOf(20, 8)
-
-local zone6 = {
-	Name = "Hermit Hollows (zone 6)",
-	Primitives = {
-		-- Cart ramps: 120-stud switchbacks, outward.
-		{
-			Kind = "Ramp",
-			Path = {
-				{ -200, 0 },
-				{ -200, 34 },
-				{ -320, 34 },
-				{ -320, 62 },
-				{ -200, 62 },
-				{ -200, 90 },
-				{ -320, 90 },
-				{ -320, 118 },
-				{ -200, 118 },
-				{ -200, 150 },
-			},
-			Width = 14,
-		},
-		{
-			Kind = "Ramp",
-			Path = {
-				{ 180, 0 },
-				{ 180, 34 },
-				{ 300, 34 },
-				{ 300, 62 },
-				{ 180, 62 },
-				{ 180, 90 },
-				{ 300, 90 },
-				{ 300, 118 },
-				{ 180, 118 },
-				{ 180, 150 },
-			},
-			Width = 14,
-		},
-		-- Walls across the tile. The middle maze's way through: gaps at x -130, -50, 90, -10
-		-- and -100. False doors at 90 (first wall) and 130 (fourth) lead to dead ends.
-		w6({ { -360, 20 }, { -214, 20 } }),
-		w6({ { -186, 20 }, { -144, 20 } }),
-		w6({ { -116, 20 }, { 76, 20 } }),
-		w6({ { 104, 20 }, { 166, 20 } }),
-		w6({ { 194, 20 }, { 360, 20 } }),
-		w6({ { -360, 48 }, { -334, 48 } }),
-		w6({ { -306, 48 }, { -64, 48 } }),
-		w6({ { -36, 48 }, { 286, 48 } }),
-		w6({ { 314, 48 }, { 360, 48 } }),
-		w6({ { -360, 76 }, { -214, 76 } }),
-		w6({ { -100, 76 }, { 76, 76 } }),
-		w6({ { 104, 76 }, { 166, 76 } }),
-		w6({ { 194, 76 }, { 360, 76 } }),
-		w6({ { -360, 104 }, { -334, 104 } }),
-		w6({ { -306, 104 }, { -24, 104 } }),
-		w6({ { 4, 104 }, { 116, 104 } }),
-		w6({ { 144, 104 }, { 286, 104 } }),
-		w6({ { 314, 104 }, { 360, 104 } }),
-		w6({ { -360, 132 }, { -214, 132 } }),
-		w6({ { -186, 132 }, { -114, 132 } }),
-		w6({ { -86, 132 }, { 166, 132 } }),
-		w6({ { 194, 132 }, { 360, 132 } }),
-		-- Walls down the beach: the ramp cells' sides and the maze's dividers.
-		w6({ { -176, 20 }, { -176, 132 } }),
-		w6({ { 156, 20 }, { 156, 132 } }),
-		w6({ { 24, 20 }, { 24, 48 } }),
-		w6({ { -60, 76 }, { -60, 104 } }),
-		w6({ { 40, 104 }, { 40, 132 } }),
-		-- The rubble in the fourth wall's gap: a scramble on foot, too steep for a cart.
-		{ Kind = "Ridge", Path = { { -24, 104 }, { 4, 104 } }, Height = 5, Width = 20 },
-		-- Roofs: everything but the chamber.
-		r6({ { -366, 34 }, { 366, 34 } }, 28),
-		r6({ { -366, 62 }, { -184, 62 } }, 28),
-		r6({ { -92, 62 }, { 366, 62 } }, 28),
-		r6({ { -366, 90 }, { -184, 90 } }, 28),
-		r6({ { -92, 90 }, { 366, 90 } }, 28),
-		r6({ { -366, 118 }, { 366, 118 } }, 28),
-		gapRoof(r6, -200, 20),
-		gapRoof(r6, -130, 20),
-		gapRoof(r6, 90, 20),
-		gapRoof(r6, 180, 20),
-		gapRoof(r6, -320, 48),
-		gapRoof(r6, -50, 48),
-		gapRoof(r6, 300, 48),
-		gapRoof(r6, -200, 76),
-		gapRoof(r6, 90, 76),
-		gapRoof(r6, 180, 76),
-		gapRoof(r6, -320, 104),
-		gapRoof(r6, -10, 104),
-		gapRoof(r6, 130, 104),
-		gapRoof(r6, 300, 104),
-		gapRoof(r6, -200, 132),
-		gapRoof(r6, -100, 132),
-		gapRoof(r6, 180, 132),
-		-- The chamber, off the second lane's west end.
-		{ Kind = "Flat", At = { -140, 76 }, Radius = 12 },
-		{ Kind = "Mound", At = { -112, 62 }, Radius = 7, Height = 5, Rock = true },
-	},
-	Loot = {
-		{ At = { 60, 118 }, Radius = 6, Weight = 5 },
-		{ At = { -80, 90 }, Radius = 6, Weight = 4 },
-		{ At = { 120, 34 }, Radius = 6, Weight = 2 },
-		{ At = { -158, 34 }, Radius = 6, Weight = 1 },
-		{ At = { 136, 62 }, Radius = 6, Weight = 2 },
-		{ At = { 136, 90 }, Radius = 6, Weight = 3 },
-		{ At = { -150, 118 }, Radius = 6, Weight = 2 },
-		{ At = { -345, 62 }, Radius = 6, Weight = 3 },
-		{ At = { -345, 118 }, Radius = 6, Weight = 4 },
-		{ At = { 340, 34 }, Radius = 6, Weight = 3 },
-		{ At = { 340, 90 }, Radius = 6, Weight = 4 },
-	},
-	Entrances = { { -140, 76 } },
-	Hazards = {
-		{ Type = "Patrol", Path = { { -310, 34 }, { -210, 34 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -310, 90 }, { -210, 90 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { 190, 62 }, { 290, 62 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { 190, 118 }, { 290, 118 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -150, 34 }, { -60, 34 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -40, 62 }, { 100, 62 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -40, 90 }, { 100, 90 } }, Count = 1 },
-		{ Type = "Patrol", Path = { { -110, 118 }, { 30, 118 } }, Count = 1 },
-	},
-}
-
+-- Hermit Hollows (zones 4 to 6): a giant hermit crab's warren, drawn with the layout kit from
+-- tools/kit/plans/hermit_hollows.py (edit the plan and re-run it, not this file).
+-- See docs/layouts/HermitHollows.md and docs/design/cards/hermit-hollows.md.
 return {
-	[4] = zone4,
-	[5] = Tiled(zone5),
-	[6] = Tiled(zone6),
+	[4] = {
+		Primitives = {
+			{
+				Kind = "Wall",
+				Area = {
+					{ -380, -12 },
+					{ 380, -12 },
+					{ 380, 620 },
+					{ -380, 620 },
+				},
+				Height = 20,
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -360, -12 },
+					{ 360, -12 },
+					{ 360, 20 },
+					{ -360, 20 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -360, 592 },
+					{ 360, 592 },
+					{ 360, 620 },
+					{ -360, 620 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -272, 176 },
+					{ -176, 176 },
+					{ -176, 264 },
+					{ -272, 264 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 274 },
+					{ -72, 248 },
+					{ 72, 248 },
+					{ 72, 274 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 286 },
+					{ -72, 274 },
+					{ -42, 274 },
+					{ -42, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -30, 286 },
+					{ -30, 274 },
+					{ -6, 274 },
+					{ -6, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 6, 286 },
+					{ 6, 274 },
+					{ 30, 274 },
+					{ 30, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 42, 286 },
+					{ 42, 274 },
+					{ 72, 274 },
+					{ 72, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 306 },
+					{ -72, 286 },
+					{ 72, 286 },
+					{ 72, 306 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 318 },
+					{ -72, 306 },
+					{ -42, 306 },
+					{ -42, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -30, 318 },
+					{ -30, 306 },
+					{ -6, 306 },
+					{ -6, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 6, 318 },
+					{ 6, 306 },
+					{ 30, 306 },
+					{ 30, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 42, 318 },
+					{ 42, 306 },
+					{ 72, 306 },
+					{ 72, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 318 },
+					{ 72, 318 },
+					{ 72, 344 },
+					{ -72, 344 },
+				},
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -42, 274 },
+					{ -30, 274 },
+					{ -30, 286 },
+					{ -42, 286 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -6, 274 },
+					{ 6, 274 },
+					{ 6, 286 },
+					{ -6, 286 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ 30, 274 },
+					{ 42, 274 },
+					{ 42, 286 },
+					{ 30, 286 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -42, 306 },
+					{ -30, 306 },
+					{ -30, 318 },
+					{ -42, 318 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -6, 306 },
+					{ 6, 306 },
+					{ 6, 318 },
+					{ -6, 318 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ 30, 306 },
+					{ 42, 306 },
+					{ 42, 318 },
+					{ 30, 318 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Roof",
+				Area = {
+					{ -80.32, 242.45 },
+					{ 80.32, 242.45 },
+					{ 80.32, 349.55 },
+					{ -80.32, 349.55 },
+				},
+				Clearance = 18,
+				Thickness = 6,
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 176, 328 },
+					{ 280, 328 },
+					{ 280, 424 },
+					{ 176, 424 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -294, 44 },
+					{ -294, 20 },
+					{ -306, 20 },
+					{ -306, 44 },
+				},
+			},
+			{ Kind = "Flat", At = { -300, 44 }, Radius = 6 },
+			{ Kind = "Flat", At = { -300, 20 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 326, 44 },
+					{ 326, 20 },
+					{ 314, 20 },
+					{ 314, 44 },
+				},
+			},
+			{ Kind = "Flat", At = { 320, 44 }, Radius = 6 },
+			{ Kind = "Flat", At = { 320, 20 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ -296, 226 },
+					{ -272, 226 },
+					{ -272, 214 },
+					{ -296, 214 },
+				},
+			},
+			{ Kind = "Flat", At = { -296, 220 }, Radius = 6 },
+			{ Kind = "Flat", At = { -272, 220 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 6, 368 },
+					{ 6, 344 },
+					{ -6, 344 },
+					{ -6, 368 },
+				},
+			},
+			{ Kind = "Flat", At = { 0, 368 }, Radius = 6 },
+			{ Kind = "Flat", At = { 0, 344 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 170, 568 },
+					{ 170, 592 },
+					{ 182, 592 },
+					{ 182, 568 },
+				},
+			},
+			{ Kind = "Flat", At = { 176, 568 }, Radius = 6 },
+			{ Kind = "Flat", At = { 176, 592 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ -182, 568 },
+					{ -182, 592 },
+					{ -170, 592 },
+					{ -170, 568 },
+				},
+			},
+			{ Kind = "Flat", At = { -176, 568 }, Radius = 6 },
+			{ Kind = "Flat", At = { -176, 592 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 304, 370 },
+					{ 280, 370 },
+					{ 280, 382 },
+					{ 304, 382 },
+				},
+			},
+			{ Kind = "Flat", At = { 304, 376 }, Radius = 6 },
+			{ Kind = "Flat", At = { 280, 376 }, Radius = 6 },
+		},
+		Loot = {
+			{ At = { 0, 296 }, Radius = 6, Weight = 3 },
+			{ At = { 228, 376 }, Radius = 6, Weight = 2 },
+		},
+		Entrances = {
+			{ -224, 232 },
+		},
+		Hazards = {
+			{
+				Type = "Patrol",
+				Path = {
+					{ -252, 214 },
+					{ -196, 214 },
+				},
+				Count = 2,
+			},
+			{
+				Type = "Patrol",
+				Path = {
+					{ -56, 296 },
+					{ 56, 296 },
+				},
+				Count = 2,
+			},
+			{
+				Type = "Patrol",
+				Path = {
+					{ 190, 376 },
+					{ 270, 376 },
+				},
+				Count = 2,
+			},
+		},
+		Decor = {
+			{
+				Kind = "Shells",
+				Area = {
+					{ -300, 0 },
+					{ 300, 0 },
+					{ 300, 16 },
+					{ -300, 16 },
+				},
+				Count = 8,
+				Scale = 1.2,
+			},
+			{
+				Kind = "Shells",
+				Area = {
+					{ -264, 184 },
+					{ -184, 184 },
+					{ -184, 256 },
+					{ -264, 256 },
+				},
+				Count = 12,
+				Scale = 1.5,
+			},
+			{ Kind = "Bones", At = { -224, 220 }, Scale = 1.1, Yaw = 40 },
+			{ Kind = "GlowShells", At = { -200, 200 } },
+			{ Kind = "Bones", At = { 0, 296 }, Scale = 1.3, Yaw = 90 },
+			{ Kind = "GlowShells", At = { -54, 296 } },
+			{ Kind = "GlowShells", At = { 54, 296 } },
+			{
+				Kind = "Shells",
+				Area = {
+					{ 184, 336 },
+					{ 272, 336 },
+					{ 272, 416 },
+					{ 184, 416 },
+				},
+				Count = 12,
+				Scale = 1.6,
+			},
+			{ Kind = "Bones", At = { 228, 376 }, Scale = 1.2, Yaw = 30 },
+			{ Kind = "GlowShells", At = { 200, 352 } },
+			{ Kind = "GlowShells", At = { -214, 238 } },
+		},
+		Name = "Outer Shore",
+		Crossings = {
+			{
+				Name = "Crab walk",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -200, 0 },
+							{ -200, 60 },
+							{ 120, 60 },
+							{ 120, 128 },
+							{ -140, 128 },
+							{ -140, 456 },
+							{ -60, 456 },
+							{ -60, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -218, 0 },
+							{ -218, 60 },
+							{ -182, 60 },
+							{ -182, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -200, 78 },
+							{ 120, 78 },
+							{ 120, 42 },
+							{ -200, 42 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 102, 60 },
+							{ 102, 128 },
+							{ 138, 128 },
+							{ 138, 60 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 120, 110 },
+							{ -140, 110 },
+							{ -140, 146 },
+							{ 120, 146 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -158, 128 },
+							{ -158, 456 },
+							{ -122, 456 },
+							{ -122, 128 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -140, 474 },
+							{ -60, 474 },
+							{ -60, 438 },
+							{ -140, 438 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -78, 456 },
+							{ -78, 608 },
+							{ -42, 608 },
+							{ -42, 456 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 218, 0 },
+							{ 218, 132 },
+							{ 230, 132 },
+							{ 230, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 224, 138 },
+							{ 336, 138 },
+							{ 336, 126 },
+							{ 224, 126 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 132 },
+							{ 330, 188 },
+							{ 342, 188 },
+							{ 342, 132 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 182 },
+							{ 232, 182 },
+							{ 232, 194 },
+							{ 336, 194 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 226, 188 },
+							{ 226, 328 },
+							{ 238, 328 },
+							{ 238, 188 },
+						},
+					},
+					{ Kind = "Flat", At = { 224, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 132 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 132 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 232, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 232, 328 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 208, 0 },
+							{ 208, 132 },
+							{ 240, 132 },
+							{ 240, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 224, 148 },
+							{ 336, 148 },
+							{ 336, 116 },
+							{ 224, 116 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 132 },
+							{ 320, 188 },
+							{ 352, 188 },
+							{ 352, 132 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 172 },
+							{ 232, 172 },
+							{ 232, 204 },
+							{ 336, 204 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 216, 188 },
+							{ 216, 328 },
+							{ 248, 328 },
+							{ 248, 188 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 226, 424 },
+							{ 226, 452 },
+							{ 238, 452 },
+							{ 238, 424 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 232, 458 },
+							{ 336, 458 },
+							{ 336, 446 },
+							{ 232, 446 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 452 },
+							{ 330, 500 },
+							{ 342, 500 },
+							{ 342, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 494 },
+							{ 256, 494 },
+							{ 256, 506 },
+							{ 336, 506 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 250, 500 },
+							{ 250, 548 },
+							{ 262, 548 },
+							{ 262, 500 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 256, 554 },
+							{ 336, 554 },
+							{ 336, 542 },
+							{ 256, 542 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 548 },
+							{ 330, 608 },
+							{ 342, 608 },
+							{ 342, 548 },
+						},
+					},
+					{ Kind = "Flat", At = { 232, 424 }, Radius = 6 },
+					{ Kind = "Flat", At = { 232, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 216, 424 },
+							{ 216, 452 },
+							{ 248, 452 },
+							{ 248, 424 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 232, 468 },
+							{ 336, 468 },
+							{ 336, 436 },
+							{ 232, 436 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 452 },
+							{ 320, 500 },
+							{ 352, 500 },
+							{ 352, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 484 },
+							{ 256, 484 },
+							{ 256, 516 },
+							{ 336, 516 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 500 },
+							{ 240, 548 },
+							{ 272, 548 },
+							{ 272, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 256, 564 },
+							{ 336, 564 },
+							{ 336, 532 },
+							{ 256, 532 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 548 },
+							{ 320, 608 },
+							{ 352, 608 },
+							{ 352, 548 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -140, 214 },
+							{ -176, 214 },
+							{ -176, 226 },
+							{ -140, 226 },
+						},
+					},
+					{ Kind = "Flat", At = { -140, 220 }, Radius = 6 },
+					{ Kind = "Flat", At = { -176, 220 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -140, 306 },
+							{ -72, 306 },
+							{ -72, 294 },
+							{ -140, 294 },
+						},
+					},
+					{ Kind = "Flat", At = { -140, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 176, 342 },
+							{ 176, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 176, 336 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -140, 374 },
+							{ -240, 374 },
+							{ -240, 386 },
+							{ -140, 386 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -246, 380 },
+							{ -246, 420 },
+							{ -234, 420 },
+							{ -234, 380 },
+						},
+					},
+					{ Kind = "Flat", At = { -140, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -240, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -240, 420 }, Radius = 6 },
+				},
+				Loot = {
+					{ At = { -240, 420 }, Radius = 5, Weight = 2 },
+				},
+				Hazards = {
+					{
+						Type = "Patrol",
+						Path = {
+							{ -170, 60 },
+							{ -110, 60 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -22, 128 },
+							{ -82, 128 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -140, 260 },
+							{ -140, 320 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 292, 188 },
+							{ 240, 188 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 232, 374 },
+							{ 232, 434 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 308, 500 },
+							{ 264, 500 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -100, 300 },
+							{ -72, 300 },
+						},
+						Count = 1,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { -200, 55 } },
+					{ Kind = "GlowShells", At = { -95, 60 } },
+					{ Kind = "GlowShells", At = { 15, 60 } },
+					{ Kind = "GlowShells", At = { 120, 65 } },
+					{ Kind = "GlowShells", At = { 73, 128 } },
+					{ Kind = "GlowShells", At = { -37, 128 } },
+					{ Kind = "GlowShells", At = { -140, 135 } },
+					{ Kind = "GlowShells", At = { -140, 245 } },
+					{ Kind = "GlowShells", At = { -140, 355 } },
+					{ Kind = "GlowShells", At = { -131, 456 } },
+					{ Kind = "GlowShells", At = { -60, 495 } },
+					{ Kind = "GlowShells", At = { -60, 605 } },
+					{ Kind = "GlowShells", At = { 224, 55 } },
+					{ Kind = "GlowShells", At = { 257, 132 } },
+					{ Kind = "GlowShells", At = { 336, 163 } },
+					{ Kind = "GlowShells", At = { 251, 188 } },
+					{ Kind = "GlowShells", At = { 232, 279 } },
+					{ Kind = "GlowShells", At = { 259, 452 } },
+					{ Kind = "GlowShells", At = { 336, 485 } },
+					{ Kind = "GlowShells", At = { 256, 515 } },
+					{ Kind = "GlowShells", At = { 333, 548 } },
+					{ Kind = "Shells", At = { -240, 420 }, Scale = 1.4 },
+					{ Kind = "GlowShells", At = { -240, 380 } },
+					{ Kind = "Shells", At = { -188, 10 }, Scale = 1.8 },
+					{ Kind = "GlowShells", At = { -210, 12 } },
+				},
+			},
+			{
+				Name = "Midden descent",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 120, 0 },
+							{ 120, 76 },
+							{ 220, 76 },
+							{ 220, 150 },
+							{ 120, 150 },
+							{ 120, 230 },
+							{ 220, 230 },
+							{ 220, 466 },
+							{ 60, 466 },
+							{ 60, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 102, 0 },
+							{ 102, 76 },
+							{ 138, 76 },
+							{ 138, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 120, 94 },
+							{ 220, 94 },
+							{ 220, 58 },
+							{ 120, 58 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 202, 76 },
+							{ 202, 150 },
+							{ 238, 150 },
+							{ 238, 76 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 220, 132 },
+							{ 120, 132 },
+							{ 120, 168 },
+							{ 220, 168 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 102, 150 },
+							{ 102, 230 },
+							{ 138, 230 },
+							{ 138, 150 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 120, 248 },
+							{ 220, 248 },
+							{ 220, 212 },
+							{ 120, 212 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 202, 230 },
+							{ 202, 466 },
+							{ 238, 466 },
+							{ 238, 230 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 220, 448 },
+							{ 60, 448 },
+							{ 60, 484 },
+							{ 220, 484 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 42, 466 },
+							{ 42, 608 },
+							{ 78, 608 },
+							{ 78, 466 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 0 },
+							{ -142, 48 },
+							{ -130, 48 },
+							{ -130, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 42 },
+							{ -224, 42 },
+							{ -224, 54 },
+							{ -136, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 48 },
+							{ -230, 176 },
+							{ -218, 176 },
+							{ -218, 48 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 176 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 0 },
+							{ -152, 48 },
+							{ -120, 48 },
+							{ -120, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 32 },
+							{ -224, 32 },
+							{ -224, 64 },
+							{ -136, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 48 },
+							{ -240, 176 },
+							{ -208, 176 },
+							{ -208, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 264 },
+							{ -230, 300 },
+							{ -218, 300 },
+							{ -218, 264 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -224, 306 },
+							{ -136, 306 },
+							{ -136, 294 },
+							{ -224, 294 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 300 },
+							{ -142, 340 },
+							{ -130, 340 },
+							{ -130, 300 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 334 },
+							{ -288, 334 },
+							{ -288, 346 },
+							{ -136, 346 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -294, 340 },
+							{ -294, 380 },
+							{ -282, 380 },
+							{ -282, 340 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -288, 386 },
+							{ -136, 386 },
+							{ -136, 374 },
+							{ -288, 374 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 380 },
+							{ -142, 480 },
+							{ -130, 480 },
+							{ -130, 380 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 474 },
+							{ -280, 474 },
+							{ -280, 486 },
+							{ -136, 486 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -286, 480 },
+							{ -286, 608 },
+							{ -274, 608 },
+							{ -274, 480 },
+						},
+					},
+					{ Kind = "Flat", At = { -224, 264 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 480 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 480 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 264 },
+							{ -240, 300 },
+							{ -208, 300 },
+							{ -208, 264 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 316 },
+							{ -136, 316 },
+							{ -136, 284 },
+							{ -224, 284 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 300 },
+							{ -152, 340 },
+							{ -120, 340 },
+							{ -120, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 324 },
+							{ -288, 324 },
+							{ -288, 356 },
+							{ -136, 356 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -304, 340 },
+							{ -304, 380 },
+							{ -272, 380 },
+							{ -272, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 396 },
+							{ -136, 396 },
+							{ -136, 364 },
+							{ -288, 364 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 380 },
+							{ -152, 480 },
+							{ -120, 480 },
+							{ -120, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 464 },
+							{ -280, 464 },
+							{ -280, 496 },
+							{ -136, 496 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -296, 480 },
+							{ -296, 608 },
+							{ -264, 608 },
+							{ -264, 480 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 294 },
+							{ -136, 294 },
+							{ -136, 306 },
+							{ -72, 306 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 302 },
+							{ 220, 302 },
+							{ 220, 290 },
+							{ 72, 290 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 296 }, Radius = 6 },
+					{ Kind = "Flat", At = { 220, 296 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 220, 370 },
+							{ 176, 370 },
+							{ 176, 382 },
+							{ 220, 382 },
+						},
+					},
+					{ Kind = "Flat", At = { 220, 376 }, Radius = 6 },
+					{ Kind = "Flat", At = { 176, 376 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 120, 186 },
+							{ 24, 186 },
+							{ 24, 198 },
+							{ 120, 198 },
+						},
+					},
+					{ Kind = "Flat", At = { 120, 192 }, Radius = 6 },
+					{ Kind = "Flat", At = { 24, 192 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 340 },
+							{ -142, 380 },
+							{ -130, 380 },
+							{ -130, 340 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 380 }, Radius = 6 },
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -136, 356 },
+							{ -136, 364 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+				},
+				Loot = {
+					{ At = { 24, 190 }, Radius = 5, Weight = 2 },
+				},
+				Hazards = {
+					{
+						Type = "Patrol",
+						Path = {
+							{ 134, 76 },
+							{ 194, 76 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 220, 270 },
+							{ 220, 330 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 176, 466 },
+							{ 116, 466 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -190, 340 },
+							{ -250, 340 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -240, 480 },
+							{ -272, 480 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 100, 296 },
+							{ 190, 296 },
+						},
+						Count = 2,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { 120, 55 } },
+					{ Kind = "GlowShells", At = { 209, 76 } },
+					{ Kind = "GlowShells", At = { 195, 150 } },
+					{ Kind = "GlowShells", At = { 120, 185 } },
+					{ Kind = "GlowShells", At = { 185, 230 } },
+					{ Kind = "GlowShells", At = { 220, 305 } },
+					{ Kind = "GlowShells", At = { 220, 415 } },
+					{ Kind = "GlowShells", At = { 161, 466 } },
+					{ Kind = "GlowShells", At = { 60, 475 } },
+					{ Kind = "GlowShells", At = { 60, 585 } },
+					{ Kind = "GlowShells", At = { -143, 48 } },
+					{ Kind = "GlowShells", At = { -224, 77 } },
+					{ Kind = "GlowShells", At = { -205, 300 } },
+					{ Kind = "GlowShells", At = { -137, 340 } },
+					{ Kind = "GlowShells", At = { -247, 340 } },
+					{ Kind = "GlowShells", At = { -259, 380 } },
+					{ Kind = "GlowShells", At = { -149, 380 } },
+					{ Kind = "GlowShells", At = { -136, 477 } },
+					{ Kind = "GlowShells", At = { -243, 480 } },
+					{ Kind = "GlowShells", At = { -280, 553 } },
+					{ Kind = "Shells", At = { 24, 190 }, Scale = 1.4 },
+					{ Kind = "GlowShells", At = { 120, 190 } },
+					{ Kind = "Bones", At = { 128, 12 }, Scale = 1.2, Yaw = 90 },
+					{ Kind = "GlowShells", At = { 110, 12 } },
+				},
+			},
+			{
+				Name = "Three ways",
+				Paths = 3,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 224, 0 },
+							{ 224, 132 },
+							{ 336, 132 },
+							{ 336, 188 },
+							{ 232, 188 },
+							{ 232, 328 },
+							{ 232, 424 },
+							{ 232, 452 },
+							{ 336, 452 },
+							{ 336, 500 },
+							{ 256, 500 },
+							{ 256, 548 },
+							{ 336, 548 },
+							{ 336, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 206, 0 },
+							{ 206, 132 },
+							{ 242, 132 },
+							{ 242, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 224, 150 },
+							{ 336, 150 },
+							{ 336, 114 },
+							{ 224, 114 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 318, 132 },
+							{ 318, 188 },
+							{ 354, 188 },
+							{ 354, 132 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 170 },
+							{ 232, 170 },
+							{ 232, 206 },
+							{ 336, 206 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 214, 188 },
+							{ 214, 328 },
+							{ 250, 328 },
+							{ 250, 188 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 214, 328 },
+							{ 214, 424 },
+							{ 250, 424 },
+							{ 250, 328 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 214, 424 },
+							{ 214, 452 },
+							{ 250, 452 },
+							{ 250, 424 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 232, 470 },
+							{ 336, 470 },
+							{ 336, 434 },
+							{ 232, 434 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 318, 452 },
+							{ 318, 500 },
+							{ 354, 500 },
+							{ 354, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 482 },
+							{ 256, 482 },
+							{ 256, 518 },
+							{ 336, 518 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 238, 500 },
+							{ 238, 548 },
+							{ 274, 548 },
+							{ 274, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 256, 566 },
+							{ 336, 566 },
+							{ 336, 530 },
+							{ 256, 530 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 318, 548 },
+							{ 318, 608 },
+							{ 354, 608 },
+							{ 354, 548 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 0 },
+							{ -142, 48 },
+							{ -130, 48 },
+							{ -130, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 42 },
+							{ -224, 42 },
+							{ -224, 54 },
+							{ -136, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 48 },
+							{ -230, 176 },
+							{ -218, 176 },
+							{ -218, 48 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 176 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 0 },
+							{ -152, 48 },
+							{ -120, 48 },
+							{ -120, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 32 },
+							{ -224, 32 },
+							{ -224, 64 },
+							{ -136, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 48 },
+							{ -240, 176 },
+							{ -208, 176 },
+							{ -208, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 264 },
+							{ -230, 300 },
+							{ -218, 300 },
+							{ -218, 264 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -224, 306 },
+							{ -136, 306 },
+							{ -136, 294 },
+							{ -224, 294 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 300 },
+							{ -142, 340 },
+							{ -130, 340 },
+							{ -130, 300 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 334 },
+							{ -288, 334 },
+							{ -288, 346 },
+							{ -136, 346 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -294, 340 },
+							{ -294, 380 },
+							{ -282, 380 },
+							{ -282, 340 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -288, 386 },
+							{ -136, 386 },
+							{ -136, 374 },
+							{ -288, 374 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 380 },
+							{ -142, 480 },
+							{ -130, 480 },
+							{ -130, 380 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 474 },
+							{ -280, 474 },
+							{ -280, 486 },
+							{ -136, 486 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -286, 480 },
+							{ -286, 608 },
+							{ -274, 608 },
+							{ -274, 480 },
+						},
+					},
+					{ Kind = "Flat", At = { -224, 264 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 480 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 480 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 264 },
+							{ -240, 300 },
+							{ -208, 300 },
+							{ -208, 264 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 316 },
+							{ -136, 316 },
+							{ -136, 284 },
+							{ -224, 284 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 300 },
+							{ -152, 340 },
+							{ -120, 340 },
+							{ -120, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 324 },
+							{ -288, 324 },
+							{ -288, 356 },
+							{ -136, 356 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -304, 340 },
+							{ -304, 380 },
+							{ -272, 380 },
+							{ -272, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 396 },
+							{ -136, 396 },
+							{ -136, 364 },
+							{ -288, 364 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 380 },
+							{ -152, 480 },
+							{ -120, 480 },
+							{ -120, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 464 },
+							{ -280, 464 },
+							{ -280, 496 },
+							{ -136, 496 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -296, 480 },
+							{ -296, 608 },
+							{ -264, 608 },
+							{ -264, 480 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 0 },
+							{ 34, 48 },
+							{ 46, 48 },
+							{ 46, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 40, 42 },
+							{ -88, 42 },
+							{ -88, 54 },
+							{ 40, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -94, 48 },
+							{ -94, 104 },
+							{ -82, 104 },
+							{ -82, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -88, 110 },
+							{ 40, 110 },
+							{ 40, 98 },
+							{ -88, 98 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 104 },
+							{ 34, 248 },
+							{ 46, 248 },
+							{ 46, 104 },
+						},
+					},
+					{ Kind = "Flat", At = { 40, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 248 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 0 },
+							{ 24, 48 },
+							{ 56, 48 },
+							{ 56, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 32 },
+							{ -88, 32 },
+							{ -88, 64 },
+							{ 40, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -104, 48 },
+							{ -104, 104 },
+							{ -72, 104 },
+							{ -72, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 120 },
+							{ 40, 120 },
+							{ 40, 88 },
+							{ -88, 88 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 104 },
+							{ 24, 248 },
+							{ 56, 248 },
+							{ 56, 104 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 330 },
+							{ -100, 330 },
+							{ -100, 342 },
+							{ -72, 342 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -106, 336 },
+							{ -106, 452 },
+							{ -94, 452 },
+							{ -94, 336 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -100, 458 },
+							{ 80, 458 },
+							{ 80, 446 },
+							{ -100, 446 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 74, 452 },
+							{ 74, 520 },
+							{ 86, 520 },
+							{ 86, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 80, 514 },
+							{ -60, 514 },
+							{ -60, 526 },
+							{ 80, 526 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -66, 520 },
+							{ -66, 608 },
+							{ -54, 608 },
+							{ -54, 520 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { -100, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { -100, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 520 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 520 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -72, 320 },
+							{ -100, 320 },
+							{ -100, 352 },
+							{ -72, 352 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -116, 336 },
+							{ -116, 452 },
+							{ -84, 452 },
+							{ -84, 336 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -100, 468 },
+							{ 80, 468 },
+							{ 80, 436 },
+							{ -100, 436 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 64, 452 },
+							{ 64, 520 },
+							{ 96, 520 },
+							{ 96, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 80, 504 },
+							{ -60, 504 },
+							{ -60, 536 },
+							{ 80, 536 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -76, 520 },
+							{ -76, 608 },
+							{ -44, 608 },
+							{ -44, 520 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 294 },
+							{ -136, 294 },
+							{ -136, 306 },
+							{ -72, 306 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 176, 342 },
+							{ 176, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 176, 336 }, Radius = 6 },
+				},
+				Hazards = {
+					{
+						Type = "Patrol",
+						Path = {
+							{ 224, 76 },
+							{ 224, 124 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 336, 140 },
+							{ 336, 176 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 232, 196 },
+							{ 232, 252 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 232, 372 },
+							{ 232, 416 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -160, 48 },
+							{ -216, 48 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -200, 300 },
+							{ -144, 300 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -200, 340 },
+							{ -260, 340 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -246, 380 },
+							{ -186, 380 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 18, 48 },
+							{ -42, 48 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -80, 104 },
+							{ -20, 104 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 40, 154 },
+							{ 40, 214 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -100, 354 },
+							{ -100, 414 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -28, 452 },
+							{ 32, 452 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 72, 520 },
+							{ 40, 520 },
+						},
+						Count = 1,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { 224, 55 } },
+					{ Kind = "GlowShells", At = { 257, 132 } },
+					{ Kind = "GlowShells", At = { 336, 163 } },
+					{ Kind = "GlowShells", At = { 251, 188 } },
+					{ Kind = "GlowShells", At = { 232, 279 } },
+					{ Kind = "GlowShells", At = { 232, 389 } },
+					{ Kind = "GlowShells", At = { 279, 452 } },
+					{ Kind = "GlowShells", At = { 331, 500 } },
+					{ Kind = "GlowShells", At = { 256, 535 } },
+					{ Kind = "GlowShells", At = { 336, 565 } },
+					{ Kind = "GlowShells", At = { -143, 48 } },
+					{ Kind = "GlowShells", At = { -224, 77 } },
+					{ Kind = "GlowShells", At = { -205, 300 } },
+					{ Kind = "GlowShells", At = { -137, 340 } },
+					{ Kind = "GlowShells", At = { -247, 340 } },
+					{ Kind = "GlowShells", At = { -259, 380 } },
+					{ Kind = "GlowShells", At = { -149, 380 } },
+					{ Kind = "GlowShells", At = { -136, 477 } },
+					{ Kind = "GlowShells", At = { -243, 480 } },
+					{ Kind = "GlowShells", At = { -280, 553 } },
+					{ Kind = "GlowShells", At = { 33, 48 } },
+					{ Kind = "GlowShells", At = { -77, 48 } },
+					{ Kind = "GlowShells", At = { -45, 104 } },
+					{ Kind = "GlowShells", At = { 40, 129 } },
+					{ Kind = "GlowShells", At = { 40, 239 } },
+					{ Kind = "GlowShells", At = { -100, 363 } },
+					{ Kind = "GlowShells", At = { -79, 452 } },
+					{ Kind = "GlowShells", At = { 31, 452 } },
+					{ Kind = "GlowShells", At = { 80, 513 } },
+					{ Kind = "GlowShells", At = { -23, 520 } },
+					{ Kind = "GlowShells", At = { -60, 593 } },
+					{ Kind = "Shells", At = { 30, 12 }, Scale = 2.2 },
+					{ Kind = "Bones", At = { 44, 10 }, Scale = 0.9, Yaw = 60 },
+				},
+			},
+			{
+				Name = "The long hollow",
+				Paths = 1,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -136, 0 },
+							{ -136, 48 },
+							{ -224, 48 },
+							{ -224, 100 },
+							{ -152, 100 },
+							{ -152, 148 },
+							{ -224, 148 },
+							{ -224, 176 },
+							{ -224, 264 },
+							{ -224, 300 },
+							{ -136, 300 },
+							{ -136, 340 },
+							{ -288, 340 },
+							{ -288, 380 },
+							{ -136, 380 },
+							{ -136, 480 },
+							{ -280, 480 },
+							{ -280, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 0 },
+							{ -154, 48 },
+							{ -118, 48 },
+							{ -118, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 30 },
+							{ -224, 30 },
+							{ -224, 66 },
+							{ -136, 66 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 48 },
+							{ -242, 100 },
+							{ -206, 100 },
+							{ -206, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 118 },
+							{ -152, 118 },
+							{ -152, 82 },
+							{ -224, 82 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -170, 100 },
+							{ -170, 148 },
+							{ -134, 148 },
+							{ -134, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 130 },
+							{ -224, 130 },
+							{ -224, 166 },
+							{ -152, 166 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 148 },
+							{ -242, 176 },
+							{ -206, 176 },
+							{ -206, 148 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 176 },
+							{ -242, 264 },
+							{ -206, 264 },
+							{ -206, 176 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 264 },
+							{ -242, 300 },
+							{ -206, 300 },
+							{ -206, 264 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 318 },
+							{ -136, 318 },
+							{ -136, 282 },
+							{ -224, 282 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 300 },
+							{ -154, 340 },
+							{ -118, 340 },
+							{ -118, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 322 },
+							{ -288, 322 },
+							{ -288, 358 },
+							{ -136, 358 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 340 },
+							{ -306, 380 },
+							{ -270, 380 },
+							{ -270, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 398 },
+							{ -136, 398 },
+							{ -136, 362 },
+							{ -288, 362 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 380 },
+							{ -154, 480 },
+							{ -118, 480 },
+							{ -118, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 462 },
+							{ -280, 462 },
+							{ -280, 498 },
+							{ -136, 498 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -298, 480 },
+							{ -298, 608 },
+							{ -262, 608 },
+							{ -262, 480 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 306 },
+							{ -72, 306 },
+							{ -72, 294 },
+							{ -136, 294 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 176, 342 },
+							{ 176, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 176, 336 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 466 },
+							{ -60, 466 },
+							{ -60, 454 },
+							{ -136, 454 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -54, 460 },
+							{ -54, 420 },
+							{ -66, 420 },
+							{ -66, 460 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 460 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 460 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 420 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -152, 130 },
+							{ -60, 130 },
+							{ -60, 118 },
+							{ -152, 118 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -66, 124 },
+							{ -66, 160 },
+							{ -54, 160 },
+							{ -54, 124 },
+						},
+					},
+					{ Kind = "Flat", At = { -152, 124 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 124 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 160 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 340 },
+							{ -142, 380 },
+							{ -130, 380 },
+							{ -130, 340 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 380 }, Radius = 6 },
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -136, 356 },
+							{ -136, 364 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+				},
+				Loot = {
+					{ At = { -60, 420 }, Radius = 5, Weight = 3 },
+					{ At = { -60, 160 }, Radius = 5, Weight = 2 },
+				},
+				Hazards = {
+					{
+						Type = "Patrol",
+						Path = {
+							{ -148, 48 },
+							{ -208, 48 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -216, 100 },
+							{ -168, 100 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -172, 148 },
+							{ -216, 148 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -186, 340 },
+							{ -246, 340 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -144, 480 },
+							{ -180, 480 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -110, 300 },
+							{ -72, 300 },
+						},
+						Count = 1,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { -143, 48 } },
+					{ Kind = "GlowShells", At = { -224, 77 } },
+					{ Kind = "GlowShells", At = { -152, 115 } },
+					{ Kind = "GlowShells", At = { -224, 153 } },
+					{ Kind = "GlowShells", At = { -224, 263 } },
+					{ Kind = "GlowShells", At = { -151, 300 } },
+					{ Kind = "GlowShells", At = { -191, 340 } },
+					{ Kind = "GlowShells", At = { -288, 353 } },
+					{ Kind = "GlowShells", At = { -205, 380 } },
+					{ Kind = "GlowShells", At = { -136, 421 } },
+					{ Kind = "GlowShells", At = { -187, 480 } },
+					{ Kind = "GlowShells", At = { -280, 497 } },
+					{ Kind = "GlowShells", At = { -280, 607 } },
+					{ Kind = "Shells", At = { -60, 420 }, Scale = 1.4 },
+					{ Kind = "GlowShells", At = { -60, 460 } },
+					{ Kind = "Shells", At = { -60, 160 }, Scale = 1.4 },
+					{ Kind = "GlowShells", At = { -60, 124 } },
+					{ Kind = "Bones", At = { -150, 12 }, Scale = 1.6, Yaw = 0 },
+					{ Kind = "Bones", At = { -122, 12 }, Scale = 1.6, Yaw = 180 },
+				},
+			},
+			{
+				Name = "Moult run",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 40, 0 },
+							{ 40, 48 },
+							{ -88, 48 },
+							{ -88, 104 },
+							{ 104, 104 },
+							{ 104, 160 },
+							{ -88, 160 },
+							{ -88, 216 },
+							{ 104, 216 },
+							{ 104, 470 },
+							{ 60, 470 },
+							{ 60, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 22, 0 },
+							{ 22, 48 },
+							{ 58, 48 },
+							{ 58, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 30 },
+							{ -88, 30 },
+							{ -88, 66 },
+							{ 40, 66 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -106, 48 },
+							{ -106, 104 },
+							{ -70, 104 },
+							{ -70, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 122 },
+							{ 104, 122 },
+							{ 104, 86 },
+							{ -88, 86 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 86, 104 },
+							{ 86, 160 },
+							{ 122, 160 },
+							{ 122, 104 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 104, 142 },
+							{ -88, 142 },
+							{ -88, 178 },
+							{ 104, 178 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -106, 160 },
+							{ -106, 216 },
+							{ -70, 216 },
+							{ -70, 160 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 234 },
+							{ 104, 234 },
+							{ 104, 198 },
+							{ -88, 198 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 86, 216 },
+							{ 86, 470 },
+							{ 122, 470 },
+							{ 122, 216 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 104, 452 },
+							{ 60, 452 },
+							{ 60, 488 },
+							{ 104, 488 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 42, 470 },
+							{ 42, 608 },
+							{ 78, 608 },
+							{ 78, 470 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 48 },
+							{ 34, 104 },
+							{ 46, 104 },
+							{ 46, 48 },
+						},
+					},
+					{ Kind = "Flat", At = { 40, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 104 }, Radius = 6 },
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 40, 64 },
+							{ 40, 88 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 218, 0 },
+							{ 218, 132 },
+							{ 230, 132 },
+							{ 230, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 224, 138 },
+							{ 336, 138 },
+							{ 336, 126 },
+							{ 224, 126 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 132 },
+							{ 330, 188 },
+							{ 342, 188 },
+							{ 342, 132 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 182 },
+							{ 144, 182 },
+							{ 144, 194 },
+							{ 336, 194 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 138, 188 },
+							{ 138, 244 },
+							{ 150, 244 },
+							{ 150, 188 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 144, 250 },
+							{ 336, 250 },
+							{ 336, 238 },
+							{ 144, 238 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 244 },
+							{ 330, 300 },
+							{ 342, 300 },
+							{ 342, 244 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 294 },
+							{ 140, 294 },
+							{ 140, 306 },
+							{ 336, 306 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 134, 300 },
+							{ 134, 376 },
+							{ 146, 376 },
+							{ 146, 300 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 140, 382 },
+							{ 176, 382 },
+							{ 176, 370 },
+							{ 140, 370 },
+						},
+					},
+					{ Kind = "Flat", At = { 224, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 132 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 132 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 144, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 144, 244 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 244 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { 140, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { 140, 376 }, Radius = 6 },
+					{ Kind = "Flat", At = { 176, 376 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 208, 0 },
+							{ 208, 132 },
+							{ 240, 132 },
+							{ 240, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 224, 148 },
+							{ 336, 148 },
+							{ 336, 116 },
+							{ 224, 116 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 132 },
+							{ 320, 188 },
+							{ 352, 188 },
+							{ 352, 132 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 172 },
+							{ 144, 172 },
+							{ 144, 204 },
+							{ 336, 204 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 128, 188 },
+							{ 128, 244 },
+							{ 160, 244 },
+							{ 160, 188 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 144, 260 },
+							{ 336, 260 },
+							{ 336, 228 },
+							{ 144, 228 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 244 },
+							{ 320, 300 },
+							{ 352, 300 },
+							{ 352, 244 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 284 },
+							{ 140, 284 },
+							{ 140, 316 },
+							{ 336, 316 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 124, 300 },
+							{ 124, 376 },
+							{ 156, 376 },
+							{ 156, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 140, 392 },
+							{ 176, 392 },
+							{ 176, 360 },
+							{ 140, 360 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 226, 376 },
+							{ 226, 472 },
+							{ 238, 472 },
+							{ 238, 376 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 232, 478 },
+							{ 300, 478 },
+							{ 300, 466 },
+							{ 232, 466 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 294, 472 },
+							{ 294, 608 },
+							{ 306, 608 },
+							{ 306, 472 },
+						},
+					},
+					{ Kind = "Flat", At = { 232, 376 }, Radius = 6 },
+					{ Kind = "Flat", At = { 232, 472 }, Radius = 6 },
+					{ Kind = "Flat", At = { 300, 472 }, Radius = 6 },
+					{ Kind = "Flat", At = { 300, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 216, 376 },
+							{ 216, 470 },
+							{ 248, 470 },
+							{ 248, 376 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 232, 486 },
+							{ 300, 486 },
+							{ 300, 454 },
+							{ 232, 454 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 284, 470 },
+							{ 284, 608 },
+							{ 316, 608 },
+							{ 316, 470 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 176, 382 },
+							{ 232, 382 },
+							{ 232, 370 },
+							{ 176, 370 },
+						},
+					},
+					{ Kind = "Flat", At = { 176, 376 }, Radius = 6 },
+					{ Kind = "Flat", At = { 232, 376 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 302 },
+							{ 104, 302 },
+							{ 104, 290 },
+							{ 72, 290 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 296 }, Radius = 6 },
+					{ Kind = "Flat", At = { 104, 296 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 60, 534 },
+							{ -20, 534 },
+							{ -20, 546 },
+							{ 60, 546 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -14, 540 },
+							{ -14, 500 },
+							{ -26, 500 },
+							{ -26, 540 },
+						},
+					},
+					{ Kind = "Flat", At = { 60, 540 }, Radius = 6 },
+					{ Kind = "Flat", At = { -20, 540 }, Radius = 6 },
+					{ Kind = "Flat", At = { -20, 500 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 250 },
+							{ -176, 250 },
+							{ -176, 262 },
+							{ -72, 262 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 256 }, Radius = 6 },
+					{ Kind = "Flat", At = { -176, 256 }, Radius = 6 },
+				},
+				Loot = {
+					{ At = { -20, 500 }, Radius = 5, Weight = 2 },
+				},
+				Hazards = {
+					{
+						Type = "Patrol",
+						Path = {
+							{ -2, 48 },
+							{ -62, 48 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 10, 104 },
+							{ 70, 104 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 14, 160 },
+							{ -46, 160 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -6, 216 },
+							{ 54, 216 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 104, 346 },
+							{ 104, 406 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 306, 188 },
+							{ 246, 188 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 166, 244 },
+							{ 226, 244 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 322, 300 },
+							{ 262, 300 },
+						},
+						Count = 2,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { 33, 48 } },
+					{ Kind = "GlowShells", At = { -77, 48 } },
+					{ Kind = "GlowShells", At = { -45, 104 } },
+					{ Kind = "GlowShells", At = { 65, 104 } },
+					{ Kind = "GlowShells", At = { 89, 160 } },
+					{ Kind = "GlowShells", At = { -21, 160 } },
+					{ Kind = "GlowShells", At = { -88, 203 } },
+					{ Kind = "GlowShells", At = { 9, 216 } },
+					{ Kind = "GlowShells", At = { 104, 231 } },
+					{ Kind = "GlowShells", At = { 104, 341 } },
+					{ Kind = "GlowShells", At = { 104, 451 } },
+					{ Kind = "GlowShells", At = { 60, 517 } },
+					{ Kind = "GlowShells", At = { 224, 55 } },
+					{ Kind = "GlowShells", At = { 257, 132 } },
+					{ Kind = "GlowShells", At = { 336, 163 } },
+					{ Kind = "GlowShells", At = { 251, 188 } },
+					{ Kind = "GlowShells", At = { 144, 191 } },
+					{ Kind = "GlowShells", At = { 201, 244 } },
+					{ Kind = "GlowShells", At = { 311, 244 } },
+					{ Kind = "GlowShells", At = { 307, 300 } },
+					{ Kind = "GlowShells", At = { 197, 300 } },
+					{ Kind = "GlowShells", At = { 140, 353 } },
+					{ Kind = "GlowShells", At = { 232, 431 } },
+					{ Kind = "GlowShells", At = { 300, 473 } },
+					{ Kind = "GlowShells", At = { 300, 583 } },
+					{ Kind = "Shells", At = { -20, 500 }, Scale = 1.4 },
+					{ Kind = "GlowShells", At = { -20, 540 } },
+					{ Kind = "Shells", At = { 52, 12 }, Scale = 1.8 },
+					{ Kind = "GlowShells", At = { 28, 12 } },
+					{ Kind = "GlowShells", At = { 52, 24 } },
+				},
+			},
+		},
+		Slots = {
+			{
+				Name = "Nest row west",
+				At = { -352, 36 },
+				Size = { 104, 72 },
+				Rooms = {
+					{
+						Name = "Crab nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 0 },
+									{ 46, 52 },
+									{ 58, 52 },
+									{ 58, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 36, 0 },
+									{ 36, 24 },
+									{ 68, 24 },
+									{ 68, 0 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 30, 40 },
+									{ 74, 40 },
+									{ 74, 64 },
+									{ 30, 64 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 52, 60 }, Radius = 5, Weight = 3 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 52, 60 }, Scale = 2 },
+							{ Kind = "Bones", At = { 62, 52 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 42, 52 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 34, 42 },
+									{ 70, 42 },
+									{ 70, 62 },
+									{ 34, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Shell midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 0 },
+									{ 46, 36 },
+									{ 58, 36 },
+									{ 58, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 31, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 73, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 52, 60 }, Radius = 4, Weight = 2 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 52, 60 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 92, 12 },
+									{ 92, 60 },
+									{ 12, 60 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 52, 36 }, Scale = 0.9 },
+						},
+					},
+				},
+			},
+			{
+				Name = "Nest row east",
+				At = { 284, 36 },
+				Size = { 72, 72 },
+				Rooms = {
+					{
+						Name = "Crab nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 30, 0 },
+									{ 30, 52 },
+									{ 42, 52 },
+									{ 42, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 36, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 36, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 20, 0 },
+									{ 20, 24 },
+									{ 52, 24 },
+									{ 52, 0 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 14, 40 },
+									{ 58, 40 },
+									{ 58, 64 },
+									{ 14, 64 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 36, 60 }, Radius = 5, Weight = 3 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 36, 60 }, Scale = 2 },
+							{ Kind = "Bones", At = { 46, 52 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 26, 52 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 18, 42 },
+									{ 54, 42 },
+									{ 54, 62 },
+									{ 18, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Collapsed chamber",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 30, 0 },
+									{ 30, 36 },
+									{ 42, 36 },
+									{ 42, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 36, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 36, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 64, 8 },
+									{ 64, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 22, 25 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 50, 36 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 29, 50 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 47, 18 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 36, 60 }, Radius = 4, Weight = 2 },
+						},
+						Decor = {
+							{
+								Kind = "Rocks",
+								Area = {
+									{ 12, 12 },
+									{ 60, 12 },
+									{ 60, 60 },
+									{ 12, 60 },
+								},
+								Count = 5,
+							},
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 8, 8 },
+									{ 64, 8 },
+									{ 64, 64 },
+									{ 8, 64 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+			{
+				Name = "Western midden",
+				At = { -360, 168 },
+				Size = { 72, 104 },
+				Rooms = {
+					{
+						Name = "Old midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 72, 46 },
+									{ 36, 46 },
+									{ 36, 58 },
+									{ 72, 58 },
+								},
+							},
+							{ Kind = "Flat", At = { 72, 52 }, Radius = 6 },
+							{ Kind = "Flat", At = { 36, 52 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 64, 8 },
+									{ 64, 96 },
+									{ 8, 96 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 22, 52 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 50, 52 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 12, 52 }, Radius = 4, Weight = 2 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 12, 52 }, Radius = 4, Covered = true },
+							{ Type = "Pit", At = { 36, 52 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 60, 12 },
+									{ 60, 92 },
+									{ 12, 92 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 36, 52 }, Scale = 0.9 },
+						},
+					},
+					{
+						Name = "Hermit nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 72, 46 },
+									{ 20, 46 },
+									{ 20, 58 },
+									{ 72, 58 },
+								},
+							},
+							{ Kind = "Flat", At = { 72, 52 }, Radius = 6 },
+							{ Kind = "Flat", At = { 20, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 72, 36 },
+									{ 48, 36 },
+									{ 48, 68 },
+									{ 72, 68 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 30 },
+									{ 32, 30 },
+									{ 32, 74 },
+									{ 8, 74 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 12, 52 }, Radius = 5, Weight = 3 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 12, 52 }, Scale = 2 },
+							{ Kind = "Bones", At = { 20, 42 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 20, 62 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 2, 42 },
+									{ 38, 42 },
+									{ 38, 62 },
+									{ 2, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+			{
+				Name = "Deep nest",
+				At = { -48, 360 },
+				Size = { 96, 72 },
+				Rooms = {
+					{
+						Name = "Brood nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 42, 0 },
+									{ 42, 52 },
+									{ 54, 52 },
+									{ 54, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 48, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 48, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 32, 0 },
+									{ 32, 24 },
+									{ 64, 24 },
+									{ 64, 0 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 26, 40 },
+									{ 70, 40 },
+									{ 70, 64 },
+									{ 26, 64 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 48, 60 }, Radius = 5, Weight = 5 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 48, 60 }, Scale = 2 },
+							{ Kind = "Bones", At = { 58, 52 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 38, 52 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 30, 42 },
+									{ 66, 42 },
+									{ 66, 62 },
+									{ 30, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Moult midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 42, 0 },
+									{ 42, 36 },
+									{ 54, 36 },
+									{ 54, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 48, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 48, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 88, 8 },
+									{ 88, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 29, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 67, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 48, 60 }, Radius = 4, Weight = 3 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 48, 60 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 84, 12 },
+									{ 84, 60 },
+									{ 12, 60 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 48, 36 }, Scale = 0.9 },
+						},
+					},
+				},
+			},
+			{
+				Name = "Hoard",
+				At = { 120, 504 },
+				Size = { 112, 72 },
+				Rooms = {
+					{
+						Name = "Hoard nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 20 },
+									{ 50, 20 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 20 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 72, 72 },
+									{ 72, 48 },
+									{ 40, 48 },
+									{ 40, 72 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 34, 8 },
+									{ 78, 8 },
+									{ 78, 32 },
+									{ 34, 32 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 5, Weight = 5 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 56, 12 }, Scale = 2 },
+							{ Kind = "Bones", At = { 46, 20 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 66, 20 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 38, 10 },
+									{ 74, 10 },
+									{ 74, 30 },
+									{ 38, 30 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Fallen hoard",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 36 },
+									{ 50, 36 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 104, 8 },
+									{ 104, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 34, 25 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 78, 36 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 45, 50 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 73, 18 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 4, Weight = 3 },
+						},
+						Decor = {
+							{
+								Kind = "Rocks",
+								Area = {
+									{ 12, 12 },
+									{ 100, 12 },
+									{ 100, 60 },
+									{ 12, 60 },
+								},
+								Count = 5,
+							},
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 8, 8 },
+									{ 104, 8 },
+									{ 104, 64 },
+									{ 8, 64 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+			{
+				Name = "Sea nests",
+				At = { -232, 504 },
+				Size = { 112, 72 },
+				Rooms = {
+					{
+						Name = "Sea nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 20 },
+									{ 50, 20 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 20 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 72, 72 },
+									{ 72, 48 },
+									{ 40, 48 },
+									{ 40, 72 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 34, 8 },
+									{ 78, 8 },
+									{ 78, 32 },
+									{ 34, 32 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 5, Weight = 6 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 56, 12 }, Scale = 2 },
+							{ Kind = "Bones", At = { 46, 20 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 66, 20 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 38, 10 },
+									{ 74, 10 },
+									{ 74, 30 },
+									{ 38, 30 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Drowned midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 36 },
+									{ 50, 36 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 104, 8 },
+									{ 104, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 34, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 78, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 4, Weight = 4 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 56, 12 }, Radius = 4, Covered = true },
+							{ Type = "Pit", At = { 56, 36 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 100, 12 },
+									{ 100, 60 },
+									{ 12, 60 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 56, 36 }, Scale = 0.9 },
+						},
+					},
+				},
+			},
+			{
+				Name = "East collapse",
+				At = { 296, 328 },
+				Size = { 64, 96 },
+				Rooms = {
+					{
+						Name = "Collapsed chamber",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 0, 54 },
+									{ 32, 54 },
+									{ 32, 42 },
+									{ 0, 42 },
+								},
+							},
+							{ Kind = "Flat", At = { 0, 48 }, Radius = 6 },
+							{ Kind = "Flat", At = { 32, 48 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 56, 8 },
+									{ 56, 88 },
+									{ 8, 88 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 19, 34 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 45, 48 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 26, 67 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 42, 24 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 52, 48 }, Radius = 4, Weight = 3 },
+						},
+						Decor = {
+							{
+								Kind = "Rocks",
+								Area = {
+									{ 12, 12 },
+									{ 52, 12 },
+									{ 52, 84 },
+									{ 12, 84 },
+								},
+								Count = 5,
+							},
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 8, 8 },
+									{ 56, 8 },
+									{ 56, 88 },
+									{ 8, 88 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "East nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 0, 54 },
+									{ 44, 54 },
+									{ 44, 42 },
+									{ 0, 42 },
+								},
+							},
+							{ Kind = "Flat", At = { 0, 48 }, Radius = 6 },
+							{ Kind = "Flat", At = { 44, 48 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 0, 64 },
+									{ 24, 64 },
+									{ 24, 32 },
+									{ 0, 32 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 32, 26 },
+									{ 56, 26 },
+									{ 56, 70 },
+									{ 32, 70 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 52, 48 }, Radius = 5, Weight = 4 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 52, 48 }, Scale = 2 },
+							{ Kind = "Bones", At = { 44, 58 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 44, 38 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 26, 38 },
+									{ 62, 38 },
+									{ 62, 58 },
+									{ 26, 58 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+	[5] = {
+		Primitives = {
+			{
+				Kind = "Wall",
+				Area = {
+					{ -380, -12 },
+					{ 380, -12 },
+					{ 380, 620 },
+					{ -380, 620 },
+				},
+				Height = 20,
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -360, -12 },
+					{ 360, -12 },
+					{ 360, 20 },
+					{ -360, 20 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -360, 592 },
+					{ 360, 592 },
+					{ 360, 620 },
+					{ -360, 620 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -272, 176 },
+					{ -176, 176 },
+					{ -176, 264 },
+					{ -272, 264 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 274 },
+					{ -72, 248 },
+					{ 72, 248 },
+					{ 72, 274 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 286 },
+					{ -72, 274 },
+					{ -42, 274 },
+					{ -42, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -30, 286 },
+					{ -30, 274 },
+					{ -6, 274 },
+					{ -6, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 6, 286 },
+					{ 6, 274 },
+					{ 30, 274 },
+					{ 30, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 42, 286 },
+					{ 42, 274 },
+					{ 72, 274 },
+					{ 72, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 306 },
+					{ -72, 286 },
+					{ 72, 286 },
+					{ 72, 306 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 318 },
+					{ -72, 306 },
+					{ -42, 306 },
+					{ -42, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -30, 318 },
+					{ -30, 306 },
+					{ -6, 306 },
+					{ -6, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 6, 318 },
+					{ 6, 306 },
+					{ 30, 306 },
+					{ 30, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 42, 318 },
+					{ 42, 306 },
+					{ 72, 306 },
+					{ 72, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 318 },
+					{ 72, 318 },
+					{ 72, 344 },
+					{ -72, 344 },
+				},
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -42, 274 },
+					{ -30, 274 },
+					{ -30, 286 },
+					{ -42, 286 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -6, 274 },
+					{ 6, 274 },
+					{ 6, 286 },
+					{ -6, 286 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ 30, 274 },
+					{ 42, 274 },
+					{ 42, 286 },
+					{ 30, 286 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -42, 306 },
+					{ -30, 306 },
+					{ -30, 318 },
+					{ -42, 318 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -6, 306 },
+					{ 6, 306 },
+					{ 6, 318 },
+					{ -6, 318 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ 30, 306 },
+					{ 42, 306 },
+					{ 42, 318 },
+					{ 30, 318 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Roof",
+				Area = {
+					{ -80.32, 242.45 },
+					{ 80.32, 242.45 },
+					{ 80.32, 349.55 },
+					{ -80.32, 349.55 },
+				},
+				Clearance = 18,
+				Thickness = 6,
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 152, 320 },
+					{ 296, 320 },
+					{ 296, 440 },
+					{ 152, 440 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -294, 44 },
+					{ -294, 20 },
+					{ -306, 20 },
+					{ -306, 44 },
+				},
+			},
+			{ Kind = "Flat", At = { -300, 44 }, Radius = 6 },
+			{ Kind = "Flat", At = { -300, 20 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 306, 44 },
+					{ 306, 20 },
+					{ 294, 20 },
+					{ 294, 44 },
+				},
+			},
+			{ Kind = "Flat", At = { 300, 44 }, Radius = 6 },
+			{ Kind = "Flat", At = { 300, 20 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ -296, 226 },
+					{ -272, 226 },
+					{ -272, 214 },
+					{ -296, 214 },
+				},
+			},
+			{ Kind = "Flat", At = { -296, 220 }, Radius = 6 },
+			{ Kind = "Flat", At = { -272, 220 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 6, 368 },
+					{ 6, 344 },
+					{ -6, 344 },
+					{ -6, 368 },
+				},
+			},
+			{ Kind = "Flat", At = { 0, 368 }, Radius = 6 },
+			{ Kind = "Flat", At = { 0, 344 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 170, 568 },
+					{ 170, 592 },
+					{ 182, 592 },
+					{ 182, 568 },
+				},
+			},
+			{ Kind = "Flat", At = { 176, 568 }, Radius = 6 },
+			{ Kind = "Flat", At = { 176, 592 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ -182, 568 },
+					{ -182, 592 },
+					{ -170, 592 },
+					{ -170, 568 },
+				},
+			},
+			{ Kind = "Flat", At = { -176, 568 }, Radius = 6 },
+			{ Kind = "Flat", At = { -176, 592 }, Radius = 6 },
+		},
+		Loot = {
+			{ At = { 0, 296 }, Radius = 6, Weight = 3 },
+			{ At = { 256, 410 }, Radius = 6, Weight = 4 },
+		},
+		Entrances = {
+			{ 54, 328 },
+		},
+		Hazards = {
+			{
+				Type = "Patrol",
+				Path = {
+					{ -252, 214 },
+					{ -196, 214 },
+				},
+				Count = 2,
+			},
+			{
+				Type = "Patrol",
+				Path = {
+					{ -56, 296 },
+					{ 56, 296 },
+				},
+				Count = 2,
+			},
+			{
+				Type = "Patrol",
+				Path = {
+					{ 170, 396 },
+					{ 280, 396 },
+				},
+				Count = 2,
+			},
+		},
+		Decor = {
+			{
+				Kind = "Shells",
+				Area = {
+					{ -300, 0 },
+					{ 300, 0 },
+					{ 300, 16 },
+					{ -300, 16 },
+				},
+				Count = 8,
+				Scale = 1.2,
+			},
+			{
+				Kind = "Shells",
+				Area = {
+					{ -264, 184 },
+					{ -184, 184 },
+					{ -184, 256 },
+					{ -264, 256 },
+				},
+				Count = 12,
+				Scale = 1.5,
+			},
+			{ Kind = "Bones", At = { -224, 220 }, Scale = 1.1, Yaw = 40 },
+			{ Kind = "GlowShells", At = { -200, 200 } },
+			{ Kind = "Bones", At = { 0, 296 }, Scale = 1.3, Yaw = 90 },
+			{ Kind = "GlowShells", At = { -54, 296 } },
+			{ Kind = "GlowShells", At = { 54, 296 } },
+			{
+				Kind = "Shells",
+				Area = {
+					{ 160, 328 },
+					{ 288, 328 },
+					{ 288, 432 },
+					{ 160, 432 },
+				},
+				Count = 16,
+				Scale = 2,
+			},
+			{ Kind = "Bones", At = { 224, 380 }, Scale = 2, Yaw = 20 },
+			{ Kind = "Bones", At = { 184, 410 }, Scale = 1.2, Yaw = 140 },
+			{
+				Kind = "Barnacles",
+				Area = {
+					{ 160, 328 },
+					{ 288, 328 },
+					{ 288, 432 },
+					{ 160, 432 },
+				},
+				Count = 6,
+			},
+			{ Kind = "GlowShells", At = { 64, 334 } },
+		},
+		Name = "The Shoals",
+		Crossings = {
+			{
+				Name = "Lair watch",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -200, 0 },
+							{ -200, 60 },
+							{ 100, 60 },
+							{ 100, 128 },
+							{ -140, 128 },
+							{ -140, 300 },
+							{ -288, 300 },
+							{ -288, 340 },
+							{ -140, 340 },
+							{ -140, 456 },
+							{ -60, 456 },
+							{ -60, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -218, 0 },
+							{ -218, 60 },
+							{ -182, 60 },
+							{ -182, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -200, 78 },
+							{ 100, 78 },
+							{ 100, 42 },
+							{ -200, 42 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 82, 60 },
+							{ 82, 128 },
+							{ 118, 128 },
+							{ 118, 60 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 100, 110 },
+							{ -140, 110 },
+							{ -140, 146 },
+							{ 100, 146 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -158, 128 },
+							{ -158, 300 },
+							{ -122, 300 },
+							{ -122, 128 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -140, 282 },
+							{ -288, 282 },
+							{ -288, 318 },
+							{ -140, 318 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 300 },
+							{ -306, 340 },
+							{ -270, 340 },
+							{ -270, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 358 },
+							{ -140, 358 },
+							{ -140, 322 },
+							{ -288, 322 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -158, 340 },
+							{ -158, 456 },
+							{ -122, 456 },
+							{ -122, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -140, 474 },
+							{ -60, 474 },
+							{ -60, 438 },
+							{ -140, 438 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -78, 456 },
+							{ -78, 608 },
+							{ -42, 608 },
+							{ -42, 456 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 162, 0 },
+							{ 162, 48 },
+							{ 174, 48 },
+							{ 174, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 168, 54 },
+							{ 224, 54 },
+							{ 224, 42 },
+							{ 168, 42 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 218, 48 },
+							{ 218, 100 },
+							{ 230, 100 },
+							{ 230, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 224, 94 },
+							{ 168, 94 },
+							{ 168, 106 },
+							{ 224, 106 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 162, 100 },
+							{ 162, 200 },
+							{ 174, 200 },
+							{ 174, 100 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 168, 206 },
+							{ 336, 206 },
+							{ 336, 194 },
+							{ 168, 194 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 200 },
+							{ 330, 244 },
+							{ 342, 244 },
+							{ 342, 200 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 238 },
+							{ 264, 238 },
+							{ 264, 250 },
+							{ 336, 250 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 258, 244 },
+							{ 258, 288 },
+							{ 270, 288 },
+							{ 270, 244 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 264, 294 },
+							{ 336, 294 },
+							{ 336, 282 },
+							{ 264, 282 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 288 },
+							{ 330, 452 },
+							{ 342, 452 },
+							{ 342, 288 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 452 },
+							{ 330, 500 },
+							{ 342, 500 },
+							{ 342, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 494 },
+							{ 256, 494 },
+							{ 256, 506 },
+							{ 336, 506 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 250, 500 },
+							{ 250, 548 },
+							{ 262, 548 },
+							{ 262, 500 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 256, 554 },
+							{ 336, 554 },
+							{ 336, 542 },
+							{ 256, 542 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 548 },
+							{ 330, 608 },
+							{ 342, 608 },
+							{ 342, 548 },
+						},
+					},
+					{ Kind = "Flat", At = { 168, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 168, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { 168, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { 168, 200 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 200 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 244 }, Radius = 6 },
+					{ Kind = "Flat", At = { 264, 244 }, Radius = 6 },
+					{ Kind = "Flat", At = { 264, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 154, 0 },
+							{ 154, 50 },
+							{ 186, 50 },
+							{ 186, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 170, 66 },
+							{ 222, 66 },
+							{ 222, 34 },
+							{ 170, 34 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 206, 50 },
+							{ 206, 100 },
+							{ 238, 100 },
+							{ 238, 50 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 222, 84 },
+							{ 170, 84 },
+							{ 170, 116 },
+							{ 222, 116 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 154, 100 },
+							{ 154, 200 },
+							{ 186, 200 },
+							{ 186, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 170, 216 },
+							{ 336, 216 },
+							{ 336, 184 },
+							{ 170, 184 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 200 },
+							{ 320, 244 },
+							{ 352, 244 },
+							{ 352, 200 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 228 },
+							{ 262, 228 },
+							{ 262, 260 },
+							{ 336, 260 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 246, 244 },
+							{ 246, 288 },
+							{ 278, 288 },
+							{ 278, 244 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 262, 304 },
+							{ 336, 304 },
+							{ 336, 272 },
+							{ 262, 272 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 288 },
+							{ 320, 452 },
+							{ 352, 452 },
+							{ 352, 288 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 452 },
+							{ 320, 500 },
+							{ 352, 500 },
+							{ 352, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 484 },
+							{ 256, 484 },
+							{ 256, 516 },
+							{ 336, 516 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 500 },
+							{ 240, 548 },
+							{ 272, 548 },
+							{ 272, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 256, 564 },
+							{ 336, 564 },
+							{ 336, 532 },
+							{ 256, 532 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 548 },
+							{ 320, 608 },
+							{ 352, 608 },
+							{ 352, 548 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 230, 380 },
+							{ 230, 140 },
+							{ 218, 140 },
+							{ 218, 380 },
+						},
+					},
+					{ Kind = "Flat", At = { 224, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 140 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 380 },
+							{ 240, 140 },
+							{ 208, 140 },
+							{ 208, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 336, 392 },
+							{ 336, 408 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 336, 562 },
+							{ 336, 578 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 152, 342 },
+							{ 152, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 336 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 250 },
+							{ -176, 250 },
+							{ -176, 262 },
+							{ -72, 262 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 256 }, Radius = 6 },
+					{ Kind = "Flat", At = { -176, 256 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 294 },
+							{ -136, 294 },
+							{ -136, 306 },
+							{ -72, 306 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -140, 214 },
+							{ -176, 214 },
+							{ -176, 226 },
+							{ -140, 226 },
+						},
+					},
+					{ Kind = "Flat", At = { -140, 220 }, Radius = 6 },
+					{ Kind = "Flat", At = { -176, 220 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -140, 414 },
+							{ -240, 414 },
+							{ -240, 426 },
+							{ -140, 426 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -246, 420 },
+							{ -246, 460 },
+							{ -234, 460 },
+							{ -234, 420 },
+						},
+					},
+					{ Kind = "Flat", At = { -140, 420 }, Radius = 6 },
+					{ Kind = "Flat", At = { -240, 420 }, Radius = 6 },
+					{ Kind = "Flat", At = { -240, 460 }, Radius = 6 },
+				},
+				Loot = {
+					{ At = { -240, 460 }, Radius = 5, Weight = 3 },
+				},
+				Hazards = {
+					{
+						Type = "Hunter",
+						Path = {
+							{ 224, 380 },
+							{ 224, 140 },
+						},
+						Burrows = {
+							{ 224, 340 },
+							{ 224, 250 },
+							{ 224, 170 },
+						},
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -170, 60 },
+							{ -110, 60 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -22, 128 },
+							{ -82, 128 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -140, 248 },
+							{ -140, 292 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -140, 420 },
+							{ -140, 448 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 186, 200 },
+							{ 246, 200 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 336, 362 },
+							{ 336, 422 },
+						},
+						Count = 2,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { -200, 55 } },
+					{ Kind = "GlowShells", At = { -95, 60 } },
+					{ Kind = "GlowShells", At = { 15, 60 } },
+					{ Kind = "GlowShells", At = { 100, 85 } },
+					{ Kind = "GlowShells", At = { 33, 128 } },
+					{ Kind = "GlowShells", At = { -77, 128 } },
+					{ Kind = "GlowShells", At = { -140, 175 } },
+					{ Kind = "GlowShells", At = { -140, 285 } },
+					{ Kind = "GlowShells", At = { -235, 300 } },
+					{ Kind = "GlowShells", At = { -271, 340 } },
+					{ Kind = "GlowShells", At = { -161, 340 } },
+					{ Kind = "GlowShells", At = { -140, 429 } },
+					{ Kind = "GlowShells", At = { -60, 459 } },
+					{ Kind = "GlowShells", At = { -60, 569 } },
+					{ Kind = "GlowShells", At = { 175, 50 } },
+					{ Kind = "GlowShells", At = { 209, 100 } },
+					{ Kind = "GlowShells", At = { 170, 171 } },
+					{ Kind = "GlowShells", At = { 251, 200 } },
+					{ Kind = "GlowShells", At = { 336, 225 } },
+					{ Kind = "GlowShells", At = { 262, 261 } },
+					{ Kind = "GlowShells", At = { 336, 297 } },
+					{ Kind = "GlowShells", At = { 336, 407 } },
+					{ Kind = "GlowShells", At = { 319, 500 } },
+					{ Kind = "GlowShells", At = { 256, 547 } },
+					{ Kind = "GlowShells", At = { 336, 577 } },
+					{ Kind = "Rocks", At = { 224, 340 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 228, 343 } },
+					{ Kind = "Rocks", At = { 224, 250 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 228, 253 } },
+					{ Kind = "Rocks", At = { 224, 170 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 228, 173 } },
+					{ Kind = "Bones", At = { 210, 360 }, Scale = 1.2, Yaw = 70 },
+					{ Kind = "Rocks", At = { 336, 400 }, Scale = 0.7 },
+					{ Kind = "Rocks", At = { 336, 570 }, Scale = 0.7 },
+					{ Kind = "Shells", At = { -240, 460 }, Scale = 1.4 },
+					{ Kind = "GlowShells", At = { -240, 420 } },
+					{ Kind = "Bones", At = { -188, 12 }, Scale = 1.8, Yaw = 20 },
+					{ Kind = "Shells", At = { -210, 14 }, Scale = 2 },
+				},
+			},
+			{
+				Name = "Bone road",
+				Paths = 3,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 40, 0 },
+							{ 40, 48 },
+							{ -88, 48 },
+							{ -88, 104 },
+							{ 104, 104 },
+							{ 104, 160 },
+							{ -88, 160 },
+							{ -88, 216 },
+							{ 104, 216 },
+							{ 104, 470 },
+							{ 60, 470 },
+							{ 60, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 22, 0 },
+							{ 22, 48 },
+							{ 58, 48 },
+							{ 58, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 30 },
+							{ -88, 30 },
+							{ -88, 66 },
+							{ 40, 66 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -106, 48 },
+							{ -106, 104 },
+							{ -70, 104 },
+							{ -70, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 122 },
+							{ 104, 122 },
+							{ 104, 86 },
+							{ -88, 86 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 86, 104 },
+							{ 86, 160 },
+							{ 122, 160 },
+							{ 122, 104 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 104, 142 },
+							{ -88, 142 },
+							{ -88, 178 },
+							{ 104, 178 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -106, 160 },
+							{ -106, 216 },
+							{ -70, 216 },
+							{ -70, 160 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 234 },
+							{ 104, 234 },
+							{ 104, 198 },
+							{ -88, 198 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 86, 216 },
+							{ 86, 470 },
+							{ 122, 470 },
+							{ 122, 216 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 104, 452 },
+							{ 60, 452 },
+							{ 60, 488 },
+							{ 104, 488 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 42, 470 },
+							{ 42, 608 },
+							{ 78, 608 },
+							{ 78, 470 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 0 },
+							{ -142, 48 },
+							{ -130, 48 },
+							{ -130, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 42 },
+							{ -224, 42 },
+							{ -224, 54 },
+							{ -136, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 48 },
+							{ -230, 100 },
+							{ -218, 100 },
+							{ -218, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -224, 106 },
+							{ -152, 106 },
+							{ -152, 94 },
+							{ -224, 94 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -158, 100 },
+							{ -158, 148 },
+							{ -146, 148 },
+							{ -146, 100 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -152, 142 },
+							{ -224, 142 },
+							{ -224, 154 },
+							{ -152, 154 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 148 },
+							{ -230, 176 },
+							{ -218, 176 },
+							{ -218, 148 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { -152, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { -152, 148 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 148 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 176 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 0 },
+							{ -152, 48 },
+							{ -120, 48 },
+							{ -120, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 32 },
+							{ -224, 32 },
+							{ -224, 64 },
+							{ -136, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 48 },
+							{ -240, 100 },
+							{ -208, 100 },
+							{ -208, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 116 },
+							{ -152, 116 },
+							{ -152, 84 },
+							{ -224, 84 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -168, 100 },
+							{ -168, 148 },
+							{ -136, 148 },
+							{ -136, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 132 },
+							{ -224, 132 },
+							{ -224, 164 },
+							{ -152, 164 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 148 },
+							{ -240, 176 },
+							{ -208, 176 },
+							{ -208, 148 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 264 },
+							{ -230, 300 },
+							{ -218, 300 },
+							{ -218, 264 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -224, 306 },
+							{ -136, 306 },
+							{ -136, 294 },
+							{ -224, 294 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 300 },
+							{ -142, 340 },
+							{ -130, 340 },
+							{ -130, 300 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 334 },
+							{ -288, 334 },
+							{ -288, 346 },
+							{ -136, 346 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -294, 340 },
+							{ -294, 380 },
+							{ -282, 380 },
+							{ -282, 340 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -288, 386 },
+							{ -136, 386 },
+							{ -136, 374 },
+							{ -288, 374 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 380 },
+							{ -142, 480 },
+							{ -130, 480 },
+							{ -130, 380 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 474 },
+							{ -280, 474 },
+							{ -280, 486 },
+							{ -136, 486 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -286, 480 },
+							{ -286, 608 },
+							{ -274, 608 },
+							{ -274, 480 },
+						},
+					},
+					{ Kind = "Flat", At = { -224, 264 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 480 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 480 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 264 },
+							{ -240, 300 },
+							{ -208, 300 },
+							{ -208, 264 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 316 },
+							{ -136, 316 },
+							{ -136, 284 },
+							{ -224, 284 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 300 },
+							{ -152, 340 },
+							{ -120, 340 },
+							{ -120, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 324 },
+							{ -288, 324 },
+							{ -288, 356 },
+							{ -136, 356 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -304, 340 },
+							{ -304, 380 },
+							{ -272, 380 },
+							{ -272, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 396 },
+							{ -136, 396 },
+							{ -136, 364 },
+							{ -288, 364 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 380 },
+							{ -152, 480 },
+							{ -120, 480 },
+							{ -120, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 464 },
+							{ -280, 464 },
+							{ -280, 496 },
+							{ -136, 496 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -296, 480 },
+							{ -296, 608 },
+							{ -264, 608 },
+							{ -264, 480 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 218, 0 },
+							{ 218, 132 },
+							{ 230, 132 },
+							{ 230, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 224, 138 },
+							{ 336, 138 },
+							{ 336, 126 },
+							{ 224, 126 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 132 },
+							{ 330, 188 },
+							{ 342, 188 },
+							{ 342, 132 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 182 },
+							{ 152, 182 },
+							{ 152, 194 },
+							{ 336, 194 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 146, 188 },
+							{ 146, 240 },
+							{ 158, 240 },
+							{ 158, 188 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 152, 246 },
+							{ 336, 246 },
+							{ 336, 234 },
+							{ 152, 234 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 240 },
+							{ 330, 288 },
+							{ 342, 288 },
+							{ 342, 240 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 282 },
+							{ 192, 282 },
+							{ 192, 294 },
+							{ 336, 294 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 186, 288 },
+							{ 186, 340 },
+							{ 198, 340 },
+							{ 198, 288 },
+						},
+					},
+					{ Kind = "Flat", At = { 224, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 132 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 132 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 240 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 240 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 192, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 192, 340 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 208, 0 },
+							{ 208, 132 },
+							{ 240, 132 },
+							{ 240, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 224, 148 },
+							{ 336, 148 },
+							{ 336, 116 },
+							{ 224, 116 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 132 },
+							{ 320, 188 },
+							{ 352, 188 },
+							{ 352, 132 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 172 },
+							{ 150, 172 },
+							{ 150, 204 },
+							{ 336, 204 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 134, 188 },
+							{ 134, 240 },
+							{ 166, 240 },
+							{ 166, 188 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 150, 256 },
+							{ 336, 256 },
+							{ 336, 224 },
+							{ 150, 224 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 240 },
+							{ 320, 288 },
+							{ 352, 288 },
+							{ 352, 240 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 272 },
+							{ 190, 272 },
+							{ 190, 304 },
+							{ 336, 304 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 174, 288 },
+							{ 174, 340 },
+							{ 206, 340 },
+							{ 206, 288 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 226, 424 },
+							{ 226, 452 },
+							{ 238, 452 },
+							{ 238, 424 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 232, 458 },
+							{ 336, 458 },
+							{ 336, 446 },
+							{ 232, 446 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 452 },
+							{ 330, 500 },
+							{ 342, 500 },
+							{ 342, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 494 },
+							{ 256, 494 },
+							{ 256, 506 },
+							{ 336, 506 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 250, 500 },
+							{ 250, 548 },
+							{ 262, 548 },
+							{ 262, 500 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 256, 554 },
+							{ 336, 554 },
+							{ 336, 542 },
+							{ 256, 542 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 548 },
+							{ 330, 608 },
+							{ 342, 608 },
+							{ 342, 548 },
+						},
+					},
+					{ Kind = "Flat", At = { 232, 424 }, Radius = 6 },
+					{ Kind = "Flat", At = { 232, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 216, 424 },
+							{ 216, 452 },
+							{ 248, 452 },
+							{ 248, 424 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 232, 468 },
+							{ 336, 468 },
+							{ 336, 436 },
+							{ 232, 436 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 452 },
+							{ 320, 500 },
+							{ 352, 500 },
+							{ 352, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 484 },
+							{ 256, 484 },
+							{ 256, 516 },
+							{ 336, 516 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 500 },
+							{ 240, 548 },
+							{ 272, 548 },
+							{ 272, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 256, 564 },
+							{ 336, 564 },
+							{ 336, 532 },
+							{ 256, 532 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 548 },
+							{ 320, 608 },
+							{ 352, 608 },
+							{ 352, 548 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 262, 400 },
+							{ 262, 592 },
+							{ 274, 592 },
+							{ 274, 400 },
+						},
+					},
+					{ Kind = "Flat", At = { 268, 400 }, Radius = 6 },
+					{ Kind = "Flat", At = { 268, 592 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 252, 400 },
+							{ 252, 592 },
+							{ 284, 592 },
+							{ 284, 400 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -136, 422 },
+							{ -136, 438 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 336, 152 },
+							{ 336, 168 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 152, 342 },
+							{ 152, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 336 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 294 },
+							{ -136, 294 },
+							{ -136, 306 },
+							{ -72, 306 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+				},
+				Hazards = {
+					{
+						Type = "Hunter",
+						Path = {
+							{ 268, 400 },
+							{ 268, 592 },
+						},
+						Burrows = {
+							{ 268, 450 },
+							{ 268, 520 },
+							{ 268, 570 },
+						},
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -12, 48 },
+							{ -72, 48 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 104, 296 },
+							{ 104, 356 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -224, 184 },
+							{ -224, 212 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -176, 340 },
+							{ -236, 340 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -136, 388 },
+							{ -136, 424 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -280, 532 },
+							{ -280, 592 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 236, 188 },
+							{ 176, 188 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 205, 370 },
+							{ 228, 417 },
+						},
+						Count = 2,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { 33, 48 } },
+					{ Kind = "GlowShells", At = { -77, 48 } },
+					{ Kind = "GlowShells", At = { -45, 104 } },
+					{ Kind = "GlowShells", At = { 65, 104 } },
+					{ Kind = "GlowShells", At = { 89, 160 } },
+					{ Kind = "GlowShells", At = { -21, 160 } },
+					{ Kind = "GlowShells", At = { -88, 203 } },
+					{ Kind = "GlowShells", At = { 9, 216 } },
+					{ Kind = "GlowShells", At = { 104, 231 } },
+					{ Kind = "GlowShells", At = { 104, 341 } },
+					{ Kind = "GlowShells", At = { 104, 451 } },
+					{ Kind = "GlowShells", At = { 60, 517 } },
+					{ Kind = "GlowShells", At = { -143, 48 } },
+					{ Kind = "GlowShells", At = { -224, 77 } },
+					{ Kind = "GlowShells", At = { -152, 115 } },
+					{ Kind = "GlowShells", At = { -224, 153 } },
+					{ Kind = "GlowShells", At = { -205, 300 } },
+					{ Kind = "GlowShells", At = { -137, 340 } },
+					{ Kind = "GlowShells", At = { -247, 340 } },
+					{ Kind = "GlowShells", At = { -259, 380 } },
+					{ Kind = "GlowShells", At = { -149, 380 } },
+					{ Kind = "GlowShells", At = { -136, 477 } },
+					{ Kind = "GlowShells", At = { -243, 480 } },
+					{ Kind = "GlowShells", At = { -280, 553 } },
+					{ Kind = "GlowShells", At = { 224, 55 } },
+					{ Kind = "GlowShells", At = { 257, 132 } },
+					{ Kind = "GlowShells", At = { 336, 163 } },
+					{ Kind = "GlowShells", At = { 251, 188 } },
+					{ Kind = "GlowShells", At = { 150, 197 } },
+					{ Kind = "GlowShells", At = { 217, 240 } },
+					{ Kind = "GlowShells", At = { 327, 240 } },
+					{ Kind = "GlowShells", At = { 283, 288 } },
+					{ Kind = "GlowShells", At = { 190, 305 } },
+					{ Kind = "GlowShells", At = { 259, 452 } },
+					{ Kind = "GlowShells", At = { 336, 485 } },
+					{ Kind = "GlowShells", At = { 256, 515 } },
+					{ Kind = "GlowShells", At = { 333, 548 } },
+					{ Kind = "Rocks", At = { 268, 450 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 453 } },
+					{ Kind = "Rocks", At = { 268, 520 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 523 } },
+					{ Kind = "Rocks", At = { 268, 570 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 573 } },
+					{ Kind = "Bones", At = { 254, 380 }, Scale = 1.2, Yaw = 70 },
+					{ Kind = "Rocks", At = { -136, 430 }, Scale = 0.7 },
+					{ Kind = "Rocks", At = { 336, 160 }, Scale = 0.7 },
+					{ Kind = "Shells", At = { 30, 12 }, Scale = 2.4 },
+					{ Kind = "Bones", At = { 44, 10 }, Scale = 1, Yaw = 60 },
+				},
+			},
+			{
+				Name = "Nest road",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -136, 0 },
+							{ -136, 48 },
+							{ -224, 48 },
+							{ -224, 100 },
+							{ -152, 100 },
+							{ -152, 148 },
+							{ -224, 148 },
+							{ -224, 176 },
+							{ -224, 264 },
+							{ -224, 300 },
+							{ -136, 300 },
+							{ -136, 340 },
+							{ -288, 340 },
+							{ -288, 380 },
+							{ -136, 380 },
+							{ -136, 480 },
+							{ -280, 480 },
+							{ -280, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 0 },
+							{ -154, 48 },
+							{ -118, 48 },
+							{ -118, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 30 },
+							{ -224, 30 },
+							{ -224, 66 },
+							{ -136, 66 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 48 },
+							{ -242, 100 },
+							{ -206, 100 },
+							{ -206, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 118 },
+							{ -152, 118 },
+							{ -152, 82 },
+							{ -224, 82 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -170, 100 },
+							{ -170, 148 },
+							{ -134, 148 },
+							{ -134, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 130 },
+							{ -224, 130 },
+							{ -224, 166 },
+							{ -152, 166 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 148 },
+							{ -242, 176 },
+							{ -206, 176 },
+							{ -206, 148 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 176 },
+							{ -242, 264 },
+							{ -206, 264 },
+							{ -206, 176 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 264 },
+							{ -242, 300 },
+							{ -206, 300 },
+							{ -206, 264 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 318 },
+							{ -136, 318 },
+							{ -136, 282 },
+							{ -224, 282 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 300 },
+							{ -154, 340 },
+							{ -118, 340 },
+							{ -118, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 322 },
+							{ -288, 322 },
+							{ -288, 358 },
+							{ -136, 358 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 340 },
+							{ -306, 380 },
+							{ -270, 380 },
+							{ -270, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 398 },
+							{ -136, 398 },
+							{ -136, 362 },
+							{ -288, 362 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 380 },
+							{ -154, 480 },
+							{ -118, 480 },
+							{ -118, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 462 },
+							{ -280, 462 },
+							{ -280, 498 },
+							{ -136, 498 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -298, 480 },
+							{ -298, 608 },
+							{ -262, 608 },
+							{ -262, 480 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 0 },
+							{ 34, 48 },
+							{ 46, 48 },
+							{ 46, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 40, 42 },
+							{ -88, 42 },
+							{ -88, 54 },
+							{ 40, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -94, 48 },
+							{ -94, 104 },
+							{ -82, 104 },
+							{ -82, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -88, 110 },
+							{ 100, 110 },
+							{ 100, 98 },
+							{ -88, 98 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 94, 104 },
+							{ 94, 192 },
+							{ 106, 192 },
+							{ 106, 104 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 100, 198 },
+							{ 336, 198 },
+							{ 336, 186 },
+							{ 100, 186 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 192 },
+							{ 330, 452 },
+							{ 342, 452 },
+							{ 342, 192 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 452 },
+							{ 330, 500 },
+							{ 342, 500 },
+							{ 342, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 494 },
+							{ 256, 494 },
+							{ 256, 506 },
+							{ 336, 506 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 250, 500 },
+							{ 250, 548 },
+							{ 262, 548 },
+							{ 262, 500 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 256, 554 },
+							{ 336, 554 },
+							{ 336, 542 },
+							{ 256, 542 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 548 },
+							{ 330, 608 },
+							{ 342, 608 },
+							{ 342, 548 },
+						},
+					},
+					{ Kind = "Flat", At = { 40, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 100, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 100, 192 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 192 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 0 },
+							{ 24, 48 },
+							{ 56, 48 },
+							{ 56, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 32 },
+							{ -88, 32 },
+							{ -88, 64 },
+							{ 40, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -104, 48 },
+							{ -104, 104 },
+							{ -72, 104 },
+							{ -72, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 120 },
+							{ 100, 120 },
+							{ 100, 88 },
+							{ -88, 88 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 84, 104 },
+							{ 84, 190 },
+							{ 116, 190 },
+							{ 116, 104 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 100, 206 },
+							{ 336, 206 },
+							{ 336, 174 },
+							{ 100, 174 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 190 },
+							{ 320, 452 },
+							{ 352, 452 },
+							{ 352, 190 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 452 },
+							{ 320, 500 },
+							{ 352, 500 },
+							{ 352, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 484 },
+							{ 256, 484 },
+							{ 256, 516 },
+							{ 336, 516 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 500 },
+							{ 240, 548 },
+							{ 272, 548 },
+							{ 272, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 256, 564 },
+							{ 336, 564 },
+							{ 336, 532 },
+							{ 256, 532 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 548 },
+							{ 320, 608 },
+							{ 352, 608 },
+							{ 352, 548 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 194, 380 },
+							{ 194, 120 },
+							{ 182, 120 },
+							{ 182, 380 },
+						},
+					},
+					{ Kind = "Flat", At = { 188, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { 188, 120 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 204, 380 },
+							{ 204, 120 },
+							{ 172, 120 },
+							{ 172, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 336, 342 },
+							{ 336, 358 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -88, 72 },
+							{ -88, 88 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 152, 342 },
+							{ 152, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 336 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 250 },
+							{ -176, 250 },
+							{ -176, 262 },
+							{ -72, 262 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 256 }, Radius = 6 },
+					{ Kind = "Flat", At = { -176, 256 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 294 },
+							{ -136, 294 },
+							{ -136, 306 },
+							{ -72, 306 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 438 },
+							{ -80, 438 },
+							{ -80, 426 },
+							{ -136, 426 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 432 }, Radius = 6 },
+					{ Kind = "Flat", At = { -80, 432 }, Radius = 6 },
+				},
+				Loot = {
+					{ At = { -80, 430 }, Radius = 5, Weight = 3 },
+				},
+				Hazards = {
+					{
+						Type = "Hunter",
+						Path = {
+							{ 188, 380 },
+							{ 188, 120 },
+						},
+						Burrows = {
+							{ 188, 340 },
+							{ 188, 262 },
+							{ 188, 190 },
+							{ 188, 140 },
+						},
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -160, 48 },
+							{ -216, 48 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -176, 340 },
+							{ -236, 340 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -230, 380 },
+							{ -170, 380 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -152, 480 },
+							{ -212, 480 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 18, 48 },
+							{ -42, 48 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -40, 104 },
+							{ 20, 104 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 336, 358 },
+							{ 336, 418 },
+						},
+						Count = 2,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { -143, 48 } },
+					{ Kind = "GlowShells", At = { -224, 77 } },
+					{ Kind = "GlowShells", At = { -152, 115 } },
+					{ Kind = "GlowShells", At = { -224, 153 } },
+					{ Kind = "GlowShells", At = { -224, 263 } },
+					{ Kind = "GlowShells", At = { -151, 300 } },
+					{ Kind = "GlowShells", At = { -191, 340 } },
+					{ Kind = "GlowShells", At = { -288, 353 } },
+					{ Kind = "GlowShells", At = { -205, 380 } },
+					{ Kind = "GlowShells", At = { -136, 421 } },
+					{ Kind = "GlowShells", At = { -187, 480 } },
+					{ Kind = "GlowShells", At = { -280, 497 } },
+					{ Kind = "GlowShells", At = { -280, 607 } },
+					{ Kind = "GlowShells", At = { 33, 48 } },
+					{ Kind = "GlowShells", At = { -77, 48 } },
+					{ Kind = "GlowShells", At = { -45, 104 } },
+					{ Kind = "GlowShells", At = { 65, 104 } },
+					{ Kind = "GlowShells", At = { 100, 179 } },
+					{ Kind = "GlowShells", At = { 199, 190 } },
+					{ Kind = "GlowShells", At = { 309, 190 } },
+					{ Kind = "GlowShells", At = { 336, 273 } },
+					{ Kind = "GlowShells", At = { 336, 383 } },
+					{ Kind = "GlowShells", At = { 336, 493 } },
+					{ Kind = "GlowShells", At = { 256, 523 } },
+					{ Kind = "GlowShells", At = { 336, 553 } },
+					{ Kind = "Rocks", At = { 188, 340 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 192, 343 } },
+					{ Kind = "Rocks", At = { 188, 262 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 192, 265 } },
+					{ Kind = "Rocks", At = { 188, 190 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 192, 193 } },
+					{ Kind = "Rocks", At = { 188, 140 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 192, 143 } },
+					{ Kind = "Bones", At = { 174, 360 }, Scale = 1.2, Yaw = 70 },
+					{ Kind = "Rocks", At = { 336, 350 }, Scale = 0.7 },
+					{ Kind = "Rocks", At = { -88, 80 }, Scale = 0.7 },
+					{ Kind = "Shells", At = { -80, 430 }, Scale = 1.4 },
+					{ Kind = "GlowShells", At = { -136, 430 } },
+					{ Kind = "Bones", At = { -150, 12 }, Scale = 1.6, Yaw = 0 },
+					{ Kind = "Bones", At = { -122, 12 }, Scale = 1.6, Yaw = 180 },
+					{ Kind = "Shells", At = { -136, 24 }, Scale = 1.6 },
+				},
+			},
+			{
+				Name = "Hunter's gate",
+				Paths = 3,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -200, 0 },
+							{ -200, 128 },
+							{ -140, 128 },
+							{ -140, 300 },
+							{ -288, 300 },
+							{ -288, 340 },
+							{ -140, 340 },
+							{ -140, 480 },
+							{ -280, 480 },
+							{ -280, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -218, 0 },
+							{ -218, 128 },
+							{ -182, 128 },
+							{ -182, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -200, 146 },
+							{ -140, 146 },
+							{ -140, 110 },
+							{ -200, 110 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -158, 128 },
+							{ -158, 300 },
+							{ -122, 300 },
+							{ -122, 128 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -140, 282 },
+							{ -288, 282 },
+							{ -288, 318 },
+							{ -140, 318 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 300 },
+							{ -306, 340 },
+							{ -270, 340 },
+							{ -270, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 358 },
+							{ -140, 358 },
+							{ -140, 322 },
+							{ -288, 322 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -158, 340 },
+							{ -158, 480 },
+							{ -122, 480 },
+							{ -122, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -140, 462 },
+							{ -280, 462 },
+							{ -280, 498 },
+							{ -140, 498 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -298, 480 },
+							{ -298, 608 },
+							{ -262, 608 },
+							{ -262, 480 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 218, 0 },
+							{ 218, 48 },
+							{ 230, 48 },
+							{ 230, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 224, 42 },
+							{ 152, 42 },
+							{ 152, 54 },
+							{ 224, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 146, 48 },
+							{ 146, 100 },
+							{ 158, 100 },
+							{ 158, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 152, 106 },
+							{ 224, 106 },
+							{ 224, 94 },
+							{ 152, 94 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 218, 100 },
+							{ 218, 132 },
+							{ 230, 132 },
+							{ 230, 100 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 224, 138 },
+							{ 336, 138 },
+							{ 336, 126 },
+							{ 224, 126 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 132 },
+							{ 330, 188 },
+							{ 342, 188 },
+							{ 342, 132 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 182 },
+							{ 152, 182 },
+							{ 152, 194 },
+							{ 336, 194 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 146, 188 },
+							{ 146, 240 },
+							{ 158, 240 },
+							{ 158, 188 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 152, 246 },
+							{ 336, 246 },
+							{ 336, 234 },
+							{ 152, 234 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 240 },
+							{ 330, 288 },
+							{ 342, 288 },
+							{ 342, 240 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 282 },
+							{ 192, 282 },
+							{ 192, 294 },
+							{ 336, 294 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 186, 288 },
+							{ 186, 340 },
+							{ 198, 340 },
+							{ 198, 288 },
+						},
+					},
+					{ Kind = "Flat", At = { 224, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 132 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 132 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 240 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 240 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 192, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 192, 340 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 208, 0 },
+							{ 208, 50 },
+							{ 240, 50 },
+							{ 240, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 224, 34 },
+							{ 150, 34 },
+							{ 150, 66 },
+							{ 224, 66 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 134, 50 },
+							{ 134, 100 },
+							{ 166, 100 },
+							{ 166, 50 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 150, 116 },
+							{ 224, 116 },
+							{ 224, 84 },
+							{ 150, 84 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 208, 100 },
+							{ 208, 132 },
+							{ 240, 132 },
+							{ 240, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 224, 148 },
+							{ 336, 148 },
+							{ 336, 116 },
+							{ 224, 116 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 132 },
+							{ 320, 188 },
+							{ 352, 188 },
+							{ 352, 132 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 172 },
+							{ 150, 172 },
+							{ 150, 204 },
+							{ 336, 204 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 134, 188 },
+							{ 134, 240 },
+							{ 166, 240 },
+							{ 166, 188 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 150, 256 },
+							{ 336, 256 },
+							{ 336, 224 },
+							{ 150, 224 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 240 },
+							{ 320, 288 },
+							{ 352, 288 },
+							{ 352, 240 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 272 },
+							{ 190, 272 },
+							{ 190, 304 },
+							{ 336, 304 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 174, 288 },
+							{ 174, 340 },
+							{ 206, 340 },
+							{ 206, 288 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 226, 424 },
+							{ 226, 452 },
+							{ 238, 452 },
+							{ 238, 424 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 232, 458 },
+							{ 336, 458 },
+							{ 336, 446 },
+							{ 232, 446 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 452 },
+							{ 330, 500 },
+							{ 342, 500 },
+							{ 342, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 494 },
+							{ 256, 494 },
+							{ 256, 506 },
+							{ 336, 506 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 250, 500 },
+							{ 250, 548 },
+							{ 262, 548 },
+							{ 262, 500 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 256, 554 },
+							{ 336, 554 },
+							{ 336, 542 },
+							{ 256, 542 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 548 },
+							{ 330, 608 },
+							{ 342, 608 },
+							{ 342, 548 },
+						},
+					},
+					{ Kind = "Flat", At = { 232, 424 }, Radius = 6 },
+					{ Kind = "Flat", At = { 232, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 216, 424 },
+							{ 216, 452 },
+							{ 248, 452 },
+							{ 248, 424 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 232, 468 },
+							{ 336, 468 },
+							{ 336, 436 },
+							{ 232, 436 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 452 },
+							{ 320, 500 },
+							{ 352, 500 },
+							{ 352, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 484 },
+							{ 256, 484 },
+							{ 256, 516 },
+							{ 336, 516 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 500 },
+							{ 240, 548 },
+							{ 272, 548 },
+							{ 272, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 256, 564 },
+							{ 336, 564 },
+							{ 336, 532 },
+							{ 256, 532 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 548 },
+							{ 320, 608 },
+							{ 352, 608 },
+							{ 352, 548 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 0 },
+							{ 34, 48 },
+							{ 46, 48 },
+							{ 46, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 40, 42 },
+							{ -88, 42 },
+							{ -88, 54 },
+							{ 40, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -94, 48 },
+							{ -94, 104 },
+							{ -82, 104 },
+							{ -82, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -88, 110 },
+							{ 40, 110 },
+							{ 40, 98 },
+							{ -88, 98 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 104 },
+							{ 34, 248 },
+							{ 46, 248 },
+							{ 46, 104 },
+						},
+					},
+					{ Kind = "Flat", At = { 40, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 248 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 0 },
+							{ 24, 48 },
+							{ 56, 48 },
+							{ 56, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 32 },
+							{ -88, 32 },
+							{ -88, 64 },
+							{ 40, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -104, 48 },
+							{ -104, 104 },
+							{ -72, 104 },
+							{ -72, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 120 },
+							{ 40, 120 },
+							{ 40, 88 },
+							{ -88, 88 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 104 },
+							{ 24, 248 },
+							{ 56, 248 },
+							{ 56, 104 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 330 },
+							{ -100, 330 },
+							{ -100, 342 },
+							{ -72, 342 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -106, 336 },
+							{ -106, 452 },
+							{ -94, 452 },
+							{ -94, 336 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -100, 458 },
+							{ 80, 458 },
+							{ 80, 446 },
+							{ -100, 446 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 74, 452 },
+							{ 74, 520 },
+							{ 86, 520 },
+							{ 86, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 80, 514 },
+							{ -60, 514 },
+							{ -60, 526 },
+							{ 80, 526 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -66, 520 },
+							{ -66, 608 },
+							{ -54, 608 },
+							{ -54, 520 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { -100, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { -100, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 520 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 520 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -72, 320 },
+							{ -100, 320 },
+							{ -100, 352 },
+							{ -72, 352 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -116, 336 },
+							{ -116, 452 },
+							{ -84, 452 },
+							{ -84, 336 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -100, 468 },
+							{ 80, 468 },
+							{ 80, 436 },
+							{ -100, 436 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 64, 452 },
+							{ 64, 520 },
+							{ 96, 520 },
+							{ 96, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 80, 504 },
+							{ -60, 504 },
+							{ -60, 536 },
+							{ 80, 536 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -76, 520 },
+							{ -76, 608 },
+							{ -44, 608 },
+							{ -44, 520 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 274, 380 },
+							{ 274, 188 },
+							{ 262, 188 },
+							{ 262, 380 },
+						},
+					},
+					{ Kind = "Flat", At = { 268, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { 268, 188 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 284, 380 },
+							{ 284, 188 },
+							{ 252, 188 },
+							{ 252, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 336, 512 },
+							{ 336, 528 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -100, 392 },
+							{ -100, 408 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 152, 342 },
+							{ 152, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 336 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -140, 214 },
+							{ -176, 214 },
+							{ -176, 226 },
+							{ -140, 226 },
+						},
+					},
+					{ Kind = "Flat", At = { -140, 220 }, Radius = 6 },
+					{ Kind = "Flat", At = { -176, 220 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 294 },
+							{ -136, 294 },
+							{ -136, 306 },
+							{ -72, 306 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+				},
+				Hazards = {
+					{
+						Type = "Hunter",
+						Path = {
+							{ 268, 380 },
+							{ 268, 188 },
+						},
+						Burrows = {
+							{ 268, 340 },
+							{ 268, 264 },
+							{ 268, 214 },
+							{ 268, 196 },
+						},
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -200, 80 },
+							{ -200, 120 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -150, 300 },
+							{ -210, 300 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -280, 488 },
+							{ -280, 520 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 190, 50 },
+							{ 158, 50 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 264, 132 },
+							{ 324, 132 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 210, 188 },
+							{ 158, 188 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 300, 240 },
+							{ 328, 240 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 18, 48 },
+							{ -42, 48 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 40, 114 },
+							{ 40, 174 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 32, 452 },
+							{ 72, 452 },
+						},
+						Count = 1,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { -200, 55 } },
+					{ Kind = "GlowShells", At = { -163, 128 } },
+					{ Kind = "GlowShells", At = { -140, 215 } },
+					{ Kind = "GlowShells", At = { -165, 300 } },
+					{ Kind = "GlowShells", At = { -275, 300 } },
+					{ Kind = "GlowShells", At = { -231, 340 } },
+					{ Kind = "GlowShells", At = { -140, 359 } },
+					{ Kind = "GlowShells", At = { -140, 469 } },
+					{ Kind = "GlowShells", At = { -239, 480 } },
+					{ Kind = "GlowShells", At = { -280, 549 } },
+					{ Kind = "GlowShells", At = { 219, 50 } },
+					{ Kind = "GlowShells", At = { 150, 91 } },
+					{ Kind = "GlowShells", At = { 224, 127 } },
+					{ Kind = "GlowShells", At = { 329, 132 } },
+					{ Kind = "GlowShells", At = { 289, 188 } },
+					{ Kind = "GlowShells", At = { 179, 188 } },
+					{ Kind = "GlowShells", At = { 179, 240 } },
+					{ Kind = "GlowShells", At = { 289, 240 } },
+					{ Kind = "GlowShells", At = { 321, 288 } },
+					{ Kind = "GlowShells", At = { 211, 288 } },
+					{ Kind = "GlowShells", At = { 259, 452 } },
+					{ Kind = "GlowShells", At = { 336, 485 } },
+					{ Kind = "GlowShells", At = { 256, 515 } },
+					{ Kind = "GlowShells", At = { 333, 548 } },
+					{ Kind = "GlowShells", At = { 33, 48 } },
+					{ Kind = "GlowShells", At = { -77, 48 } },
+					{ Kind = "GlowShells", At = { -45, 104 } },
+					{ Kind = "GlowShells", At = { 40, 129 } },
+					{ Kind = "GlowShells", At = { 40, 239 } },
+					{ Kind = "GlowShells", At = { -100, 363 } },
+					{ Kind = "GlowShells", At = { -79, 452 } },
+					{ Kind = "GlowShells", At = { 31, 452 } },
+					{ Kind = "GlowShells", At = { 80, 513 } },
+					{ Kind = "GlowShells", At = { -23, 520 } },
+					{ Kind = "GlowShells", At = { -60, 593 } },
+					{ Kind = "Rocks", At = { 268, 340 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 343 } },
+					{ Kind = "Rocks", At = { 268, 264 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 267 } },
+					{ Kind = "Rocks", At = { 268, 214 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 217 } },
+					{ Kind = "Rocks", At = { 268, 196 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 199 } },
+					{ Kind = "Bones", At = { 254, 360 }, Scale = 1.2, Yaw = 70 },
+					{ Kind = "Rocks", At = { 336, 520 }, Scale = 0.7 },
+					{ Kind = "Rocks", At = { -100, 400 }, Scale = 0.7 },
+					{ Kind = "Shells", At = { -148, 12 }, Scale = 2.4 },
+					{ Kind = "Bones", At = { -122, 10 }, Scale = 1, Yaw = 60 },
+				},
+			},
+			{
+				Name = "Midden maze",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 40, 0 },
+							{ 40, 48 },
+							{ -88, 48 },
+							{ -88, 104 },
+							{ 104, 104 },
+							{ 104, 160 },
+							{ -88, 160 },
+							{ -88, 216 },
+							{ 104, 216 },
+							{ 104, 470 },
+							{ 60, 470 },
+							{ 60, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 22, 0 },
+							{ 22, 48 },
+							{ 58, 48 },
+							{ 58, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 30 },
+							{ -88, 30 },
+							{ -88, 66 },
+							{ 40, 66 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -106, 48 },
+							{ -106, 104 },
+							{ -70, 104 },
+							{ -70, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 122 },
+							{ 104, 122 },
+							{ 104, 86 },
+							{ -88, 86 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 86, 104 },
+							{ 86, 160 },
+							{ 122, 160 },
+							{ 122, 104 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 104, 142 },
+							{ -88, 142 },
+							{ -88, 178 },
+							{ 104, 178 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -106, 160 },
+							{ -106, 216 },
+							{ -70, 216 },
+							{ -70, 160 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 234 },
+							{ 104, 234 },
+							{ 104, 198 },
+							{ -88, 198 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 86, 216 },
+							{ 86, 470 },
+							{ 122, 470 },
+							{ 122, 216 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 104, 452 },
+							{ 60, 452 },
+							{ 60, 488 },
+							{ 104, 488 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 42, 470 },
+							{ 42, 608 },
+							{ 78, 608 },
+							{ 78, 470 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 0 },
+							{ -142, 48 },
+							{ -130, 48 },
+							{ -130, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 42 },
+							{ -224, 42 },
+							{ -224, 54 },
+							{ -136, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 48 },
+							{ -230, 100 },
+							{ -218, 100 },
+							{ -218, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -224, 106 },
+							{ -152, 106 },
+							{ -152, 94 },
+							{ -224, 94 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -158, 100 },
+							{ -158, 148 },
+							{ -146, 148 },
+							{ -146, 100 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -152, 142 },
+							{ -224, 142 },
+							{ -224, 154 },
+							{ -152, 154 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 148 },
+							{ -230, 176 },
+							{ -218, 176 },
+							{ -218, 148 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 176 },
+							{ -230, 264 },
+							{ -218, 264 },
+							{ -218, 176 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 264 },
+							{ -230, 300 },
+							{ -218, 300 },
+							{ -218, 264 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -224, 306 },
+							{ -136, 306 },
+							{ -136, 294 },
+							{ -224, 294 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 300 },
+							{ -142, 340 },
+							{ -130, 340 },
+							{ -130, 300 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 334 },
+							{ -288, 334 },
+							{ -288, 346 },
+							{ -136, 346 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -294, 340 },
+							{ -294, 380 },
+							{ -282, 380 },
+							{ -282, 340 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -288, 386 },
+							{ -136, 386 },
+							{ -136, 374 },
+							{ -288, 374 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 380 },
+							{ -142, 420 },
+							{ -130, 420 },
+							{ -130, 380 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 414 },
+							{ -288, 414 },
+							{ -288, 426 },
+							{ -136, 426 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -294, 420 },
+							{ -294, 460 },
+							{ -282, 460 },
+							{ -282, 420 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -288, 466 },
+							{ -136, 466 },
+							{ -136, 454 },
+							{ -288, 454 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 460 },
+							{ -142, 500 },
+							{ -130, 500 },
+							{ -130, 460 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 494 },
+							{ -280, 494 },
+							{ -280, 506 },
+							{ -136, 506 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -286, 500 },
+							{ -286, 608 },
+							{ -274, 608 },
+							{ -274, 500 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { -152, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { -152, 148 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 148 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 176 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 264 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 420 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 420 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 460 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 460 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 0 },
+							{ -152, 48 },
+							{ -120, 48 },
+							{ -120, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 32 },
+							{ -224, 32 },
+							{ -224, 64 },
+							{ -136, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 48 },
+							{ -240, 100 },
+							{ -208, 100 },
+							{ -208, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 116 },
+							{ -152, 116 },
+							{ -152, 84 },
+							{ -224, 84 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -168, 100 },
+							{ -168, 148 },
+							{ -136, 148 },
+							{ -136, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 132 },
+							{ -224, 132 },
+							{ -224, 164 },
+							{ -152, 164 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 148 },
+							{ -240, 176 },
+							{ -208, 176 },
+							{ -208, 148 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 176 },
+							{ -240, 264 },
+							{ -208, 264 },
+							{ -208, 176 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 264 },
+							{ -240, 300 },
+							{ -208, 300 },
+							{ -208, 264 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 316 },
+							{ -136, 316 },
+							{ -136, 284 },
+							{ -224, 284 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 300 },
+							{ -152, 340 },
+							{ -120, 340 },
+							{ -120, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 324 },
+							{ -288, 324 },
+							{ -288, 356 },
+							{ -136, 356 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -304, 340 },
+							{ -304, 380 },
+							{ -272, 380 },
+							{ -272, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 396 },
+							{ -136, 396 },
+							{ -136, 364 },
+							{ -288, 364 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 380 },
+							{ -152, 420 },
+							{ -120, 420 },
+							{ -120, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 404 },
+							{ -288, 404 },
+							{ -288, 436 },
+							{ -136, 436 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -304, 420 },
+							{ -304, 460 },
+							{ -272, 460 },
+							{ -272, 420 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 476 },
+							{ -136, 476 },
+							{ -136, 444 },
+							{ -288, 444 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 460 },
+							{ -152, 500 },
+							{ -120, 500 },
+							{ -120, 460 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 484 },
+							{ -280, 484 },
+							{ -280, 516 },
+							{ -136, 516 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -296, 500 },
+							{ -296, 608 },
+							{ -264, 608 },
+							{ -264, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 170, 380 },
+							{ 170, 128 },
+							{ 158, 128 },
+							{ 158, 380 },
+						},
+					},
+					{ Kind = "Flat", At = { 164, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { 164, 128 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 180, 380 },
+							{ 180, 126 },
+							{ 148, 126 },
+							{ 148, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -136, 472 },
+							{ -136, 488 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -224, 92 },
+							{ -224, 108 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 152, 342 },
+							{ 152, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 336 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 294 },
+							{ -136, 294 },
+							{ -136, 306 },
+							{ -72, 306 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 60, 534 },
+							{ -20, 534 },
+							{ -20, 546 },
+							{ 60, 546 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -14, 540 },
+							{ -14, 500 },
+							{ -26, 500 },
+							{ -26, 540 },
+						},
+					},
+					{ Kind = "Flat", At = { 60, 540 }, Radius = 6 },
+					{ Kind = "Flat", At = { -20, 540 }, Radius = 6 },
+					{ Kind = "Flat", At = { -20, 500 }, Radius = 6 },
+				},
+				Loot = {
+					{ At = { -20, 500 }, Radius = 5, Weight = 3 },
+				},
+				Hazards = {
+					{
+						Type = "Hunter",
+						Path = {
+							{ 164, 380 },
+							{ 164, 126 },
+						},
+						Burrows = {
+							{ 164, 340 },
+							{ 164, 270 },
+							{ 164, 210 },
+							{ 164, 150 },
+						},
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 18, 48 },
+							{ -42, 48 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -40, 104 },
+							{ 20, 104 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 94, 160 },
+							{ 34, 160 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 104, 430 },
+							{ 104, 462 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -160, 48 },
+							{ -216, 48 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -224, 184 },
+							{ -224, 232 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -232, 340 },
+							{ -280, 340 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -220, 380 },
+							{ -160, 380 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -182, 420 },
+							{ -242, 420 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -264, 460 },
+							{ -204, 460 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -144, 500 },
+							{ -192, 500 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -280, 528 },
+							{ -280, 588 },
+						},
+						Count = 1,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { 33, 48 } },
+					{ Kind = "GlowShells", At = { -77, 48 } },
+					{ Kind = "GlowShells", At = { -45, 104 } },
+					{ Kind = "GlowShells", At = { 65, 104 } },
+					{ Kind = "GlowShells", At = { 89, 160 } },
+					{ Kind = "GlowShells", At = { -21, 160 } },
+					{ Kind = "GlowShells", At = { -88, 203 } },
+					{ Kind = "GlowShells", At = { 9, 216 } },
+					{ Kind = "GlowShells", At = { 104, 231 } },
+					{ Kind = "GlowShells", At = { 104, 341 } },
+					{ Kind = "GlowShells", At = { 104, 451 } },
+					{ Kind = "GlowShells", At = { 60, 517 } },
+					{ Kind = "GlowShells", At = { -143, 48 } },
+					{ Kind = "GlowShells", At = { -224, 77 } },
+					{ Kind = "GlowShells", At = { -152, 115 } },
+					{ Kind = "GlowShells", At = { -224, 153 } },
+					{ Kind = "GlowShells", At = { -224, 263 } },
+					{ Kind = "GlowShells", At = { -151, 300 } },
+					{ Kind = "GlowShells", At = { -191, 340 } },
+					{ Kind = "GlowShells", At = { -288, 353 } },
+					{ Kind = "GlowShells", At = { -205, 380 } },
+					{ Kind = "GlowShells", At = { -137, 420 } },
+					{ Kind = "GlowShells", At = { -247, 420 } },
+					{ Kind = "GlowShells", At = { -259, 460 } },
+					{ Kind = "GlowShells", At = { -149, 460 } },
+					{ Kind = "GlowShells", At = { -193, 500 } },
+					{ Kind = "GlowShells", At = { -280, 523 } },
+					{ Kind = "Rocks", At = { 164, 340 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 168, 343 } },
+					{ Kind = "Rocks", At = { 164, 270 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 168, 273 } },
+					{ Kind = "Rocks", At = { 164, 210 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 168, 213 } },
+					{ Kind = "Rocks", At = { 164, 150 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 168, 153 } },
+					{ Kind = "Bones", At = { 150, 360 }, Scale = 1.2, Yaw = 70 },
+					{ Kind = "Rocks", At = { -136, 480 }, Scale = 0.7 },
+					{ Kind = "Rocks", At = { -224, 100 }, Scale = 0.7 },
+					{ Kind = "Shells", At = { -20, 500 }, Scale = 1.4 },
+					{ Kind = "GlowShells", At = { -20, 540 } },
+					{ Kind = "Shells", At = { 52, 12 }, Scale = 1.8 },
+					{ Kind = "GlowShells", At = { 28, 12 } },
+					{ Kind = "GlowShells", At = { 52, 24 } },
+				},
+			},
+		},
+		Slots = {
+			{
+				Name = "Nest row west",
+				At = { -352, 36 },
+				Size = { 104, 72 },
+				Rooms = {
+					{
+						Name = "Crab nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 0 },
+									{ 46, 52 },
+									{ 58, 52 },
+									{ 58, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 36, 0 },
+									{ 36, 24 },
+									{ 68, 24 },
+									{ 68, 0 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 30, 40 },
+									{ 74, 40 },
+									{ 74, 64 },
+									{ 30, 64 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 52, 60 }, Radius = 5, Weight = 3 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 52, 60 }, Scale = 2 },
+							{ Kind = "Bones", At = { 62, 52 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 42, 52 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 34, 42 },
+									{ 70, 42 },
+									{ 70, 62 },
+									{ 34, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Shell midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 0 },
+									{ 46, 36 },
+									{ 58, 36 },
+									{ 58, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 31, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 73, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 52, 60 }, Radius = 4, Weight = 2 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 52, 60 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 92, 12 },
+									{ 92, 60 },
+									{ 12, 60 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 52, 36 }, Scale = 0.9 },
+						},
+					},
+				},
+			},
+			{
+				Name = "Nest row east",
+				At = { 248, 36 },
+				Size = { 104, 72 },
+				Rooms = {
+					{
+						Name = "Crab nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 0 },
+									{ 46, 52 },
+									{ 58, 52 },
+									{ 58, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 36, 0 },
+									{ 36, 24 },
+									{ 68, 24 },
+									{ 68, 0 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 30, 40 },
+									{ 74, 40 },
+									{ 74, 64 },
+									{ 30, 64 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 52, 60 }, Radius = 5, Weight = 3 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 52, 60 }, Scale = 2 },
+							{ Kind = "Bones", At = { 62, 52 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 42, 52 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 34, 42 },
+									{ 70, 42 },
+									{ 70, 62 },
+									{ 34, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Collapsed chamber",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 0 },
+									{ 46, 36 },
+									{ 58, 36 },
+									{ 58, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 31, 25 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 73, 36 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 42, 50 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 68, 18 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 52, 60 }, Radius = 4, Weight = 2 },
+						},
+						Decor = {
+							{
+								Kind = "Rocks",
+								Area = {
+									{ 12, 12 },
+									{ 92, 12 },
+									{ 92, 60 },
+									{ 12, 60 },
+								},
+								Count = 5,
+							},
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+			{
+				Name = "Western midden",
+				At = { -360, 168 },
+				Size = { 72, 104 },
+				Rooms = {
+					{
+						Name = "Old midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 72, 46 },
+									{ 36, 46 },
+									{ 36, 58 },
+									{ 72, 58 },
+								},
+							},
+							{ Kind = "Flat", At = { 72, 52 }, Radius = 6 },
+							{ Kind = "Flat", At = { 36, 52 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 64, 8 },
+									{ 64, 96 },
+									{ 8, 96 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 22, 52 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 50, 52 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 12, 52 }, Radius = 4, Weight = 2 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 12, 52 }, Radius = 4, Covered = true },
+							{ Type = "Pit", At = { 36, 52 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 60, 12 },
+									{ 60, 92 },
+									{ 12, 92 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 36, 52 }, Scale = 0.9 },
+						},
+					},
+					{
+						Name = "Hermit nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 72, 46 },
+									{ 20, 46 },
+									{ 20, 58 },
+									{ 72, 58 },
+								},
+							},
+							{ Kind = "Flat", At = { 72, 52 }, Radius = 6 },
+							{ Kind = "Flat", At = { 20, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 72, 36 },
+									{ 48, 36 },
+									{ 48, 68 },
+									{ 72, 68 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 30 },
+									{ 32, 30 },
+									{ 32, 74 },
+									{ 8, 74 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 12, 52 }, Radius = 5, Weight = 3 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 12, 52 }, Scale = 2 },
+							{ Kind = "Bones", At = { 20, 42 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 20, 62 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 2, 42 },
+									{ 38, 42 },
+									{ 38, 62 },
+									{ 2, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+			{
+				Name = "Deep nest",
+				At = { -48, 360 },
+				Size = { 96, 72 },
+				Rooms = {
+					{
+						Name = "Brood nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 42, 0 },
+									{ 42, 52 },
+									{ 54, 52 },
+									{ 54, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 48, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 48, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 32, 0 },
+									{ 32, 24 },
+									{ 64, 24 },
+									{ 64, 0 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 26, 40 },
+									{ 70, 40 },
+									{ 70, 64 },
+									{ 26, 64 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 48, 60 }, Radius = 5, Weight = 5 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 48, 60 }, Scale = 2 },
+							{ Kind = "Bones", At = { 58, 52 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 38, 52 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 30, 42 },
+									{ 66, 42 },
+									{ 66, 62 },
+									{ 30, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Moult midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 42, 0 },
+									{ 42, 36 },
+									{ 54, 36 },
+									{ 54, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 48, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 48, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 88, 8 },
+									{ 88, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 29, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 67, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 48, 60 }, Radius = 4, Weight = 3 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 48, 60 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 84, 12 },
+									{ 84, 60 },
+									{ 12, 60 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 48, 36 }, Scale = 0.9 },
+						},
+					},
+				},
+			},
+			{
+				Name = "Hoard",
+				At = { 120, 504 },
+				Size = { 112, 72 },
+				Rooms = {
+					{
+						Name = "Hoard nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 20 },
+									{ 50, 20 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 20 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 72, 72 },
+									{ 72, 48 },
+									{ 40, 48 },
+									{ 40, 72 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 34, 8 },
+									{ 78, 8 },
+									{ 78, 32 },
+									{ 34, 32 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 5, Weight = 5 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 56, 12 }, Scale = 2 },
+							{ Kind = "Bones", At = { 46, 20 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 66, 20 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 38, 10 },
+									{ 74, 10 },
+									{ 74, 30 },
+									{ 38, 30 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Fallen hoard",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 36 },
+									{ 50, 36 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 104, 8 },
+									{ 104, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 34, 25 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 78, 36 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 45, 50 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 73, 18 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 4, Weight = 3 },
+						},
+						Decor = {
+							{
+								Kind = "Rocks",
+								Area = {
+									{ 12, 12 },
+									{ 100, 12 },
+									{ 100, 60 },
+									{ 12, 60 },
+								},
+								Count = 5,
+							},
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 8, 8 },
+									{ 104, 8 },
+									{ 104, 64 },
+									{ 8, 64 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+			{
+				Name = "Sea nests",
+				At = { -232, 504 },
+				Size = { 112, 72 },
+				Rooms = {
+					{
+						Name = "Sea nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 20 },
+									{ 50, 20 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 20 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 72, 72 },
+									{ 72, 48 },
+									{ 40, 48 },
+									{ 40, 72 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 34, 8 },
+									{ 78, 8 },
+									{ 78, 32 },
+									{ 34, 32 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 5, Weight = 6 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 56, 12 }, Scale = 2 },
+							{ Kind = "Bones", At = { 46, 20 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 66, 20 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 38, 10 },
+									{ 74, 10 },
+									{ 74, 30 },
+									{ 38, 30 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Drowned midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 36 },
+									{ 50, 36 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 104, 8 },
+									{ 104, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 34, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 78, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 4, Weight = 4 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 56, 12 }, Radius = 4, Covered = true },
+							{ Type = "Pit", At = { 56, 36 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 100, 12 },
+									{ 100, 60 },
+									{ 12, 60 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 56, 36 }, Scale = 0.9 },
+						},
+					},
+				},
+			},
+		},
+	},
+	[6] = {
+		Primitives = {
+			{
+				Kind = "Wall",
+				Area = {
+					{ -380, -12 },
+					{ 380, -12 },
+					{ 380, 620 },
+					{ -380, 620 },
+				},
+				Height = 20,
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -360, -12 },
+					{ 360, -12 },
+					{ 360, 20 },
+					{ -360, 20 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -360, 592 },
+					{ 360, 592 },
+					{ 360, 620 },
+					{ -360, 620 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -272, 176 },
+					{ -176, 176 },
+					{ -176, 264 },
+					{ -272, 264 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 274 },
+					{ -72, 248 },
+					{ 72, 248 },
+					{ 72, 274 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 286 },
+					{ -72, 274 },
+					{ -42, 274 },
+					{ -42, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -30, 286 },
+					{ -30, 274 },
+					{ -6, 274 },
+					{ -6, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 6, 286 },
+					{ 6, 274 },
+					{ 30, 274 },
+					{ 30, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 42, 286 },
+					{ 42, 274 },
+					{ 72, 274 },
+					{ 72, 286 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 306 },
+					{ -72, 286 },
+					{ 72, 286 },
+					{ 72, 306 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 318 },
+					{ -72, 306 },
+					{ -42, 306 },
+					{ -42, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -30, 318 },
+					{ -30, 306 },
+					{ -6, 306 },
+					{ -6, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 6, 318 },
+					{ 6, 306 },
+					{ 30, 306 },
+					{ 30, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 42, 318 },
+					{ 42, 306 },
+					{ 72, 306 },
+					{ 72, 318 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -72, 318 },
+					{ 72, 318 },
+					{ 72, 344 },
+					{ -72, 344 },
+				},
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -42, 274 },
+					{ -30, 274 },
+					{ -30, 286 },
+					{ -42, 286 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -6, 274 },
+					{ 6, 274 },
+					{ 6, 286 },
+					{ -6, 286 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ 30, 274 },
+					{ 42, 274 },
+					{ 42, 286 },
+					{ 30, 286 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -42, 306 },
+					{ -30, 306 },
+					{ -30, 318 },
+					{ -42, 318 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ -6, 306 },
+					{ 6, 306 },
+					{ 6, 318 },
+					{ -6, 318 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Wall",
+				Area = {
+					{ 30, 306 },
+					{ 42, 306 },
+					{ 42, 318 },
+					{ 30, 318 },
+				},
+				Height = 20,
+				Over = true,
+			},
+			{
+				Kind = "Roof",
+				Area = {
+					{ -80.32, 242.45 },
+					{ 80.32, 242.45 },
+					{ 80.32, 349.55 },
+					{ -80.32, 349.55 },
+				},
+				Clearance = 18,
+				Thickness = 6,
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ 152, 320 },
+					{ 296, 320 },
+					{ 296, 440 },
+					{ 152, 440 },
+				},
+			},
+			{
+				Kind = "Flat",
+				Area = {
+					{ -294, 44 },
+					{ -294, 20 },
+					{ -306, 20 },
+					{ -306, 44 },
+				},
+			},
+			{ Kind = "Flat", At = { -300, 44 }, Radius = 6 },
+			{ Kind = "Flat", At = { -300, 20 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 306, 44 },
+					{ 306, 20 },
+					{ 294, 20 },
+					{ 294, 44 },
+				},
+			},
+			{ Kind = "Flat", At = { 300, 44 }, Radius = 6 },
+			{ Kind = "Flat", At = { 300, 20 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ -296, 226 },
+					{ -272, 226 },
+					{ -272, 214 },
+					{ -296, 214 },
+				},
+			},
+			{ Kind = "Flat", At = { -296, 220 }, Radius = 6 },
+			{ Kind = "Flat", At = { -272, 220 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 6, 368 },
+					{ 6, 344 },
+					{ -6, 344 },
+					{ -6, 368 },
+				},
+			},
+			{ Kind = "Flat", At = { 0, 368 }, Radius = 6 },
+			{ Kind = "Flat", At = { 0, 344 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 170, 568 },
+					{ 170, 592 },
+					{ 182, 592 },
+					{ 182, 568 },
+				},
+			},
+			{ Kind = "Flat", At = { 176, 568 }, Radius = 6 },
+			{ Kind = "Flat", At = { 176, 592 }, Radius = 6 },
+			{
+				Kind = "Flat",
+				Area = {
+					{ -182, 568 },
+					{ -182, 592 },
+					{ -170, 592 },
+					{ -170, 568 },
+				},
+			},
+			{ Kind = "Flat", At = { -176, 568 }, Radius = 6 },
+			{ Kind = "Flat", At = { -176, 592 }, Radius = 6 },
+		},
+		Loot = {
+			{ At = { 0, 296 }, Radius = 6, Weight = 3 },
+			{ At = { 256, 410 }, Radius = 6, Weight = 4 },
+		},
+		Entrances = {
+			{ 176, 424 },
+		},
+		Hazards = {
+			{
+				Type = "Patrol",
+				Path = {
+					{ -252, 214 },
+					{ -196, 214 },
+				},
+				Count = 2,
+			},
+			{
+				Type = "Patrol",
+				Path = {
+					{ -56, 296 },
+					{ 56, 296 },
+				},
+				Count = 2,
+			},
+			{
+				Type = "Patrol",
+				Path = {
+					{ 170, 396 },
+					{ 280, 396 },
+				},
+				Count = 2,
+			},
+		},
+		Decor = {
+			{
+				Kind = "Shells",
+				Area = {
+					{ -300, 0 },
+					{ 300, 0 },
+					{ 300, 16 },
+					{ -300, 16 },
+				},
+				Count = 8,
+				Scale = 1.2,
+			},
+			{
+				Kind = "Shells",
+				Area = {
+					{ -264, 184 },
+					{ -184, 184 },
+					{ -184, 256 },
+					{ -264, 256 },
+				},
+				Count = 12,
+				Scale = 1.5,
+			},
+			{ Kind = "Bones", At = { -224, 220 }, Scale = 1.1, Yaw = 40 },
+			{ Kind = "GlowShells", At = { -200, 200 } },
+			{ Kind = "Bones", At = { 0, 296 }, Scale = 1.3, Yaw = 90 },
+			{ Kind = "GlowShells", At = { -54, 296 } },
+			{ Kind = "GlowShells", At = { 54, 296 } },
+			{
+				Kind = "Shells",
+				Area = {
+					{ 160, 328 },
+					{ 288, 328 },
+					{ 288, 432 },
+					{ 160, 432 },
+				},
+				Count = 16,
+				Scale = 2,
+			},
+			{ Kind = "Bones", At = { 224, 380 }, Scale = 2, Yaw = 20 },
+			{ Kind = "Bones", At = { 184, 410 }, Scale = 1.2, Yaw = 140 },
+			{
+				Kind = "Barnacles",
+				Area = {
+					{ 160, 328 },
+					{ 288, 328 },
+					{ 288, 432 },
+					{ 160, 432 },
+				},
+				Count = 6,
+			},
+			{ Kind = "GlowShells", At = { 186, 430 } },
+		},
+		Name = "The Drowned Reach",
+		Crossings = {
+			{
+				Name = "Deep watch",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -136, 0 },
+							{ -136, 48 },
+							{ -224, 48 },
+							{ -224, 100 },
+							{ -152, 100 },
+							{ -152, 148 },
+							{ -224, 148 },
+							{ -224, 176 },
+							{ -224, 264 },
+							{ -224, 300 },
+							{ -136, 300 },
+							{ -136, 340 },
+							{ -288, 340 },
+							{ -288, 380 },
+							{ -136, 380 },
+							{ -136, 420 },
+							{ -288, 420 },
+							{ -288, 460 },
+							{ -136, 460 },
+							{ -136, 500 },
+							{ -280, 500 },
+							{ -280, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 0 },
+							{ -154, 48 },
+							{ -118, 48 },
+							{ -118, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 30 },
+							{ -224, 30 },
+							{ -224, 66 },
+							{ -136, 66 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 48 },
+							{ -242, 100 },
+							{ -206, 100 },
+							{ -206, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 118 },
+							{ -152, 118 },
+							{ -152, 82 },
+							{ -224, 82 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -170, 100 },
+							{ -170, 148 },
+							{ -134, 148 },
+							{ -134, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 130 },
+							{ -224, 130 },
+							{ -224, 166 },
+							{ -152, 166 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 148 },
+							{ -242, 176 },
+							{ -206, 176 },
+							{ -206, 148 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 176 },
+							{ -242, 264 },
+							{ -206, 264 },
+							{ -206, 176 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 264 },
+							{ -242, 300 },
+							{ -206, 300 },
+							{ -206, 264 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 318 },
+							{ -136, 318 },
+							{ -136, 282 },
+							{ -224, 282 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 300 },
+							{ -154, 340 },
+							{ -118, 340 },
+							{ -118, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 322 },
+							{ -288, 322 },
+							{ -288, 358 },
+							{ -136, 358 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 340 },
+							{ -306, 380 },
+							{ -270, 380 },
+							{ -270, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 398 },
+							{ -136, 398 },
+							{ -136, 362 },
+							{ -288, 362 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 380 },
+							{ -154, 420 },
+							{ -118, 420 },
+							{ -118, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 402 },
+							{ -288, 402 },
+							{ -288, 438 },
+							{ -136, 438 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 420 },
+							{ -306, 460 },
+							{ -270, 460 },
+							{ -270, 420 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 478 },
+							{ -136, 478 },
+							{ -136, 442 },
+							{ -288, 442 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 460 },
+							{ -154, 500 },
+							{ -118, 500 },
+							{ -118, 460 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 482 },
+							{ -280, 482 },
+							{ -280, 518 },
+							{ -136, 518 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -298, 500 },
+							{ -298, 608 },
+							{ -262, 608 },
+							{ -262, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -46, 0 },
+							{ -46, 60 },
+							{ -34, 60 },
+							{ -34, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -40, 66 },
+							{ 100, 66 },
+							{ 100, 54 },
+							{ -40, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 94, 60 },
+							{ 94, 100 },
+							{ 106, 100 },
+							{ 106, 60 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 100, 94 },
+							{ -40, 94 },
+							{ -40, 106 },
+							{ 100, 106 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -46, 100 },
+							{ -46, 152 },
+							{ -34, 152 },
+							{ -34, 100 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -40, 158 },
+							{ 100, 158 },
+							{ 100, 146 },
+							{ -40, 146 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 94, 152 },
+							{ 94, 200 },
+							{ 106, 200 },
+							{ 106, 152 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 100, 206 },
+							{ 336, 206 },
+							{ 336, 194 },
+							{ 100, 194 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 200 },
+							{ 330, 244 },
+							{ 342, 244 },
+							{ 342, 200 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 238 },
+							{ 264, 238 },
+							{ 264, 250 },
+							{ 336, 250 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 258, 244 },
+							{ 258, 288 },
+							{ 270, 288 },
+							{ 270, 244 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 264, 294 },
+							{ 336, 294 },
+							{ 336, 282 },
+							{ 264, 282 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 288 },
+							{ 330, 452 },
+							{ 342, 452 },
+							{ 342, 288 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 452 },
+							{ 330, 500 },
+							{ 342, 500 },
+							{ 342, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 494 },
+							{ 256, 494 },
+							{ 256, 506 },
+							{ 336, 506 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 250, 500 },
+							{ 250, 548 },
+							{ 262, 548 },
+							{ 262, 500 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 256, 554 },
+							{ 336, 554 },
+							{ 336, 542 },
+							{ 256, 542 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 548 },
+							{ 330, 608 },
+							{ 342, 608 },
+							{ 342, 548 },
+						},
+					},
+					{ Kind = "Flat", At = { -40, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { -40, 60 }, Radius = 6 },
+					{ Kind = "Flat", At = { 100, 60 }, Radius = 6 },
+					{ Kind = "Flat", At = { 100, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { -40, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { -40, 152 }, Radius = 6 },
+					{ Kind = "Flat", At = { 100, 152 }, Radius = 6 },
+					{ Kind = "Flat", At = { 100, 200 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 200 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 244 }, Radius = 6 },
+					{ Kind = "Flat", At = { 264, 244 }, Radius = 6 },
+					{ Kind = "Flat", At = { 264, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -56, 0 },
+							{ -56, 60 },
+							{ -24, 60 },
+							{ -24, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -40, 76 },
+							{ 100, 76 },
+							{ 100, 44 },
+							{ -40, 44 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 84, 60 },
+							{ 84, 100 },
+							{ 116, 100 },
+							{ 116, 60 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 100, 84 },
+							{ -40, 84 },
+							{ -40, 116 },
+							{ 100, 116 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -56, 100 },
+							{ -56, 150 },
+							{ -24, 150 },
+							{ -24, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -40, 166 },
+							{ 100, 166 },
+							{ 100, 134 },
+							{ -40, 134 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 84, 150 },
+							{ 84, 200 },
+							{ 116, 200 },
+							{ 116, 150 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 100, 216 },
+							{ 336, 216 },
+							{ 336, 184 },
+							{ 100, 184 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 200 },
+							{ 320, 244 },
+							{ 352, 244 },
+							{ 352, 200 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 228 },
+							{ 262, 228 },
+							{ 262, 260 },
+							{ 336, 260 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 246, 244 },
+							{ 246, 288 },
+							{ 278, 288 },
+							{ 278, 244 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 262, 304 },
+							{ 336, 304 },
+							{ 336, 272 },
+							{ 262, 272 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 288 },
+							{ 320, 452 },
+							{ 352, 452 },
+							{ 352, 288 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 452 },
+							{ 320, 500 },
+							{ 352, 500 },
+							{ 352, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 484 },
+							{ 256, 484 },
+							{ 256, 516 },
+							{ 336, 516 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 500 },
+							{ 240, 548 },
+							{ 272, 548 },
+							{ 272, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 256, 564 },
+							{ 336, 564 },
+							{ 336, 532 },
+							{ 256, 532 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 548 },
+							{ 320, 608 },
+							{ 352, 608 },
+							{ 352, 548 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 230, 380 },
+							{ 230, 200 },
+							{ 218, 200 },
+							{ 218, 380 },
+						},
+					},
+					{ Kind = "Flat", At = { 224, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 200 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 380 },
+							{ 240, 200 },
+							{ 208, 200 },
+							{ 208, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 336, 392 },
+							{ 336, 408 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 336, 562 },
+							{ 336, 578 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 152, 342 },
+							{ 152, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 336 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 294 },
+							{ -136, 294 },
+							{ -136, 306 },
+							{ -72, 306 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 486 },
+							{ -80, 486 },
+							{ -80, 474 },
+							{ -136, 474 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 480 }, Radius = 6 },
+					{ Kind = "Flat", At = { -80, 480 }, Radius = 6 },
+				},
+				Loot = {
+					{ At = { -80, 480 }, Radius = 5, Weight = 4 },
+				},
+				Hazards = {
+					{
+						Type = "Hunter",
+						Path = {
+							{ 224, 380 },
+							{ 224, 200 },
+						},
+						Burrows = {
+							{ 224, 344 },
+							{ 224, 266 },
+							{ 224, 222 },
+							{ 224, 206 },
+						},
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -160, 48 },
+							{ -216, 48 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -280, 518 },
+							{ -280, 578 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -30, 60 },
+							{ 30, 60 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 92, 100 },
+							{ 48, 100 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 230, 200 },
+							{ 290, 200 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 302, 244 },
+							{ 270, 244 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 336, 296 },
+							{ 336, 336 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 264, 548 },
+							{ 304, 548 },
+						},
+						Count = 2,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { -143, 48 } },
+					{ Kind = "GlowShells", At = { -224, 77 } },
+					{ Kind = "GlowShells", At = { -152, 115 } },
+					{ Kind = "GlowShells", At = { -224, 153 } },
+					{ Kind = "GlowShells", At = { -224, 263 } },
+					{ Kind = "GlowShells", At = { -151, 300 } },
+					{ Kind = "GlowShells", At = { -191, 340 } },
+					{ Kind = "GlowShells", At = { -288, 353 } },
+					{ Kind = "GlowShells", At = { -205, 380 } },
+					{ Kind = "GlowShells", At = { -137, 420 } },
+					{ Kind = "GlowShells", At = { -247, 420 } },
+					{ Kind = "GlowShells", At = { -259, 460 } },
+					{ Kind = "GlowShells", At = { -149, 460 } },
+					{ Kind = "GlowShells", At = { -193, 500 } },
+					{ Kind = "GlowShells", At = { -280, 523 } },
+					{ Kind = "GlowShells", At = { -40, 55 } },
+					{ Kind = "GlowShells", At = { 65, 60 } },
+					{ Kind = "GlowShells", At = { 65, 100 } },
+					{ Kind = "GlowShells", At = { -40, 105 } },
+					{ Kind = "GlowShells", At = { 25, 150 } },
+					{ Kind = "GlowShells", At = { 100, 185 } },
+					{ Kind = "GlowShells", At = { 195, 200 } },
+					{ Kind = "GlowShells", At = { 305, 200 } },
+					{ Kind = "GlowShells", At = { 301, 244 } },
+					{ Kind = "GlowShells", At = { 289, 288 } },
+					{ Kind = "GlowShells", At = { 336, 351 } },
+					{ Kind = "GlowShells", At = { 336, 461 } },
+					{ Kind = "GlowShells", At = { 265, 500 } },
+					{ Kind = "GlowShells", At = { 309, 548 } },
+					{ Kind = "Rocks", At = { 224, 344 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 228, 347 } },
+					{ Kind = "Rocks", At = { 224, 266 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 228, 269 } },
+					{ Kind = "Rocks", At = { 224, 222 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 228, 225 } },
+					{ Kind = "Rocks", At = { 224, 206 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 228, 209 } },
+					{ Kind = "Bones", At = { 210, 360 }, Scale = 1.2, Yaw = 70 },
+					{ Kind = "Rocks", At = { 336, 400 }, Scale = 0.7 },
+					{ Kind = "Rocks", At = { 336, 570 }, Scale = 0.7 },
+					{ Kind = "Shells", At = { -80, 480 }, Scale = 1.4 },
+					{ Kind = "GlowShells", At = { -136, 480 } },
+					{ Kind = "Bones", At = { -188, 12 }, Scale = 1.8, Yaw = 20 },
+					{ Kind = "Shells", At = { -210, 14 }, Scale = 2 },
+				},
+			},
+			{
+				Name = "Shell stair",
+				Paths = 3,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ 40, 0 },
+							{ 40, 48 },
+							{ -88, 48 },
+							{ -88, 104 },
+							{ 104, 104 },
+							{ 104, 160 },
+							{ -88, 160 },
+							{ -88, 216 },
+							{ 104, 216 },
+							{ 104, 470 },
+							{ -60, 470 },
+							{ -60, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 22, 0 },
+							{ 22, 48 },
+							{ 58, 48 },
+							{ 58, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 30 },
+							{ -88, 30 },
+							{ -88, 66 },
+							{ 40, 66 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -106, 48 },
+							{ -106, 104 },
+							{ -70, 104 },
+							{ -70, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 122 },
+							{ 104, 122 },
+							{ 104, 86 },
+							{ -88, 86 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 86, 104 },
+							{ 86, 160 },
+							{ 122, 160 },
+							{ 122, 104 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 104, 142 },
+							{ -88, 142 },
+							{ -88, 178 },
+							{ 104, 178 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -106, 160 },
+							{ -106, 216 },
+							{ -70, 216 },
+							{ -70, 160 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 234 },
+							{ 104, 234 },
+							{ 104, 198 },
+							{ -88, 198 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 86, 216 },
+							{ 86, 470 },
+							{ 122, 470 },
+							{ 122, 216 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 104, 452 },
+							{ -60, 452 },
+							{ -60, 488 },
+							{ 104, 488 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -78, 470 },
+							{ -78, 608 },
+							{ -42, 608 },
+							{ -42, 470 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 0 },
+							{ -142, 48 },
+							{ -130, 48 },
+							{ -130, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 42 },
+							{ -224, 42 },
+							{ -224, 54 },
+							{ -136, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 48 },
+							{ -230, 100 },
+							{ -218, 100 },
+							{ -218, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -224, 106 },
+							{ -152, 106 },
+							{ -152, 94 },
+							{ -224, 94 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -158, 100 },
+							{ -158, 148 },
+							{ -146, 148 },
+							{ -146, 100 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -152, 142 },
+							{ -224, 142 },
+							{ -224, 154 },
+							{ -152, 154 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 148 },
+							{ -230, 176 },
+							{ -218, 176 },
+							{ -218, 148 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { -152, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { -152, 148 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 148 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 176 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 0 },
+							{ -152, 48 },
+							{ -120, 48 },
+							{ -120, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 32 },
+							{ -224, 32 },
+							{ -224, 64 },
+							{ -136, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 48 },
+							{ -240, 100 },
+							{ -208, 100 },
+							{ -208, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 116 },
+							{ -152, 116 },
+							{ -152, 84 },
+							{ -224, 84 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -168, 100 },
+							{ -168, 148 },
+							{ -136, 148 },
+							{ -136, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 132 },
+							{ -224, 132 },
+							{ -224, 164 },
+							{ -152, 164 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 148 },
+							{ -240, 176 },
+							{ -208, 176 },
+							{ -208, 148 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -230, 264 },
+							{ -230, 300 },
+							{ -218, 300 },
+							{ -218, 264 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -224, 306 },
+							{ -136, 306 },
+							{ -136, 294 },
+							{ -224, 294 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 300 },
+							{ -142, 340 },
+							{ -130, 340 },
+							{ -130, 300 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 334 },
+							{ -288, 334 },
+							{ -288, 346 },
+							{ -136, 346 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -294, 340 },
+							{ -294, 380 },
+							{ -282, 380 },
+							{ -282, 340 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -288, 386 },
+							{ -136, 386 },
+							{ -136, 374 },
+							{ -288, 374 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 380 },
+							{ -142, 420 },
+							{ -130, 420 },
+							{ -130, 380 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 414 },
+							{ -288, 414 },
+							{ -288, 426 },
+							{ -136, 426 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -294, 420 },
+							{ -294, 460 },
+							{ -282, 460 },
+							{ -282, 420 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -288, 466 },
+							{ -136, 466 },
+							{ -136, 454 },
+							{ -288, 454 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -142, 460 },
+							{ -142, 500 },
+							{ -130, 500 },
+							{ -130, 460 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 494 },
+							{ -280, 494 },
+							{ -280, 506 },
+							{ -136, 506 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -286, 500 },
+							{ -286, 608 },
+							{ -274, 608 },
+							{ -274, 500 },
+						},
+					},
+					{ Kind = "Flat", At = { -224, 264 }, Radius = 6 },
+					{ Kind = "Flat", At = { -224, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 340 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 420 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 420 }, Radius = 6 },
+					{ Kind = "Flat", At = { -288, 460 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 460 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { -280, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -240, 264 },
+							{ -240, 300 },
+							{ -208, 300 },
+							{ -208, 264 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 316 },
+							{ -136, 316 },
+							{ -136, 284 },
+							{ -224, 284 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 300 },
+							{ -152, 340 },
+							{ -120, 340 },
+							{ -120, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 324 },
+							{ -288, 324 },
+							{ -288, 356 },
+							{ -136, 356 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -304, 340 },
+							{ -304, 380 },
+							{ -272, 380 },
+							{ -272, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 396 },
+							{ -136, 396 },
+							{ -136, 364 },
+							{ -288, 364 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 380 },
+							{ -152, 420 },
+							{ -120, 420 },
+							{ -120, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 404 },
+							{ -288, 404 },
+							{ -288, 436 },
+							{ -136, 436 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -304, 420 },
+							{ -304, 460 },
+							{ -272, 460 },
+							{ -272, 420 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 476 },
+							{ -136, 476 },
+							{ -136, 444 },
+							{ -288, 444 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 460 },
+							{ -152, 500 },
+							{ -120, 500 },
+							{ -120, 460 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 484 },
+							{ -280, 484 },
+							{ -280, 516 },
+							{ -136, 516 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -296, 500 },
+							{ -296, 608 },
+							{ -264, 608 },
+							{ -264, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 218, 0 },
+							{ 218, 60 },
+							{ 230, 60 },
+							{ 230, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 224, 54 },
+							{ 152, 54 },
+							{ 152, 66 },
+							{ 224, 66 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 146, 60 },
+							{ 146, 100 },
+							{ 158, 100 },
+							{ 158, 60 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 152, 106 },
+							{ 224, 106 },
+							{ 224, 94 },
+							{ 152, 94 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 218, 100 },
+							{ 218, 140 },
+							{ 230, 140 },
+							{ 230, 100 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 224, 146 },
+							{ 336, 146 },
+							{ 336, 134 },
+							{ 224, 134 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 140 },
+							{ 330, 188 },
+							{ 342, 188 },
+							{ 342, 140 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 182 },
+							{ 152, 182 },
+							{ 152, 194 },
+							{ 336, 194 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 146, 188 },
+							{ 146, 240 },
+							{ 158, 240 },
+							{ 158, 188 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 152, 246 },
+							{ 336, 246 },
+							{ 336, 234 },
+							{ 152, 234 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 240 },
+							{ 330, 288 },
+							{ 342, 288 },
+							{ 342, 240 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 282 },
+							{ 192, 282 },
+							{ 192, 294 },
+							{ 336, 294 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 186, 288 },
+							{ 186, 340 },
+							{ 198, 340 },
+							{ 198, 288 },
+						},
+					},
+					{ Kind = "Flat", At = { 224, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 60 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 60 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 140 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 140 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 240 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 240 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 192, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 192, 340 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 206, 0 },
+							{ 206, 60 },
+							{ 238, 60 },
+							{ 238, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 222, 44 },
+							{ 150, 44 },
+							{ 150, 76 },
+							{ 222, 76 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 134, 60 },
+							{ 134, 100 },
+							{ 166, 100 },
+							{ 166, 60 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 150, 116 },
+							{ 222, 116 },
+							{ 222, 84 },
+							{ 150, 84 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 206, 100 },
+							{ 206, 140 },
+							{ 238, 140 },
+							{ 238, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 222, 156 },
+							{ 336, 156 },
+							{ 336, 124 },
+							{ 222, 124 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 140 },
+							{ 320, 188 },
+							{ 352, 188 },
+							{ 352, 140 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 172 },
+							{ 150, 172 },
+							{ 150, 204 },
+							{ 336, 204 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 134, 188 },
+							{ 134, 240 },
+							{ 166, 240 },
+							{ 166, 188 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 150, 256 },
+							{ 336, 256 },
+							{ 336, 224 },
+							{ 150, 224 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 240 },
+							{ 320, 288 },
+							{ 352, 288 },
+							{ 352, 240 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 272 },
+							{ 190, 272 },
+							{ 190, 304 },
+							{ 336, 304 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 174, 288 },
+							{ 174, 340 },
+							{ 206, 340 },
+							{ 206, 288 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 226, 424 },
+							{ 226, 452 },
+							{ 238, 452 },
+							{ 238, 424 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 232, 458 },
+							{ 336, 458 },
+							{ 336, 446 },
+							{ 232, 446 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 452 },
+							{ 330, 500 },
+							{ 342, 500 },
+							{ 342, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 494 },
+							{ 256, 494 },
+							{ 256, 506 },
+							{ 336, 506 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 250, 500 },
+							{ 250, 548 },
+							{ 262, 548 },
+							{ 262, 500 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 256, 554 },
+							{ 336, 554 },
+							{ 336, 542 },
+							{ 256, 542 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 548 },
+							{ 330, 608 },
+							{ 342, 608 },
+							{ 342, 548 },
+						},
+					},
+					{ Kind = "Flat", At = { 232, 424 }, Radius = 6 },
+					{ Kind = "Flat", At = { 232, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 216, 424 },
+							{ 216, 452 },
+							{ 248, 452 },
+							{ 248, 424 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 232, 468 },
+							{ 336, 468 },
+							{ 336, 436 },
+							{ 232, 436 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 452 },
+							{ 320, 500 },
+							{ 352, 500 },
+							{ 352, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 484 },
+							{ 256, 484 },
+							{ 256, 516 },
+							{ 336, 516 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 500 },
+							{ 240, 548 },
+							{ 272, 548 },
+							{ 272, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 256, 564 },
+							{ 336, 564 },
+							{ 336, 532 },
+							{ 256, 532 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 548 },
+							{ 320, 608 },
+							{ 352, 608 },
+							{ 352, 548 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 262, 400 },
+							{ 262, 592 },
+							{ 274, 592 },
+							{ 274, 400 },
+						},
+					},
+					{ Kind = "Flat", At = { 268, 400 }, Radius = 6 },
+					{ Kind = "Flat", At = { 268, 592 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 252, 400 },
+							{ 252, 592 },
+							{ 284, 592 },
+							{ 284, 400 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -136, 472 },
+							{ -136, 488 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 336, 512 },
+							{ 336, 528 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 152, 342 },
+							{ 152, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 336 }, Radius = 6 },
+				},
+				Hazards = {
+					{
+						Type = "Hunter",
+						Path = {
+							{ 268, 400 },
+							{ 268, 592 },
+						},
+						Burrows = {
+							{ 268, 450 },
+							{ 268, 500 },
+							{ 268, 540 },
+							{ 268, 576 },
+						},
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -12, 48 },
+							{ -72, 48 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -56, 216 },
+							{ 4, 216 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 104, 386 },
+							{ 104, 446 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -224, 200 },
+							{ -224, 256 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -252, 340 },
+							{ -280, 340 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -182, 420 },
+							{ -242, 420 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -144, 500 },
+							{ -172, 500 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 226, 240 },
+							{ 286, 240 },
+						},
+						Count = 2,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { 33, 48 } },
+					{ Kind = "GlowShells", At = { -77, 48 } },
+					{ Kind = "GlowShells", At = { -45, 104 } },
+					{ Kind = "GlowShells", At = { 65, 104 } },
+					{ Kind = "GlowShells", At = { 89, 160 } },
+					{ Kind = "GlowShells", At = { -21, 160 } },
+					{ Kind = "GlowShells", At = { -88, 203 } },
+					{ Kind = "GlowShells", At = { 9, 216 } },
+					{ Kind = "GlowShells", At = { 104, 231 } },
+					{ Kind = "GlowShells", At = { 104, 341 } },
+					{ Kind = "GlowShells", At = { 104, 451 } },
+					{ Kind = "GlowShells", At = { 13, 470 } },
+					{ Kind = "GlowShells", At = { -60, 507 } },
+					{ Kind = "GlowShells", At = { -143, 48 } },
+					{ Kind = "GlowShells", At = { -224, 77 } },
+					{ Kind = "GlowShells", At = { -152, 115 } },
+					{ Kind = "GlowShells", At = { -224, 153 } },
+					{ Kind = "GlowShells", At = { -205, 300 } },
+					{ Kind = "GlowShells", At = { -137, 340 } },
+					{ Kind = "GlowShells", At = { -247, 340 } },
+					{ Kind = "GlowShells", At = { -259, 380 } },
+					{ Kind = "GlowShells", At = { -149, 380 } },
+					{ Kind = "GlowShells", At = { -193, 420 } },
+					{ Kind = "GlowShells", At = { -288, 435 } },
+					{ Kind = "GlowShells", At = { -203, 460 } },
+					{ Kind = "GlowShells", At = { -139, 500 } },
+					{ Kind = "GlowShells", At = { -249, 500 } },
+					{ Kind = "GlowShells", At = { -280, 579 } },
+					{ Kind = "GlowShells", At = { 222, 55 } },
+					{ Kind = "GlowShells", At = { 150, 93 } },
+					{ Kind = "GlowShells", At = { 222, 131 } },
+					{ Kind = "GlowShells", At = { 323, 140 } },
+					{ Kind = "GlowShells", At = { 287, 188 } },
+					{ Kind = "GlowShells", At = { 177, 188 } },
+					{ Kind = "GlowShells", At = { 181, 240 } },
+					{ Kind = "GlowShells", At = { 291, 240 } },
+					{ Kind = "GlowShells", At = { 319, 288 } },
+					{ Kind = "GlowShells", At = { 209, 288 } },
+					{ Kind = "GlowShells", At = { 259, 452 } },
+					{ Kind = "GlowShells", At = { 336, 485 } },
+					{ Kind = "GlowShells", At = { 256, 515 } },
+					{ Kind = "GlowShells", At = { 333, 548 } },
+					{ Kind = "Rocks", At = { 268, 450 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 453 } },
+					{ Kind = "Rocks", At = { 268, 500 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 503 } },
+					{ Kind = "Rocks", At = { 268, 540 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 543 } },
+					{ Kind = "Rocks", At = { 268, 576 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 579 } },
+					{ Kind = "Bones", At = { 254, 380 }, Scale = 1.2, Yaw = 70 },
+					{ Kind = "Rocks", At = { -136, 480 }, Scale = 0.7 },
+					{ Kind = "Rocks", At = { 336, 520 }, Scale = 0.7 },
+					{ Kind = "Shells", At = { 30, 12 }, Scale = 2.4 },
+					{ Kind = "Bones", At = { 44, 10 }, Scale = 1, Yaw = 60 },
+				},
+			},
+			{
+				Name = "Fallen way",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -136, 0 },
+							{ -136, 48 },
+							{ -224, 48 },
+							{ -224, 100 },
+							{ -152, 100 },
+							{ -152, 148 },
+							{ -224, 148 },
+							{ -224, 176 },
+							{ -224, 264 },
+							{ -224, 300 },
+							{ -136, 300 },
+							{ -136, 340 },
+							{ -288, 340 },
+							{ -288, 380 },
+							{ -136, 380 },
+							{ -136, 420 },
+							{ -288, 420 },
+							{ -288, 460 },
+							{ -136, 460 },
+							{ -136, 500 },
+							{ -280, 500 },
+							{ -280, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 0 },
+							{ -154, 48 },
+							{ -118, 48 },
+							{ -118, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 30 },
+							{ -224, 30 },
+							{ -224, 66 },
+							{ -136, 66 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 48 },
+							{ -242, 100 },
+							{ -206, 100 },
+							{ -206, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 118 },
+							{ -152, 118 },
+							{ -152, 82 },
+							{ -224, 82 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -170, 100 },
+							{ -170, 148 },
+							{ -134, 148 },
+							{ -134, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 130 },
+							{ -224, 130 },
+							{ -224, 166 },
+							{ -152, 166 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 148 },
+							{ -242, 176 },
+							{ -206, 176 },
+							{ -206, 148 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 176 },
+							{ -242, 264 },
+							{ -206, 264 },
+							{ -206, 176 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 264 },
+							{ -242, 300 },
+							{ -206, 300 },
+							{ -206, 264 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 318 },
+							{ -136, 318 },
+							{ -136, 282 },
+							{ -224, 282 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 300 },
+							{ -154, 340 },
+							{ -118, 340 },
+							{ -118, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 322 },
+							{ -288, 322 },
+							{ -288, 358 },
+							{ -136, 358 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 340 },
+							{ -306, 380 },
+							{ -270, 380 },
+							{ -270, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 398 },
+							{ -136, 398 },
+							{ -136, 362 },
+							{ -288, 362 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 380 },
+							{ -154, 420 },
+							{ -118, 420 },
+							{ -118, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 402 },
+							{ -288, 402 },
+							{ -288, 438 },
+							{ -136, 438 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 420 },
+							{ -306, 460 },
+							{ -270, 460 },
+							{ -270, 420 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 478 },
+							{ -136, 478 },
+							{ -136, 442 },
+							{ -288, 442 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 460 },
+							{ -154, 500 },
+							{ -118, 500 },
+							{ -118, 460 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 482 },
+							{ -280, 482 },
+							{ -280, 518 },
+							{ -136, 518 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -298, 500 },
+							{ -298, 608 },
+							{ -262, 608 },
+							{ -262, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 0 },
+							{ 34, 48 },
+							{ 46, 48 },
+							{ 46, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 40, 42 },
+							{ -88, 42 },
+							{ -88, 54 },
+							{ 40, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -94, 48 },
+							{ -94, 104 },
+							{ -82, 104 },
+							{ -82, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -88, 110 },
+							{ 100, 110 },
+							{ 100, 98 },
+							{ -88, 98 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 94, 104 },
+							{ 94, 192 },
+							{ 106, 192 },
+							{ 106, 104 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 100, 198 },
+							{ 336, 198 },
+							{ 336, 186 },
+							{ 100, 186 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 192 },
+							{ 330, 244 },
+							{ 342, 244 },
+							{ 342, 192 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 238 },
+							{ 264, 238 },
+							{ 264, 250 },
+							{ 336, 250 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 258, 244 },
+							{ 258, 288 },
+							{ 270, 288 },
+							{ 270, 244 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 264, 294 },
+							{ 336, 294 },
+							{ 336, 282 },
+							{ 264, 282 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 288 },
+							{ 330, 452 },
+							{ 342, 452 },
+							{ 342, 288 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 452 },
+							{ 330, 500 },
+							{ 342, 500 },
+							{ 342, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 494 },
+							{ 256, 494 },
+							{ 256, 506 },
+							{ 336, 506 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 250, 500 },
+							{ 250, 548 },
+							{ 262, 548 },
+							{ 262, 500 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 256, 554 },
+							{ 336, 554 },
+							{ 336, 542 },
+							{ 256, 542 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 548 },
+							{ 330, 608 },
+							{ 342, 608 },
+							{ 342, 548 },
+						},
+					},
+					{ Kind = "Flat", At = { 40, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 100, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 100, 192 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 192 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 244 }, Radius = 6 },
+					{ Kind = "Flat", At = { 264, 244 }, Radius = 6 },
+					{ Kind = "Flat", At = { 264, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 500 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 548 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 0 },
+							{ 24, 48 },
+							{ 56, 48 },
+							{ 56, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 32 },
+							{ -88, 32 },
+							{ -88, 64 },
+							{ 40, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -104, 48 },
+							{ -104, 104 },
+							{ -72, 104 },
+							{ -72, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 120 },
+							{ 100, 120 },
+							{ 100, 88 },
+							{ -88, 88 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 84, 104 },
+							{ 84, 190 },
+							{ 116, 190 },
+							{ 116, 104 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 100, 206 },
+							{ 336, 206 },
+							{ 336, 174 },
+							{ 100, 174 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 190 },
+							{ 320, 244 },
+							{ 352, 244 },
+							{ 352, 190 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 228 },
+							{ 262, 228 },
+							{ 262, 260 },
+							{ 336, 260 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 246, 244 },
+							{ 246, 288 },
+							{ 278, 288 },
+							{ 278, 244 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 262, 304 },
+							{ 336, 304 },
+							{ 336, 272 },
+							{ 262, 272 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 288 },
+							{ 320, 452 },
+							{ 352, 452 },
+							{ 352, 288 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 452 },
+							{ 320, 500 },
+							{ 352, 500 },
+							{ 352, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 484 },
+							{ 256, 484 },
+							{ 256, 516 },
+							{ 336, 516 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 500 },
+							{ 240, 548 },
+							{ 272, 548 },
+							{ 272, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 256, 564 },
+							{ 336, 564 },
+							{ 336, 532 },
+							{ 256, 532 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 548 },
+							{ 320, 608 },
+							{ 352, 608 },
+							{ 352, 548 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 194, 380 },
+							{ 194, 120 },
+							{ 182, 120 },
+							{ 182, 380 },
+						},
+					},
+					{ Kind = "Flat", At = { 188, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { 188, 120 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 204, 380 },
+							{ 204, 120 },
+							{ 172, 120 },
+							{ 172, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 336, 372 },
+							{ 336, 388 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -88, 72 },
+							{ -88, 88 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 152, 342 },
+							{ 152, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 336 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 294 },
+							{ -136, 294 },
+							{ -136, 306 },
+							{ -72, 306 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 300 }, Radius = 6 },
+					{ Kind = "Flat", At = { -136, 300 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -136, 486 },
+							{ -80, 486 },
+							{ -80, 474 },
+							{ -136, 474 },
+						},
+					},
+					{ Kind = "Flat", At = { -136, 480 }, Radius = 6 },
+					{ Kind = "Flat", At = { -80, 480 }, Radius = 6 },
+				},
+				Loot = {
+					{ At = { -80, 480 }, Radius = 5, Weight = 4 },
+				},
+				Hazards = {
+					{
+						Type = "Hunter",
+						Path = {
+							{ 188, 380 },
+							{ 188, 120 },
+						},
+						Burrows = {
+							{ 188, 340 },
+							{ 188, 262 },
+							{ 188, 210 },
+							{ 188, 140 },
+						},
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -160, 48 },
+							{ -216, 48 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -280, 518 },
+							{ -280, 578 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 18, 48 },
+							{ -42, 48 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -80, 104 },
+							{ -20, 104 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 174, 190 },
+							{ 234, 190 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 270, 288 },
+							{ 326, 288 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 336, 396 },
+							{ 336, 444 },
+						},
+						Count = 2,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { -143, 48 } },
+					{ Kind = "GlowShells", At = { -224, 77 } },
+					{ Kind = "GlowShells", At = { -152, 115 } },
+					{ Kind = "GlowShells", At = { -224, 153 } },
+					{ Kind = "GlowShells", At = { -224, 263 } },
+					{ Kind = "GlowShells", At = { -151, 300 } },
+					{ Kind = "GlowShells", At = { -191, 340 } },
+					{ Kind = "GlowShells", At = { -288, 353 } },
+					{ Kind = "GlowShells", At = { -205, 380 } },
+					{ Kind = "GlowShells", At = { -137, 420 } },
+					{ Kind = "GlowShells", At = { -247, 420 } },
+					{ Kind = "GlowShells", At = { -259, 460 } },
+					{ Kind = "GlowShells", At = { -149, 460 } },
+					{ Kind = "GlowShells", At = { -193, 500 } },
+					{ Kind = "GlowShells", At = { -280, 523 } },
+					{ Kind = "GlowShells", At = { 33, 48 } },
+					{ Kind = "GlowShells", At = { -77, 48 } },
+					{ Kind = "GlowShells", At = { -45, 104 } },
+					{ Kind = "GlowShells", At = { 65, 104 } },
+					{ Kind = "GlowShells", At = { 100, 179 } },
+					{ Kind = "GlowShells", At = { 199, 190 } },
+					{ Kind = "GlowShells", At = { 309, 190 } },
+					{ Kind = "GlowShells", At = { 307, 244 } },
+					{ Kind = "GlowShells", At = { 283, 288 } },
+					{ Kind = "GlowShells", At = { 336, 345 } },
+					{ Kind = "GlowShells", At = { 336, 455 } },
+					{ Kind = "GlowShells", At = { 271, 500 } },
+					{ Kind = "GlowShells", At = { 303, 548 } },
+					{ Kind = "Rocks", At = { 188, 340 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 192, 343 } },
+					{ Kind = "Rocks", At = { 188, 262 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 192, 265 } },
+					{ Kind = "Rocks", At = { 188, 210 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 192, 213 } },
+					{ Kind = "Rocks", At = { 188, 140 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 192, 143 } },
+					{ Kind = "Bones", At = { 174, 360 }, Scale = 1.2, Yaw = 70 },
+					{ Kind = "Rocks", At = { 336, 380 }, Scale = 0.7 },
+					{ Kind = "Rocks", At = { -88, 80 }, Scale = 0.7 },
+					{ Kind = "Shells", At = { -80, 480 }, Scale = 1.4 },
+					{ Kind = "GlowShells", At = { -136, 480 } },
+					{ Kind = "Bones", At = { -150, 12 }, Scale = 1.6, Yaw = 0 },
+					{ Kind = "Bones", At = { -122, 12 }, Scale = 1.6, Yaw = 180 },
+					{ Kind = "Shells", At = { -136, 24 }, Scale = 1.6 },
+				},
+			},
+			{
+				Name = "The three gates",
+				Paths = 3,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -200, 0 },
+							{ -200, 60 },
+							{ 0, 60 },
+							{ 0, 110 },
+							{ -140, 110 },
+							{ -140, 300 },
+							{ -288, 300 },
+							{ -288, 340 },
+							{ -140, 340 },
+							{ -140, 380 },
+							{ -288, 380 },
+							{ -288, 420 },
+							{ -140, 420 },
+							{ -140, 480 },
+							{ -280, 480 },
+							{ -280, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -218, 0 },
+							{ -218, 60 },
+							{ -182, 60 },
+							{ -182, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -200, 78 },
+							{ 0, 78 },
+							{ 0, 42 },
+							{ -200, 42 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -18, 60 },
+							{ -18, 110 },
+							{ 18, 110 },
+							{ 18, 60 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 0, 92 },
+							{ -140, 92 },
+							{ -140, 128 },
+							{ 0, 128 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -158, 110 },
+							{ -158, 300 },
+							{ -122, 300 },
+							{ -122, 110 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -140, 282 },
+							{ -288, 282 },
+							{ -288, 318 },
+							{ -140, 318 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 300 },
+							{ -306, 340 },
+							{ -270, 340 },
+							{ -270, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 358 },
+							{ -140, 358 },
+							{ -140, 322 },
+							{ -288, 322 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -158, 340 },
+							{ -158, 380 },
+							{ -122, 380 },
+							{ -122, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -140, 362 },
+							{ -288, 362 },
+							{ -288, 398 },
+							{ -140, 398 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 380 },
+							{ -306, 420 },
+							{ -270, 420 },
+							{ -270, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 438 },
+							{ -140, 438 },
+							{ -140, 402 },
+							{ -288, 402 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -158, 420 },
+							{ -158, 480 },
+							{ -122, 480 },
+							{ -122, 420 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -140, 462 },
+							{ -280, 462 },
+							{ -280, 498 },
+							{ -140, 498 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -298, 480 },
+							{ -298, 608 },
+							{ -262, 608 },
+							{ -262, 480 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 218, 0 },
+							{ 218, 60 },
+							{ 230, 60 },
+							{ 230, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 224, 54 },
+							{ 152, 54 },
+							{ 152, 66 },
+							{ 224, 66 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 146, 60 },
+							{ 146, 100 },
+							{ 158, 100 },
+							{ 158, 60 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 152, 106 },
+							{ 224, 106 },
+							{ 224, 94 },
+							{ 152, 94 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 218, 100 },
+							{ 218, 140 },
+							{ 230, 140 },
+							{ 230, 100 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 224, 146 },
+							{ 336, 146 },
+							{ 336, 134 },
+							{ 224, 134 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 140 },
+							{ 330, 188 },
+							{ 342, 188 },
+							{ 342, 140 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 182 },
+							{ 152, 182 },
+							{ 152, 194 },
+							{ 336, 194 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 146, 188 },
+							{ 146, 240 },
+							{ 158, 240 },
+							{ 158, 188 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 152, 246 },
+							{ 336, 246 },
+							{ 336, 234 },
+							{ 152, 234 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 240 },
+							{ 330, 288 },
+							{ 342, 288 },
+							{ 342, 240 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 282 },
+							{ 192, 282 },
+							{ 192, 294 },
+							{ 336, 294 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 186, 288 },
+							{ 186, 340 },
+							{ 198, 340 },
+							{ 198, 288 },
+						},
+					},
+					{ Kind = "Flat", At = { 224, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 60 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 60 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 100 }, Radius = 6 },
+					{ Kind = "Flat", At = { 224, 140 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 140 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 188 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 240 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 240 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 192, 288 }, Radius = 6 },
+					{ Kind = "Flat", At = { 192, 340 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 206, 0 },
+							{ 206, 60 },
+							{ 238, 60 },
+							{ 238, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 222, 44 },
+							{ 150, 44 },
+							{ 150, 76 },
+							{ 222, 76 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 134, 60 },
+							{ 134, 100 },
+							{ 166, 100 },
+							{ 166, 60 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 150, 116 },
+							{ 222, 116 },
+							{ 222, 84 },
+							{ 150, 84 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 206, 100 },
+							{ 206, 140 },
+							{ 238, 140 },
+							{ 238, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 222, 156 },
+							{ 336, 156 },
+							{ 336, 124 },
+							{ 222, 124 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 140 },
+							{ 320, 188 },
+							{ 352, 188 },
+							{ 352, 140 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 172 },
+							{ 150, 172 },
+							{ 150, 204 },
+							{ 336, 204 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 134, 188 },
+							{ 134, 240 },
+							{ 166, 240 },
+							{ 166, 188 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 150, 256 },
+							{ 336, 256 },
+							{ 336, 224 },
+							{ 150, 224 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 240 },
+							{ 320, 288 },
+							{ 352, 288 },
+							{ 352, 240 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 272 },
+							{ 190, 272 },
+							{ 190, 304 },
+							{ 336, 304 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 174, 288 },
+							{ 174, 340 },
+							{ 206, 340 },
+							{ 206, 288 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 226, 424 },
+							{ 226, 448 },
+							{ 238, 448 },
+							{ 238, 424 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 232, 454 },
+							{ 336, 454 },
+							{ 336, 442 },
+							{ 232, 442 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 448 },
+							{ 330, 488 },
+							{ 342, 488 },
+							{ 342, 448 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 482 },
+							{ 256, 482 },
+							{ 256, 494 },
+							{ 336, 494 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 250, 488 },
+							{ 250, 520 },
+							{ 262, 520 },
+							{ 262, 488 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 256, 526 },
+							{ 336, 526 },
+							{ 336, 514 },
+							{ 256, 514 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 330, 520 },
+							{ 330, 560 },
+							{ 342, 560 },
+							{ 342, 520 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 554 },
+							{ 256, 554 },
+							{ 256, 566 },
+							{ 336, 566 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 250, 560 },
+							{ 250, 608 },
+							{ 262, 608 },
+							{ 262, 560 },
+						},
+					},
+					{ Kind = "Flat", At = { 232, 424 }, Radius = 6 },
+					{ Kind = "Flat", At = { 232, 448 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 448 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 488 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 488 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 520 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 520 }, Radius = 6 },
+					{ Kind = "Flat", At = { 336, 560 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 560 }, Radius = 6 },
+					{ Kind = "Flat", At = { 256, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 216, 424 },
+							{ 216, 450 },
+							{ 248, 450 },
+							{ 248, 424 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 232, 466 },
+							{ 336, 466 },
+							{ 336, 434 },
+							{ 232, 434 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 450 },
+							{ 320, 486 },
+							{ 352, 486 },
+							{ 352, 450 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 470 },
+							{ 256, 470 },
+							{ 256, 502 },
+							{ 336, 502 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 486 },
+							{ 240, 522 },
+							{ 272, 522 },
+							{ 272, 486 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 256, 538 },
+							{ 336, 538 },
+							{ 336, 506 },
+							{ 256, 506 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 320, 522 },
+							{ 320, 558 },
+							{ 352, 558 },
+							{ 352, 522 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 336, 542 },
+							{ 256, 542 },
+							{ 256, 574 },
+							{ 336, 574 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 240, 558 },
+							{ 240, 608 },
+							{ 272, 608 },
+							{ 272, 558 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 94, 0 },
+							{ 94, 48 },
+							{ 106, 48 },
+							{ 106, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 100, 42 },
+							{ -88, 42 },
+							{ -88, 54 },
+							{ 100, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -94, 48 },
+							{ -94, 104 },
+							{ -82, 104 },
+							{ -82, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -88, 110 },
+							{ 40, 110 },
+							{ 40, 98 },
+							{ -88, 98 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 104 },
+							{ 34, 160 },
+							{ 46, 160 },
+							{ 46, 104 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 40, 154 },
+							{ -88, 154 },
+							{ -88, 166 },
+							{ 40, 166 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -94, 160 },
+							{ -94, 216 },
+							{ -82, 216 },
+							{ -82, 160 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -88, 222 },
+							{ 40, 222 },
+							{ 40, 210 },
+							{ -88, 210 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 216 },
+							{ 34, 248 },
+							{ 46, 248 },
+							{ 46, 216 },
+						},
+					},
+					{ Kind = "Flat", At = { 100, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 100, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 160 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 160 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 216 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 216 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 248 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 84, 0 },
+							{ 84, 48 },
+							{ 116, 48 },
+							{ 116, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 100, 32 },
+							{ -88, 32 },
+							{ -88, 64 },
+							{ 100, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -104, 48 },
+							{ -104, 104 },
+							{ -72, 104 },
+							{ -72, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 120 },
+							{ 40, 120 },
+							{ 40, 88 },
+							{ -88, 88 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 104 },
+							{ 24, 160 },
+							{ 56, 160 },
+							{ 56, 104 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 144 },
+							{ -88, 144 },
+							{ -88, 176 },
+							{ 40, 176 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -104, 160 },
+							{ -104, 216 },
+							{ -72, 216 },
+							{ -72, 160 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 232 },
+							{ 40, 232 },
+							{ 40, 200 },
+							{ -88, 200 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 216 },
+							{ 24, 248 },
+							{ 56, 248 },
+							{ 56, 216 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 330 },
+							{ -100, 330 },
+							{ -100, 342 },
+							{ -72, 342 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -106, 336 },
+							{ -106, 452 },
+							{ -94, 452 },
+							{ -94, 336 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -100, 458 },
+							{ 80, 458 },
+							{ 80, 446 },
+							{ -100, 446 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 74, 452 },
+							{ 74, 520 },
+							{ 86, 520 },
+							{ 86, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 80, 514 },
+							{ -60, 514 },
+							{ -60, 526 },
+							{ 80, 526 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -66, 520 },
+							{ -66, 608 },
+							{ -54, 608 },
+							{ -54, 520 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { -100, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { -100, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 520 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 520 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -72, 320 },
+							{ -100, 320 },
+							{ -100, 352 },
+							{ -72, 352 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -116, 336 },
+							{ -116, 452 },
+							{ -84, 452 },
+							{ -84, 336 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -100, 468 },
+							{ 80, 468 },
+							{ 80, 436 },
+							{ -100, 436 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 64, 452 },
+							{ 64, 520 },
+							{ 96, 520 },
+							{ 96, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 80, 504 },
+							{ -60, 504 },
+							{ -60, 536 },
+							{ 80, 536 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -76, 520 },
+							{ -76, 608 },
+							{ -44, 608 },
+							{ -44, 520 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 274, 380 },
+							{ 274, 240 },
+							{ 262, 240 },
+							{ 262, 380 },
+						},
+					},
+					{ Kind = "Flat", At = { 268, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { 268, 240 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 284, 380 },
+							{ 284, 240 },
+							{ 252, 240 },
+							{ 252, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 336, 460 },
+							{ 336, 476 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -100, 392 },
+							{ -100, 408 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 152, 342 },
+							{ 152, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 336 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -140, 214 },
+							{ -176, 214 },
+							{ -176, 226 },
+							{ -140, 226 },
+						},
+					},
+					{ Kind = "Flat", At = { -140, 220 }, Radius = 6 },
+					{ Kind = "Flat", At = { -176, 220 }, Radius = 6 },
+				},
+				Hazards = {
+					{
+						Type = "Hunter",
+						Path = {
+							{ 268, 380 },
+							{ 268, 240 },
+						},
+						Burrows = {
+							{ 268, 344 },
+							{ 268, 300 },
+							{ 268, 264 },
+							{ 268, 248 },
+						},
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -190, 60 },
+							{ -130, 60 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -60, 110 },
+							{ -120, 110 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -170, 300 },
+							{ -230, 300 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -222, 420 },
+							{ -162, 420 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -280, 498 },
+							{ -280, 558 },
+						},
+						Count = 2,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 206, 60 },
+							{ 158, 60 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 284, 288 },
+							{ 224, 288 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 78, 48 },
+							{ 18, 48 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -78, 216 },
+							{ -18, 216 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 6, 452 },
+							{ 66, 452 },
+						},
+						Count = 1,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { -200, 55 } },
+					{ Kind = "GlowShells", At = { -95, 60 } },
+					{ Kind = "GlowShells", At = { 0, 75 } },
+					{ Kind = "GlowShells", At = { -75, 110 } },
+					{ Kind = "GlowShells", At = { -140, 155 } },
+					{ Kind = "GlowShells", At = { -140, 265 } },
+					{ Kind = "GlowShells", At = { -215, 300 } },
+					{ Kind = "GlowShells", At = { -288, 337 } },
+					{ Kind = "GlowShells", At = { -181, 340 } },
+					{ Kind = "GlowShells", At = { -169, 380 } },
+					{ Kind = "GlowShells", At = { -279, 380 } },
+					{ Kind = "GlowShells", At = { -227, 420 } },
+					{ Kind = "GlowShells", At = { -140, 443 } },
+					{ Kind = "GlowShells", At = { -213, 480 } },
+					{ Kind = "GlowShells", At = { -280, 523 } },
+					{ Kind = "GlowShells", At = { 222, 55 } },
+					{ Kind = "GlowShells", At = { 150, 93 } },
+					{ Kind = "GlowShells", At = { 222, 131 } },
+					{ Kind = "GlowShells", At = { 323, 140 } },
+					{ Kind = "GlowShells", At = { 287, 188 } },
+					{ Kind = "GlowShells", At = { 177, 188 } },
+					{ Kind = "GlowShells", At = { 181, 240 } },
+					{ Kind = "GlowShells", At = { 291, 240 } },
+					{ Kind = "GlowShells", At = { 319, 288 } },
+					{ Kind = "GlowShells", At = { 209, 288 } },
+					{ Kind = "GlowShells", At = { 261, 450 } },
+					{ Kind = "GlowShells", At = { 336, 485 } },
+					{ Kind = "GlowShells", At = { 256, 515 } },
+					{ Kind = "GlowShells", At = { 336, 545 } },
+					{ Kind = "GlowShells", At = { 256, 575 } },
+					{ Kind = "GlowShells", At = { 93, 48 } },
+					{ Kind = "GlowShells", At = { -17, 48 } },
+					{ Kind = "GlowShells", At = { -88, 87 } },
+					{ Kind = "GlowShells", At = { 5, 104 } },
+					{ Kind = "GlowShells", At = { 21, 160 } },
+					{ Kind = "GlowShells", At = { -88, 161 } },
+					{ Kind = "GlowShells", At = { -33, 216 } },
+					{ Kind = "GlowShells", At = { -100, 363 } },
+					{ Kind = "GlowShells", At = { -79, 452 } },
+					{ Kind = "GlowShells", At = { 31, 452 } },
+					{ Kind = "GlowShells", At = { 80, 513 } },
+					{ Kind = "GlowShells", At = { -23, 520 } },
+					{ Kind = "GlowShells", At = { -60, 593 } },
+					{ Kind = "Rocks", At = { 268, 344 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 347 } },
+					{ Kind = "Rocks", At = { 268, 300 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 303 } },
+					{ Kind = "Rocks", At = { 268, 264 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 267 } },
+					{ Kind = "Rocks", At = { 268, 248 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 272, 251 } },
+					{ Kind = "Bones", At = { 254, 360 }, Scale = 1.2, Yaw = 70 },
+					{ Kind = "Rocks", At = { 336, 468 }, Scale = 0.7 },
+					{ Kind = "Rocks", At = { -100, 400 }, Scale = 0.7 },
+					{ Kind = "Shells", At = { -148, 12 }, Scale = 2.4 },
+					{ Kind = "Bones", At = { -122, 10 }, Scale = 1, Yaw = 60 },
+				},
+			},
+			{
+				Name = "Brood maze",
+				Paths = 2,
+				Primitives = {
+					{
+						Kind = "Ramp",
+						Path = {
+							{ -136, 0 },
+							{ -136, 48 },
+							{ -224, 48 },
+							{ -224, 100 },
+							{ -152, 100 },
+							{ -152, 148 },
+							{ -224, 148 },
+							{ -224, 176 },
+							{ -224, 264 },
+							{ -224, 300 },
+							{ -136, 300 },
+							{ -136, 340 },
+							{ -288, 340 },
+							{ -288, 380 },
+							{ -136, 380 },
+							{ -136, 420 },
+							{ -288, 420 },
+							{ -288, 460 },
+							{ -136, 460 },
+							{ -136, 500 },
+							{ -280, 500 },
+							{ -280, 608 },
+						},
+						Width = 16,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 0 },
+							{ -154, 48 },
+							{ -118, 48 },
+							{ -118, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 30 },
+							{ -224, 30 },
+							{ -224, 66 },
+							{ -136, 66 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 48 },
+							{ -242, 100 },
+							{ -206, 100 },
+							{ -206, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 118 },
+							{ -152, 118 },
+							{ -152, 82 },
+							{ -224, 82 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -170, 100 },
+							{ -170, 148 },
+							{ -134, 148 },
+							{ -134, 100 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -152, 130 },
+							{ -224, 130 },
+							{ -224, 166 },
+							{ -152, 166 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 148 },
+							{ -242, 176 },
+							{ -206, 176 },
+							{ -206, 148 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 176 },
+							{ -242, 264 },
+							{ -206, 264 },
+							{ -206, 176 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -242, 264 },
+							{ -242, 300 },
+							{ -206, 300 },
+							{ -206, 264 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -224, 318 },
+							{ -136, 318 },
+							{ -136, 282 },
+							{ -224, 282 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 300 },
+							{ -154, 340 },
+							{ -118, 340 },
+							{ -118, 300 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 322 },
+							{ -288, 322 },
+							{ -288, 358 },
+							{ -136, 358 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 340 },
+							{ -306, 380 },
+							{ -270, 380 },
+							{ -270, 340 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 398 },
+							{ -136, 398 },
+							{ -136, 362 },
+							{ -288, 362 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 380 },
+							{ -154, 420 },
+							{ -118, 420 },
+							{ -118, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 402 },
+							{ -288, 402 },
+							{ -288, 438 },
+							{ -136, 438 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -306, 420 },
+							{ -306, 460 },
+							{ -270, 460 },
+							{ -270, 420 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -288, 478 },
+							{ -136, 478 },
+							{ -136, 442 },
+							{ -288, 442 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -154, 460 },
+							{ -154, 500 },
+							{ -118, 500 },
+							{ -118, 460 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -136, 482 },
+							{ -280, 482 },
+							{ -280, 518 },
+							{ -136, 518 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -298, 500 },
+							{ -298, 608 },
+							{ -262, 608 },
+							{ -262, 500 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 0 },
+							{ 34, 48 },
+							{ 46, 48 },
+							{ 46, 0 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 40, 42 },
+							{ -88, 42 },
+							{ -88, 54 },
+							{ 40, 54 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -94, 48 },
+							{ -94, 104 },
+							{ -82, 104 },
+							{ -82, 48 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -88, 110 },
+							{ 40, 110 },
+							{ 40, 98 },
+							{ -88, 98 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 104 },
+							{ 34, 160 },
+							{ 46, 160 },
+							{ 46, 104 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 40, 154 },
+							{ -88, 154 },
+							{ -88, 166 },
+							{ 40, 166 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -94, 160 },
+							{ -94, 216 },
+							{ -82, 216 },
+							{ -82, 160 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -88, 222 },
+							{ 40, 222 },
+							{ 40, 210 },
+							{ -88, 210 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 34, 216 },
+							{ 34, 248 },
+							{ 46, 248 },
+							{ 46, 216 },
+						},
+					},
+					{ Kind = "Flat", At = { 40, 0 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 48 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 104 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 160 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 160 }, Radius = 6 },
+					{ Kind = "Flat", At = { -88, 216 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 216 }, Radius = 6 },
+					{ Kind = "Flat", At = { 40, 248 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 0 },
+							{ 24, 48 },
+							{ 56, 48 },
+							{ 56, 0 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 32 },
+							{ -88, 32 },
+							{ -88, 64 },
+							{ 40, 64 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -104, 48 },
+							{ -104, 104 },
+							{ -72, 104 },
+							{ -72, 48 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 120 },
+							{ 40, 120 },
+							{ 40, 88 },
+							{ -88, 88 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 104 },
+							{ 24, 160 },
+							{ 56, 160 },
+							{ 56, 104 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 40, 144 },
+							{ -88, 144 },
+							{ -88, 176 },
+							{ 40, 176 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -104, 160 },
+							{ -104, 216 },
+							{ -72, 216 },
+							{ -72, 160 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -88, 232 },
+							{ 40, 232 },
+							{ 40, 200 },
+							{ -88, 200 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 24, 216 },
+							{ 24, 248 },
+							{ 56, 248 },
+							{ 56, 216 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -72, 330 },
+							{ -100, 330 },
+							{ -100, 342 },
+							{ -72, 342 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -106, 336 },
+							{ -106, 452 },
+							{ -94, 452 },
+							{ -94, 336 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -100, 458 },
+							{ 80, 458 },
+							{ 80, 446 },
+							{ -100, 446 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 74, 452 },
+							{ 74, 520 },
+							{ 86, 520 },
+							{ 86, 452 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 80, 514 },
+							{ -60, 514 },
+							{ -60, 526 },
+							{ 80, 526 },
+						},
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ -66, 520 },
+							{ -66, 608 },
+							{ -54, 608 },
+							{ -54, 520 },
+						},
+					},
+					{ Kind = "Flat", At = { -72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { -100, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { -100, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 452 }, Radius = 6 },
+					{ Kind = "Flat", At = { 80, 520 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 520 }, Radius = 6 },
+					{ Kind = "Flat", At = { -60, 608 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ -72, 320 },
+							{ -100, 320 },
+							{ -100, 352 },
+							{ -72, 352 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -116, 336 },
+							{ -116, 452 },
+							{ -84, 452 },
+							{ -84, 336 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -100, 468 },
+							{ 80, 468 },
+							{ 80, 436 },
+							{ -100, 436 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 64, 452 },
+							{ 64, 520 },
+							{ 96, 520 },
+							{ 96, 452 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ 80, 504 },
+							{ -60, 504 },
+							{ -60, 536 },
+							{ 80, 536 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Roof",
+						Area = {
+							{ -76, 520 },
+							{ -76, 608 },
+							{ -44, 608 },
+							{ -44, 520 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 170, 380 },
+							{ 170, 128 },
+							{ 158, 128 },
+							{ 158, 380 },
+						},
+					},
+					{ Kind = "Flat", At = { 164, 380 }, Radius = 6 },
+					{ Kind = "Flat", At = { 164, 128 }, Radius = 6 },
+					{
+						Kind = "Roof",
+						Area = {
+							{ 180, 380 },
+							{ 180, 126 },
+							{ 148, 126 },
+							{ 148, 380 },
+						},
+						Clearance = 18,
+						Thickness = 6,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -100, 392 },
+							{ -100, 408 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Ridge",
+						Path = {
+							{ 40, 172 },
+							{ 40, 188 },
+						},
+						Height = 2.5,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 72, 342 },
+							{ 152, 342 },
+							{ 152, 330 },
+							{ 72, 330 },
+						},
+					},
+					{ Kind = "Flat", At = { 72, 336 }, Radius = 6 },
+					{ Kind = "Flat", At = { 152, 336 }, Radius = 6 },
+				},
+				Hazards = {
+					{
+						Type = "Hunter",
+						Path = {
+							{ 164, 380 },
+							{ 164, 126 },
+						},
+						Burrows = {
+							{ 164, 340 },
+							{ 164, 270 },
+							{ 164, 210 },
+							{ 164, 150 },
+						},
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -160, 48 },
+							{ -216, 48 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -224, 184 },
+							{ -224, 232 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -232, 340 },
+							{ -280, 340 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -220, 380 },
+							{ -160, 380 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -182, 420 },
+							{ -242, 420 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -264, 460 },
+							{ -204, 460 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -144, 500 },
+							{ -192, 500 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -280, 528 },
+							{ -280, 588 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 18, 48 },
+							{ -42, 48 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -50, 104 },
+							{ 10, 104 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -14, 160 },
+							{ -74, 160 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ -8, 216 },
+							{ 32, 216 },
+						},
+						Count = 1,
+					},
+					{
+						Type = "Patrol",
+						Path = {
+							{ 18, 336 },
+							{ -42, 336 },
+						},
+						Count = 1,
+					},
+				},
+				Decor = {
+					{ Kind = "GlowShells", At = { -143, 48 } },
+					{ Kind = "GlowShells", At = { -224, 77 } },
+					{ Kind = "GlowShells", At = { -152, 115 } },
+					{ Kind = "GlowShells", At = { -224, 153 } },
+					{ Kind = "GlowShells", At = { -224, 263 } },
+					{ Kind = "GlowShells", At = { -151, 300 } },
+					{ Kind = "GlowShells", At = { -191, 340 } },
+					{ Kind = "GlowShells", At = { -288, 353 } },
+					{ Kind = "GlowShells", At = { -205, 380 } },
+					{ Kind = "GlowShells", At = { -137, 420 } },
+					{ Kind = "GlowShells", At = { -247, 420 } },
+					{ Kind = "GlowShells", At = { -259, 460 } },
+					{ Kind = "GlowShells", At = { -149, 460 } },
+					{ Kind = "GlowShells", At = { -193, 500 } },
+					{ Kind = "GlowShells", At = { -280, 523 } },
+					{ Kind = "GlowShells", At = { 33, 48 } },
+					{ Kind = "GlowShells", At = { -77, 48 } },
+					{ Kind = "GlowShells", At = { -45, 104 } },
+					{ Kind = "GlowShells", At = { 40, 129 } },
+					{ Kind = "GlowShells", At = { -39, 160 } },
+					{ Kind = "GlowShells", At = { -83, 216 } },
+					{ Kind = "GlowShells", At = { 27, 216 } },
+					{ Kind = "GlowShells", At = { -100, 363 } },
+					{ Kind = "GlowShells", At = { -79, 452 } },
+					{ Kind = "GlowShells", At = { 31, 452 } },
+					{ Kind = "GlowShells", At = { 80, 513 } },
+					{ Kind = "GlowShells", At = { -23, 520 } },
+					{ Kind = "GlowShells", At = { -60, 593 } },
+					{ Kind = "Rocks", At = { 164, 340 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 168, 343 } },
+					{ Kind = "Rocks", At = { 164, 270 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 168, 273 } },
+					{ Kind = "Rocks", At = { 164, 210 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 168, 213 } },
+					{ Kind = "Rocks", At = { 164, 150 }, Scale = 0.8 },
+					{ Kind = "Pebbles", At = { 168, 153 } },
+					{ Kind = "Bones", At = { 150, 360 }, Scale = 1.2, Yaw = 70 },
+					{ Kind = "Rocks", At = { -100, 400 }, Scale = 0.7 },
+					{ Kind = "Rocks", At = { 40, 180 }, Scale = 0.7 },
+					{ Kind = "Shells", At = { 52, 12 }, Scale = 1.8 },
+					{ Kind = "GlowShells", At = { 28, 12 } },
+					{ Kind = "GlowShells", At = { 52, 24 } },
+				},
+			},
+		},
+		Slots = {
+			{
+				Name = "Nest row west",
+				At = { -352, 36 },
+				Size = { 104, 72 },
+				Rooms = {
+					{
+						Name = "Crab nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 0 },
+									{ 46, 52 },
+									{ 58, 52 },
+									{ 58, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 36, 0 },
+									{ 36, 24 },
+									{ 68, 24 },
+									{ 68, 0 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 30, 40 },
+									{ 74, 40 },
+									{ 74, 64 },
+									{ 30, 64 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 52, 60 }, Radius = 5, Weight = 3 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 52, 60 }, Scale = 2 },
+							{ Kind = "Bones", At = { 62, 52 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 42, 52 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 34, 42 },
+									{ 70, 42 },
+									{ 70, 62 },
+									{ 34, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Shell midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 0 },
+									{ 46, 36 },
+									{ 58, 36 },
+									{ 58, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 31, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 73, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 52, 60 }, Radius = 4, Weight = 2 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 52, 60 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 92, 12 },
+									{ 92, 60 },
+									{ 12, 60 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 52, 36 }, Scale = 0.9 },
+						},
+					},
+				},
+			},
+			{
+				Name = "Nest row east",
+				At = { 248, 36 },
+				Size = { 104, 72 },
+				Rooms = {
+					{
+						Name = "Crab nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 0 },
+									{ 46, 52 },
+									{ 58, 52 },
+									{ 58, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 36, 0 },
+									{ 36, 24 },
+									{ 68, 24 },
+									{ 68, 0 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 30, 40 },
+									{ 74, 40 },
+									{ 74, 64 },
+									{ 30, 64 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 52, 60 }, Radius = 5, Weight = 3 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 52, 60 }, Scale = 2 },
+							{ Kind = "Bones", At = { 62, 52 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 42, 52 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 34, 42 },
+									{ 70, 42 },
+									{ 70, 62 },
+									{ 34, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Collapsed chamber",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 46, 0 },
+									{ 46, 36 },
+									{ 58, 36 },
+									{ 58, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 52, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 31, 25 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 73, 36 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 42, 50 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 68, 18 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 52, 60 }, Radius = 4, Weight = 2 },
+						},
+						Decor = {
+							{
+								Kind = "Rocks",
+								Area = {
+									{ 12, 12 },
+									{ 92, 12 },
+									{ 92, 60 },
+									{ 12, 60 },
+								},
+								Count = 5,
+							},
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+			{
+				Name = "Western midden",
+				At = { -360, 168 },
+				Size = { 72, 104 },
+				Rooms = {
+					{
+						Name = "Old midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 72, 46 },
+									{ 36, 46 },
+									{ 36, 58 },
+									{ 72, 58 },
+								},
+							},
+							{ Kind = "Flat", At = { 72, 52 }, Radius = 6 },
+							{ Kind = "Flat", At = { 36, 52 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 64, 8 },
+									{ 64, 96 },
+									{ 8, 96 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 22, 52 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 50, 52 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 12, 52 }, Radius = 4, Weight = 2 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 12, 52 }, Radius = 4, Covered = true },
+							{ Type = "Pit", At = { 36, 52 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 60, 12 },
+									{ 60, 92 },
+									{ 12, 92 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 36, 52 }, Scale = 0.9 },
+						},
+					},
+					{
+						Name = "Hermit nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 72, 46 },
+									{ 20, 46 },
+									{ 20, 58 },
+									{ 72, 58 },
+								},
+							},
+							{ Kind = "Flat", At = { 72, 52 }, Radius = 6 },
+							{ Kind = "Flat", At = { 20, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 72, 36 },
+									{ 48, 36 },
+									{ 48, 68 },
+									{ 72, 68 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 30 },
+									{ 32, 30 },
+									{ 32, 74 },
+									{ 8, 74 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 12, 52 }, Radius = 5, Weight = 3 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 12, 52 }, Scale = 2 },
+							{ Kind = "Bones", At = { 20, 42 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 20, 62 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 2, 42 },
+									{ 38, 42 },
+									{ 38, 62 },
+									{ 2, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+			{
+				Name = "Deep nest",
+				At = { -48, 360 },
+				Size = { 96, 72 },
+				Rooms = {
+					{
+						Name = "Brood nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 42, 0 },
+									{ 42, 52 },
+									{ 54, 52 },
+									{ 54, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 48, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 48, 52 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 32, 0 },
+									{ 32, 24 },
+									{ 64, 24 },
+									{ 64, 0 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 26, 40 },
+									{ 70, 40 },
+									{ 70, 64 },
+									{ 26, 64 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 48, 60 }, Radius = 5, Weight = 5 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 48, 60 }, Scale = 2 },
+							{ Kind = "Bones", At = { 58, 52 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 38, 52 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 30, 42 },
+									{ 66, 42 },
+									{ 66, 62 },
+									{ 30, 62 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Moult midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 42, 0 },
+									{ 42, 36 },
+									{ 54, 36 },
+									{ 54, 0 },
+								},
+							},
+							{ Kind = "Flat", At = { 48, 0 }, Radius = 6 },
+							{ Kind = "Flat", At = { 48, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 88, 8 },
+									{ 88, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 29, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 67, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 48, 60 }, Radius = 4, Weight = 3 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 48, 60 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 84, 12 },
+									{ 84, 60 },
+									{ 12, 60 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 48, 36 }, Scale = 0.9 },
+						},
+					},
+				},
+			},
+			{
+				Name = "Hoard",
+				At = { 120, 504 },
+				Size = { 112, 72 },
+				Rooms = {
+					{
+						Name = "Hoard nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 20 },
+									{ 50, 20 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 20 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 72, 72 },
+									{ 72, 48 },
+									{ 40, 48 },
+									{ 40, 72 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 34, 8 },
+									{ 78, 8 },
+									{ 78, 32 },
+									{ 34, 32 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 5, Weight = 5 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 56, 12 }, Scale = 2 },
+							{ Kind = "Bones", At = { 46, 20 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 66, 20 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 38, 10 },
+									{ 74, 10 },
+									{ 74, 30 },
+									{ 38, 30 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Fallen hoard",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 36 },
+									{ 50, 36 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 104, 8 },
+									{ 104, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 34, 25 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 78, 36 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 45, 50 },
+								Radius = 7,
+								Height = 5,
+								Rock = true,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 73, 18 },
+								Radius = 7,
+								Height = 6,
+								Rock = true,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 4, Weight = 3 },
+						},
+						Decor = {
+							{
+								Kind = "Rocks",
+								Area = {
+									{ 12, 12 },
+									{ 100, 12 },
+									{ 100, 60 },
+									{ 12, 60 },
+								},
+								Count = 5,
+							},
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 8, 8 },
+									{ 104, 8 },
+									{ 104, 64 },
+									{ 8, 64 },
+								},
+								Count = 4,
+							},
+						},
+					},
+				},
+			},
+			{
+				Name = "Sea nests",
+				At = { -232, 504 },
+				Size = { 112, 72 },
+				Rooms = {
+					{
+						Name = "Sea nest",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 20 },
+									{ 50, 20 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 20 }, Radius = 6 },
+							{
+								Kind = "Roof",
+								Area = {
+									{ 72, 72 },
+									{ 72, 48 },
+									{ 40, 48 },
+									{ 40, 72 },
+								},
+								Clearance = 18,
+								Thickness = 6,
+							},
+							{
+								Kind = "Flat",
+								Area = {
+									{ 34, 8 },
+									{ 78, 8 },
+									{ 78, 32 },
+									{ 34, 32 },
+								},
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 5, Weight = 6 },
+						},
+						Decor = {
+							{ Kind = "Shells", At = { 56, 12 }, Scale = 2 },
+							{ Kind = "Bones", At = { 46, 20 }, Scale = 0.8 },
+							{ Kind = "Shells", At = { 66, 20 }, Scale = 1.2 },
+							{
+								Kind = "Barnacles",
+								Area = {
+									{ 38, 10 },
+									{ 74, 10 },
+									{ 74, 30 },
+									{ 38, 30 },
+								},
+								Count = 4,
+							},
+						},
+					},
+					{
+						Name = "Drowned midden",
+						Primitives = {
+							{
+								Kind = "Flat",
+								Area = {
+									{ 62, 72 },
+									{ 62, 36 },
+									{ 50, 36 },
+									{ 50, 72 },
+								},
+							},
+							{ Kind = "Flat", At = { 56, 72 }, Radius = 6 },
+							{ Kind = "Flat", At = { 56, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 104, 8 },
+									{ 104, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Mound",
+								At = { 34, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+							{
+								Kind = "Mound",
+								At = { 78, 36 },
+								Radius = 6,
+								Height = 3,
+								Rock = false,
+								Over = true,
+							},
+						},
+						Loot = {
+							{ At = { 56, 12 }, Radius = 4, Weight = 4 },
+						},
+						Hazards = {
+							{ Type = "Pit", At = { 56, 12 }, Radius = 4, Covered = true },
+							{ Type = "Pit", At = { 56, 36 }, Radius = 4, Covered = true },
+						},
+						Decor = {
+							{
+								Kind = "Shells",
+								Area = {
+									{ 12, 12 },
+									{ 100, 12 },
+									{ 100, 60 },
+									{ 12, 60 },
+								},
+								Count = 14,
+								Scale = 1.3,
+							},
+							{ Kind = "Bones", At = { 56, 36 }, Scale = 0.9 },
+						},
+					},
+				},
+			},
+		},
+	},
 }
