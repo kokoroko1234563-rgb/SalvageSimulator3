@@ -20,3 +20,4 @@ Tidewalker Boots.
 
 **Questions.**
 1. Patterns: waves rolling across a field (run behind them), or a checkerboard (hop between)?
+Answer: This should be the one most like an obstacle course of the ones we currently have, they should have different rooms with differing challanges, should to more or less damage depending on the zone
