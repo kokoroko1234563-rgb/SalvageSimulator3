@@ -319,6 +319,7 @@ Config.Looks = {
 	-- By zone: [0] the shop, 1 to 6, [7] the Far Sandbar (and the sea past it).
 	Zones = {
 		[0] = {
+			Gloom = 0,
 			Fog = 0.2,
 			Floor = "Sand",
 			Rock = "Sandstone",
@@ -334,6 +335,7 @@ Config.Looks = {
 		},
 		-- 1 and 2 are the same as the shop (filled in below).
 		[3] = {
+			Gloom = 0,
 			Fog = 0.38,
 			Floor = "Salt",
 			Rock = "Sandstone",
@@ -348,6 +350,7 @@ Config.Looks = {
 			Tint = rgb(250, 248, 240),
 		},
 		[4] = {
+			Gloom = 0.45, -- the deep zones keep to dusk: see DayController
 			Fog = 0.48,
 			Floor = "Ground",
 			Rock = "Slate",
@@ -362,6 +365,7 @@ Config.Looks = {
 			Tint = rgb(238, 244, 250),
 		},
 		[5] = {
+			Gloom = 0.7,
 			Fog = 0.6,
 			Floor = "Mud",
 			Rock = "Rock",
@@ -376,6 +380,7 @@ Config.Looks = {
 			Tint = rgb(226, 240, 230),
 		},
 		[6] = {
+			Gloom = 0.9,
 			Fog = 0.74,
 			Floor = "Limestone",
 			Rock = "Basalt",
@@ -390,6 +395,7 @@ Config.Looks = {
 			Tint = rgb(204, 224, 236),
 		},
 		[7] = {
+			Gloom = 0,
 			Fog = 0.66,
 			Floor = "Sand",
 			Rock = "Sandstone",

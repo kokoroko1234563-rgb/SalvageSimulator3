@@ -33,7 +33,7 @@ export type Look = {
 	Tint: Color3,
 }
 
-local NUMBERS = { "Fog", "Brightness", "Saturation", "Contrast", "Exposure" }
+local NUMBERS = { "Fog", "Brightness", "Saturation", "Contrast", "Exposure", "Gloom" }
 local COLORS = { "Haze", "Decay", "Outdoor", "Ambient", "Tint" }
 
 -- The zone's look at a point along the beach (Z): [0] behind the shop, the Far Sandbar's
@@ -86,7 +86,7 @@ function Looks.at(z: number): Look
 	for i = 0, samples - 1 do
 		local look: any = Looks.pointAt(z + (i / (samples - 1) - 0.5) * cfg.Blend)
 		for _, key in NUMBERS do
-			blended[key] += look[key] / samples
+			blended[key] += (look[key] or 0) / samples
 		end
 		for _, key in COLORS do
 			local c = look[key]

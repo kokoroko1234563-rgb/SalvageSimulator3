@@ -19,6 +19,7 @@ local cfg = Config.Day
 local DayController = {}
 
 local NIGHT_FOG = Color3.fromRGB(30, 40, 70)
+local GLOOM_HOUR = 19.2 -- the sky the deep zones' gloom holds to: just after sunset
 
 local look: any = nil -- the look being shown, following where you stand
 local roofShade = 0 -- 0 under open sky, 1 under a roof
@@ -86,14 +87,18 @@ function DayController.apply(hour: number, dt: number?)
 	local roof = Config.Looks.UnderRoof
 	local shade = 1 + (roof.Light - 1) * roofShade
 
-	local night = DayCycle.nightness(hour)
-	local warm = glow(hour)
+	-- The deep zones' gloom (their look's Gloom, 0-1): the light no brighter than that close to
+	-- night, and the sky held in a late dusk, whatever the hour up the beach.
+	local gloom = math.clamp(look.Gloom or 0, 0, 1)
+	local night = math.max(DayCycle.nightness(hour), gloom)
+	local warm = glow(hour) * (1 - gloom)
+	local shownHour = if hour >= 6 and hour < GLOOM_HOUR then hour + (GLOOM_HOUR - hour) * gloom else hour
 	local wanted = DayController.blind
 	local rate = if wanted > blindNow then BLIND_IN else BLIND_OUT
 	blindNow += math.clamp(wanted - blindNow, -rate * (dt or 1), rate * (dt or 1))
 	local blind = blindNow
 	local black = Color3.new()
-	Lighting.ClockTime = hour
+	Lighting.ClockTime = shownHour
 	Lighting.Brightness = (look.Brightness + (cfg.NightBrightness - look.Brightness) * night)
 		* shade
 		* (1 - blind)
