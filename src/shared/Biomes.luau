@@ -117,8 +117,13 @@ Biomes.List = {
 	},
 	DriftwoodCove = {
 		Id = "DriftwoodCove",
-		-- The pools behind the jams slow you where its layout puts them (gentle: a common biome).
-		Hazards = { { Type = "Slow", Scatter = false, Factor = 0.7, Color = Color3.fromRGB(90, 110, 120) } },
+		-- The pools behind the jams slow you where its layout puts them; zones 3 and 4 add open
+		-- spike pits and quicksand, off the cart route.
+		Hazards = {
+			{ Type = "Slow", Scatter = false, Factor = 0.7, Color = Color3.fromRGB(90, 110, 120) },
+			{ Type = "Pit", Scatter = false },
+			{ Type = "Sink", Scatter = false },
+		},
 		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
 		LootShare = 0.6,
 		Decor = Color3.fromRGB(196, 170, 136),

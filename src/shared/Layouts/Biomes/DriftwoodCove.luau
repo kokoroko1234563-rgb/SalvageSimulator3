@@ -1319,6 +1319,19 @@ return {
 					{ Type = "Slow", At = { -90, 376 }, Radius = 12 },
 					{ Type = "Slow", At = { 210, 518 }, Radius = 12 },
 					{ Type = "Slow", At = { -260, 520 }, Radius = 12 },
+					{ Type = "Pit", At = { -300, 300 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { -40, 300 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { 300, 300 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { -230, 440 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { 40, 440 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { 290, 440 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { -20, 570 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { 220, 570 }, Radius = 4, Covered = false },
+					{ Type = "Sink", At = { -190, 285 }, Radius = 10 },
+					{ Type = "Sink", At = { 190, 280 }, Radius = 10 },
+					{ Type = "Sink", At = { -300, 425 }, Radius = 10 },
+					{ Type = "Sink", At = { 150, 425 }, Radius = 10 },
+					{ Type = "Sink", At = { -300, 570 }, Radius = 10 },
 				},
 				Decor = {
 					{ Kind = "Anchor", At = { -124, 22 }, Scale = 1.2, Yaw = 40 },
@@ -1349,6 +1362,18 @@ return {
 					{ Type = "Slow", At = { 260, 378 }, Radius = 12 },
 					{ Type = "Slow", At = { 210, 518 }, Radius = 12 },
 					{ Type = "Slow", At = { -260, 520 }, Radius = 12 },
+					{ Type = "Pit", At = { -300, 300 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { 300, 300 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { -230, 440 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { 290, 440 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { -20, 570 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { 220, 570 }, Radius = 4, Covered = false },
+					{ Type = "Sink", At = { -190, 285 }, Radius = 10 },
+					{ Type = "Sink", At = { 190, 280 }, Radius = 10 },
+					{ Type = "Sink", At = { -300, 425 }, Radius = 10 },
+					{ Type = "Sink", At = { 150, 425 }, Radius = 10 },
+					{ Type = "Sink", At = { -120, 560 }, Radius = 10 },
+					{ Type = "Sink", At = { -300, 570 }, Radius = 10 },
 				},
 				Decor = {
 					{ Kind = "Crate", At = { 196, 22 }, Scale = 1.2, Yaw = 80 },
@@ -1380,6 +1405,19 @@ return {
 					{ Type = "Slow", At = { -90, 376 }, Radius = 12 },
 					{ Type = "Slow", At = { 210, 518 }, Radius = 12 },
 					{ Type = "Slow", At = { -260, 520 }, Radius = 12 },
+					{ Type = "Pit", At = { -300, 300 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { -40, 300 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { 300, 300 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { -230, 440 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { 290, 440 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { -20, 570 }, Radius = 4, Covered = false },
+					{ Type = "Pit", At = { 220, 570 }, Radius = 4, Covered = false },
+					{ Type = "Sink", At = { -190, 285 }, Radius = 10 },
+					{ Type = "Sink", At = { 190, 280 }, Radius = 10 },
+					{ Type = "Sink", At = { -300, 425 }, Radius = 10 },
+					{ Type = "Sink", At = { 150, 425 }, Radius = 10 },
+					{ Type = "Sink", At = { -120, 560 }, Radius = 10 },
+					{ Type = "Sink", At = { -300, 570 }, Radius = 10 },
 				},
 				Decor = {
 					{ Kind = "Bones", At = { 6, 22 }, Scale = 1.2, Yaw = 120 },
@@ -1465,6 +1503,12 @@ return {
 		Entrances = {
 			{ 0, 48 },
 		},
+		Hazards = {
+			{ Type = "Pit", At = { -180, 4 }, Radius = 4, Covered = false },
+			{ Type = "Sink", At = { -180, 602 }, Radius = 10 },
+			{ Type = "Pit", At = { 180, 4 }, Radius = 4, Covered = false },
+			{ Type = "Sink", At = { 180, 602 }, Radius = 10 },
+		},
 		Decor = {
 			{
 				Kind = "DuneGrass",
@@ -1499,6 +1543,8 @@ return {
 				},
 				Count = 3,
 			},
+			{ Kind = "Bones", At = { -180, 14 }, Scale = 0.9, Yaw = 30 },
+			{ Kind = "Bones", At = { 180, 14 }, Scale = 0.9, Yaw = 110 },
 		},
 		Name = "Outer Shore",
 		Crossings = {
@@ -1701,6 +1747,8 @@ return {
 				Hazards = {
 					{ Type = "Slow", At = { -180, 300 }, Radius = 9 },
 					{ Type = "Slow", At = { 260, 240 }, Radius = 7 },
+					{ Type = "Sink", At = { 80, 410 }, Radius = 10 },
+					{ Type = "Pit", At = { 86, 540 }, Radius = 4, Covered = false },
 				},
 				Decor = {
 					{ Kind = "Driftwood", At = { 200, 150 }, Scale = 1.1, Yaw = 90 },
@@ -1911,6 +1959,8 @@ return {
 				Hazards = {
 					{ Type = "Slow", At = { 180, 150 }, Radius = 9 },
 					{ Type = "Slow", At = { -260, 220 }, Radius = 7 },
+					{ Type = "Sink", At = { -80, 410 }, Radius = 10 },
+					{ Type = "Pit", At = { -86, 540 }, Radius = 4, Covered = false },
 				},
 				Decor = {
 					{ Kind = "Driftwood", At = { -190, 130 }, Scale = 1.1, Yaw = 90 },

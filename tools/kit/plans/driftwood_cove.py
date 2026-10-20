@@ -69,6 +69,16 @@ def slow_dips(part, dips, ramp, radius=12):
             part.hazard("Slow", at=at, radius=min(radius, r))
 
 
+def danger(part, ramp, pits=(), sinks=()):
+    """Open spike pits and quicksand (zones 3 and 4), kept off the cart route."""
+    for at in pits:
+        if not near_path(ramp, at[0], at[1], 8 + 4 + 8):
+            part.hazard("Pit", at=at, radius=4, covered=False)
+    for at in sinks:
+        if not near_path(ramp, at[0], at[1], 8 + 10 + 6):
+            part.hazard("Sink", at=at, radius=10)
+
+
 def cart_gap(part, gaps, jams, width=16):
     """The cart route: straight through each jam at its gap, slanting between jams."""
     pts = [(gaps[0], 0)]
@@ -116,6 +126,9 @@ OPEN = {
               ((210, 518), 14), ((-260, 520), 16)],
         loot=[((-310, 238), 1), ((290, 378), 2), ((-270, 520), 3), ((240, 556), 4)],
         entrance=(40, 410),
+        pits=[(-300, 300), (-40, 300), (300, 300), (-230, 440), (40, 440), (290, 440),
+              (-20, 570), (220, 570)],
+        sinks=[(-190, 285), (190, 280), (-300, 425), (150, 425), (-120, 560), (-300, 570)],
         crossings=[("Anchor gap", (-150, 110, -100), "Anchor"),
                    ("Crate gap", (170, -120, 140), "Crate"),
                    ("Ribs gap", (-20, 210, 10), "Bones")],
@@ -165,6 +178,7 @@ def open_zone(n):
         ramp = cart_gap(c, gaps, crosses)
         clear_of_pools(n, ramp)
         slow_dips(c, s["dips"], ramp)
+        danger(c, ramp, s.get("pits", ()), s.get("sinks", ()))
         # The tell, at the way in: the landmark beside the first gap.
         gx = gaps[0]
         c.decor(tell, at=(gx + 26, 22), scale=1.2, yaw=40 * k)
@@ -201,6 +215,11 @@ def way(part, cart, foot, stacks, cart_dip, foot_dip, tell, loots):
         log_stack(part, x, zz, along)
     pool(part, cart_dip, radius=10, depth=1)
     pool(part, foot_dip, radius=8)
+    # The foot way, in its long run to the sea: quicksand in the lane (wade it fast, or die) and
+    # an open pit beside it, a gap left to squeeze by.
+    fx = foot[-1][0]
+    part.hazard("Sink", at=(fx, 410), radius=10)
+    part.hazard("Pit", at=(fx + (6 if fx > 0 else -6), 540), radius=4, covered=False)
     for kind, at, scale in tell:
         part.decor(kind, at=at, scale=scale, yaw=at[0] % 160)
     for at, weight in loots:
@@ -222,6 +241,13 @@ def zone4():
     f.decor("Timber", at=(-20, 36), scale=1.5, yaw=30)
     f.decor("Timber", at=(22, 60), scale=1.5, yaw=120)
     f.decor("Shells", area=[(-24, 28), (24, 28), (24, 62), (-24, 62)], count=3)
+
+    # Open spike pits and quicksand in the top and bottom bands, between the ways' ends.
+    for x in (-180, 180):
+        f.hazard("Pit", at=(x, 4), radius=4, covered=False)
+        f.hazard("Sink", at=(x, 602), radius=10)
+    f.decor("Bones", at=(-180, 14), scale=0.9, yaw=30)
+    f.decor("Bones", at=(180, 14), scale=0.9, yaw=110)
 
     # Side hollows under the jams: two off the top band, one at the sea end (the best find).
     s = z.slot("West hollow", at=(-340, 36), size=(80, 60), door=(40, 0))
