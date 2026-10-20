@@ -5,8 +5,8 @@ frozen lake across its middle, ice tunnels and crevasses. Laid out like zone 6's
 then each crossing's paths (a character each), then the slots' rooms.
 
 Run it with the quick check, once per zone:
-    python3 tools/kit/quick.py 5 Biomes/Planned/StrandedIceberg --plan tools/kit/plans/stranded_iceberg.py
-    python3 tools/kit/quick.py 6 Biomes/Planned/StrandedIceberg --plan tools/kit/plans/stranded_iceberg.py
+    python3 tools/kit/quick.py 5 Biomes/StrandedIceberg --plan tools/kit/plans/stranded_iceberg.py
+    python3 tools/kit/quick.py 6 Biomes/StrandedIceberg --plan tools/kit/plans/stranded_iceberg.py
 
 Three kinds of way, 2 or 3 in each crossing:
   the lake    across the frozen lake, a wide flat hall of Glacier ice covered with big overlapping
@@ -32,7 +32,7 @@ import math
 
 from kit import Zone, write_zones
 
-OUT = "src/shared/Layouts/Biomes/Planned/StrandedIceberg.luau"
+OUT = "src/shared/Layouts/Biomes/StrandedIceberg.luau"
 ICE = "Glacier"
 SNOW = "Snow"
 ROCK = 20  # walls you can't see over; roofs at 18 clear

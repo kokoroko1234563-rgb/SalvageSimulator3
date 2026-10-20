@@ -1,6 +1,6 @@
 # Fog Bank (planned biome, zones 2 to 6)
 
-Plan: `tools/kit/plans/fog_bank.py` (writes `src/shared/Layouts/Biomes/Planned/FogBank.luau`).
+Plan: `tools/kit/plans/fog_bank.py` (writes `src/shared/Layouts/Biomes/FogBank.luau`).
 Card: `docs/design/cards/fog-bank.md`. The foghorn (`Fog` hazard, `At`) stands at the
 lighthouse in every zone; a lantern does nothing against fog, so no lights are used.
 Pictures: `fog-bank-z2.png`, `fog-bank-z4.png`, `fog-bank-z6.png`.

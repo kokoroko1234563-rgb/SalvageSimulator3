@@ -2,9 +2,9 @@
 
 An iceberg run aground (card: `docs/design/cards/stranded-iceberg.md`). Drawn with the layout
 kit from `tools/kit/plans/stranded_iceberg.py` into
-`src/shared/Layouts/Biomes/Planned/StrandedIceberg.luau`: edit the plan and re-run it.
+`src/shared/Layouts/Biomes/StrandedIceberg.luau`: edit the plan and re-run it.
 
-    python3 tools/kit/quick.py 5 Biomes/Planned/StrandedIceberg --plan tools/kit/plans/stranded_iceberg.py
+    python3 tools/kit/quick.py 5 Biomes/StrandedIceberg --plan tools/kit/plans/stranded_iceberg.py
 
 Walls and roofs are Glacier (rock 20 high), lanes and bands are painted Snow, the lake's floor
 Glacier. Per the card's answer there is no cart spilling: the Ice hazard is placement only

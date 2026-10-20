@@ -4,7 +4,7 @@ A wall of fog that stays; a foghorn at the lighthouse clears it for a moment (th
 placed at the lighthouse: its behaviour is the engine's). A lantern does nothing against fog.
 
 Run it with the quick check, once per zone:
-    python3 tools/kit/quick.py 4 Biomes/Planned/FogBank --plan tools/kit/plans/fog_bank.py
+    python3 tools/kit/quick.py 4 Biomes/FogBank --plan tools/kit/plans/fog_bank.py
 
 Zones 2 and 3 are open dunes (no walls, no rock; sand dunes no taller than the zone allows):
   three low dunes across the zone (carts can't climb them, feet can: the shortcuts), the cart's
@@ -21,7 +21,7 @@ import math
 
 from kit import Zone, write_zones
 
-OUT = "src/shared/Layouts/Biomes/Planned/FogBank.luau"
+OUT = "src/shared/Layouts/Biomes/FogBank.luau"
 NAME = "Fog Bank"
 POST = "Timber"
 ROPE = "Chain"

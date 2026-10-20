@@ -3,10 +3,10 @@
 Card: `docs/design/cards/whirlwind-dunes.md`. Drawn with the layout kit from
 `tools/kit/plans/whirlwind_dunes.py` (edit the plan and re-run it, never the layout by hand):
 
-    python3 tools/kit/quick.py 5 Biomes/Planned/WhirlwindDunes --plan tools/kit/plans/whirlwind_dunes.py
+    python3 tools/kit/quick.py 5 Biomes/WhirlwindDunes --plan tools/kit/plans/whirlwind_dunes.py
 
 Each zone is walled (dunes 16 high, packed sand: the `Salt` material, walls drawn 24+ thick) and
-has its own layout in `src/shared/Layouts/Biomes/Planned/WhirlwindDunes.luau`.
+has its own layout in `src/shared/Layouts/Biomes/WhirlwindDunes.luau`.
 
 ## The frame (every zone)
 

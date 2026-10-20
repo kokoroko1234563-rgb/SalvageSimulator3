@@ -2,7 +2,7 @@
 and a bowl in the middle where a whirlwind turns. Zones 4, 5 and 6, each its own layout.
 
 Run it with the quick check, per zone:
-  python3 tools/kit/quick.py 4 Biomes/Planned/WhirlwindDunes --plan tools/kit/plans/whirlwind_dunes.py
+  python3 tools/kit/quick.py 4 Biomes/WhirlwindDunes --plan tools/kit/plans/whirlwind_dunes.py
 
 The map (zone coordinates: x -360 west to 360 east, z 0 at the top to 608 at the sea):
 
@@ -24,7 +24,7 @@ import math
 
 from kit import Zone, write_zones
 
-OUT = "src/shared/Layouts/Biomes/Planned/WhirlwindDunes.luau"
+OUT = "src/shared/Layouts/Biomes/WhirlwindDunes.luau"
 COMMENT = (
     "-- Whirlwind Dunes (planned biome, zones 4 to 6): tall dune ridges carved into a maze, a bowl\n"
     "-- in the middle where a whirlwind turns. Drawn with the layout kit from\n"

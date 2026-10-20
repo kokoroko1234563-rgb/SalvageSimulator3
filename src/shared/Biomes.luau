@@ -207,27 +207,14 @@ Biomes.List = {
 			Fog = -0.05,
 		},
 	},
-}
-
--- The doc's other biomes, written down so their items exist and point somewhere. They don't
--- roll yet: each needs its decor, entrance, secret course and hazard built first. Moving one
--- into Biomes.List (with those) is what turns it on. Coin = the normal secret's colored coin;
--- Rewards = the exotic secret's lootbox (all in Gear); Variant = its rare cosmetic variant.
-Biomes.Planned = {
-	JellyfishLagoon = {
-		Name = "Jellyfish Lagoon",
-		Tier = "Uncommon",
-		UnlockItem = "JellyJar",
-		Hazard = "Jellyfish: a sting drops what you hold",
-		Look = {
-			Haze = Color3.fromRGB(170, 140, 220),
-			Decay = Color3.fromRGB(90, 60, 150),
-			Tint = Color3.fromRGB(240, 225, 255),
-			Brightness = -0.2,
-		},
-		Rewards = { "JellyRaft", "GlowPearl" },
-	},
 	FogBank = {
+		Id = "FogBank",
+		Zones = { [2] = 12, [3] = 12, [4] = 14, [5] = 14, [6] = 14 },
+		Loot = {},
+		LootShare = 0,
+		Decor = Color3.fromRGB(200, 205, 210),
+		-- The fog, cleared now and then by the lighthouse's foghorn; covered pits in the deep zones.
+		Hazards = { { Type = "Fog", Scatter = false }, { Type = "Pit", Scatter = false } },
 		Name = "Fog Bank",
 		Tier = "Uncommon",
 		UnlockItem = "LighthouseKey",
@@ -236,6 +223,13 @@ Biomes.Planned = {
 		Rewards = { "LanternOfClearSight", "Foghorn" },
 	},
 	WhirlwindDunes = {
+		Id = "WhirlwindDunes",
+		Zones = { [4] = 10, [5] = 10, [6] = 10 },
+		Loot = {},
+		LootShare = 0,
+		Decor = Color3.fromRGB(225, 195, 140),
+		-- The whirlwind circling its bowl; spike pits in zone 6 where it can throw you.
+		Hazards = { { Type = "Whirlwind", Scatter = false }, { Type = "Pit", Scatter = false } },
 		Name = "Whirlwind Dunes",
 		Tier = "Rare",
 		UnlockItem = "WindChime",
@@ -249,30 +243,13 @@ Biomes.Planned = {
 		},
 		Rewards = { "MagicCarpet", "GustGloves" },
 	},
-	SpearstoneReef = {
-		Name = "Spearstone Reef",
-		Tier = "Rare",
-		UnlockItem = "SpearstoneShard",
-		Hazard = "Spears shooting from the floor on a timer",
-		Look = { Rock = "Basalt", Haze = Color3.fromRGB(120, 150, 170), Contrast = 0.12, Mix = 0.5 },
-		Rewards = { "TidewalkerBoots" },
-	},
-	SeaGlassShore = {
-		Name = "Sea-Glass Shore",
-		Tier = "VeryRare",
-		UnlockItem = "PrismShard",
-		Hazard = "Sharp glass patches that slow you",
-		Look = {
-			Floor = "Salt",
-			Haze = Color3.fromRGB(170, 235, 225),
-			Tint = Color3.fromRGB(225, 255, 250),
-			Saturation = 0.2,
-			Fog = -0.1,
-		},
-		Rewards = { "PrismLens", "GlassSwan" },
-		Variant = "Sea-glass",
-	},
 	StrandedIceberg = {
+		Id = "StrandedIceberg",
+		Zones = { [5] = 4, [6] = 6 },
+		LootShare = 0.5,
+		Decor = Color3.fromRGB(200, 230, 245),
+		-- Slippery ice across the frozen lake; crevasses (spike pits), covered and open.
+		Hazards = { { Type = "Ice", Scatter = false }, { Type = "Pit", Scatter = false } },
 		Name = "Stranded Iceberg",
 		Tier = "VeryRare",
 		Loot = { "FrozenFish" },
@@ -288,6 +265,56 @@ Biomes.Planned = {
 		},
 		Rewards = { "FrostSled", "FreezeWand" },
 		Variant = "Frosted",
+	},
+}
+
+-- The doc's other biomes, written down so their items exist and point somewhere. They don't
+-- roll yet: each needs its decor, entrance, secret course and hazard built first. Moving one
+-- into Biomes.List (with those) is what turns it on. Coin = the normal secret's colored coin;
+-- Rewards = the exotic secret's lootbox (all in Gear); Variant = its rare cosmetic variant.
+Biomes.Planned = {
+	SpearstoneReef = {
+		Id = "SpearstoneReef",
+		Zones = { [4] = 10, [5] = 10, [6] = 10 },
+		Loot = {},
+		LootShare = 0,
+		Decor = Color3.fromRGB(70, 80, 90),
+		-- Fields of spearstones on a rhythm, room after room: an obstacle course.
+		Hazards = { { Type = "Spears", Scatter = false } },
+		Name = "Spearstone Reef",
+		Tier = "Rare",
+		UnlockItem = "SpearstoneShard",
+		Hazard = "Spears shooting from the floor on a timer",
+		Look = { Rock = "Basalt", Haze = Color3.fromRGB(120, 150, 170), Contrast = 0.12, Mix = 0.5 },
+		Rewards = { "TidewalkerBoots" },
+	},
+	JellyfishLagoon = {
+		Name = "Jellyfish Lagoon",
+		Tier = "Uncommon",
+		UnlockItem = "JellyJar",
+		Hazard = "Jellyfish: a sting drops what you hold",
+		Look = {
+			Haze = Color3.fromRGB(170, 140, 220),
+			Decay = Color3.fromRGB(90, 60, 150),
+			Tint = Color3.fromRGB(240, 225, 255),
+			Brightness = -0.2,
+		},
+		Rewards = { "JellyRaft", "GlowPearl" },
+	},
+	SeaGlassShore = {
+		Name = "Sea-Glass Shore",
+		Tier = "VeryRare",
+		UnlockItem = "PrismShard",
+		Hazard = "Sharp glass patches that slow you",
+		Look = {
+			Floor = "Salt",
+			Haze = Color3.fromRGB(170, 235, 225),
+			Tint = Color3.fromRGB(225, 255, 250),
+			Saturation = 0.2,
+			Fog = -0.1,
+		},
+		Rewards = { "PrismLens", "GlassSwan" },
+		Variant = "Sea-glass",
 	},
 	BlackSandVents = {
 		Name = "Black Sand Vents",
