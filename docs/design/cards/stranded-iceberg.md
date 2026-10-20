@@ -24,3 +24,4 @@ Freeze Wand; the Frosted variant.
 
 **Questions.**
 1. Should a cart only spill when it hits something, or slowly on any ice?
+Answer: We should probably not have the spilling at all, lets remove that detail.
