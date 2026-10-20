@@ -131,6 +131,13 @@ Config.Zones = {
 		Multiplier = 8,
 		CrossTime = 55,
 		Rarity = { Common = 30, Uncommon = 35, Rare = 25, VeryRare = 10 },
+		-- Its own dangers: rockfall in the breaks between the ribs, the odd spike pit (always
+		-- clearly shown), and the undertow in its lowest lane.
+		Hazards = {
+			{ Type = "Rockfall", Scatter = false },
+			{ Type = "Pit", Scatter = false },
+			{ Type = "Undertow", Scatter = false },
+		},
 	},
 	{
 		Name = "The Shoals",
