@@ -22,3 +22,5 @@ channels flood first.
 
 **Questions.**
 1. Seagrass slowing you: enough, or should the channels' undertow join it in zone 4?
+
+Answer: That should join, and there is also far to little coverage by the hazards, they are very scattered
