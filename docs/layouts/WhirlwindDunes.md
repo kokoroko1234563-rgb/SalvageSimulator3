@@ -54,3 +54,9 @@ loops and pits in red.)
 ## Test Range
 
 See the end of this note (filled in after the runs).
+
+Run once per zone with the biome on its tile (`--no-routes`): terrain within 0.03 to 0.06 studs
+of the layout on average (worst 2.2), no pits or lanes off the layout. The only buried and
+floating things reported are the base zone's own props and cosmetic specks (zone props such as
+boulders and columns, coral rubble) that the tile's layout does not own: none of the biome's
+decor. The walk's route search (`--no-routes`) was not run.
