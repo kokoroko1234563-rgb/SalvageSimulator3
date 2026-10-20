@@ -24,3 +24,22 @@ Each card says:
 - **Rooms and loot**: the kinds of side pockets, and where the best finds are.
 - **Keep**: what must stay as it is (entrances, pools, the edges).
 - **Questions**: what the designer still has to decide.
+
+## The initial build
+
+The biomes to build before launch (decided with the designer):
+
+- **Rebuilt with the kit** (zone 6 is the model): zones 4 and 5, Hermit Hollows, Shipwreck
+  Shallows (its own zones 2 to 6).
+- **New:** one VeryRare biome, **Stranded Iceberg** (Pip the penguin's), rolling **only in zones 5
+  and 6**; Sea-Glass Shore and Black Sand Vents wait. Which of the planned Common, Uncommon and
+  Rare biomes join it: to decide.
+
+Where each biome rolls, by tier (VeryRare decided; the rest proposed):
+
+| Tier | Zones | Weight each (against no biome: 40) |
+|---|---|---|
+| Common | 1 to 4 | 20 to 45 |
+| Uncommon | 2 to 6 | 12 to 15 |
+| Rare | 4 to 6 | 8 to 15 |
+| VeryRare | 5 and 6 only | 4 to 6 |
