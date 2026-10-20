@@ -5,7 +5,7 @@ landmark (its entrance is under the jetty). Gentle: tangling seagrass patches (S
 danger, and they are easy to step round.
 
 Run it with the quick check, once per zone:
-    python3 tools/kit/quick.py 1 Biomes/Planned/SeagrassShallows --plan tools/kit/plans/seagrass_shallows.py
+    python3 tools/kit/quick.py 1 Biomes/SeagrassShallows --plan tools/kit/plans/seagrass_shallows.py
 
 Zones 1 to 3 are open sand (no walls, no rock, banks no taller than the zone allows):
   the frame is two low banks across the zone (carts can't climb them, feet can: the shortcuts),
@@ -29,7 +29,7 @@ The map of zones 1 to 3 (zone coordinates, x -360 west to 360 east, z 0 top to 6
 
 from kit import Zone, write_zones, segment_box, rounded
 
-OUT = "src/shared/Layouts/Biomes/Planned/SeagrassShallows.luau"
+OUT = "src/shared/Layouts/Biomes/SeagrassShallows.luau"
 NAME = "Seagrass Shallows"
 MUD = "Mud"
 
@@ -167,6 +167,9 @@ def zone1():
 def zone2():
     z = shore(2, NAME, hmax=4.4, bank_w=14, depth=3, jx=90,
               tide_z=(70, 300, 510), loot_at=[((-300, 240), 1), ((-60, 360), 2), ((250, 470), 3), ((-290, 560), 4)])
+    # The pier runs along x 40 over the zone's first 150 studs: its path kept clear (the
+    # channel passes under it).
+    z.frame.add(Kind="Flat", Area=[[32, 0], [48, 0], [48, 156], [32, 156]])
     crossing(z, "Seagrass trail", 0, 140, 20, -140, 0, tell_posts(0),
              [(-80, 140), (-60, 270), (100, 480)])
     crossing(z, "Reed track", 140, -130, -50, 130, 20, tell_chain(140),

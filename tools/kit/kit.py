@@ -40,6 +40,10 @@ import math
 import os
 
 GRID = 4  # the terrain's cells
+# How far a roof reaches past what it covers, onto the rock either side: a carving's edges
+# slope in over the terrain's Blend (8 studs), so a roof must reach past that to rest on rock at
+# its full height, or it floats over the slope.
+ROOF_REST = 10
 HALF = 360  # the beach's half width
 LENGTH = 608  # a zone's length
 EDGE = 380  # how far past the sides the rock reaches (it runs on under the cliffs)
@@ -214,6 +218,7 @@ class Part:
         self.hazards = []
         self.decors = []
         self.paths = None
+        self.bounds = None  # a room's: its slot (x0, z0, x1, z1), which its roofs keep inside
 
     # -- carving (in a rock zone) --
     def lane(self, points, width=16, roof=False, floor=None, rough=0):
@@ -242,6 +247,11 @@ class Part:
         holes = [(snap(x) - h, snap(z) - h, snap(x) + h, snap(z) + h) for x, z in pillars]
         for piece in without(area, holes):
             self.primitives.append({"Kind": "Flat", "Area": rounded(piece)})
+        for x0, z0, x1, z1 in holes if self.zone.rock else ():
+            # Solid to its full height (a carving's edges slope in, so the rock left standing
+            # alone would come up short of the roof).
+            self.primitives.append({"Kind": "Wall", "Area": rounded([(x0, z0), (x1, z0), (x1, z1), (x0, z1)]),
+                                    "Height": self.zone.rock, "Over": True})
         if floor:
             self.primitives.append({"Kind": "Paint", "Area": rounded(area), "Material": floor})
         if roof:
@@ -258,12 +268,21 @@ class Part:
             return self.lane([(x, z - depth / 2), (x, z + depth / 2)], width=width)
         return self.lane([(x - depth / 2, z), (x + depth / 2, z)], width=width)
 
+    def _inside(self, points):
+        """A room's shape kept inside its slot (others as they are)."""
+        if not self.bounds:
+            return points
+        clipped = clip(points, *self.bounds)
+        return clipped if len(clipped) >= 3 else None
+
     def roof_lane(self, points, width, clearance=True):
         rock = self.zone.rock
         clear = (rock - 2) if clearance is True else clearance
         for a, b in zip(points, points[1:]):
             # The roof is wider than the lane: it rests on the rock either side.
-            box = segment_box(a, b, width + 8)
+            box = self._inside(segment_box(a, b, width + 2 * ROOF_REST))
+            if not box:
+                continue
             self.primitives.append(
                 {"Kind": "Roof", "Area": rounded(box), "Clearance": clear, "Thickness": 6})
         return self
@@ -272,7 +291,8 @@ class Part:
         rock = self.zone.rock
         clear = (rock - 2) if clearance is True else clearance
         self.primitives.append(
-            {"Kind": "Roof", "Area": rounded(grow(area, 4)), "Clearance": clear, "Thickness": 6})
+            {"Kind": "Roof", "Area": rounded(self._inside(grow(area, ROOF_REST))), "Clearance": clear,
+             "Thickness": 6})
         return self
 
     # -- adding (anywhere) --
@@ -392,6 +412,7 @@ class Slot:
         """A room in the slot, in the slot's own coordinates. Its way from the door to the
         slot's middle is cut for it (lead=False: the room cuts its own)."""
         r = Part(self.zone, name)
+        r.bounds = (0, 0, self.size[0], self.size[1])
         if lead and self.door is not None and self.zone.rock:
             dx, dz = self.door
             w, d = self.size

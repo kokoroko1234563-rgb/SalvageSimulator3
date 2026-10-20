@@ -115,14 +115,13 @@ Biomes.List = {
 			Mix = 0.55,
 		},
 	},
-}
-
--- The doc's other biomes, written down so their items exist and point somewhere. They don't
--- roll yet: each needs its decor, entrance, secret course and hazard built first. Moving one
--- into Biomes.List (with those) is what turns it on. Coin = the normal secret's colored coin;
--- Rewards = the exotic secret's lootbox (all in Gear); Variant = its rare cosmetic variant.
-Biomes.Planned = {
 	DriftwoodCove = {
+		Id = "DriftwoodCove",
+		-- The pools behind the jams slow you where its layout puts them (gentle: a common biome).
+		Hazards = { { Type = "Slow", Scatter = false, Factor = 0.7, Color = Color3.fromRGB(90, 110, 120) } },
+		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
+		LootShare = 0.6,
+		Decor = Color3.fromRGB(196, 170, 136),
 		Name = "Driftwood Cove",
 		Tier = "Common",
 		Loot = { "Plank", "Rope", "GlassBottle", "OldBoot" },
@@ -132,6 +131,12 @@ Biomes.Planned = {
 		Look = { Haze = Color3.fromRGB(225, 190, 150), Tint = Color3.fromRGB(255, 235, 210), Mix = 0.4 },
 	},
 	TidepoolRocks = {
+		Id = "TidepoolRocks",
+		-- The pools slow you where its layout puts them (gentle: a common biome).
+		Hazards = { { Type = "Slow", Scatter = false, Factor = 0.7, Color = Color3.fromRGB(80, 130, 150) } },
+		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
+		LootShare = 0.6,
+		Decor = Color3.fromRGB(120, 140, 150),
 		Name = "Tidepool Rocks",
 		Tier = "Common",
 		Loot = { "Seashell", "Starfish", "FishingLure" },
@@ -141,6 +146,12 @@ Biomes.Planned = {
 		Look = { Rock = "Slate", Haze = Color3.fromRGB(160, 205, 230), Saturation = 0.1, Mix = 0.4 },
 	},
 	SeagrassShallows = {
+		Id = "SeagrassShallows",
+		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
+		LootShare = 0.6,
+		Decor = Color3.fromRGB(110, 150, 100),
+		-- Tangling seagrass slows you where its layout puts it (gentle: a common biome).
+		Hazards = { { Type = "Slow", Scatter = false, Factor = 0.6, Color = Color3.fromRGB(70, 120, 60) } },
 		Name = "Seagrass Shallows",
 		Tier = "Common",
 		Loot = { "Buoy", "Net", "GlassFloat" },
@@ -155,6 +166,12 @@ Biomes.Planned = {
 		},
 	},
 	CoralGarden = {
+		Id = "CoralGarden",
+		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
+		LootShare = 0.6,
+		Decor = Color3.fromRGB(235, 170, 180),
+		-- Sharp coral slows you where its layout puts it (gentle: a common biome).
+		Hazards = { { Type = "Slow", Scatter = false, Factor = 0.6, Color = Color3.fromRGB(240, 150, 160) } },
 		Name = "Coral Garden",
 		Tier = "Common",
 		Loot = { "Coral", "Snorkel", "Coconut" },
@@ -168,6 +185,13 @@ Biomes.Planned = {
 			Fog = -0.05,
 		},
 	},
+}
+
+-- The doc's other biomes, written down so their items exist and point somewhere. They don't
+-- roll yet: each needs its decor, entrance, secret course and hazard built first. Moving one
+-- into Biomes.List (with those) is what turns it on. Coin = the normal secret's colored coin;
+-- Rewards = the exotic secret's lootbox (all in Gear); Variant = its rare cosmetic variant.
+Biomes.Planned = {
 	JellyfishLagoon = {
 		Name = "Jellyfish Lagoon",
 		Tier = "Uncommon",

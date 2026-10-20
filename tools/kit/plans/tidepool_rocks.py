@@ -12,12 +12,12 @@ cart way is the gully (20 wide) and goes the long way round; the foot way is nar
 and steps up over low ledges and wades pool to pool. Side pools open off the top and bottom bands.
 Two crossings: the gully is in the east, or in the west.
 
-Run:  python3 tools/kit/quick.py <zone> Biomes/Planned/TidepoolRocks --plan tools/kit/plans/tidepool_rocks.py
+Run:  python3 tools/kit/quick.py <zone> Biomes/TidepoolRocks --plan tools/kit/plans/tidepool_rocks.py
 """
 
 from kit import Zone, near_path, write_zones
 
-OUT = "src/shared/Layouts/Biomes/Planned/TidepoolRocks.luau"
+OUT = "src/shared/Layouts/Biomes/TidepoolRocks.luau"
 COMMENT = (
     "-- Tidepool Rocks (planned): rock benches pocked with pools, drawn with the layout kit from\n"
     "-- tools/kit/plans/tidepool_rocks.py. Edit that plan and run it again, not this file.\n"

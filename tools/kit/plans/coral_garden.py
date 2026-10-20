@@ -5,7 +5,7 @@ through them. Gentle: sharp coral beds (the Slow hazard: step round them) are th
 The entrance is an arch in the reef.
 
 Run it with the quick check, once per zone:
-    python3 tools/kit/quick.py 1 Biomes/Planned/CoralGarden --plan tools/kit/plans/coral_garden.py
+    python3 tools/kit/quick.py 1 Biomes/CoralGarden --plan tools/kit/plans/coral_garden.py
 
 Zones 1 to 3 are open sand (no walls, no rock, spines no taller than the zone allows):
   the frame is three pairs of low reef ridges across the zone (carts can't climb them, feet can:
@@ -34,7 +34,7 @@ The map of zones 1 to 3 (zone coordinates, x -360 west to 360 east, z 0 top to 6
 
 from kit import Zone, write_zones
 
-OUT = "src/shared/Layouts/Biomes/Planned/CoralGarden.luau"
+OUT = "src/shared/Layouts/Biomes/CoralGarden.luau"
 NAME = "Coral Garden"
 CORAL = "Concrete"  # the reef's pale, shell-grit ground
 PAIRS = (120, 300, 480)  # the coves' middle lines (zones 2 and 3 move them off the rock pools)

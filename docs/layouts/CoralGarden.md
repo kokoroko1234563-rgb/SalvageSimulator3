@@ -1,7 +1,7 @@
 # Coral Garden (biome, zones 1 to 4)
 
 Drawn with the kit from `tools/kit/plans/coral_garden.py` (edit the plan and re-run it), written
-to `src/shared/Layouts/Biomes/Planned/CoralGarden.luau`. Card: `docs/design/cards/coral-garden.md`.
+to `src/shared/Layouts/Biomes/CoralGarden.luau`. Card: `docs/design/cards/coral-garden.md`.
 Gentle choices taken: sharp coral beds are `Slow` patches (radius 8 to 9, coral and urchins
 marking them), nothing that knocks you back.
 

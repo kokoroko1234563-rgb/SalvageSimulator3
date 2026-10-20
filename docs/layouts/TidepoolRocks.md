@@ -1,12 +1,12 @@
 # Tidepool Rocks (planned, common; zones 1 to 4)
 
 Drawn with the layout kit from `tools/kit/plans/tidepool_rocks.py` (edit the plan and run it, not
-the layout). It writes `src/shared/Layouts/Biomes/Planned/TidepoolRocks.luau`, one layout per
+the layout). It writes `src/shared/Layouts/Biomes/TidepoolRocks.luau`, one layout per
 zone. The card is `docs/design/cards/tidepool-rocks.md`. No deadly dangers: the card's question
 (a spouting blowhole) is answered gently, so the blowhole is only the entrance's look; the only
 hazard is `Slow` wading in the pools.
 
-Check it:  `python3 tools/kit/quick.py <zone> Biomes/Planned/TidepoolRocks --plan tools/kit/plans/tidepool_rocks.py`
+Check it:  `python3 tools/kit/quick.py <zone> Biomes/TidepoolRocks --plan tools/kit/plans/tidepool_rocks.py`
 
 ## Zones 1 to 3: open sand
 

@@ -918,6 +918,15 @@ return {
 			{ Kind = "Hollow", At = { -60, 360 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
 			{ Kind = "Hollow", At = { 250, 470 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
 			{ Kind = "Hollow", At = { -290, 560 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
+			{
+				Kind = "Flat",
+				Area = {
+					{ 32, 0 },
+					{ 48, 0 },
+					{ 48, 156 },
+					{ 32, 156 },
+				},
+			},
 		},
 		Loot = {
 			{ At = { 90, 326 }, Radius = 6, Weight = 2 },
@@ -3099,6 +3108,17 @@ return {
 									{ 64, 88 },
 									{ 8, 88 },
 								},
+							},
+							{
+								Kind = "Wall",
+								Area = {
+									{ 30, 42 },
+									{ 42, 42 },
+									{ 42, 54 },
+									{ 30, 54 },
+								},
+								Height = 10,
+								Over = true,
 							},
 						},
 						Loot = {

@@ -12,12 +12,12 @@ the beach. The cart way is 20 wide and goes the long way round; the foot way is 
 shorter, and climbs over low log stacks lying across its lane. Side hollows open off the top and
 bottom bands. Two crossings: the cart way is in the west, or in the east.
 
-Run:  python3 tools/kit/quick.py <zone> Biomes/Planned/DriftwoodCove --plan tools/kit/plans/driftwood_cove.py
+Run:  python3 tools/kit/quick.py <zone> Biomes/DriftwoodCove --plan tools/kit/plans/driftwood_cove.py
 """
 
 from kit import Zone, near_path, write_zones
 
-OUT = "src/shared/Layouts/Biomes/Planned/DriftwoodCove.luau"
+OUT = "src/shared/Layouts/Biomes/DriftwoodCove.luau"
 COMMENT = (
     "-- Driftwood Cove (planned): a log jam, drawn with the layout kit from\n"
     "-- tools/kit/plans/driftwood_cove.py. Edit that plan and run it again, not this file.\n"

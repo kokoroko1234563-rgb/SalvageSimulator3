@@ -9,10 +9,10 @@
 --              back out of it outside.
 --   Current    dragged along its Direction at Strength (into deep water, where you drown).
 --   Harm       the server is told you were hit (it applies the Damage), and you're thrown.
---   Gloom      its shadow makes you Benighted for its Duration (renewed while you're in it):
---              the world goes black around you (DayController.blind) and only lights show.
---              Within a ward's light (Hazards.WardTag) it wears off WardCure times faster. The
---              time left is the LocalPlayer's "Benighted" attribute, shown on screen.
+--   Gloom      its shadow makes you Benighted (not within a ward's light, Hazards.WardTag):
+--              the world goes black around you (DayController.blind) and only lights show,
+--              until you die or leave the deep (zones 5 and 6). The LocalPlayer's "Benighted"
+--              attribute says so, shown on screen.
 -- A hazard with an Active attribute only hits while it's set.
 
 local CollectionService = game:GetService("CollectionService")
@@ -20,6 +20,8 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Beach = require(Shared.Beach)
+local Config = require(Shared.Config)
 local Hazards = require(Shared.Hazards)
 local Remotes = require(Shared.Remotes)
 
@@ -41,10 +43,19 @@ local lastDrop: { [Instance]: number } = {}
 local lastHarm: { [Instance]: number } = {}
 local sunk = 0 -- seconds of sinking so far (standing-still seconds)
 local warned = false
-local benighted = 0 -- seconds left Benighted by the Gloom
+local benighted = false -- Benighted by the Gloom (until you die or leave the deep)
 local benightedLabel: TextLabel? = nil
 local baseHip: number? = nil -- the character's own HipHeight, while the sand pulls it down
-local gloomCure: number? = nil -- how much faster Benighted wears off in a ward's light
+
+-- Whether a point along the beach (Z) is in the deep, the zones where the Gloom keeps hold of
+-- you (DEEP, by zone).
+local DEEP = { 5, 6 }
+local function inDeep(z: number): boolean
+	local per = Config.Beach.TilesPerZone
+	local from = Beach.tileRange((DEEP[1] - 1) * per + 1)
+	local _, to = Beach.tileRange(DEEP[#DEEP] * per)
+	return z >= from and z < to
+end
 
 -- Whether a point is within a ward's light, where the Gloom can't reach.
 local function warded(position: Vector3): boolean
@@ -76,7 +87,7 @@ local function step(dt: number)
 		WaveController.hazardJump = 1
 		WaveController.hazardPush = Vector3.zero
 		sunk, warned, baseHip = 0, false, nil
-		benighted = 0
+		benighted = false -- (dying lifts it)
 		DayController.blind = 0
 		return
 	end
@@ -174,30 +185,21 @@ local function step(dt: number)
 		baseHip = nil
 	end
 
-	-- The Gloom: its shadow Benights you; it wears off with time, faster in a ward's light.
-	local inWard = warded(position)
-	if gloom and not inWard then
-		local duration = gloom:GetAttribute("Duration") or 30
-		if benighted <= 0 then
+	-- The Gloom: its shadow Benights you (a ward's light keeps it off), and it stays on you until
+	-- you die or leave the deep (back up past zone 5, or out onto the Far Sandbar).
+	if gloom and not warded(position) then
+		if not benighted then
 			HUD.notify(gloom:GetAttribute("HitText") or "The Gloom's shadow fell on you: find the light!")
 		end
-		benighted = math.max(benighted, duration)
-	elseif benighted > 0 then
-		local cure = if inWard then (gloomCure or 4) else 1
-		benighted = math.max(0, benighted - dt * cure)
+		benighted = true
+	elseif benighted and not inDeep(position.Z) then
+		benighted = false
+		HUD.notify("The Gloom lets go of you.")
 	end
-	if gloom then
-		gloomCure = gloom:GetAttribute("WardCure") or 4
-	end
-	DayController.blind = if benighted > 0 then 1 else 0
-	player:SetAttribute("Benighted", if benighted > 0 then math.ceil(benighted) else nil)
+	DayController.blind = if benighted then 1 else 0
+	player:SetAttribute("Benighted", if benighted then true else nil)
 	if benightedLabel then
-		benightedLabel.Visible = benighted > 0
-		benightedLabel.Text = string.format(
-			"Benighted: %ds%s",
-			math.ceil(benighted),
-			if inWard then "  (the light is driving it off)" else ""
-		)
+		benightedLabel.Visible = benighted
 	end
 end
 
@@ -210,12 +212,13 @@ function HazardController.init()
 	local label = Instance.new("TextLabel")
 	label.AnchorPoint = Vector2.new(0.5, 0)
 	label.Position = UDim2.new(0.5, 0, 0, 70)
-	label.Size = UDim2.fromOffset(420, 28)
+	label.Size = UDim2.fromOffset(700, 28)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.GothamBold
 	label.TextSize = 20
 	label.TextColor3 = Color3.fromRGB(200, 190, 255)
 	label.TextStrokeTransparency = 0.4
+	label.Text = "Benighted: follow the lights, or carry your own (it lifts out of the deep)"
 	label.Visible = false
 	label.Parent = gui
 	gui.Parent = player:WaitForChild("PlayerGui")

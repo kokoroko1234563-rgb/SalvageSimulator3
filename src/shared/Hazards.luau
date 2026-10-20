@@ -56,10 +56,10 @@
 --           middle; without a Path, the layout's longest Patrol route.
 --   Gloom   a living, magical darkness (the Drowned Reach's): something unseen that roams
 --           its Path at Speed (or lurks At a spot), casting a shadow Radius studs across on the
---           floor under it. Step into the shadow and you're Benighted for Duration seconds:
---           the world goes black, and you see only lights (a lantern or headlamp shows you your
---           own surroundings). Within a GloomWard's light (glowing decor) it wears off
---           WardCure times faster. Placement: Path or At, Radius.
+--           floor under it. Step into the shadow (outside a GloomWard's light: glowing decor)
+--           and you're Benighted until you die or leave the deep (zones 5 and 6): the world goes
+--           black, and you see only lights (a lantern or headlamp shows you your own
+--           surroundings, and the wards light the way). Placement: Path or At, Radius.
 --
 -- What a hazard does to a player who gets within HitRadius of it is its Effect:
 --   Knockdown  knocked over (you drop what you hold) and thrown Push studs/s away from it.
@@ -68,7 +68,7 @@
 --   Sink       slowed, and swallowed if you stay in it (Sink hazards).
 --   Current    dragged along (Undertow hazards): into deep water, where you drown.
 --   Harm       Damage taken (100 kills), and thrown Push studs/s away from it.
---   Gloom      Benighted: the world goes dark around you for a while (Gloom hazards).
+--   Gloom      Benighted: the world goes dark around you until you die or leave the deep.
 -- Dangers are meant to be deadly: a hazard that only slows you is scenery.
 -- The server builds and moves the hazards (HazardService); each player's own client checks its
 -- character against them and applies the effect (HazardController), like the waves.

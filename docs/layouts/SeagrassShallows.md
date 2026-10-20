@@ -1,7 +1,7 @@
 # Seagrass Shallows (biome, zones 1 to 4)
 
 Drawn with the kit from `tools/kit/plans/seagrass_shallows.py` (edit the plan and re-run it),
-written to `src/shared/Layouts/Biomes/Planned/SeagrassShallows.luau`. Card:
+written to `src/shared/Layouts/Biomes/SeagrassShallows.luau`. Card:
 `docs/design/cards/seagrass-shallows.md`. Gentle choices taken: only tangling seagrass (`Slow`,
 radius 8 to 10, easy to step round), no undertow.
 

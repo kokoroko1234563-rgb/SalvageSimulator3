@@ -1,11 +1,11 @@
 # Driftwood Cove (planned, common; zones 1 to 4)
 
 Drawn with the layout kit from `tools/kit/plans/driftwood_cove.py` (edit the plan and run it, not
-the layout). It writes `src/shared/Layouts/Biomes/Planned/DriftwoodCove.luau`, one layout per
+the layout). It writes `src/shared/Layouts/Biomes/DriftwoodCove.luau`, one layout per
 zone. The card is `docs/design/cards/driftwood-cove.md`. No deadly dangers (the card's question,
 answered gently): the only hazard is `Slow` wading in the dips.
 
-Check it:  `python3 tools/kit/quick.py <zone> Biomes/Planned/DriftwoodCove --plan tools/kit/plans/driftwood_cove.py`
+Check it:  `python3 tools/kit/quick.py <zone> Biomes/DriftwoodCove --plan tools/kit/plans/driftwood_cove.py`
 
 ## Zones 1 to 3: open sand
 

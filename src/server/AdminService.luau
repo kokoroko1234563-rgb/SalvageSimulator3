@@ -786,9 +786,10 @@ command(
 			return { Biomes.Planned[id].Name .. " has no layout for zone " .. zone .. " yet" }
 		end
 		Layouts.setPreview(zone, id)
+		-- (The preview's already in place, so the ground looks unchanged to set: rebuild anyway.)
 		for _, tile in { wasTile, zone } do
 			if type(tile) == "number" then
-				BiomeService.set(tile, nil, "1:")
+				BiomeService.set(tile, nil, "1:", true)
 			end
 		end
 		return {
