@@ -2598,7 +2598,8 @@ test("barrels teeter at the top of their gully first, then roll down it", functi
 	local Hazards = h.require("Shared/Hazards")
 	local Layouts = h.require("Shared/Layouts")
 	local HazardService = h.require("Server/HazardService")
-	local tile = 3
+	-- (Tile 1's top is above even high tide: a barrel whose start is under water doesn't come.)
+	local tile = 1
 	local z0 = Beach.tileRange(tile)
 	Layouts.setActive(tile, {
 		Name = "gully",
