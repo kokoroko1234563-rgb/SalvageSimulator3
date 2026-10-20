@@ -93,6 +93,7 @@ Biomes.List = {
 				Type = "Patrol",
 				Count = 4,
 				Speed = 7,
+				Calls = true, -- one that spots you drums for the giant
 				Color = Color3.fromRGB(200, 95, 70),
 				HitText = "A hermit crab knocked you flat!",
 			},

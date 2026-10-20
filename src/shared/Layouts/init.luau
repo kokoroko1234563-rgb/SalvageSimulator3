@@ -1029,6 +1029,8 @@ function Layouts.problems(layout: any): { string }
 				add(where .. ": Path needs at least two {x, z} points")
 			elseif key == "Lanes" and (type(value) ~= "table" or #value < 1) then
 				add(where .. ": Lanes is a list of X positions")
+			elseif key == "Burrows" and (type(value) ~= "table" or #value < 1 or not isPoint(value[1])) then
+				add(where .. ": Burrows is a list of {x, z} points")
 			elseif
 				(key == "Count" or key == "Radius" or key == "Depth")
 				and (type(value) ~= "number" or value <= 0)

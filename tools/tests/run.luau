@@ -2614,6 +2614,18 @@ test("the giant crab takes the longest crab route, and is deadly but can be outr
 	local settings = Hazards.settings({ Type = "Hunter" })
 	assert(settings.Damage >= 100 and settings.ChaseSpeed < 20, "deadly, but a running player can outpace it")
 	assert(settings.SightAngle < 360, "it can't see behind it")
+	-- Its moves are telegraphed: it rears up before a dash, and where it'll come up shakes and
+	-- spurts sand for a while before it does; a patrol crab drums before it calls.
+	assert(settings.DashWarn >= 0.5 and settings.DashRecover >= 1, "the dash: rear up first, stand after")
+	assert(settings.DigTime + settings.UnderTime >= 2, "the dig: its way up shows for 2 s at least")
+	assert(Hazards.settings({ Type = "Patrol" }).CallTime >= 1.5, "a call: drumming first")
+	local holes = 0
+	for _, part in folder:GetChildren() do
+		if part.Name == "BurrowHole" then
+			holes += 1
+		end
+	end
+	assert(holes == 3, "burrow holes: its route's ends and middle, without Burrows of its own")
 	-- It keeps to its route like a rail: an L-shaped route, 100 along X then 50 along Z.
 	local V2 = roblox.Vector2.new
 	local route = HazardService._rail({ V2(0, 0), V2(100, 0), V2(100, 50) })

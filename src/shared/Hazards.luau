@@ -6,7 +6,10 @@
 --   Roller  something rolls down the tile toward the sea every Period seconds, at Speed (the
 --           Shipwreck Shallows barrels). Placement: Lanes = { x, ... } it can start from.
 --   Patrol  Count creatures walk a route back and forth at Speed (hermit crabs). Placement:
---           Path = { {x, z}, ... }; without one, each wanders around where it starts.
+--           Path = { {x, z}, ... }; without one, each wanders around where it starts. With
+--           Calls, one that sees someone within CallRange ahead (CallAngle across) stops and
+--           drums its claws, a ring pulsing round it, for CallTime seconds: still seen then, it
+--           calls the tile's Hunter, which digs to the burrow nearest it.
 --   Pulse   a spot erupts for Active seconds every Period, after Warning seconds of warning
 --           (vents, blowholes). Placement: At = {x, z}.
 --   Slow    a patch that slows you to Factor of your speed while you're in it (sea glass,
@@ -31,11 +34,18 @@
 --           Depth, Covered (true or false; without it, the kind's Covered).
 --   Undertow  while the sea covers it (deeper than MinDepth), a current along a ford or
 --           channel drags you toward the sea at Strength studs/s. Placement: Path, Width.
---   Hunter  a big creature (the giant hermit crab) that patrols its Path at Speed and hunts:
---           it sees a player within SightRange (LightRange if they carry a light) with nothing
---           in the way, chases at ChaseSpeed, gives up LoseTime seconds after losing sight of
---           them or Leash studs from its route, and walks back the way it came. Placement:
---           Path; without one it takes the layout's longest Patrol route.
+--   Hunter  a big creature (the giant hermit crab) that patrols its Path at Speed and hunts,
+--           always on its route, like a rail: it sees a player ahead within SightRange
+--           (LightRange if they carry a light) with nothing in the way, and chases at
+--           ChaseSpeed, no further than Leash from where it began. Two moves, both telegraphed:
+--           the dash (someone within DashRange ahead: it rears up, eyes red, for DashWarn
+--           seconds, charges at DashSpeed up to DashDistance, then stands DashRecover seconds),
+--           and the dig (losing sight of them, or every DigEvery seconds while they're more than
+--           DigAway along its route, or called by a patrol crab: it burrows in a cloud of dust
+--           for DigTime seconds and comes out of the burrow hole nearest them after UnderTime
+--           more, the hole shaking and spurting sand all that while). Placement: Path, and
+--           Burrows = { {x, z}, ... } (on its route); without Burrows, its route's ends and
+--           middle; without a Path, the layout's longest Patrol route.
 --   Gloom   a living, magical darkness (the Drowned Reach's): something unseen that roams
 --           its Path at Speed (or lurks At a spot), casting a shadow Radius studs across on the
 --           floor under it. Step into the shadow and you're Benighted for Duration seconds:
@@ -85,6 +95,11 @@ Hazards.Types = {
 		HitRadius = 3,
 		Push = 30,
 		Wander = 30, -- studs a creature without a Path wanders from where it starts
+		Calls = false, -- whether it calls the Hunter when it sees someone
+		CallRange = 26,
+		CallAngle = 100, -- degrees across the cone it watches, ahead of it
+		CallTime = 2, -- seconds of drumming before the call goes out
+		CallCooldown = 10,
 		HitText = "You got knocked over!",
 	},
 	Pulse = {
@@ -177,6 +192,17 @@ Hazards.Types = {
 		FeelRange = 8, -- this close, it notices you from any side
 		LoseTime = 2.5,
 		Leash = 90,
+		DashRange = 30, -- someone this close ahead, it dashes
+		DashWarn = 0.8, -- seconds it rears up first
+		DashSpeed = 42,
+		DashDistance = 36,
+		DashRecover = 1.2, -- seconds it stands after a dash: the chance to get away
+		DashCooldown = 5,
+		DigTime = 1.5, -- seconds burrowing (dust where it goes down)
+		UnderTime = 1, -- seconds under before it comes up (the hole's been shaking since the dig began)
+		EmergeTime = 0.6,
+		DigEvery = 15,
+		DigAway = 40, -- studs along its route someone must be for it to dig after them
 		Size = Vector3.new(12, 6, 10),
 		Color = Color3.fromRGB(176, 72, 52),
 		Damage = 100,
@@ -215,7 +241,7 @@ Hazards.Placement = {
 	Pit = { At = true, Radius = true, Depth = true, Covered = true },
 	Undertow = { Path = true, Width = true },
 	Gloom = { Path = true, At = true, Radius = true },
-	Hunter = { Path = true },
+	Hunter = { Path = true, Burrows = true },
 }
 
 -- A biome's hazard entry with every setting filled in from its kind's defaults.

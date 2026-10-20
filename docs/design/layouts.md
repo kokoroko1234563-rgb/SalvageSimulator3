@@ -129,7 +129,7 @@ biome's its `Hazards`.
 | **Pit**: a spike pit, open or under a false floor whose cracks are the only tell | `At`, `Radius`, `Depth` (≤12), `Covered` | off the cart route and clear of doors; covered under a prize |
 | **Undertow**: a current dragging seaward while the sea covers a ford or channel | `Path`, `Width` | along the channels |
 | **Patrol**: creatures walking a route | `Path`, `Count` | in corridors, crossing the ways through |
-| **Hunter**: the giant crab; sees in a cone ahead, keeps to its route, chases and kills | `Path` | down a tunnel: it fills it, so it can't be run round |
+| **Hunter**: the giant crab; sees in a cone ahead, keeps to its route, chases and kills; rears up then dashes; digs and comes up at a burrow hole (which shakes and spurts sand first); patrol crabs that spot you drum to call it | `Path`, `Burrows` (on its route; default its ends and middle) | down a tunnel: it fills it, so it can't be run round; burrows where it can cut you off |
 | **Roller**: things rolling down the zone on a timer | `Lanes` | down the gullies |
 
 ## Decor and tells

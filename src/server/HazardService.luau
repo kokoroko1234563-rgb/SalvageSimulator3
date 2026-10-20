@@ -183,7 +183,25 @@ local function creature(settings, at: Vector3): (Model, BasePart)
 	return model, body
 end
 
--- Patrol: creatures walk a route back and forth, or wander around where they start.
+-- The calls patrol crabs make to their tile's Hunter: where, and when.
+local calls: { [number]: { at: Vector2, time: number } } = {}
+
+-- Whether anything solid is between two points (players and the hazards' own parts aside).
+local sightParams = RaycastParams.new()
+sightParams.FilterType = Enum.RaycastFilterType.Exclude
+local function clearSight(from: Vector3, to: Vector3, folder: Instance): boolean
+	local exclude: { Instance } = { folder }
+	for _, p in Players:GetPlayers() do
+		if p.Character then
+			table.insert(exclude, p.Character)
+		end
+	end
+	sightParams.FilterDescendantsInstances = exclude
+	return Workspace:Raycast(from, to - from, sightParams) == nil
+end
+
+-- Patrol: creatures walk a route back and forth, or wander around where they start. With
+-- Calls, one that spots someone stops and drums for the Hunter (see Hazards.luau).
 function builders.Patrol(tile, settings, folder)
 	local z0 = Beach.tileRange(tile)
 	local size: Vector3 = settings.Size
@@ -213,7 +231,7 @@ function builders.Patrol(tile, settings, folder)
 				place(model, path[1], Vector2.new(0, 1)) -- on the ground from the start
 				model.Parent = folder
 				-- Spread out along the route, coming and going.
-				table.insert(walkers, { model = model, path = path, offset = 2 * length * (i - 1) / count })
+				table.insert(walkers, { model = model, path = path, dist = 2 * length * (i - 1) / count })
 			end
 		end
 	else
@@ -226,14 +244,87 @@ function builders.Patrol(tile, settings, folder)
 			table.insert(walkers, { model = model, home = home, at = home, target = home })
 		end
 	end
-	local started = os.clock()
+	-- Calling: the ring that pulses round a drumming crab.
+	local function ring(walker): BasePart
+		if not walker.ring then
+			walker.ring = makePart({
+				Name = "CallRing",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.15, 1, 1),
+				Color = Color3.fromRGB(255, 150, 60),
+				Material = Enum.Material.Neon,
+				Transparency = 1,
+			})
+			walker.ring.Parent = folder
+		end
+		return walker.ring
+	end
+	local callCos = math.cos(math.rad(settings.CallAngle / 2))
+	-- Someone the crab can see ahead of it, near enough to call about.
+	local function spots(walker): Vector3?
+		local at, heading = walker.at, walker.heading
+		if not at or not heading then
+			return nil
+		end
+		local eye = Vector3.new(at.X, Beach.groundAt(at.X, at.Y) + size.Y, at.Y)
+		for _, player in Players:GetPlayers() do
+			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+			if root and humanoid and humanoid.Health > 0 then
+				local offset = Vector2.new(root.Position.X, root.Position.Z) - at
+				if
+					offset.Magnitude <= settings.CallRange
+					and offset.Magnitude > 0
+					and offset.Unit:Dot(heading) >= callCos
+					and clearSight(eye, root.Position, folder)
+				then
+					return root.Position
+				end
+			end
+		end
+		return nil
+	end
 	table.insert(running, {
 		folder = folder,
 		step = function(now, dt)
 			for _, walker in walkers do
+				if settings.Calls and walker.path then
+					if walker.callUntil then
+						-- Drumming: it stands, claws going, a ring pulsing out round it.
+						local k = ((walker.callUntil - now) * 2) % 1
+						local r = ring(walker)
+						local radius = 2 + (1 - k) * 10
+						r.Size = Vector3.new(0.15, radius * 2, radius * 2)
+						r.CFrame = CFrame.new(
+							walker.at.X,
+							Beach.groundAt(walker.at.X, walker.at.Y) + 0.2,
+							walker.at.Y
+						) * CFrame.Angles(0, 0, math.pi / 2)
+						r.Transparency = 0.2 + 0.7 * (1 - k)
+						local bob = math.abs(math.sin(now * 14)) * 0.6
+						walker.model:PivotTo(
+							walker.model:GetPivot() + Vector3.new(0, bob - (walker.bob or 0), 0)
+						)
+						walker.bob = bob
+						if now >= walker.callUntil then
+							local seen = spots(walker)
+							if seen then
+								calls[tile] = { at = walker.at, time = now }
+							end
+							walker.callUntil, walker.nextCall, walker.bob =
+								nil, now + settings.CallCooldown, 0
+							r.Transparency = 1
+						end
+						continue
+					elseif now >= (walker.nextCall or 0) and spots(walker) then
+						walker.callUntil = now + settings.CallTime
+						continue
+					end
+				end
 				if walker.path then
-					local at, heading =
-						HazardService.alongPath(walker.path, walker.offset + (now - started) * settings.Speed)
+					walker.dist += settings.Speed * dt
+					local at, heading = HazardService.alongPath(walker.path, walker.dist)
+					walker.at, walker.heading = at, heading
 					place(walker.model, at, heading)
 				else
 					local toTarget = walker.target - walker.at
@@ -945,7 +1036,7 @@ function builders.Hunter(tile, settings, folder)
 	local z0 = Beach.tileRange(tile)
 	local routes = {}
 	for _, placement in Layouts.hazardPlacements(tile, "Hunter") do
-		table.insert(routes, placement.Path)
+		table.insert(routes, { path = placement.Path, burrows = placement.Burrows })
 	end
 	if #routes == 0 then
 		-- The longest crab route the layout has (the Test Range checks those stay in corridors).
@@ -961,36 +1052,103 @@ function builders.Hunter(tile, settings, folder)
 			end
 		end
 		if best then
-			table.insert(routes, best)
+			table.insert(routes, { path = best })
 		end
 	end
 	local size: Vector3 = settings.Size
+	local calm, angry = Color3.fromRGB(255, 230, 120), Color3.fromRGB(255, 40, 30)
 	local hunters = {}
 	for index, route in routes do
 		if index > settings.Count then
 			break
 		end
 		local path = {}
-		for _, point in route do
+		for _, point in route.path do
 			table.insert(path, Vector2.new(point[1], z0 + point[2]))
 		end
 		local model, body = creature(settings, Vector3.new(path[1].X, 0, path[1].Y))
 		model.Name = "Hunter"
+		local eyes = {}
 		for _, side in { -1, 1 } do
 			local eye = makePart({
 				Name = "Eye",
 				Shape = Enum.PartType.Ball,
 				Size = Vector3.new(0.9, 0.9, 0.9),
 				CFrame = body.CFrame * CFrame.new(side * size.X * 0.15, size.Y * 0.45, -size.Z * 0.45),
-				Color = Color3.fromRGB(255, 230, 120),
+				Color = calm,
 				Material = Enum.Material.Neon,
 			})
 			eye.Parent = model
+			table.insert(eyes, eye)
 		end
+		-- The dust it throws up going down.
+		local dig = makePart({ Name = "DigDust", Size = Vector3.new(1, 1, 1), Transparency = 1 })
+		local digDust = Instance.new("ParticleEmitter")
+		digDust.Color = ColorSequence.new(Color3.fromRGB(196, 176, 140))
+		digDust.Size = NumberSequence.new(2.5, 5)
+		digDust.Lifetime = NumberRange.new(1, 1.6)
+		digDust.Rate = 50
+		digDust.Speed = NumberRange.new(6, 12)
+		digDust.SpreadAngle = Vector2.new(60, 60)
+		digDust.EmissionDirection = Enum.NormalId.Top
+		digDust.Enabled = false
+		digDust.Parent = dig
+		dig.Parent = folder
 		model.Parent = folder
+		local track = rail(path)
+		-- Its burrow holes: on its route, where it can come up. Churned sand marks each.
+		local burrows = {}
+		local points = route.burrows
+		if not points then
+			local middle = track.at(track.length / 2)
+			points = {
+				{ path[1].X, path[1].Y - z0 },
+				{ middle.X, middle.Y - z0 },
+				{ path[#path].X, path[#path].Y - z0 },
+			}
+		end
+		for _, point in points do
+			local s = track.nearest(Vector2.new(point[1], z0 + point[2]))
+			local at = track.at(s)
+			local ground = Beach.groundAt(at.X, at.Y)
+			local hole = makePart({
+				Name = "BurrowHole",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(1.4, size.X * 0.9, size.X * 0.9),
+				CFrame = CFrame.new(at.X, ground + 0.1, at.Y) * CFrame.Angles(0, 0, math.pi / 2),
+				Color = Color3.fromRGB(120, 100, 74),
+				Material = Enum.Material.Sand,
+			})
+			hole.Parent = folder
+			local mound = makePart({
+				Name = "BurrowMound",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(size.X * 0.6, 2.2, size.X * 0.6),
+				CFrame = CFrame.new(at.X, ground + 0.3, at.Y),
+				Color = Color3.fromRGB(150, 128, 96),
+				Material = Enum.Material.Sand,
+			})
+			local spurt = Instance.new("ParticleEmitter")
+			spurt.Color = ColorSequence.new(Color3.fromRGB(206, 186, 150))
+			spurt.Size = NumberSequence.new(1.2, 2.5)
+			spurt.Lifetime = NumberRange.new(0.6, 1)
+			spurt.Rate = 70
+			spurt.Speed = NumberRange.new(10, 18)
+			spurt.SpreadAngle = Vector2.new(25, 25)
+			spurt.EmissionDirection = Enum.NormalId.Top
+			spurt.Enabled = false
+			spurt.Parent = mound
+			mound.Parent = folder
+			table.insert(burrows, { s = s, at = at, mound = mound, base = mound.CFrame, spurt = spurt })
+		end
 		table.insert(hunters, {
 			model = model,
-			rail = rail(path),
+			body = body,
+			eyes = eyes,
+			dig = dig,
+			digDust = digDust,
+			rail = track,
+			burrows = burrows,
 			s = 0, -- how far along its route it is
 			dir = 1, -- which way it's patrolling
 			at = path[1],
@@ -998,33 +1156,38 @@ function builders.Hunter(tile, settings, folder)
 			mode = "patrol",
 			home = 0, -- where along the route the chase began (its leash runs from there)
 			lost = 0,
+			sink = 0, -- how far down in the sand it is
+			pitch = 0, -- how far it's reared up
+			nextDash = 0,
+			nextDig = 0,
+			heard = 0, -- the last call it answered
 		})
 	end
 	if #hunters == 0 then
 		return
 	end
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
 	local function place(h)
 		local ground = Beach.groundAt(h.at.X, h.at.Y)
-		local position = Vector3.new(h.at.X, ground + size.Y / 2, h.at.Y)
+		local position = Vector3.new(h.at.X, ground + size.Y / 2 - h.sink, h.at.Y)
 		local look = Vector3.new(h.heading.X, 0, h.heading.Y)
 		h.model:PivotTo(
 			CFrame.lookAt(position, position + (if look.Magnitude > 0 then look else Vector3.zAxis))
+				* CFrame.Angles(h.pitch, 0, 0)
 		)
+	end
+	for _, h in hunters do
+		place(h) -- on the ground from the start
+	end
+	local function eyes(h, color: Color3)
+		for _, eye in h.eyes do
+			eye.Color = color
+		end
 	end
 	local viewCos = math.cos(math.rad(settings.SightAngle / 2))
 	-- Whether a hunter can see a point: nothing solid in between, at about eye height.
 	local function sees(h, target: Vector3): boolean
 		local from = Vector3.new(h.at.X, Beach.groundAt(h.at.X, h.at.Y) + size.Y * 0.6, h.at.Y)
-		local exclude = { folder }
-		for _, p in Players:GetPlayers() do
-			if p.Character then
-				table.insert(exclude, p.Character)
-			end
-		end
-		params.FilterDescendantsInstances = exclude
-		return Workspace:Raycast(from, target - from, params) == nil
+		return clearSight(from, target, folder)
 	end
 	-- Moves a hunter along its route toward `goal` (a distance along it) at `speed`. It turns to
 	-- face the way it goes, or, standing still, toward `face`.
@@ -1039,11 +1202,53 @@ function builders.Hunter(tile, settings, folder)
 			h.heading = (face - at).Unit
 		end
 	end
+	-- The dig: down where it is (dust), up at the burrow nearest `toward` (its hole shaking and
+	-- spurting sand from now until it's up). False if there's no burrow worth digging to.
+	local function startDig(h, toward: Vector2, now: number): boolean
+		local want = h.rail.nearest(toward)
+		local best, bestGap = nil, math.huge
+		for _, burrow in h.burrows do
+			local gap = math.abs(burrow.s - want)
+			if math.abs(burrow.s - h.s) > 20 and gap < bestGap then
+				best, bestGap = burrow, gap
+			end
+		end
+		if not best then
+			return false
+		end
+		h.mode, h.burrow, h.due = "dig", best, now + settings.DigTime
+		h.dig.CFrame = CFrame.new(h.at.X, Beach.groundAt(h.at.X, h.at.Y), h.at.Y)
+		h.digDust.Enabled = true
+		best.spurt.Enabled = true
+		best.shakeUntil = now + settings.DigTime + settings.UnderTime
+		return true
+	end
 	table.insert(running, {
 		folder = folder,
-		step = function(_, dt)
+		step = function(now, dt)
 			for _, h in hunters do
-				if h.mode ~= "chase" then
+				for _, burrow in h.burrows do
+					-- A hole about to give up the crab shakes.
+					if burrow.shakeUntil and now < burrow.shakeUntil then
+						burrow.mound.CFrame = burrow.base
+							+ Vector3.new(
+								rng:NextNumber(-0.4, 0.4),
+								rng:NextNumber(0, 0.5),
+								rng:NextNumber(-0.4, 0.4)
+							)
+					elseif burrow.shakeUntil then
+						burrow.mound.CFrame, burrow.spurt.Enabled, burrow.shakeUntil = burrow.base, false, nil
+					end
+				end
+			end
+			local call = calls[tile]
+			for _, h in hunters do
+				-- A patrol crab's call: it digs to the burrow nearest the caller.
+				if call and call.time > h.heard and (h.mode == "patrol" or h.mode == "chase") then
+					h.heard = call.time
+					startDig(h, call.at, now)
+				end
+				if h.mode == "patrol" then
 					-- Looking out: the nearest player it can see.
 					for _, player in Players:GetPlayers() do
 						local character = player.Character
@@ -1061,37 +1266,118 @@ function builders.Hunter(tile, settings, folder)
 								or (across > 0 and offset.Unit:Dot(h.heading) >= viewCos)
 							if across <= range and ahead and sees(h, root.Position) then
 								h.mode, h.target, h.lost, h.home = "chase", player, 0, h.s
+								h.nextDig = now + settings.DigEvery
 								break
 							end
 						end
 					end
 				end
+				local character = h.target and h.target.Character
+				local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+				local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+				local where = root and Vector2.new(root.Position.X, root.Position.Z)
 				if h.mode == "chase" then
 					-- It hunts along its route, never off it: to the point of its route
 					-- nearest the player, no further than its leash from where it began. In a
 					-- tunnel it fills the way, so it can't be run round.
-					local character = h.target and h.target.Character
-					local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-					local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 					if not root or not humanoid or humanoid.Health <= 0 then
-						h.mode = "patrol"
+						h.mode, h.target = "patrol", nil
 					else
-						local where = Vector2.new(root.Position.X, root.Position.Z)
-						if sees(h, root.Position) then
-							h.lost = 0
+						local seen = sees(h, root.Position)
+						if seen then
+							h.lost, h.lastSeen = 0, where
 						else
 							h.lost += dt
 						end
+						local along = h.rail.nearest(where)
+						local offset = where - h.at
 						if h.lost > settings.LoseTime then
-							h.mode = "patrol"
-						else
-							local goal = math.clamp(
-								h.rail.nearest(where),
-								h.home - settings.Leash,
-								h.home + settings.Leash
+							-- Lost them: it digs after them, or gives up.
+							if not startDig(h, h.lastSeen or where, now) then
+								h.mode = "patrol"
+							end
+						elseif
+							seen
+							and now >= h.nextDash
+							and offset.Magnitude <= settings.DashRange
+							and offset.Magnitude > 0
+							and offset.Unit:Dot(h.heading) > 0.5
+						then
+							-- The dash: it rears up first, eyes gone red.
+							local way = math.sign(along - h.s)
+							h.mode, h.due = "rear", now + settings.DashWarn
+							h.dashGoal = math.clamp(
+								along + way * 8,
+								h.s - settings.DashDistance,
+								h.s + settings.DashDistance
 							)
-							slide(h, goal, settings.ChaseSpeed, dt, where)
+							eyes(h, angry)
+						elseif now >= h.nextDig and math.abs(along - h.s) > settings.DigAway then
+							h.nextDig = now + settings.DigEvery
+							if not startDig(h, where, now) then
+								slide(
+									h,
+									math.clamp(along, h.home - settings.Leash, h.home + settings.Leash),
+									settings.ChaseSpeed,
+									dt,
+									where
+								)
+							end
+						else
+							slide(
+								h,
+								math.clamp(along, h.home - settings.Leash, h.home + settings.Leash),
+								settings.ChaseSpeed,
+								dt,
+								where
+							)
 						end
+					end
+				elseif h.mode == "rear" then
+					h.pitch = math.min(0.45, h.pitch + dt * 1.5)
+					if now >= h.due then
+						h.mode, h.due = "dash", now + settings.DashDistance / settings.DashSpeed + 0.3
+					end
+				elseif h.mode == "dash" then
+					h.pitch = math.max(0, h.pitch - dt * 3)
+					slide(h, h.dashGoal, settings.DashSpeed, dt)
+					if math.abs(h.s - h.dashGoal) < 0.5 or now >= h.due then
+						h.mode, h.due = "recover", now + settings.DashRecover
+						h.nextDash = now + settings.DashRecover + settings.DashCooldown
+					end
+				elseif h.mode == "recover" then
+					-- Standing, getting its breath: the moment to get away.
+					if now >= h.due then
+						eyes(h, calm)
+						h.mode = if h.target then "chase" else "patrol"
+						h.home = h.s
+					end
+				elseif h.mode == "dig" then
+					h.sink = math.min(size.Y + 1, h.sink + dt * (size.Y + 1) / settings.DigTime)
+					if now >= h.due then
+						h.digDust.Enabled = false
+						h.body:SetAttribute("Active", false)
+						h.mode, h.due = "under", now + settings.UnderTime
+					end
+				elseif h.mode == "under" then
+					if now >= h.due then
+						h.s = h.burrow.s
+						h.at = h.burrow.at
+						if where then
+							h.heading = if (where - h.at).Magnitude > 0.1
+								then (where - h.at).Unit
+								else h.heading
+						end
+						h.body:SetAttribute("Active", true)
+						h.mode, h.due = "emerge", now + settings.EmergeTime
+					end
+				elseif h.mode == "emerge" then
+					h.sink = math.max(0, h.sink - dt * (size.Y + 1) / settings.EmergeTime)
+					if now >= h.due then
+						h.sink = 0
+						h.mode = if h.target then "chase" else "patrol"
+						h.home, h.lost = h.s, 0
+						h.nextDig = now + settings.DigEvery
 					end
 				else
 					-- Patrolling: back and forth along its route.
@@ -1100,6 +1386,7 @@ function builders.Hunter(tile, settings, folder)
 					if math.abs(h.s - goal) < 0.01 then
 						h.dir = -h.dir
 					end
+					h.pitch = 0
 				end
 				place(h)
 			end
