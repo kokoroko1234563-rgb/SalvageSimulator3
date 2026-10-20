@@ -37,7 +37,7 @@ from kit import Zone, write_zones
 OUT = "src/shared/Layouts/Biomes/Planned/CoralGarden.luau"
 NAME = "Coral Garden"
 CORAL = "Concrete"  # the reef's pale, shell-grit ground
-PAIRS = (120, 300, 480)  # the coves' middle lines
+PAIRS = (120, 300, 480)  # the coves' middle lines (zones 2 and 3 move them off the rock pools)
 SEP = 20  # a spine lies this far either side of its cove's line
 
 
@@ -66,6 +66,15 @@ def spine_pair(part, zc, height, width, k):
     uneven. `k` (1 or -1) bends the pair one way or the other."""
     for side in (-1, 1):
         zr = zc + side * SEP
+        if height is None:
+            # Zone 1: no ridge (even a low one hides too much of the zone from the top): the
+            # spine is a narrow steep cleft in the sand, lined with coral. Carts can't cross
+            # it, feet step down and up.
+            part.add(Kind="Channel", Path=[(-364, zr), (-180, zr + 8 * k), (0, zr - 6 * k),
+                                           (180, zr + 8 * k), (364, zr)],
+                     Depth=2.4, Width=8, Rough=1, Material=CORAL)
+            part.decor("DeadCoral", path=[(-330, zr + 6 * k), (330, zr + 6 * k)], count=11)
+            continue
         part.add(Kind="Ridge", Path=[(-364, zr), (-180, zr + 8 * k), (0, zr - 6 * k),
                                      (180, zr + 8 * k), (364, zr)],
                  Height=height, Width=width, Rough=1, Material=CORAL)
@@ -89,20 +98,21 @@ def cove(part, at, weight):
 
 
 # ---- zones 1 to 3: open sand --------------------------------------------------------------------
-def shore(n, hmax, width, loot_at):
+def shore(n, hmax, width, loot_at, pairs=PAIRS):
     z = Zone(n, NAME, rock=0)
     f = z.frame
-    for i, zc in enumerate(PAIRS):
+    mid = pairs[1]
+    for i, zc in enumerate(pairs):
         spine_pair(f, zc, hmax, width, 1 if i % 2 == 0 else -1)
 
     # The entrance: an arch in the reef, at the east end of the middle cove (cleared through both
     # spines, a flat place for the secret door).
-    f.add(Kind="Flat", At=[322, 300], Radius=9)
-    f.entrance((322, 300))
+    f.add(Kind="Flat", At=[322, mid], Radius=9)
+    f.entrance((322, mid))
     for side in (-1, 1):
-        f.decor("DeadCoral", at=(306, 300 + side * SEP), scale=1.5)
-        f.decor("DeadCoral", at=(338, 300 + side * SEP), scale=1.5)
-    f.decor("Starfish", at=(322, 314))
+        f.decor("DeadCoral", at=(306, mid + side * SEP), scale=1.5)
+        f.decor("DeadCoral", at=(338, mid + side * SEP), scale=1.5)
+    f.decor("Starfish", at=(322, mid + 14))
 
     # Coral growing on the open sand between the pairs, and the finds in the coves.
     for cx, cz in ((-250, 50), (220, 60), (-60, 200), (260, 210), (-230, 390), (30, 400),
@@ -116,16 +126,16 @@ def shore(n, hmax, width, loot_at):
     return z
 
 
-def crossing(z, name, start, gaps, end, tell, beds):
+def crossing(z, name, start, gaps, end, tell, beds, pairs=PAIRS):
     """The cart's ramp: down from `start`, through an arch `gaps[i]` in each pair, out at `end`.
     Straight down over the spines is quicker on foot."""
     c = z.crossing(name, paths=1)
     pts = [(start, 0), (start, 50)]
-    for g, zc in zip(gaps, PAIRS):
+    for g, zc in zip(gaps, pairs):
         pts += [(g, zc - SEP - 18), (g, zc + SEP + 18)]
     pts += [(end, 560), (end, 608)]
     c.ramp(pts, width=16)
-    for g, zc in zip(gaps, PAIRS):
+    for g, zc in zip(gaps, pairs):
         arch_tell(c, g, zc)
     for at in beds:
         bed(c, at)
@@ -154,8 +164,11 @@ def tell_snorkel(x):
     return tell
 
 
+P23 = (190, 350, 510)  # zones 2 and 3: clear of the rock pools at (140, 120) and (-60, 130)
+
+
 def zone1():
-    z = shore(1, 2.4, 10, [((-300, 120), 1), ((-300, 300), 2),
+    z = shore(1, None, 10, [((-300, 120), 1), ((-300, 300), 2),
                            ((300, 480), 3), ((-300, 480), 4)])
     crossing(z, "North arches", -40, (-150, 10, 150), 40, tell_spires(-40),
              [(-70, 60), (90, 210), (-60, 400), (110, 540)])
@@ -167,26 +180,26 @@ def zone1():
 
 
 def zone2():
-    z = shore(2, 4.4, 14, [((300, 120), 1), ((-300, 300), 2), ((-300, 120), 2),
-                           ((300, 480), 3), ((-300, 480), 4)])
+    z = shore(2, 4.4, 14, [((300, 190), 1), ((-300, 350), 2), ((-300, 190), 2),
+                           ((300, 510), 3), ((-300, 510), 4)], P23)
     crossing(z, "North arches", -40, (-150, 10, 150), 40, tell_spires(-40),
-             [(-70, 60), (90, 210), (-60, 400), (110, 540)])
-    crossing(z, "Middle arches", 130, (150, -20, -150), -60, tell_shells(130),
-             [(40, 90), (-100, 220), (90, 400), (-40, 540)])
+             [(-70, 60), (90, 210), (-60, 400), (110, 540)], P23)
+    crossing(z, "Middle arches", 175, (175, -20, -150), -60, tell_shells(175),
+             [(40, 90), (-100, 220), (90, 400), (-40, 540)], P23)
     crossing(z, "South arches", -150, (-120, 130, -10), 120, tell_snorkel(-150),
-             [(-60, 70), (60, 230), (-80, 410), (60, 550)])
+             [(-60, 70), (60, 230), (-80, 410), (60, 550)], P23)
     return z
 
 
 def zone3():
-    z = shore(3, 6.4, 18, [((300, 120), 1), ((-300, 300), 2), ((-300, 120), 2),
-                           ((300, 480), 3), ((-300, 480), 4)])
+    z = shore(3, 6.4, 18, [((300, 190), 1), ((-300, 350), 2), ((-300, 190), 2),
+                           ((300, 510), 3), ((-300, 510), 4)], P23)
     crossing(z, "North arches", -40, (-150, 10, 150), 40, tell_spires(-40),
-             [(-70, 60), (90, 210), (-60, 400), (110, 540)])
-    crossing(z, "Middle arches", 130, (150, -20, -150), -60, tell_shells(130),
-             [(40, 90), (-100, 220), (90, 400), (-40, 540)])
+             [(-70, 60), (90, 210), (-60, 400), (110, 540)], P23)
+    crossing(z, "Middle arches", 175, (175, -20, -150), -60, tell_shells(175),
+             [(40, 90), (-100, 220), (90, 400), (-40, 540)], P23)
     crossing(z, "South arches", -150, (-120, 130, -10), 120, tell_snorkel(-150),
-             [(-60, 70), (60, 230), (-80, 410), (60, 550)])
+             [(-60, 70), (60, 230), (-80, 410), (60, 550)], P23)
     return z
 
 

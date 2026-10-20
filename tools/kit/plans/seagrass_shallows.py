@@ -72,13 +72,16 @@ def pocket(part, at, weight, radius=10, depth=2):
 
 
 # ---- zones 1 to 3: open sand --------------------------------------------------------------------
-def shore(n, name, hmax, bank_w, depth, jx, loot_at, tide_z=(110, 300, 510), bank_z=(190, 410)):
+def shore(n, name, hmax, bank_w, depth, jx, loot_at, tide_z=(110, 300, 510), bank_z=(190, 410),
+          chan_w=14):
     """One open zone. `hmax`: the banks' height (the zone's limit, with a little under it)."""
     z = Zone(n, name, rock=0)
     f = z.frame
 
     # The banks across the zone: carts climb no steeper than 0.35, feet 0.9 (the shortcuts).
-    for i, zb in enumerate(bank_z):
+    # (Zone 1 has none: even a low bank hides too much of the zone from the top, so its
+    # barriers to carts are narrow steep-sided channels, which feet step down and up.)
+    for i, zb in enumerate(bank_z if hmax else ()):
         k = 1 if i == 0 else -1
         f.ridge([(-364, zb), (-180, zb + 8 * k), (0, zb - 6 * k), (180, zb + 8 * k), (364, zb)],
                 height=hmax, width=bank_w, rough=1)
@@ -87,7 +90,7 @@ def shore(n, name, hmax, bank_w, depth, jx, loot_at, tide_z=(110, 300, 510), ban
     for i, zc in enumerate(tide_z):
         k = 1 if i % 2 == 0 else -1
         f.channel([(-364, zc), (-200, zc + 10 * k), (-40, zc - 8 * k), (120, zc + 10 * k),
-                   (364, zc - 4 * k)], depth=depth, width=14, rough=1, material=MUD)
+                   (364, zc - 4 * k)], depth=depth, width=chan_w, rough=1, material=MUD)
         f.decor("Kelp", path=[(-330, zc + 12), (330, zc - 4)], count=5)
 
     # The jetty, fallen along the middle channel; its entrance is under the end of it.
@@ -149,7 +152,8 @@ def tell_kelp(x):
 
 
 def zone1():
-    z = shore(1, NAME, hmax=2.4, bank_w=10, depth=2, jx=-70,
+    z = shore(1, NAME, hmax=None, bank_w=0, depth=2.4, jx=-70, chan_w=8,
+              tide_z=(110, 200, 300, 410, 510),
               loot_at=[((-290, 250), 1), ((280, 350), 2), ((-230, 480), 3), ((300, 556), 4)])
     crossing(z, "Seagrass trail", 0, -140, -30, 140, 0, tell_posts(0),
              [(-70, 130), (60, 262), (110, 470)])
@@ -162,7 +166,7 @@ def zone1():
 
 def zone2():
     z = shore(2, NAME, hmax=4.4, bank_w=14, depth=3, jx=90,
-              loot_at=[((-300, 240), 1), ((-60, 360), 2), ((250, 470), 3), ((-290, 560), 4)])
+              tide_z=(70, 300, 510), loot_at=[((-300, 240), 1), ((-60, 360), 2), ((250, 470), 3), ((-290, 560), 4)])
     crossing(z, "Seagrass trail", 0, 140, 20, -140, 0, tell_posts(0),
              [(-80, 140), (-60, 270), (100, 480)])
     crossing(z, "Reed track", 140, -130, -50, 130, 20, tell_chain(140),
@@ -174,9 +178,9 @@ def zone2():
 
 def zone3():
     z = shore(3, NAME, hmax=6.4, bank_w=18, depth=3, jx=-110,
-              loot_at=[((290, 230), 1), ((60, 350), 2), ((-260, 470), 3), ((280, 560), 4)])
-    crossing(z, "Seagrass trail", 0, -140, 0, 140, 0, tell_posts(0),
-             [(80, 140), (-120, 260), (60, 480)])
+              tide_z=(60, 300, 510), loot_at=[((290, 230), 1), ((60, 350), 2), ((-260, 470), 3), ((280, 560), 4)])
+    crossing(z, "Seagrass trail", 0, 140, 0, -140, 0, tell_posts(0),
+             [(-120, 140), (120, 260), (60, 480)])
     crossing(z, "Reed track", -140, 140, 60, -120, 40, tell_chain(-140),
              [(-90, 110), (-30, 340), (110, 560)])
     crossing(z, "Mud-flat way", 140, -40, -140, 60, 140, tell_kelp(140),
