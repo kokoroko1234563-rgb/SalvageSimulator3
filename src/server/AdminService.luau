@@ -753,6 +753,51 @@ command(
 
 command(
 	"waterlab",
+	"preview <zone> <planned biome|off>",
+	"Show a planned biome's ground in a zone (no look, hazards or secret yet), e.g. preview 4 coral, then crossing 4 2",
+	function(_, args)
+		local which, query = (args[1] or ""):lower(), (args[2] or ""):lower()
+		local was = Workspace:GetAttribute(Layouts.PreviewAttribute)
+		local wasTile = if type(was) == "string" then tonumber(string.match(was, "^(%d+)=")) else nil
+		local zone = tonumber(which)
+		local id: string? = nil
+		if query ~= "off" then
+			local key = query:gsub("[%s%-_']", "")
+			for plannedId, biome in Biomes.Planned do
+				local nameKey = biome.Name:lower():gsub("[%s%-_']", "")
+				if plannedId:lower():sub(1, #key) == key or nameKey:sub(1, #key) == key then
+					id = plannedId
+				end
+			end
+		end
+		if not (zone and zone >= 1 and zone <= Beach.ActiveTiles) or (query ~= "off" and not id) then
+			return { "Usage: preview <zone> <planned biome|off>, e.g. preview 2 seagrass" }
+		end
+		if id and not Layouts.forPlanned(id, zone) then
+			return { Biomes.Planned[id].Name .. " has no layout for zone " .. zone .. " yet" }
+		end
+		Layouts.setPreview(zone, id)
+		for _, tile in { wasTile, zone } do
+			if type(tile) == "number" then
+				BiomeService.set(tile, nil, "1:")
+			end
+		end
+		return {
+			if id
+				then string.format(
+					"Zone %d shows %s's ground (crossing %d %d to change crossing; preview %d off to end)",
+					zone,
+					Biomes.Planned[id].Name,
+					zone,
+					2,
+					zone
+				)
+				else "Preview off",
+		}
+	end
+)
+
+command(
 	"waterlab <zone|off>",
 	"Put the water lab's test ground (Layouts/Lab) in a zone, e.g. waterlab 4, then tide at 2000",
 	function(_, args)

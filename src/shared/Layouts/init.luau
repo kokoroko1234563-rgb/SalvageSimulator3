@@ -471,6 +471,26 @@ pcall(function() -- (tools/tests' Workspace has no such signal)
 	end)
 end)
 
+-- A planned biome's ground previewed in a zone (the review place's `preview` command): the
+-- attribute holds "<tile>=<biome id>", kept here for the same reason as the lab's.
+Layouts.PreviewAttribute = "LayoutPreview"
+local preview: { tile: number, id: string }? = nil
+local function readPreview()
+	local text = Workspace:GetAttribute(Layouts.PreviewAttribute)
+	local tile, id = if type(text) == "string" then string.match(text, "^(%d+)=(%w+)$") else nil, nil
+	preview = if tile and id then { tile = tonumber(tile) :: number, id = id } else nil
+end
+readPreview()
+-- Sets (or with nil, ends) the preview, here at once (the server rebuilds the tile straight
+-- after; the attribute tells the clients).
+function Layouts.setPreview(tile: number?, id: string?)
+	Workspace:SetAttribute(Layouts.PreviewAttribute, if tile and id then tile .. "=" .. id else nil)
+	readPreview()
+end
+pcall(function()
+	Workspace:GetAttributeChangedSignal(Layouts.PreviewAttribute):Connect(readPreview)
+end)
+
 -- The Workspace attribute holding a tile's choice.
 function Layouts.attributeFor(tile: number): string
 	return "TileLayout" .. tile
@@ -487,6 +507,12 @@ function Layouts.activeDef(tile: number): any
 		return Layouts.lab()
 	end
 	local zone = zoneOfTile(tile)
+	if preview and preview.tile == tile then
+		local planned = Layouts.forPlanned(preview.id, zone)
+		if planned then
+			return planned
+		end
+	end
 	local biome = Biomes.activeIn(tile)
 	return (biome and Layouts.forBiome(biome.Id, zone)) or Layouts.base(zone)
 end
