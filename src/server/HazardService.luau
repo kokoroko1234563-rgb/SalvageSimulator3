@@ -99,50 +99,100 @@ local builders: { [string]: (tile: number, settings: { [string]: any }, folder: 
 
 -- Roller: something rolls down the tile toward the sea every Period seconds.
 function builders.Roller(tile, settings, folder)
-	local z0 = Beach.tileRange(tile)
-	local lanes = {}
+	local z0, z1 = Beach.tileRange(tile)
+	-- The ways barrels come down: a layout's Paths (from the wreck's deck down a gully), or
+	-- its Lanes (straight down the zone from the top).
+	local routes = {}
 	for _, placement in Layouts.hazardPlacements(tile, "Roller") do
-		for _, x in placement.Lanes do
-			table.insert(lanes, x)
+		if placement.Path then
+			local path = {}
+			for _, point in placement.Path do
+				table.insert(path, Vector2.new(point[1], z0 + point[2]))
+			end
+			table.insert(routes, path)
+		end
+		for _, x in placement.Lanes or {} do
+			table.insert(routes, { Vector2.new(x, z0 + 5), Vector2.new(x, z1 - 5) })
 		end
 	end
-	local nextAt = os.clock() + rng:NextNumber(0, settings.Period)
-	local function roll()
-		local fromZ = math.max(z0 + 5, 1)
-		if Beach.isDeep(Vector3.new(0, 0, fromZ), Tide.sea()) then
-			return -- the top of the tile is under water: nothing to roll down
+	if #routes == 0 then
+		return
+	end
+	local size: Vector3 = settings.Size
+	-- A point along a route, and the way it runs there.
+	local function along(path: { Vector2 }, s: number): (Vector2?, Vector2)
+		for i = 1, #path - 1 do
+			local segment = path[i + 1] - path[i]
+			local length = segment.Magnitude
+			if s <= length and length > 0 then
+				return path[i] + segment.Unit * s, segment.Unit
+			end
+			s -= length
 		end
-		local x = if #lanes > 0
-			then lanes[rng:NextInteger(1, #lanes)]
-			else rng:NextNumber(-Beach.HalfWidth + 20, Beach.HalfWidth - 20)
-		local size: Vector3 = settings.Size
-		local roller = makePart({
+		return nil, Vector2.new(0, 1)
+	end
+	local barrels = {}
+	local nextAt = os.clock() + rng:NextNumber(0, settings.Period)
+	local function roll(now: number)
+		local path = routes[rng:NextInteger(1, #routes)]
+		local start = path[1]
+		if Beach.isDeep(Vector3.new(start.X, 0, start.Y), Tide.sea()) then
+			return -- its start is under water: nothing to roll down
+		end
+		local barrel = makePart({
 			Name = "Roller",
 			Shape = Enum.PartType.Cylinder,
-			Size = size, -- the axis along X, so it rolls toward the sea
-			CFrame = CFrame.new(x, Beach.groundAt(x, fromZ) + size.Y / 2 + 0.3, fromZ),
+			Size = size, -- the axis along X: turned to face down its route
 			Color = settings.Color,
 			Material = Palette.Material.Wood,
-			Anchored = false,
-			CanCollide = true,
-			CustomPhysicalProperties = PhysicalProperties.new(2, 0.3, 0.2),
 		})
-		roller.CollisionGroup = CollisionGroups.Items
-		roller.AssemblyLinearVelocity = Vector3.new(0, 0, settings.Speed)
-		roller.AssemblyAngularVelocity = Vector3.new(settings.Speed / (size.Y / 2), 0, 0)
-		arm(roller, settings)
-		roller.Parent = folder
-		pcall(roller.SetNetworkOwner, roller, nil)
-		task.delay(12, function()
-			roller:Destroy()
-		end)
+		arm(barrel, settings)
+		barrel:SetAttribute("Active", false)
+		local dust = Instance.new("ParticleEmitter")
+		dust.Color = ColorSequence.new(Color3.fromRGB(200, 180, 150))
+		dust.Size = NumberSequence.new(0.8, 1.6)
+		dust.Lifetime = NumberRange.new(0.5, 0.9)
+		dust.Rate = 25
+		dust.Speed = NumberRange.new(2, 4)
+		dust.Parent = barrel
+		barrel.Parent = folder
+		table.insert(
+			barrels,
+			{ part = barrel, dust = dust, path = path, s = 0, released = now + settings.Warning }
+		)
 	end
 	table.insert(running, {
 		folder = folder,
-		step = function(now)
+		step = function(now, dt)
 			if now >= nextAt then
 				nextAt = now + settings.Period
-				roll()
+				roll(now)
+			end
+			for index = #barrels, 1, -1 do
+				local b = barrels[index]
+				local rolling = now >= b.released
+				if rolling then
+					b.s += settings.Speed * dt
+					b.dust.Enabled = false
+					if b.part:GetAttribute("Active") ~= true then
+						b.part:SetAttribute("Active", true)
+					end
+				end
+				local at, way = along(b.path, b.s)
+				if not at then
+					-- Off the end of its gully: it breaks up.
+					b.part:Destroy()
+					table.remove(barrels, index)
+					continue
+				end
+				local ground = Beach.groundAt(at.X, at.Y)
+				local facing = CFrame.lookAt(Vector3.zero, Vector3.new(way.X, 0, way.Y))
+				-- Teetering on the edge (the warning), then rolling over and over.
+				local spin = if rolling then b.s / (size.Y / 2) else math.sin((now - b.released) * 9) * 0.25
+				b.part.CFrame = CFrame.new(at.X, ground + size.Y / 2, at.Y)
+					* facing
+					* CFrame.Angles(-spin, 0, 0)
+					* CFrame.Angles(0, math.pi / 2, 0)
 			end
 		end,
 	})

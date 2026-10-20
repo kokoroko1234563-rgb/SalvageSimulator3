@@ -3,8 +3,11 @@
 -- Where they go comes from the zone's layout (its Hazards list, by Type); without placements, a
 -- biome's are scattered over the zone (Scatter), a plain zone's aren't built.
 --
---   Roller  something rolls down the tile toward the sea every Period seconds, at Speed (the
---           Shipwreck Shallows barrels). Placement: Lanes = { x, ... } it can start from.
+--   Roller  every Period seconds a barrel (the Shipwreck Shallows') appears at the top of one
+--           of its routes and teeters there Warning seconds, dust falling (the tell), then
+--           rolls down it at Speed: it bowls over whoever it hits, tumbling and dropping what
+--           they hold (not deadly itself). Placement: Path = { {x, z}, ... } (from the wreck's
+--           deck down a gully), or Lanes = { x, ... } (straight down the zone from the top).
 --   Patrol  Count creatures walk a route back and forth at Speed (hermit crabs). Placement:
 --           Path = { {x, z}, ... }; without one, each wanders around where it starts. With
 --           Calls, one that sees someone within CallRange ahead (CallAngle across) stops and
@@ -77,8 +80,19 @@ local Hazards = {}
 
 Hazards.Tag = "Hazard" -- CollectionService tag on the part a hazard hits with
 
-Hazards.Effects =
-	{ Knockdown = true, Drop = true, Slow = true, Sink = true, Current = true, Harm = true, Gloom = true }
+Hazards.Effects = {
+	Knockdown = true,
+	Drop = true,
+	Slow = true,
+	Sink = true,
+	Current = true,
+	Harm = true,
+	Gloom = true,
+	Sting = true, -- damage, drop what you hold, and in the deep a stun (Jelly)
+	Fog = true, -- the fog closes in round you (Fog)
+	Fling = true, -- thrown and tumbling, dropping what you hold (Whirlwind)
+	Slide = true, -- slippery: you slide, slow to stop and turn (Ice)
+}
 
 Hazards.WardTag = "GloomWard" -- a light the Gloom can't reach: a part with a WardRadius attribute
 
@@ -86,13 +100,14 @@ Hazards.WardTag = "GloomWard" -- a light the Gloom can't reach: a part with a Wa
 Hazards.Types = {
 	Roller = {
 		Period = 6,
-		Speed = 16,
-		Size = Vector3.new(3, 2.6, 2.6),
+		Warning = 2, -- seconds it teeters at the top of its gully, dust falling, before it goes
+		Speed = 20,
+		Size = Vector3.new(4, 3.4, 3.4),
 		Color = Color3.fromRGB(120, 80, 45),
-		Effect = "Drop",
-		HitRadius = 2.2,
-		Push = 0,
-		HitText = "Something rolled into you and knocked it out of your hands!",
+		Effect = "Knockdown", -- bowled over, tumbling, dropping what you hold: not deadly itself
+		HitRadius = 2.6,
+		Push = 45,
+		HitText = "A barrel bowled you over!",
 	},
 	Patrol = {
 		Count = 3,
@@ -238,6 +253,64 @@ Hazards.Types = {
 		Push = 0,
 		HitText = "The Gloom's shadow fell on you: find the light!",
 	},
+	-- The planned biomes' dangers (their behaviour is being built: HazardService).
+	Jelly = { -- Jellyfish Lagoon: jellies drifting in the water or stranded on the sand
+		Count = 6,
+		Radius = 4, -- a stranded jelly's sting reaches this far round it (its glow shows it)
+		Speed = 3, -- drifting along its Path
+		Damage = 25,
+		Stun = 1.5, -- seconds stunned by a sting in zones 5 and 6 (StunZone and deeper)
+		StunZone = 5,
+		Color = Color3.fromRGB(190, 140, 255),
+		Effect = "Sting",
+		HitRadius = 4,
+		Push = 10,
+		HitText = "A jellyfish stung you!",
+	},
+	Fog = { -- Fog Bank: the fog thickens to a few studs' sight; a foghorn clears it for a moment
+		Count = 1,
+		Sight = 12, -- studs you see in it
+		Period = 25, -- seconds between foghorn pulses
+		Clear = 5, -- seconds a pulse clears it for
+		Color = Color3.fromRGB(215, 220, 225),
+		Effect = "Fog",
+		HitRadius = 0,
+		Push = 0,
+		HitText = "",
+	},
+	Whirlwind = { -- Whirlwind Dunes: a whirlwind circling its Path, flinging whoever it catches
+		Count = 1,
+		Radius = 10,
+		Speed = 9,
+		Color = Color3.fromRGB(220, 190, 140),
+		Effect = "Fling",
+		HitRadius = 10,
+		Push = 70,
+		HitText = "The whirlwind threw you!",
+	},
+	Spears = { -- Spearstone Reef: fields of spears shooting up from the floor on a rhythm
+		Count = 2,
+		Radius = 12, -- a field
+		Period = 4,
+		Warning = 1, -- seconds a spot glows and cracks before its spear shoots up
+		Active = 0.6,
+		Damage = 100, -- (layouts set less in the near zones)
+		Color = Color3.fromRGB(60, 70, 80),
+		Effect = "Harm",
+		HitRadius = 2,
+		Push = 20,
+		HitText = "A spearstone got you!",
+	},
+	Ice = { -- Stranded Iceberg: slippery ice: you slide, slow to stop and turn
+		Count = 3,
+		Radius = 16,
+		Grip = 0.15, -- how much grip you keep on it (1: none lost)
+		Color = Color3.fromRGB(200, 230, 245),
+		Effect = "Slide",
+		HitRadius = 16,
+		Push = 0,
+		HitText = "",
+	},
 }
 
 -- Every kind may set Scatter: whether it's scattered over a zone without placements.
@@ -247,7 +320,7 @@ end
 
 -- What a placement in a layout's Hazards list may hold, by kind.
 Hazards.Placement = {
-	Roller = { Lanes = true },
+	Roller = { Lanes = true, Path = true },
 	Patrol = { Path = true, Count = true },
 	Pulse = { At = true },
 	Slow = { At = true, Radius = true },
@@ -257,6 +330,11 @@ Hazards.Placement = {
 	Undertow = { Path = true, Width = true },
 	Gloom = { Path = true, At = true, Radius = true },
 	Hunter = { Path = true, Burrows = true },
+	Jelly = { At = true, Path = true, Radius = true, Damage = true },
+	Fog = { At = true },
+	Whirlwind = { Path = true, Radius = true },
+	Spears = { At = true, Radius = true, Pattern = true, Damage = true },
+	Ice = { At = true, Radius = true },
 }
 
 -- A biome's hazard entry with every setting filled in from its kind's defaults.

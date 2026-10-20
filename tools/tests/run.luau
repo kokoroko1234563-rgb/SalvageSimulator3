@@ -17,7 +17,12 @@ local passed = 0
 
 local SLOW = 5 -- seconds: a test slower than this says so
 
+-- `lune run tools/tests/run.luau <words>` runs only the tests whose names contain them.
+local ONLY = table.concat(require("@lune/process").args, " ")
 local function test(name: string, fn: () -> ())
+	if ONLY ~= "" and not string.find(name, ONLY, 1, true) then
+		return
+	end
 	local started = os.clock()
 	local ok, err = pcall(fn)
 	local took = os.clock() - started
@@ -2586,6 +2591,34 @@ test("layouts that say how many paths they have, have them", function()
 		end
 	end
 	assert(#failures == 0, table.concat(failures, "\n      "))
+end)
+
+test("barrels teeter at the top of their gully first, then roll down it", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "gully",
+		Primitives = {},
+		Hazards = { { Type = "Roller", Path = { { 40, 20 }, { 40, 300 } } } },
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, { Hazards = { { Type = "Roller" } } }, folder)
+	local settings = Hazards.settings({ Type = "Roller" })
+	local base = os.clock() + settings.Period + 0.1 -- (the first comes within a Period)
+	HazardService._step(base, 0.1)
+	local barrel = folder:FindFirstChild("Roller")
+	assert(barrel and barrel:GetAttribute("Active") == false, "it teeters first, harmless")
+	assert(math.abs(barrel.CFrame.Z - (z0 + 20)) < 1, "at the top of its gully")
+	HazardService._step(base + settings.Warning + 0.5, 0.5)
+	assert(barrel:GetAttribute("Active") == true, "then it rolls, and bowls you over")
+	assert(barrel.CFrame.Z > z0 + 25 and math.abs(barrel.CFrame.X - 40) < 0.5, "down its gully")
+	assert(settings.Effect == "Knockdown" and settings.Warning >= 1.5, "tumbling, after a fair warning")
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
 end)
 
 test("the giant crab takes the longest crab route, and is deadly but can be outrun", function()
