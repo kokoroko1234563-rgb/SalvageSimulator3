@@ -42,6 +42,7 @@ def box(cx, cz, w, d):
 
 def meadow(part, cx, cz, w=80, d=60, count=10):
     """A stand of seagrass: weed over an area, a few shells in it."""
+    part.paint(box(cx, cz, w, d), "LeafyGrass")
     part.decor("Weed", area=box(cx, cz, w, d), count=count)
     part.decor("Shells", area=box(cx, cz, w * 0.6, d * 0.6), count=2)
 
@@ -254,14 +255,14 @@ def zone4():
     f = z.frame
 
     # The bands every path starts and ends in.
-    f.hall([(-260, -12), (260, -12), (260, 24), (-260, 24)])
-    f.hall([(-260, 584), (260, 584), (260, 620), (-260, 620)])
+    f.hall([(-260, -12), (260, -12), (260, 24), (-260, 24)], floor="LeafyGrass")
+    f.hall([(-260, 584), (260, 584), (260, 620), (-260, 620)], floor="LeafyGrass")
     f.decor("Weed", area=box(0, 6, 480, 24), count=10)
     f.decor("Shells", area=box(0, 600, 480, 24), count=6)
 
     # The jetty court: the collapsed jetty lies across a flooded court in the middle; the entrance
     # is under it. Both crossings can reach it by a spur from the middle row.
-    f.hall(box(0, 312, 96, 80))
+    f.hall(box(0, 312, 96, 80), floor="LeafyGrass")
     jetty(f, 0, 280, 340)
     f.hollow((0, 330), radius=8, depth=2, material=MUD)
     f.entrance((0, 322))

@@ -72,6 +72,106 @@ return {
 				Material = "Mud",
 			},
 			{ Kind = "Flat", At = { -70, 364 }, Radius = 9 },
+			{
+				Kind = "Paint",
+				Area = {
+					{ -280, 30 },
+					{ -200, 30 },
+					{ -200, 90 },
+					{ -280, 90 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 150, 25 },
+					{ 230, 25 },
+					{ 230, 85 },
+					{ 150, 85 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -120, 120 },
+					{ -40, 120 },
+					{ -40, 180 },
+					{ -120, 180 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 220, 220 },
+					{ 300, 220 },
+					{ 300, 280 },
+					{ 220, 280 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -290, 320 },
+					{ -210, 320 },
+					{ -210, 380 },
+					{ -290, 380 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 20, 330 },
+					{ 100, 330 },
+					{ 100, 390 },
+					{ 20, 390 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -160, 430 },
+					{ -80, 430 },
+					{ -80, 490 },
+					{ -160, 490 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 210, 430 },
+					{ 290, 430 },
+					{ 290, 490 },
+					{ 210, 490 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -80, 530 },
+					{ 0, 530 },
+					{ 0, 590 },
+					{ -80, 590 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 160, 540 },
+					{ 240, 540 },
+					{ 240, 600 },
+					{ 160, 600 },
+				},
+				Material = "LeafyGrass",
+			},
 			{ Kind = "Hollow", At = { -290, 250 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
 			{ Kind = "Hollow", At = { 280, 350 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
 			{ Kind = "Hollow", At = { -230, 480 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
@@ -696,6 +796,106 @@ return {
 				Material = "Mud",
 			},
 			{ Kind = "Flat", At = { 90, 364 }, Radius = 9 },
+			{
+				Kind = "Paint",
+				Area = {
+					{ -280, 30 },
+					{ -200, 30 },
+					{ -200, 90 },
+					{ -280, 90 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 150, 25 },
+					{ 230, 25 },
+					{ 230, 85 },
+					{ 150, 85 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -120, 120 },
+					{ -40, 120 },
+					{ -40, 180 },
+					{ -120, 180 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 220, 220 },
+					{ 300, 220 },
+					{ 300, 280 },
+					{ 220, 280 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -290, 320 },
+					{ -210, 320 },
+					{ -210, 380 },
+					{ -290, 380 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 20, 330 },
+					{ 100, 330 },
+					{ 100, 390 },
+					{ 20, 390 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -160, 430 },
+					{ -80, 430 },
+					{ -80, 490 },
+					{ -160, 490 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 210, 430 },
+					{ 290, 430 },
+					{ 290, 490 },
+					{ 210, 490 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -80, 530 },
+					{ 0, 530 },
+					{ 0, 590 },
+					{ -80, 590 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 160, 540 },
+					{ 240, 540 },
+					{ 240, 600 },
+					{ 160, 600 },
+				},
+				Material = "LeafyGrass",
+			},
 			{ Kind = "Hollow", At = { -300, 240 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
 			{ Kind = "Hollow", At = { -60, 360 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
 			{ Kind = "Hollow", At = { 250, 470 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
@@ -1320,6 +1520,106 @@ return {
 				Material = "Mud",
 			},
 			{ Kind = "Flat", At = { -110, 364 }, Radius = 9 },
+			{
+				Kind = "Paint",
+				Area = {
+					{ -280, 30 },
+					{ -200, 30 },
+					{ -200, 90 },
+					{ -280, 90 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 150, 25 },
+					{ 230, 25 },
+					{ 230, 85 },
+					{ 150, 85 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -120, 120 },
+					{ -40, 120 },
+					{ -40, 180 },
+					{ -120, 180 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 220, 220 },
+					{ 300, 220 },
+					{ 300, 280 },
+					{ 220, 280 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -290, 320 },
+					{ -210, 320 },
+					{ -210, 380 },
+					{ -290, 380 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 20, 330 },
+					{ 100, 330 },
+					{ 100, 390 },
+					{ 20, 390 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -160, 430 },
+					{ -80, 430 },
+					{ -80, 490 },
+					{ -160, 490 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 210, 430 },
+					{ 290, 430 },
+					{ 290, 490 },
+					{ 210, 490 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -80, 530 },
+					{ 0, 530 },
+					{ 0, 590 },
+					{ -80, 590 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ 160, 540 },
+					{ 240, 540 },
+					{ 240, 600 },
+					{ 160, 600 },
+				},
+				Material = "LeafyGrass",
+			},
 			{ Kind = "Hollow", At = { 290, 230 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
 			{ Kind = "Hollow", At = { 60, 350 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
 			{ Kind = "Hollow", At = { -260, 470 }, Radius = 10, Depth = 2, Rough = 2, Material = "Mud" },
@@ -1895,6 +2195,16 @@ return {
 				},
 			},
 			{
+				Kind = "Paint",
+				Area = {
+					{ -260, -12 },
+					{ 260, -12 },
+					{ 260, 24 },
+					{ -260, 24 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
 				Kind = "Flat",
 				Area = {
 					{ -260, 584 },
@@ -1904,6 +2214,16 @@ return {
 				},
 			},
 			{
+				Kind = "Paint",
+				Area = {
+					{ -260, 584 },
+					{ 260, 584 },
+					{ 260, 620 },
+					{ -260, 620 },
+				},
+				Material = "LeafyGrass",
+			},
+			{
 				Kind = "Flat",
 				Area = {
 					{ -48, 272 },
@@ -1911,6 +2231,16 @@ return {
 					{ 48, 352 },
 					{ -48, 352 },
 				},
+			},
+			{
+				Kind = "Paint",
+				Area = {
+					{ -48, 272 },
+					{ 48, 272 },
+					{ 48, 352 },
+					{ -48, 352 },
+				},
+				Material = "LeafyGrass",
 			},
 			{
 				Kind = "Hollow",
