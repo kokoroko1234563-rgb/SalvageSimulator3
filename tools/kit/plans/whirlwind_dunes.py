@@ -297,8 +297,8 @@ def B(kt, kb, half, side):
     return dict(kind="B", kt=kt, kb=kb, half=half, side=side)
 
 
-def R(kind, m, ramp=False, xi=-184):
-    return dict(kind=kind, m=m, step=48 if ramp else 40, ramp=ramp, xi=xi)
+def R(kind, m, ramp=False, xi=-184, z0=60):
+    return dict(kind=kind, m=m, step=48 if ramp else 40, ramp=ramp, xi=xi, z0=z0)
 
 
 def spec(pits, second, cs):
@@ -315,8 +315,8 @@ def spec(pits, second, cs):
 # (bowl path, rim paths) per crossing: the bowl path is the quick one, the cart's ramp the long one
 SPEC4 = spec(False, False, [
     [B(1, 1, 140, -1), R("W", 6, True)],
-    [B(2, 1, 100, 1), R("E", 6, True)],
-    [B(1, 1, 140, 1), R("W", 5), R("E", 6, True)]])
+    [B(2, 1, 100, 1), R("E", 7, True, z0=116)],
+    [B(1, 1, 140, 1), R("W", 5), R("E", 7, True, z0=116)]])
 SPEC5 = spec(False, False, [
     [B(1, 2, 120, -1), R("W", 8, True)],
     [B(2, 2, 100, 1), R("E", 8, True)],
