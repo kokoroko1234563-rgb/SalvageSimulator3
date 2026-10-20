@@ -1,109 +1,81 @@
-# Driftwood Cove (planned, draft)
+# Driftwood Cove (planned, common; zones 1 to 4)
 
-Draft, not in use. A log jam: stretches of logs piled behind a bank across the zone, with a gap between each stretch and a dip where the logs catch the water.
+Drawn with the layout kit from `tools/kit/plans/driftwood_cove.py` (edit the plan and run it, not
+the layout). It writes `src/shared/Layouts/Biomes/Planned/DriftwoodCove.luau`, one layout per
+zone. The card is `docs/design/cards/driftwood-cove.md`. No deadly dangers (the card's question,
+answered gently): the only hazard is `Slow` wading in the dips.
 
-## Maps
+Check it:  `python3 tools/kit/quick.py <zone> Biomes/Planned/DriftwoodCove --plan tools/kit/plans/driftwood_cove.py`
 
-Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` raised sand, `.` flat, `~` floods at mid-tide, `=` cart ramp, `o` entrance flat.
+## Zones 1 to 3: open sand
 
-<!-- map Biomes/Planned/DriftwoodCove@1 -->
-```text
-..............===....................................==.................
-.............==.......................................==................
-............==.........................................=................
-..........===..........................................==...............
-..........==............................................==..............
-...........==...........................................==..............
-...........==............................................=..............
-............==.... ^^^^^^^^^^^  ........................==..............
-............==..........................................==..............
-.............==.........................................==..............
-.............==.........................................=...............
-..............=........................................==...............
-..............==.......................................==...............
-...............=......................................==................
-. ^^^^^^^^^^^^^==^^^^^^^^^^^^^^^^^ .. ^^^^^^^^^^^^^^^== ^^^^^^^^^^^^^^ .
-```
-<!-- /map -->
-<!-- map Biomes/Planned/DriftwoodCove@2 -->
-```text
-..............===....................................==.................
-.............==.......................................==................
-............==.........................................=................
-........ ^===  ........................................==.^^^^^ ........
-^^^^^^^^^^==^^^^^^^^^^^^^^^^^^^^^^^^^^^..^^^^^^^^^^^^^^ ==^^^^^^^^^^^^^^
-...........==...........................................==..............
-...........==............................................=..............
-............==...............  .........................==..............
-............==...............  .........................==...  .........
-....^ .......==........ ^^^^^^..............^^^^^^^^^^^^==^^^^^^ .......
-....^^^^^^^^^==^^^^^^^^^^^ .................^^^  .......=... ^^^^^^^^ ..
-..............=........................................==...............
-..............==.......................................==...............
-...............=......................................==................
-...............==....................................==.................
-```
-<!-- /map -->
-<!-- map Biomes/Planned/DriftwoodCove@3 -->
-```text
-..............===....................................==.................
-.............==.......................................==................
-............==.........................................=................
-^^^^^^^^^^===^^^^^^^^^^^^^^^^^^^^^^^^^^..^^^^^^^^^^^^^^==^^^^^^^^^^^^^^^
-..........== ^^^^^^.....................................==..............
-...........==...........................................==..............
-...........==............................................=..............
-............==..........................................==..............
-......^ ....==............... ^^^^..........^^^^^^^^^...==... ^^^^^^^^^.
-......^^^^^ .==^^^^^^^^^^^^^^^^ .......................^==^^^^^ ........
-.............==...................                 .....=...............
-......       .=                   ...................  ==   ............
-..............==.......................................==...............
-...............=......................................==................
-...............==....................................==.................
-```
-<!-- /map -->
-<!-- map Biomes/Planned/DriftwoodCove@4 -->
-```text
-..............===....................................==.................
-.............==.......................................==................
-............==.........................................=................
-#####..###===########################################..==###############
-..........==.......#...#....................##..##......==..............
-...........==......#...#..............  ....##..##......==.......##.....
-...........==....................##...~~.................=..............
-............==.....................##..##...............==..............
-~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~##~~##~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~
-#############==#########################################==#~~~~#########
-~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~##~~##~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~~~~~~##~~##~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~
-###############=#####~~#########################~~####==#############~##
-~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~
-```
-<!-- /map -->
+Sand only: no walls, no rock, nothing above the zone's limit (zone 1: 2.4 of 2.5, zone 2: 4.6 of
+5, zone 3: 6.4 of 7). One wide cart path per crossing (a 16-wide Ramp, cleared through
+everything), three crossings per zone that differ by where the gaps are.
 
-## Flood order
+- **The jams** (zones 2 and 3): three low banks of piled logs across the whole beach, each worn
+  and lumpy, wet dark sand behind them. A cart goes through the gap its crossing cuts in every
+  jam (the ramp), slanting from gap to gap; the jam's flanks are too steep for a cart but not for
+  a walker, so on foot you just climb the logs and save the zigzag. That is the shortcut (the
+  test counts 5 start points; at least 2 are quicker on foot in every crossing).
+- **Zone 1** may not hide the beach from the top (the test caps it at 20%), so its "jams" are two
+  dark trenches across the beach (3 deep, 14 wide: the water pooling behind the logs), with log
+  stacks beside them. A cart takes the ramp over each; a walker wades through. Same shortcut
+  logic.
+- **Dips** behind each jam: round hollows with weed and shells, each a `Slow` patch (kept clear
+  of the cart ramp, so a cart is never held).
+- **The entrance**: a flat spot at a hollow beached tree trunk (a big Driftwood with boughs
+  round it), between two jams.
+- **Loot** (Plank, Rope, Glass Bottle, Old Boot): in the dips, the best (weight 4) deepest, at
+  the sea end.
+- **Tells**: each crossing has a landmark beside its way in, at the top: an anchor, a crate, a
+  chain (zone 1), or an arch of bones (zones 2 and 3).
+- The beach's own rock pools and the pier are kept clear (zone 2 jams moved below z 210, ramps
+  avoid the pools at (140, 120) in zone 2 and (-60, 130) in zone 3).
 
-As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
+| Crossing | Gaps (x, per jam) | Zone 1 cart | Zone 2 cart | Zone 3 cart |
+|---|---|---|---|---|
+| Anchor gap | west, east, west | 38 s | 44 s | 46 s |
+| Crate gap | east, west, east | 37 s | 45 s | 51 s |
+| Chain gap (zone 1) / Ribs gap (zones 2, 3) | middle | 35 s | 43 s | 45 s |
 
-<!-- floods Biomes/Planned/DriftwoodCove@1 -->
-Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 129
-<!-- /floods -->
-<!-- floods Biomes/Planned/DriftwoodCove@2 -->
-Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 737
-<!-- /floods -->
-<!-- floods Biomes/Planned/DriftwoodCove@3 -->
-Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 1345
-<!-- /floods -->
-<!-- floods Biomes/Planned/DriftwoodCove@4 -->
-Hollow at x -80, z 120: the sea reaches it when the waterline is below Z 1953
-<!-- /floods -->
+On foot every crossing takes 30 s straight down (targets 35, 36, 38 s: 87%, 84%, 80%, inside
+75% to 140%); a Huge cart takes the times above (all inside 140%: 49, 50 and 53 s).
 
-## Shortcuts
+## Zone 4: walled drift-rock
 
-Shortcut starts counts how many of five start points on the top edge reach the sea faster on foot than by cart. The ramps are the cart route, and gaps and steep banks are the foot route.
+Weathered grey rock walls (12 high, drawn 24 thick) between carved lanes; top and bottom bands
+open across the whole beach; two crossings, each **2 paths**:
 
-## What a player sees from the top
+- **The cart way** (20-wide lane, 16 ramp): three long switchbacks down one half of the beach
+  (west in "West cart way", east in "East cart way"), about 1200 studs, 58 s for a Huge cart.
+  A shallow wade pool on its middle switchback.
+- **The foot way** (12-wide lane) down the other half: two rows, 1000 studs, 48 s. Low log
+  stacks lie across the lane (3 high: too steep for a cart, a scramble on foot), and a pool
+  slows you.
+- Paths share 0% to 23% of their ground (the foot way and a third, mixed route).
+- **Side hollows** off the top and bottom bands, each with two rooms: West hollow (Under the
+  root-ball, Flooded hollow), East hollow (Boot-heap, Log cave: roofed), Deep hollow (Silted pool,
+  Wedged hull: the best loot, weight 5, deepest). They are in the outer columns so every
+  crossing reaches their doors through the bands. The east one sits clear of the beach's rock
+  pool at (260, 70).
+- **The entrance**: a trunk court off the top band (beached tree, timber, shells), flat at
+  (0, 48).
+- **Tells**: each crossing's way in has its own marks (anchor and driftwood in the west; crate
+  and chain in the east).
 
-The bank across each zone is the main shape from the top: zone 1 stays open, and zones 2 to 4 hide most of the lower half. The maze, pools and channels show as strips and gaps where the bank breaks.
+Picture of zone 4 (crossing 1) and zone 2:
+
+![zone 4](driftwood-cove-z4.png)
+![zone 2](driftwood-cove-z2.png)
+
+## Checks
+
+- Quick check: no problems, every zone and room.
+- `bash tools/check.sh`: all checks passed.
+- Test Range (one zone at a time, `--no-routes`): terrain 0.02 to 0.08 studs off on average,
+  worst 1.6 to 2.0 studs under the layout (nowhere near the wall tolerance); no floating or
+  buried props of the layout's decor. The floating and buried props it lists are all the base
+  zone's own cosmetics (`Map.Cosmetics`, `ZoneProps`: umbrellas, chairs, speckles) placed on the
+  base ground, so over the trenches and dips they hang a little; those belong to the shore's
+  cosmetics, not this layout.
