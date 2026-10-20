@@ -478,11 +478,24 @@ class Zone:
         return t
 
     def write(self, path, comment=None):
-        for message in self.intrusions():
-            print("WARNING " + message)
-        head = comment or f"-- Zone {self.number}, {self.name}: drawn with the layout kit (tools/kit)."
-        text = head.rstrip() + "\n" + "return " + lua(self.table()) + "\n"
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        with open(path, "w") as f:
-            f.write(text)
-        return path
+        """Writes this zone's layout as the file's whole definition (a zone's own file)."""
+        return write_zones(path, [self], comment)
+
+
+def write_zones(path, zones, comment=None):
+    """Writes one or more Zones to a layout file. One zone: its definition. Several (a biome
+    drawn for each zone it rolls in): { [zone] = definition, ... }; a zone without its own uses
+    the nearest one above it."""
+    for z in zones:
+        for message in z.intrusions():
+            print(f"WARNING zone {z.number}: " + message)
+    head = comment or f"-- {zones[0].name}: drawn with the layout kit (tools/kit)."
+    if len(zones) == 1:
+        body = lua(zones[0].table())
+    else:
+        body = "{\n" + "".join(f"\t[{z.number}] = {lua(z.table(), 1)},\n" for z in zones) + "}"
+    text = head.rstrip() + "\n" + "return " + body + "\n"
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(text)
+    return path

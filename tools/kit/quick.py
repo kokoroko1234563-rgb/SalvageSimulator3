@@ -47,7 +47,7 @@ def main():
                             cwd=ROOT, capture_output=True, text=True)
     print((result.stdout + result.stderr).rstrip())
 
-    if not args.no_png and not source.startswith("Biomes/Planned/"):
+    if not args.no_png:
         spec = "Base" if source.startswith("Zones/") else source.split("/", 1)[1]
         os.makedirs(OUT, exist_ok=True)
         choices = args.choices
@@ -56,7 +56,7 @@ def main():
             choices = [line.split(" ")[1] for line in result.stdout.splitlines()
                        if line.startswith(source + " ")]
         for choice in choices:
-            path = os.path.join(OUT, f"{args.zone}-{spec}-{choice.replace(':', 'c').replace(',', '-')}.png")
+            path = os.path.join(OUT, f"{args.zone}-{spec.replace('/', '-')}-{choice.replace(':', 'c').replace(',', '-')}.png")
             drawn = subprocess.run([sys.executable, "tools/layout_render.py", str(args.zone), spec, choice,
                                     "-o", path], cwd=ROOT, capture_output=True, text=True)
             print(f"picture: {os.path.relpath(path, ROOT)}" if drawn.returncode == 0

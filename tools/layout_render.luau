@@ -17,7 +17,10 @@ local Layouts = h.require("Shared/Layouts")
 
 local zone = tonumber(process.args[1]) or error("which zone?")
 local spec = process.args[2] or "Base"
-local def = if spec == "Base" then Layouts.base(zone) else Layouts.forBiome(spec, zone)
+local def = if spec == "Base"
+	then Layouts.base(zone)
+	elseif string.sub(spec, 1, 8) == "Planned/" then Layouts.forPlanned(string.sub(spec, 9), zone)
+	else Layouts.forBiome(spec, zone)
 assert(def, "no layout")
 local choice = Layouts.decode(def, process.args[3] or "1:")
 Layouts.setActive(zone, def, nil, choice)
