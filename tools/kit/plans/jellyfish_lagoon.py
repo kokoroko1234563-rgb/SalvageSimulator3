@@ -80,21 +80,21 @@ def cove(part, at, weight, radius=5):
 def shore(n, bank, hollow_depth):
     z = Zone(n, NAME, rock=0)
     f = z.frame
-    cx, cz = 0, 310
+    cx, cz = 0, 340
     f.paint(box(cx, cz, 500, 400), SAND)
     # The lagoon: a row of hollows, the seaward ones deeper (it floods from the sea side first).
     for x in (-120, 0, 120):
-        f.hollow((x, 285), radius=88, depth=hollow_depth - 1, rough=3, material=MUD)
-        f.hollow((x * 0.85, 365), radius=84, depth=hollow_depth, rough=3, material=MUD)
+        f.hollow((x, 315), radius=88, depth=hollow_depth - 1, rough=3, material=MUD)
+        f.hollow((x * 0.85, 395), radius=84, depth=hollow_depth, rough=3, material=MUD)
     # Its ring of sand: wide enough that carts must go round it.
-    ring = ellipse(cx, cz, 250, 200, 28)
+    ring = ellipse(cx, cz, 250, 190, 28)
     f.ridge(closed(ring), height=bank, width=16, rock=False, rough=1)
     # Two causeways across, north to south: one with a ford cut in it (foot only).
-    f.ridge([(-70, 125), (-72, 310), (-70, 495)], height=bank - 0.6, width=12, rough=0)
-    f.ridge([(96, 130), (98, 310), (96, 490)], height=bank - 0.6, width=12, rough=0)
-    f.add(Kind="Channel", Path=[(98, 330), (98, 366)], Depth=2.4, Width=8, Rough=0, Material=MUD)
-    f.decor("Weed", area=box(0, 316, 400, 300), count=10)
-    f.decor(GLOW, area=box(0, 316, 400, 300), count=8)
+    f.ridge([(-70, 165), (-72, 340), (-70, 515)], height=bank - 0.6, width=12, rough=0)
+    f.ridge([(96, 165), (98, 340), (96, 510)], height=bank - 0.6, width=12, rough=0)
+    f.add(Kind="Channel", Path=[(98, 360), (98, 396)], Depth=2.4, Width=8, Rough=0, Material=MUD)
+    f.decor("Weed", area=box(0, 340, 400, 300), count=10)
+    f.decor(GLOW, area=box(0, 340, 400, 300), count=8)
     # Where the finds lie: coves round the ring, the best on the sea side.
     for at, w in (((-300, 120), 1), ((300, 150), 1), ((-300, 320), 2), ((300, 400), 3),
                   ((-200, 545), 3), ((110, 555), 4)):
@@ -162,10 +162,10 @@ def lagoon_hall(z, cz, rz, roof, pillars):
     poly = ellipse(0, cz, RX, rz, 36)
     f.hall(poly, roof=roof, pillars=pillars)
     # The lagoon itself: hollows filling the cavern's middle, the seaward ones deeper.
-    for x, dz in ((-80, -30), (80, -30), (0, -50)):
-        f.hollow((x, cz + dz), radius=80, depth=3, rough=3, material=MUD)
-    for x, dz in ((-80, 40), (80, 40), (0, 60)):
-        f.hollow((x, cz + dz), radius=80, depth=4, rough=3, material=MUD)
+    r = min(70, rz - 60)  # kept off the ring, where the cart ramp runs
+    for x in (-85, 0, 85):
+        f.hollow((x, cz - 10), radius=r, depth=3, rough=2, material=MUD)
+        f.hollow((x, cz + 15), radius=r, depth=4, rough=2, material=MUD)
     f.paint(poly, SAND)
     f.decor("Weed", area=box(0, cz, 300, rz * 1.4), count=12)
     f.decor(GLOW, area=box(0, cz, 300, rz * 1.4), count=8)
@@ -191,13 +191,13 @@ def hall_z(cz, rz, x, side):
     return cz + side * rz * math.sqrt(max(0.0, 1 - (x / RX) ** 2))
 
 
-def walled(n, rock, roof, cz, rz, plan, jellies, tells, arc_end):
+def walled(n, rock, roof, cz, rz, plan, jellies, tells, arc_end, p1_step=44):
     """`plan`: pairs of rows each path winds through above and below the cavern, as
     {"p1": (top, bottom), "p2": ..., "p3": ...} (cut down to what fits); `arc_end`: the angle the
     ring path leaves the rim at (-215: west, -325: east, the long way round)."""
     z = Zone(n, NAME, rock=rock)
     f = z.frame
-    pillars = [(x, y) for x in (-130, 0, 130) for y in (cz - 80, cz, cz + 80)] if roof else ()
+    pillars = [(x, y) for x in (-120, 0, 120) for y in (cz - 50, cz, cz + 50)] if roof else ()
     lagoon_hall(z, cz, rz, roof, pillars)
     q = max(48, int(rz * 0.32))
     sites = ((-283, -q, 1), (283, -q, 2), (-283, q, 4), (283, q, 3))
@@ -224,11 +224,11 @@ def walled(n, rock, roof, cz, rz, plan, jellies, tells, arc_end):
 
         # P1, the ring: top snake in the east, round the rim (north, west and, the long way, south),
         # bottom snake.
-        t1 = top_rows(190, plan["p1"][0], 44)
+        t1 = top_rows(190, plan["p1"][0], p1_step)
         ring = [(round(188 * math.cos(math.radians(t))), round(cz + ring_z * math.sin(math.radians(t))))
                 for t in range(-35, arc_end - 1, -15)]
         ex = 190 if east_exit else ring[-1][0]
-        b1 = bottom_rows(ex, plan["p1"][1], 44)
+        b1 = bottom_rows(ex, plan["p1"][1], p1_step)
         pts = [(190, -12)]
         if t1:
             pts += serp(190, 350, t1)
@@ -237,7 +237,7 @@ def walled(n, rock, roof, cz, rz, plan, jellies, tells, arc_end):
         pts += [(ex, ring[-1][1])] if not east_exit else []
         if b1:
             pts += [(ex, b1[0])] + serp(ex, 350 if east_exit else -300, b1)[1:]
-        pts += [(ex, 620)]
+        pts += [(ex, 608)]
         c.ramp([(s * x, zz) for x, zz in pts], width=16)
 
         # P2, the causeway: top snake in the west, across the water on a causeway, down.
@@ -248,7 +248,7 @@ def walled(n, rock, roof, cz, rz, plan, jellies, tells, arc_end):
         b2 = bottom_rows(-60, plan["p2"][1])
         p2b = [(-60, hall_z(cz, rz, -60, 1) - 10)] + ([(-60, b2[0])] + serp(-60, -230, b2)[1:] if b2 else []) + [(-60, 620)]
         c.lane([(s * x, zz) for x, zz in p2b], width=12)
-        c.ridge([(s * -60, hall_z(cz, rz, -60, -1) + 4), (s * -61, cz), (s * -60, hall_z(cz, rz, -60, 1) - 4)],
+        c.ridge([(s * -60, hall_z(cz, rz, -60, -1) + 46), (s * -61, cz), (s * -60, hall_z(cz, rz, -60, 1) - 46)],
                 height=3.4, width=12, rough=0)
         c.add(Kind="Channel", Path=[(s * -60, cz + 40), (s * -60, cz + 80)], Depth=2.4, Width=8,
               Rough=0, Material=MUD)
@@ -261,14 +261,20 @@ def walled(n, rock, roof, cz, rz, plan, jellies, tells, arc_end):
         p3b = [(-24, hall_z(cz, rz, -24, 1) - 10)] + ([(-24, b3[0])] + serp(-24, 150, b3)[1:] if b3 else []) + [(-24, 620)]
         c.lane([(s * x, zz) for x, zz in p3b], width=12)
 
+        # Rubble steps in the foot lanes where they reach the cavern: feet clamber, carts can't.
+        for x in (-60, -24):
+            for side in (-1, 1):
+                zz = hall_z(cz, rz, x, side) + side * 26
+                c.ridge([(s * (x - 6), zz), (s * (x + 6), zz)], height=2.5, width=12, rough=0)
         # The jellies: drifting in the water, stranded on the rim and the causeway.
-        drifting(c, [(s * -100, cz - 90), (s * 0, cz - 50), (s * 60, cz - 80), (s * 120, cz - 30)])
-        drifting(c, [(s * 20, cz + 20), (s * 40, cz + 70), (s * -10, cz + 100), (s * 30, cz + 130)])
+        d = rz * 0.4
+        drifting(c, [(s * -100, cz - d), (s * 0, cz - d * 0.5), (s * 60, cz - d * 0.9), (s * 120, cz - d * 0.3)])
+        drifting(c, [(s * 20, cz + d * 0.1), (s * 40, cz + d * 0.5), (s * -10, cz + d * 0.8), (s * 30, cz + d)])
         for k in range(jellies):
             ang = math.radians(-190 + k * 360 / jellies)
             stranded(c, (s * round(170 * math.cos(ang)), round(cz + (rz - 36) * math.sin(ang))))
-        for dz in (-70, -20, 50, 100):
-            stranded(c, (s * -60, cz + dz))
+        for dz in (-0.45, -0.15, 0.15, 0.45):
+            stranded(c, (s * -60, round(cz + dz * rz)))
         tells[spec](c)
     return z
 
@@ -285,7 +291,7 @@ def tell_b(c):
 
 def zone4():
     return walled(4, 14, False, 330, 160, {"p1": (1, 1), "p2": (1, 0), "p3": (2, 1)}, 8,
-                  (tell_a, tell_a), -215)
+                  (tell_a, tell_a), -215, p1_step=80)
 
 
 def zone5():
