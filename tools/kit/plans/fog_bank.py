@@ -150,12 +150,12 @@ def open_zone(n, hmax, width, loot_at, starts):
 
 
 def zone2():
-    return open_zone(2, 4.4, 14, [((300, 220), 1), ((-300, 300), 2), ((-300, 440), 3),
+    return open_zone(2, 4.4, 18, [((300, 220), 1), ((-300, 300), 2), ((-300, 440), 3),
                                   ((-250, 570), 4), ((310, 580), 5)], (-40, 175, -150))
 
 
 def zone3():
-    return open_zone(3, 6.4, 18, [((300, 220), 1), ((-300, 300), 2), ((-300, 440), 3),
+    return open_zone(3, 6.4, 22, [((300, 220), 1), ((-300, 300), 2), ((-300, 440), 3),
                                   ((-250, 570), 4), ((310, 580), 5)], (-40, 175, -150))
 
 
@@ -263,7 +263,7 @@ def rows_for(count, first=76, last=468):
 
 
 def zone4():
-    rows = rows_for(7)
+    rows = rows_for(7, first=108)
     return zone_walled(4, 12, rows, 100, [
         ("Rope road", 0, "E", ["M", "W"], [("M", "E", 3)],
          [("W", 2, -1, 56, 2, True), ("M", 4, 1, 24, 1, False), ("E", 5, 1, 56, 3, False)],
@@ -279,7 +279,7 @@ def zone4():
 
 def zone5():
     rows = rows_for(9)
-    return zone_walled(5, 14, rows, -60, [
+    return zone_walled(5, 12, rows, -60, [
         ("Rope road", 0, "E", ["M", "W"], [("M", "E", 4)],
          [("W", 3, -1, 56, 3, True), ("M", 6, 1, 24, 2, False), ("E", 7, 1, 56, 4, True)],
          {"M": (2, 5, 7), "W": (1, 5)}),
@@ -294,7 +294,7 @@ def zone5():
 
 def zone6():
     rows = rows_for(11, first=72, last=476)
-    return zone_walled(6, 16, rows, 100, [
+    return zone_walled(6, 14, rows, 100, [
         ("Rope road", 0, "E", ["M", "W"], [("M", "E", 5)],
          [("W", 3, -1, 60, 4, True), ("M", 6, 1, 24, 3, False), ("E", 8, 1, 60, 5, True)],
          {"M": (2, 7), "W": (1, 5, 8)}),
