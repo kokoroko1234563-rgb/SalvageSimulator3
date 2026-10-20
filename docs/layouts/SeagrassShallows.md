@@ -1,121 +1,49 @@
-# Seagrass Shallows (planned, draft)
+# Seagrass Shallows (biome, zones 1 to 4)
 
-Draft, not in use. Low flats cut by two channels and two hollows that flood early as the tide turns, behind a bank across the zone.
+Drawn with the kit from `tools/kit/plans/seagrass_shallows.py` (edit the plan and re-run it),
+written to `src/shared/Layouts/Biomes/Planned/SeagrassShallows.luau`. Card:
+`docs/design/cards/seagrass-shallows.md`. Gentle choices taken: only tangling seagrass (`Slow`,
+radius 8 to 10, easy to step round), no undertow.
 
-## Maps
+## What was built
 
-Top-down, the top edge at the top, the sea at the bottom. Legend: `#` rock, `^` raised sand, `.` flat, `~` floods at mid-tide, `=` cart ramp, `o` entrance flat.
+- **Zones 1 to 3 (open sand, no walls or rock).** Channels flood in stages (three across the zone,
+  five in zone 1), the collapsed jetty (timber line, two rows of posts, planks, chain, crate) lies
+  along the middle channel and the entrance (a flat spot) is under its end. Seagrass meadows are
+  painted Leafy Grass with weed; pools hold the finds (weights 1 to 4, best on the far side).
+  Zones 2 and 3 have two banks across (heights 4.4 / 6.4, within the zone limits 5 / 7) that carts
+  cannot climb and feet can. Zone 1 has no banks (even a 2.4 bank hides more than 20% of the zone
+  from the top, which the sightline test forbids): its cart barriers are narrow, steep-sided
+  channels. Channels and the jetty are placed clear of the rock pools.
+- **Crossings (3 in each of zones 1 to 3, one path each):** Seagrass trail, Reed track, Mud-flat
+  way. Each is a Ramp 16 wide winding through a different gap in the banks/channels, its own
+  three seagrass patches and its own tell at the way in (posts, chain and crate, kelp).
+- **Zone 4 (walls 10, drawn 24+ thick).** Two crossings with 2 paths each, Reed maze and Net
+  rows (mirror images, different tells): a cart route (Ramp 16, a snake of five rows) down one side
+  round the channels, and a foot way (12 wide lane, a ditch along its straights that carts cannot
+  take) down the other. A jetty court in the middle holds the entrance and a find, reached by a
+  spur from each path's middle row (the one link). Two slots with two rooms each: Grass pockets
+  (Reed pocket, Silted cove) and Jetty cellars (Net store, Under the pier), best finds deepest.
+  A dead-end lane with a find per crossing; wider stretches with a seagrass patch to one side.
 
-<!-- map Biomes/Planned/SeagrassShallows@1 -->
-```text
-..............===....................................==.................
-.............==.......................................==................
-............==.........................................=................
-..........===..........................................==...............
-..........==............................................==..............
-...........==...........................................==..............
-...........==............................................=..............
-............==.... ^^^^^^^^^^^  ........................==..............
-............==..........................................==..............
-.............==.........................................==..............
-.............==.........................................=...............
-..............=........................................==...............
-..............==.......................................==...............
-...............=......................................==................
-. ^^^^^^^^^^^^^==^^^^^^^^^^^^^^^^^ .. ^^^^^^^^^^^^^^^== ^^^^^^^^^^^^^^ .
-```
-<!-- /map -->
-<!-- map Biomes/Planned/SeagrassShallows@2 -->
-```text
-..............===....................................==.................
-.............==.......................................==................
-............==.........................................=................
-........ ^===  ........................................==.^^^^^ ........
-^^^^^^^^^^==^^^^^^^^^^^^^^^^^^^^^^^^^^^..^^^^^^^^^^^^^^ ==^^^^^^^^^^^^^^
-...........==...........................................==..............
-...........==............................................=..............
-............==...............  .........................==..............
-............==...............  .........................==...  .........
-....^ .......==........ ^^^^^^..............^^^^^^^^^^^^==^^^^^^ .......
-....^^^^^^^^^==^^^^^^^^^^^ .................^^^  .......=... ^^^^^^^^ ..
-..............=........................................==...............
-..............==.......................................==...............
-...............=......................................==................
-...............==....................................==.................
-```
-<!-- /map -->
-<!-- map Biomes/Planned/SeagrassShallows@3 -->
-```text
-..............===....................................==.................
-.............==.......................................==................
-............==.........................................=................
-^^^^^^^^^^===^^^^^^^^^^^^^^^^^^^^^^^^^^..^^^^^^^^^^^^^^==^^^^^^^^^^^^^^^
-..........== ^^^^^^.....................................==..............
-...........==...........................................==..............
-...........==............................................=..............
-............==..........................................==..............
-......^ ....==............... ^^^^..........^^^^^^^^^...==... ^^^^^^^^^.
-......^^^^^ .==^^^^^^^^^^^^^^^^ .......................^==^^^^^ ........
-.............==...................                 .....=...............
-......       .=                   ...................  ==   ............
-..............==.......................................==...............
-...............=......................................==................
-...............==....................................==.................
-```
-<!-- /map -->
-<!-- map Biomes/Planned/SeagrassShallows@4 -->
-```text
-..............===....................................==.................
-.............==.......................................==................
-............==.........................................=................
-#####..###===########################################..==###############
-..........==.......#...#....................##..##......==..............
-...........==......#...#..............  ....##..##......==.......##.....
-...........==....................##...~~.................=..............
-............==.....................##..##...............==..............
-~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~##~~##~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~
-#############==#########################################==#~~~~#########
-~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~##~~##~~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~=~~~~~~~~~~~~~~~~~~~~##~~##~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~
-###############=#####~~#########################~~####==#############~##
-~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~==~~~~~~~~~~~~~~~~~
-```
-<!-- /map -->
+## Measured (quick check, fastest way on foot against the zone's target)
 
-## Flood order
+| Zone | Crossing | Foot | Cart (Huge) |
+|---|---|---|---|
+| 1 | Seagrass trail / Reed track / Mud-flat way | 30 s (87% of 35) | 41 / 43 / 41 s |
+| 2 | the same three | 30 s (84% of 36) | 42 / 46 / 45 s |
+| 3 | the same three | 31 s (82% of 38) | 43 / 49 / 44 s |
+| 4 | Reed maze, Net rows | path 1 47 s (86%), foot only; path 2 54 s (99%), all carts | 60 s |
 
-As the tide comes in, the sea flows in from the seaward edge and reaches each cut when the waterline falls to the height at which a connected path of water exists. A cut walled off by higher ground floods later than its depth alone suggests.
+check.sh: All checks passed.
 
-<!-- floods Biomes/Planned/SeagrassShallows@1 -->
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 109
-Channel at x -60, z 104: the sea reaches it when the waterline is below Z 109
-Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 78
-Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 73
-<!-- /floods -->
-<!-- floods Biomes/Planned/SeagrassShallows@2 -->
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 717
-Channel at x -60, z 104: the sea reaches it when the waterline is below Z 717
-Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 687
-Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 681
-<!-- /floods -->
-<!-- floods Biomes/Planned/SeagrassShallows@3 -->
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 1325
-Channel at x -60, z 104: the sea reaches it when the waterline is below Z 1325
-Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 1295
-Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 1289
-<!-- /floods -->
-<!-- floods Biomes/Planned/SeagrassShallows@4 -->
-Channel at x -60, z 104: the sea reaches it when the waterline is below Z 1933
-Hollow at x -180, z 70: the sea reaches it when the waterline is below Z 1903
-Hollow at x 200, z 66: the sea reaches it when the waterline is below Z 1897
-Channel at x -100, z 96: the sea reaches it when the waterline is below Z 1853
-<!-- /floods -->
+## Test Range (one zone at a time)
 
-## Shortcuts
+Zones 1 to 4 built. Terrain follows the layout (average 0.04 to 0.16 studs off); zones 2 and 3
+have two spots 2.5 to 2.8 studs off at a bank's crest (noted: thin crests come out lower than
+drawn). Buried and floating props reported are the base zone's own props and textures
+(loungers, towels, shell-grit specks), none of this biome's decor; the zone 4 rock pool water
+floats 1.1 studs (also not ours). The range does not roll the biome's loot or entrance spots
+(it reports 0 of them).
 
-Shortcut starts counts how many of five start points on the top edge reach the sea faster on foot than by cart. The ramps are the cart route, and gaps and steep banks are the foot route.
-
-## What a player sees from the top
-
-The bank across each zone is the main shape from the top: zone 1 stays open, and zones 2 to 4 hide most of the lower half. The maze, pools and channels show as strips and gaps where the bank breaks.
+Pictures: `seagrass-shallows-z2.png`, `seagrass-shallows-z4.png`.
