@@ -425,6 +425,7 @@ end
 -- is right there and lies a while as a boulder to step round.
 local ROCK_SLOTS = 10 -- boulders falling or lying at once, per area
 local SWEEP_STEP = 6 -- studs between the spots the sweep drops on
+local LYING = 0.6 -- a fallen boulder's size, as a share of the falling one's
 
 function builders.Rockfall(tile, settings, folder)
 	local areas = {}
@@ -437,6 +438,9 @@ function builders.Rockfall(tile, settings, folder)
 			local angle, reach = scatter:NextNumber() * math.pi * 2, math.sqrt(scatter:NextNumber()) * radius
 			local x, z = spot.x + math.cos(angle) * reach, spot.z + math.sin(angle) * reach
 			local size = scatter:NextNumber(0.6, 1.8)
+			if Beach.feature(x, z) >= 2 then
+				continue -- on open ground only, not up the rock round it
+			end
 			makePart({
 				Name = "Rubble",
 				Size = Vector3.new(size, size * 0.6, size * scatter:NextNumber(0.7, 1.3)),
@@ -485,7 +489,7 @@ function builders.Rockfall(tile, settings, folder)
 			dust.Enabled = false
 			dust.Parent = rock
 			rock.Parent = folder
-			table.insert(slots, { shadow = shadow, rock = rock, dust = dust, start = nil })
+			table.insert(slots, { shadow = shadow, rock = rock, size = rock.Size, dust = dust, start = nil })
 		end
 		-- The sweep: the open ground in the area (not the rock round it), ordered along the area's
 		-- longer way, so falls walk along it and back.
@@ -646,12 +650,16 @@ function builders.Rockfall(tile, settings, folder)
 					elseif t < landing + settings.Lie then
 						-- Lying there a while: a boulder to step round.
 						if slot.shadow:GetAttribute("Active") ~= false then
+							-- It breaks as it lands: what's left is a boulder you step round.
 							slot.shadow:SetAttribute("Active", false)
 							slot.shadow.Transparency = 1
+							slot.rock.Size = slot.size * LYING
+							slot.rock.CFrame = CFrame.new(at.X, ground + slot.rock.Size.Y * 0.4, at.Y)
 							slot.rock.CanCollide = true
 						end
 					else
 						slot.rock.CanCollide = false
+						slot.rock.Size = slot.size
 						slot.rock.Transparency = 1
 						slot.rock.CFrame = CFrame.new(at.X, ground - 20, at.Y)
 						slot.shadow.CFrame = CFrame.new(at.X, ground - 20, at.Y)
