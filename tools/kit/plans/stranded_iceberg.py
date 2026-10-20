@@ -316,8 +316,87 @@ def z5_slots(z):
     ])
 
 
+# ==== zone 6 ====================================================================================
+LAKE6 = (-272, 300, 272, 420)
+
+# R: the cart's way (a ramp), round the berg by the west strip; T: tunnels down the east strip;
+# L: across the lake, in at its north-west corner, out at the south-east.
+R6_A = [(-216, 0), (-216, 60), (-96, 60), (-96, 108), (-216, 108), (-216, 156), (-96, 156),
+        (-96, 204), (-312, 204), (-312, 472), (-96, 472), (-96, 520), (-216, 520), (-216, 560),
+        (-96, 560), (-96, 608)]
+R6_B = [(-96, 0), (-96, 60), (-216, 60), (-216, 108), (-96, 108), (-96, 156), (-312, 156),
+        (-312, 472), (-96, 472), (-96, 520), (-216, 520), (-216, 560), (-96, 560), (-96, 608)]
+T6 = [(56, 0), (56, 156), (312, 156), (312, 204), (96, 204), (96, 252), (312, 252), (312, 472),
+      (216, 472), (216, 520), (100, 520), (100, 608)]
+L6_IN = [(-56, 0), (-56, 252), (-260, 252), (-260, 300)]
+L6_OUT = [(260, 420), (260, 472), (40, 472), (40, 608)]
+
+
+def lake6(c):
+    lake(c, *LAKE6)
+    ice_field(c, *LAKE6)
+    for at in [(-262, 360), (262, 360), (-150, 304), (150, 416), (0, 304)]:
+        crevasse(c, at, covered=False)
+
+
+def zone6():
+    z = Zone(6, "The Drowned Reach", rock=ROCK, material=ICE)
+    f = z.frame
+    bands(f)
+    pips_court(f)
+    f.decor("Chain", path=[(250, 6), (300, 6)], count=2)
+    z6_slots(z)
+
+    # ---- crossing 1: The great crevasse (3 paths) ----
+    c = z.crossing("The great crevasse", paths=3)
+    lake6(c)
+    cart_way(c, R6_A)
+    tunnel(c, T6, roofed=(0, 1, 3, 5, 7, 9))
+    crevasse(c, (200, 156))
+    crevasse(c, (312, 360))
+    crevasse(c, (160, 520))
+    spur(c, L6_IN)
+    spur(c, L6_OUT)
+    c.decor("Bones", at=(-70, 12), scale=1.4, yaw=90)  # the tell: a skeleton in the ice
+    c.decor("GlowShells", at=(62, 12))
+    c.decor("Rocks", at=(-230, 12), scale=1.0)
+
+    # ---- crossing 2: Whiteout road (2 paths): the lake from the east, the cart's way east ----
+    c = z.crossing("Whiteout road", paths=2)
+    lake6(c)
+    cart_way(c, mirror(R6_A))
+    spur(c, mirror(L6_IN))
+    spur(c, mirror(L6_OUT))
+    c.decor("Rocks", at=(70, 12), scale=1.3)  # the tell: a cairn
+    c.decor("Pebbles", at=(84, 14))
+    c.decor("Chain", path=[(-80, 8), (-44, 8)], count=2)
+
+    # ---- crossing 3: The ice maze (3 paths): west tunnels, the cart's way east, the lake ----
+    c = z.crossing("Heart of the berg", paths=3)
+    lake6(c)
+    cart_way(c, mirror(R6_B))
+    tunnel(c, mirror(T6), roofed=(0, 1, 3, 5, 7, 9))
+    crevasse(c, (-200, 156))
+    crevasse(c, (-312, 400))
+    crevasse(c, (-160, 520))
+    spur(c, mirror(L6_IN))
+    spur(c, mirror(L6_OUT))
+    c.decor("GlowShells", at=(-60, 14))  # the tell: glow at the middle way in
+    c.decor("GlowShells", at=(-76, 14))
+    return finish(z)
+
+
+def z6_slots(z):
+    slots(z, [
+        ("Blue caves west", (-352, 36), (104, 72), (52, 0), ("pool", 2), ("pillar", 2)),
+        ("Blue caves east", (248, 36), (104, 72), (52, 0), ("comb", 2), ("boulder", 2)),
+        ("Deep grottos west", (-352, 504), (104, 72), (52, 72), ("pillar", 4), ("comb", 4)),
+        ("Deep grottos east", (248, 504), (104, 72), (52, 72), ("ring", 4), ("pool", 4)),
+    ])
+
+
 COMMENT = ("-- Stranded Iceberg: drawn with the layout kit from tools/kit/plans/stranded_iceberg.py\n"
            "-- (edit the plan and re-run it, not this file). Card: docs/design/cards/stranded-iceberg.md.")
 
-zones = [zone5()]
+zones = [zone5(), zone6()]
 write_zones(OUT, zones, COMMENT)
