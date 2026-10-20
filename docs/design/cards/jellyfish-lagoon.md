@@ -21,4 +21,6 @@ tide in, it can drown you. Their glow is the tell.
 
 **Questions.**
 1. Jellies only in the water, or some stranded on the sand too (step round them)?
+Answer: Some stranded on land with an aoe, they also do some damage to the player
 2. The stun in zones 5 and 6: agreed?
+Answer: They stun you, and there is a ceiling above the whole place
