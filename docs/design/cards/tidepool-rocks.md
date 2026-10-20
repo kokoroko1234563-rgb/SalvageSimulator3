@@ -21,3 +21,5 @@ cut you off as the tide turns.
 
 **Questions.**
 1. Should the blowhole spout (a knockback on a timer) as a gentle danger?
+
+Answer: That is a good idea, lets do that
