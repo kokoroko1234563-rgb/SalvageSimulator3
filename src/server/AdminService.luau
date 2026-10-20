@@ -165,6 +165,15 @@ local function command(
 	description: string,
 	run: (Player, { string }) -> { string }
 )
+	-- A command is its name, its usage (starting with the name), what it does, and its run.
+	assert(
+		type(usage) == "string" and string.match(usage, "^%S+") == name,
+		"admin command " .. tostring(name) .. ": its usage must start with its name"
+	)
+	assert(
+		type(description) == "string" and type(run) == "function",
+		"admin command " .. name .. ": needs a description and a function"
+	)
 	commands[name] = { usage = usage, description = description, run = run }
 	table.insert(order, name)
 end
@@ -752,7 +761,7 @@ command(
 )
 
 command(
-	"waterlab",
+	"preview",
 	"preview <zone> <planned biome|off>",
 	"Show a planned biome's ground in a zone (no look, hazards or secret yet), e.g. preview 4 coral, then crossing 4 2",
 	function(_, args)
@@ -798,6 +807,7 @@ command(
 )
 
 command(
+	"waterlab",
 	"waterlab <zone|off>",
 	"Put the water lab's test ground (Layouts/Lab) in a zone, e.g. waterlab 4, then tide at 2000",
 	function(_, args)
