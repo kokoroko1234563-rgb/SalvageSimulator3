@@ -1475,7 +1475,7 @@ test("every way through a zone has a cart ramp from its top edge to its bottom e
 	end
 end)
 
-test("ramps stay within the cart slope and are clear of the ground's shape", function()
+test("ramps stay within the cart slope and nothing is raised on them", function()
 	local Beach = h.require("Shared/Beach")
 	local Config = h.require("Shared/Config")
 	local Layouts = h.require("Shared/Layouts")
@@ -1493,9 +1493,11 @@ test("ramps stay within the cart slope and are clear of the ground's shape", fun
 						local t = s / len
 						local x = a[1] + (b[1] - a[1]) * t
 						local z = z0 + a[2] + (b[2] - a[2]) * t
+						-- Nothing raised on a ramp; a dip is allowed (low ground that floods first),
+						-- as long as it keeps to the cart slope (below).
 						assert(
-							Beach.feature(x, z) == 0,
-							entry.Source .. ": a ramp's centre is clear of shapes"
+							Beach.feature(x, z) <= 0,
+							entry.Source .. ": a ramp's centre is clear of raised shapes"
 						)
 						local y = Beach.groundAt(x, z)
 						if last then
