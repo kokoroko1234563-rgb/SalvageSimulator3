@@ -65,6 +65,8 @@ Biomes.List = {
 				Speed = 16,
 				HitText = "A barrel knocked it out of your hands!",
 			},
+			{ Type = "Pit", Scatter = false },
+			{ Type = "Undertow", Scatter = false },
 		},
 		Decor = Color3.fromRGB(105, 75, 50),
 		-- Tarry sand under a brown, smoky sepia haze.
