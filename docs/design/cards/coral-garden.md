@@ -21,3 +21,4 @@ existing Knockdown patch), easy to step round.
 
 **Questions.**
 1. The sharp coral: a knockback, or only slowing you?
+Answer: Slowing, but should be much more common in the zone, so it cannot really be avoided
