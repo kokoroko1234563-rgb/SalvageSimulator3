@@ -190,7 +190,7 @@ Biomes.List = {
 		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
 		LootShare = 0.6,
 		Decor = Color3.fromRGB(235, 170, 180),
-		-- Sharp coral slows you where its layout puts it (gentle: a common biome).
+		-- Sharp coral slows you where its layout puts it: wide beds right across the lanes, hard to avoid.
 		Hazards = { { Type = "Slow", Scatter = false, Factor = 0.6, Color = Color3.fromRGB(240, 150, 160) } },
 		Name = "Coral Garden",
 		Tier = "Common",

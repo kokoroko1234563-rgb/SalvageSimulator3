@@ -1,7 +1,8 @@
 """Coral Garden, a biome rolling in zones 1 to 4 (docs/design/cards/coral-garden.md).
 
 A dried-out reef: spines of pale coral standing in pairs with a cove between each pair, arches
-through them. Gentle: sharp coral beds (the Slow hazard: step round them) are the only danger.
+through them. Danger: sharp coral beds (the Slow hazard), wide and everywhere: bands right across zones 1 to 3,
+wall to wall along zone 4's lanes, so they cannot really be avoided.
 The entrance is an arch in the reef.
 
 Run it with the quick check, once per zone:
@@ -59,6 +60,32 @@ def bed(part, at, radius=9):
     part.hazard("Slow", at=at, radius=radius)
     part.decor("DeadCoral", area=box(at[0], at[1], radius * 1.6, radius * 1.6), count=6)
     part.decor("Urchins", at=(at[0] + radius * 0.4, at[1] - radius * 0.3))
+
+
+def band(part, zc, k, radius=26, step=44, decor=2):
+    """A wide coral bed right across the zone: overlapping beds shoulder to shoulder, so there
+    is no way round it, only through (slowed). `k` shifts it per crossing."""
+    x = -340 + (k * 17) % step
+    j = 0
+    while x < 345:
+        z = zc + ((j * 5 + k * 2) % 3 - 1) * 7
+        part.hazard("Slow", at=(x, z), radius=radius)
+        part.decor("DeadCoral", area=box(x, z, radius * 1.4, radius * 1.4), count=decor)
+        x += step
+        j += 1
+
+
+def seed(part, pts, every, radius):
+    """Sharp coral along a lane, wall to wall: a bed every `every` studs of its way."""
+    for i in range(len(pts) - 1):
+        (x0, z0), (x1, z1) = pts[i], pts[i + 1]
+        length = ((x1 - x0) ** 2 + (z1 - z0) ** 2) ** 0.5
+        n = max(1, int(length // every))
+        for m in range(n):
+            t = (m + 0.5) / n
+            at = (round(x0 + (x1 - x0) * t), round(z0 + (z1 - z0) * t))
+            part.hazard("Slow", at=at, radius=radius)
+            part.decor("DeadCoral", at=at, count=2)
 
 
 def spine_pair(part, zc, height, width, k):
@@ -137,8 +164,8 @@ def crossing(z, name, start, gaps, end, tell, beds, pairs=PAIRS):
     c.ramp(pts, width=16)
     for g, zc in zip(gaps, pairs):
         arch_tell(c, g, zc)
-    for at in beds:
-        bed(c, at)
+    for zb in beds:
+        band(c, zb, int(abs(start)) // 10 % 5)
     tell(c)
     return c
 
@@ -167,15 +194,19 @@ def tell_snorkel(x):
 P23 = (190, 350, 510)  # zones 2 and 3: clear of the rock pools at (140, 120) and (-60, 130)
 
 
+BANDS1 = [50, 210, 390, 555]
+BANDS23 = [70, 270, 430, 570]
+
+
 def zone1():
     z = shore(1, None, 10, [((-300, 120), 1), ((-300, 300), 2),
                            ((300, 480), 3), ((-300, 480), 4)])
     crossing(z, "North arches", -40, (-150, 10, 150), 40, tell_spires(-40),
-             [(-70, 60), (90, 210), (-60, 400), (110, 540)])
+             BANDS1)
     crossing(z, "Middle arches", 130, (160, -20, -150), -60, tell_shells(130),
-             [(40, 90), (-100, 220), (90, 400), (-40, 540)])
+             BANDS1)
     crossing(z, "South arches", -150, (-120, 130, -10), 120, tell_snorkel(-150),
-             [(-60, 70), (60, 230), (-80, 410), (60, 550)])
+             BANDS1)
     return z
 
 
@@ -183,11 +214,11 @@ def zone2():
     z = shore(2, 4.4, 14, [((300, 190), 1), ((-300, 350), 2), ((-300, 190), 2),
                            ((300, 510), 3), ((-300, 510), 4)], P23)
     crossing(z, "North arches", -40, (-150, 10, 150), 40, tell_spires(-40),
-             [(-70, 60), (90, 210), (-60, 400), (110, 540)], P23)
+             BANDS23, P23)
     crossing(z, "Middle arches", 175, (175, -20, -150), -60, tell_shells(175),
-             [(40, 90), (-100, 220), (90, 400), (-40, 540)], P23)
+             BANDS23, P23)
     crossing(z, "South arches", -150, (-120, 130, -10), 120, tell_snorkel(-150),
-             [(-60, 70), (60, 230), (-80, 410), (60, 550)], P23)
+             BANDS23, P23)
     return z
 
 
@@ -195,11 +226,11 @@ def zone3():
     z = shore(3, 6.4, 18, [((300, 190), 1), ((-300, 350), 2), ((-300, 190), 2),
                            ((300, 510), 3), ((-300, 510), 4)], P23)
     crossing(z, "North arches", -40, (-150, 10, 150), 40, tell_spires(-40),
-             [(-70, 60), (90, 210), (-60, 400), (110, 540)], P23)
+             BANDS23, P23)
     crossing(z, "Middle arches", 175, (175, -20, -150), -60, tell_shells(175),
-             [(40, 90), (-100, 220), (90, 400), (-40, 540)], P23)
+             BANDS23, P23)
     crossing(z, "South arches", -150, (-120, 130, -10), 120, tell_snorkel(-150),
-             [(-60, 70), (60, 230), (-80, 410), (60, 550)], P23)
+             BANDS23, P23)
     return z
 
 
@@ -316,6 +347,8 @@ def zone4():
     # west, through the arches (quicker). Link: the arch court.
     c = z.crossing("Round the reef", paths=2)
     c.ramp(serpentine(96, 224, [96, 196, 300, 404, 504]), width=16)
+    seed(c, serpentine(96, 224, [96, 196, 300, 404, 504]), 60, 12)
+    seed(c, serpentine(-96, -224, [112, 220, 312, 440]), 45, 12)
     arch_way(c, serpentine(-96, -224, [112, 220, 312, 440]))
     spur(c, (96, 300), (48, 300))
     spur(c, (-96, 312), (-48, 312))
@@ -332,6 +365,8 @@ def zone4():
     # A: the cart path, now in the west. B: the foot path through the arches in the east.
     c = z.crossing("The arch road", paths=2)
     c.ramp(serpentine(-96, -224, [96, 196, 300, 404, 504]), width=16)
+    seed(c, serpentine(-96, -224, [96, 196, 300, 404, 504]), 60, 12)
+    seed(c, serpentine(96, 224, [112, 220, 312, 440]), 45, 12)
     arch_way(c, serpentine(96, 224, [112, 220, 312, 440]))
     spur(c, (-96, 300), (-48, 300))
     spur(c, (96, 312), (48, 312))
