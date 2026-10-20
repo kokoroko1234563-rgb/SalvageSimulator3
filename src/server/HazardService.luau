@@ -1587,7 +1587,10 @@ function builders.Jelly(tile, settings, folder)
 				table.insert(list, { path = path, placement = placement })
 			end
 		elseif placement.At then
-			table.insert(list, { at = Vector2.new(placement.At[1], z0 + placement.At[2]), placement = placement })
+			table.insert(
+				list,
+				{ at = Vector2.new(placement.At[1], z0 + placement.At[2]), placement = placement }
+			)
 		end
 	end
 	if #list == 0 and settings.Scatter then
@@ -1707,7 +1710,8 @@ function builders.Jelly(tile, settings, folder)
 			y = math.max(ground + 1.5, surface - 1.5) + pulse * 0.25
 		end
 		local squash = 1 + 0.12 * pulse
-		j.bell.Size = Vector3.new(j.bellSize.X * (2 - squash), j.bellSize.Y * squash, j.bellSize.Z * (2 - squash))
+		j.bell.Size =
+			Vector3.new(j.bellSize.X * (2 - squash), j.bellSize.Y * squash, j.bellSize.Z * (2 - squash))
 		j.bell.CFrame = CFrame.new(at.X, y, at.Y)
 		j.core.CFrame = CFrame.new(at.X, y, at.Y)
 		j.bell.Transparency = 0.4 + 0.12 * pulse
@@ -2111,7 +2115,10 @@ function builders.Fog(tile, settings, folder)
 		horn:SetAttribute("ZMax", z1)
 		horn:SetAttribute("Clearing", false)
 		horn.Parent = folder
-		table.insert(horns, { horn = horn, lamp = lamp, ring = ring, x = spot.x, z = spot.z, ground = ground })
+		table.insert(
+			horns,
+			{ horn = horn, lamp = lamp, ring = ring, x = spot.x, z = spot.z, ground = ground }
+		)
 	end
 	if #horns == 0 then
 		return

@@ -2931,7 +2931,10 @@ test("jellyfish: stranded ones glow as far as they sting, drifting ones follow t
 	assert(bell and bell:GetAttribute("Damage") == settings.Damage, "a drifting jelly stings too")
 	local before = bell.CFrame.X
 	HazardService._step(os.clock() + 4, 0.1)
-	assert(bell.CFrame.X ~= before and bell.CFrame.X >= -101 and bell.CFrame.X <= -39, "it drifts along its path")
+	assert(
+		bell.CFrame.X ~= before and bell.CFrame.X >= -101 and bell.CFrame.X <= -39,
+		"it drifts along its path"
+	)
 	assert(bell.Transparency > 0 and bell.Material == roblox.Enum.Material.Neon, "translucent and glowing")
 	folder:Destroy()
 	Layouts.setActive(tile, nil)
@@ -2950,7 +2953,9 @@ test("spearstone fields glow and crack first, then shoot up, in the pattern they
 		Layouts.setActive(tile, {
 			Name = "reef",
 			Primitives = {},
-			Hazards = { { Type = "Spears", At = { 0, 200 }, Radius = 12, Pattern = pattern, Damage = damage } },
+			Hazards = {
+				{ Type = "Spears", At = { 0, 200 }, Radius = 12, Pattern = pattern, Damage = damage },
+			},
 		})
 		local folder = Harness.wrap(roblox.Instance.new("Folder"))
 		HazardService.start(tile, { Hazards = { { Type = "Spears" } } }, folder)
@@ -2989,7 +2994,10 @@ test("spearstone fields glow and crack first, then shoot up, in the pattern they
 		end
 	end
 	assert(warned, "cracks show before a spear shoots up")
-	assert(live(plates, base + settings.Period - settings.Warning + 0.1) < #plates, "not all at once in a wave")
+	assert(
+		live(plates, base + settings.Period - settings.Warning + 0.1) < #plates,
+		"not all at once in a wave"
+	)
 	local seen, most = 0, 0
 	for t = 0, settings.Period, 0.1 do
 		local n = live(plates, base + t)
@@ -3048,7 +3056,10 @@ test("a whirlwind circles its loop, a tall column of sand that flings but doesn'
 		HazardService._step(now + t, 0.1)
 		local x, z = foot.CFrame.X, foot.CFrame.Z - z0
 		assert(
-			math.abs(x) <= 41 and z >= 99 and z <= 181 and (math.abs(math.abs(x) - 40) < 1 or math.abs(z - 140) > 39),
+			math.abs(x) <= 41
+				and z >= 99
+				and z <= 181
+				and (math.abs(math.abs(x) - 40) < 1 or math.abs(z - 140) > 39),
 			"on its loop at " .. t
 		)
 	end
@@ -3087,14 +3098,23 @@ test("ice patches are flat, pale and slippery but leave you some grip, and harm 
 	end
 	assert(#patches == 2, "a patch for each placement")
 	local first = patches[1]
-	assert(first:GetAttribute("Effect") == "Slide" and first:GetAttribute("HitRadius") == 12, "slides, as wide as placed")
-	assert(math.abs(first.CFrame.X - 20) < 1 and math.abs(first.CFrame.Z - (z0 + 150)) < 1, "where it was put")
+	assert(
+		first:GetAttribute("Effect") == "Slide" and first:GetAttribute("HitRadius") == 12,
+		"slides, as wide as placed"
+	)
+	assert(
+		math.abs(first.CFrame.X - 20) < 1 and math.abs(first.CFrame.Z - (z0 + 150)) < 1,
+		"where it was put"
+	)
 	assert(patches[2]:GetAttribute("HitRadius") == settings.Radius, "the kind's radius otherwise")
 	assert(first.Size.X < 0.5, "flat")
 	assert(first.Color.B > first.Color.R and first.Color.R > 0.6, "pale blue-white")
 	assert(settings.Grip > 0 and settings.Grip < 0.5, "slippery, but not out of control")
 	assert(first:GetAttribute("Grip") == settings.Grip, "the client reads its grip")
-	assert(first:GetAttribute("Damage") == nil and first:GetAttribute("Spill") == nil, "no harm, no cart spilling")
+	assert(
+		first:GetAttribute("Damage") == nil and first:GetAttribute("Spill") == nil,
+		"no harm, no cart spilling"
+	)
 	folder:Destroy()
 	Layouts.setActive(tile, nil)
 end)
@@ -3127,14 +3147,29 @@ test("a foghorn pulses on its Period: the fog is thick, blinks a warning, then l
 		end
 	end
 	assert(horn and horn:GetAttribute("Effect") == "Fog", "a foghorn the client can find")
-	assert(tower and math.abs(tower.CFrame.X - 30) < 1 and math.abs(tower.CFrame.Z - (z0 + 120)) < 1, "where it was put")
+	assert(
+		tower and math.abs(tower.CFrame.X - 30) < 1 and math.abs(tower.CFrame.Z - (z0 + 120)) < 1,
+		"where it was put"
+	)
 	assert(horn:GetAttribute("ZMin") == z0 and horn:GetAttribute("ZMax") == z1, "it covers its tile")
-	assert(horn:GetAttribute("Sight") == settings.Sight and settings.Sight <= 20, "the fog closes in to a few studs")
-	assert(settings.Clear >= 3 and settings.Clear < settings.Period / 2, "a pulse clears it for a while, not for good")
-	assert(settings.Effect == "Fog" and settings.HitRadius == 0 and not settings.Lantern, "it hits no one; no lantern")
+	assert(
+		horn:GetAttribute("Sight") == settings.Sight and settings.Sight <= 20,
+		"the fog closes in to a few studs"
+	)
+	assert(
+		settings.Clear >= 3 and settings.Clear < settings.Period / 2,
+		"a pulse clears it for a while, not for good"
+	)
+	assert(
+		settings.Effect == "Fog" and settings.HitRadius == 0 and not settings.Lantern,
+		"it hits no one; no lantern"
+	)
 	local base = settings.Period * 40 -- (a multiple of the Period: a pulse starts)
 	HazardService._step(base + 0.1, 0.1)
-	assert(horn:GetAttribute("Clearing") == true and ring.Transparency < 1, "the pulse: a ring of light, the fog lifting")
+	assert(
+		horn:GetAttribute("Clearing") == true and ring.Transparency < 1,
+		"the pulse: a ring of light, the fog lifting"
+	)
 	HazardService._step(base + settings.Clear + 0.5, 0.1)
 	assert(horn:GetAttribute("Clearing") == false and ring.Transparency == 1, "then the fog closes in again")
 	-- The lamp blinks before the next pulse.
