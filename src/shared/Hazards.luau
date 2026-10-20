@@ -63,6 +63,22 @@
 --           and you're Benighted until you die or leave the deep (zones 5 and 6): the world goes
 --           black, and you see only lights (a lantern or headlamp shows you your own
 --           surroundings, and the wards light the way). Placement: Path or At, Radius.
+--   Jelly   (Jellyfish Lagoon) translucent glowing jellies, pulsing. Placement At: one stranded
+--           on the sand, its glow ring on the sand showing how far its sting reaches (Radius);
+--           Path: one drifting along it in the water at Speed (HitRadius round it). Placement
+--           Damage overrides the setting. Effect Sting.
+--   Spears  (Spearstone Reef) a field (At, Radius) of spots Spacing studs apart, on a rhythm of
+--           Period seconds set by Pattern: Wave (a wave rolling across the field, west to east:
+--           run behind it), Checker (alternate squares, half a Period apart: hop between), Ring
+--           (rings from the middle out), All (every spot together). Each spot glows and cracks
+--           for Warning seconds, then a stone spear shoots up for Active seconds and Harms
+--           (Damage; a placement's Damage overrides it: less in the near zones). Placement: At,
+--           Radius, Pattern, Damage.
+--   Whirlwind  (Whirlwind Dunes) a column of lifted sand Height studs tall, Radius wide at its
+--           foot, circling its Path (a loop: round and round, not back and forth) at Speed.
+--           Whoever it catches is flung (effect Fling), not hurt. Placement: Path, Radius.
+--   Ice     (Stranded Iceberg) a patch (At, Radius) of slippery ice, flat, glossy and pale
+--           blue-white. On it you slide (effect Slide, Grip). Nothing else: no cart spilling.
 --
 -- What a hazard does to a player who gets within HitRadius of it is its Effect:
 --   Knockdown  knocked over (you drop what you hold) and thrown Push studs/s away from it.
@@ -72,6 +88,14 @@
 --   Current    dragged along (Undertow hazards): into deep water, where you drown.
 --   Harm       Damage taken (100 kills), and thrown Push studs/s away from it.
 --   Gloom      Benighted: the world goes dark around you until you die or leave the deep.
+--   Sting      Damage taken (checked like Harm), you drop what you hold, a small push, and in
+--              zones StunZone and deeper you're stunned Stun seconds (can't move).
+--   Fling      thrown Push studs/s up and away from the hazard, tumbling, dropping what you
+--              hold; not deadly itself (Whirlwind).
+--   Slide      slippery (Ice): your movement keeps its momentum and turns slowly; Grip is the
+--              share of control you keep (the less, the slipperier).
+--   Fog        the mist thickens to Sight studs while you're on the tile (Fog); a foghorn
+--              pulse lifts it for Clear seconds every Period.
 -- Dangers are meant to be deadly: a hazard that only slows you is scenery.
 -- The server builds and moves the hazards (HazardService); each player's own client checks its
 -- character against them and applies the effect (HazardController), like the waves.
@@ -281,6 +305,7 @@ Hazards.Types = {
 	Whirlwind = { -- Whirlwind Dunes: a whirlwind circling its Path, flinging whoever it catches
 		Count = 1,
 		Radius = 10,
+		Height = 45, -- the column of sand: tall enough to see from far off
 		Speed = 9,
 		Color = Color3.fromRGB(220, 190, 140),
 		Effect = "Fling",
@@ -291,6 +316,8 @@ Hazards.Types = {
 	Spears = { -- Spearstone Reef: fields of spears shooting up from the floor on a rhythm
 		Count = 2,
 		Radius = 12, -- a field
+		Pattern = "Wave", -- Wave (rolls across the field), Checker (alternating squares), Ring (outward from the middle), All
+		Spacing = 5, -- studs between the spots of a field
 		Period = 4,
 		Warning = 1, -- seconds a spot glows and cracks before its spear shoots up
 		Active = 0.6,

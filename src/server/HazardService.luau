@@ -1561,6 +1561,596 @@ function builders.Gloom(tile, settings, folder)
 	})
 end
 
+-- Jelly: translucent, glowing jellyfish (see Hazards.luau). Stranded on the sand (At) one lies
+-- still with a ring of glow on the sand round it, as wide as its sting's reach (Radius); in the
+-- water (Path) it drifts along its route at Speed, a little under the surface. Both pulse. What
+-- stings is the glow ring (stranded) or the bell (drifting), tagged with the sting's Damage,
+-- Stun and StunZone: the client does the rest (HazardController).
+local JELLY_COLORS = {
+	Color3.fromRGB(190, 140, 255),
+	Color3.fromRGB(255, 130, 200),
+	Color3.fromRGB(150, 160, 255),
+	Color3.fromRGB(210, 120, 255),
+}
+local TENTACLES = 5
+
+function builders.Jelly(tile, settings, folder)
+	local z0 = Beach.tileRange(tile)
+	local list = {}
+	for _, placement in Layouts.hazardPlacements(tile, "Jelly") do
+		if placement.Path then
+			local path = {}
+			for _, point in placement.Path do
+				table.insert(path, Vector2.new(point[1], z0 + point[2]))
+			end
+			if #path >= 1 then
+				table.insert(list, { path = path, placement = placement })
+			end
+		elseif placement.At then
+			table.insert(
+				list,
+				{ at = Vector2.new(placement.At[1], z0 + placement.At[2]), placement = placement }
+			)
+		end
+	end
+	if #list == 0 and settings.Scatter then
+		for _ = 1, settings.Count do
+			local x, z = randomSpot(tile)
+			table.insert(list, { at = Vector2.new(x, z), placement = {} })
+		end
+	end
+	local jellies = {}
+	for index, entry in list do
+		local stranded = entry.at ~= nil
+		local placement = entry.placement
+		local look = Random.new(index * 97 + math.floor((entry.at or entry.path[1]).X))
+		local color = JELLY_COLORS[look:NextInteger(1, #JELLY_COLORS)]
+		local scale = look:NextNumber(0.9, 1.3)
+		local bellSize = Vector3.new(3.2, if stranded then 1.8 else 2.4, 3.2) * scale
+		local bell = makePart({
+			Name = "JellyBell",
+			Shape = Enum.PartType.Ball,
+			Size = bellSize,
+			Color = color,
+			Material = Enum.Material.Neon,
+			Transparency = 0.4,
+		})
+		local core = makePart({
+			Name = "JellyCore",
+			Shape = Enum.PartType.Ball,
+			Size = bellSize * 0.55,
+			Color = color:Lerp(Color3.new(1, 1, 1), 0.5),
+			Material = Enum.Material.Neon,
+			Transparency = 0.15,
+		})
+		local light = Instance.new("PointLight")
+		light.Color = color
+		light.Range = 14
+		light.Brightness = 1.5
+		light.Parent = bell
+		local tentacles = {}
+		for k = 1, TENTACLES do
+			local angle = k / TENTACLES * math.pi * 2
+			local length = look:NextNumber(2.5, 4) * scale
+			table.insert(tentacles, {
+				offset = Vector3.new(
+					math.cos(angle) * 0.9 * scale,
+					-bellSize.Y * 0.5 - length / 2 + 0.3,
+					math.sin(angle) * 0.9 * scale
+				),
+				part = makePart({
+					Name = "JellyTentacle",
+					Size = Vector3.new(0.18, length, 0.18),
+					Color = color,
+					Material = Enum.Material.Neon,
+					Transparency = 0.5,
+				}),
+			})
+		end
+		local jelly = {
+			bell = bell,
+			core = core,
+			tentacles = tentacles,
+			bellSize = bellSize,
+			stranded = stranded,
+			at = entry.at,
+			path = entry.path,
+			phase = look:NextNumber(0, 100),
+		}
+		if stranded then
+			local radius = placement.Radius or settings.Radius
+			-- The glow on the sand: as far as the sting reaches.
+			local ring = makePart({
+				Name = "JellyGlow",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.15, radius * 2, radius * 2),
+				Color = color,
+				Material = Enum.Material.Neon,
+				Transparency = 0.75,
+			})
+			arm(ring, settings)
+			ring:SetAttribute("HitRadius", radius)
+			jelly.hit, jelly.ring = ring, ring
+			ring.Parent = folder
+		else
+			arm(bell, settings)
+			bell:SetAttribute("HitRadius", placement.Radius or settings.HitRadius)
+			jelly.hit = bell
+			jelly.length = 0
+			for i = 1, #entry.path - 1 do
+				jelly.length += (entry.path[i + 1] - entry.path[i]).Magnitude
+			end
+		end
+		jelly.hit:SetAttribute("Damage", placement.Damage or settings.Damage)
+		jelly.hit:SetAttribute("Stun", settings.Stun)
+		jelly.hit:SetAttribute("StunZone", settings.StunZone)
+		bell.Parent = folder
+		core.Parent = folder
+		for _, t in tentacles do
+			t.part.Parent = folder
+		end
+		table.insert(jellies, jelly)
+	end
+	if #jellies == 0 then
+		return
+	end
+	local function place(j, now: number)
+		local pulse = math.sin(now * 2.2 + j.phase)
+		local at = j.at
+		local y
+		if j.stranded then
+			y = Beach.groundAt(at.X, at.Y) + j.bellSize.Y * 0.4
+		else
+			at = if j.length > 0
+				then HazardService.alongPath(j.path, (now + j.phase) * settings.Speed)
+				else j.path[1]
+			-- A little under the water's surface, and bobbing with its pulse.
+			local ground = Beach.groundAt(at.X, at.Y)
+			local surface = Beach.waterYAt(Tide.sea(), at.X)
+			y = math.max(ground + 1.5, surface - 1.5) + pulse * 0.25
+		end
+		local squash = 1 + 0.12 * pulse
+		j.bell.Size =
+			Vector3.new(j.bellSize.X * (2 - squash), j.bellSize.Y * squash, j.bellSize.Z * (2 - squash))
+		j.bell.CFrame = CFrame.new(at.X, y, at.Y)
+		j.core.CFrame = CFrame.new(at.X, y, at.Y)
+		j.bell.Transparency = 0.4 + 0.12 * pulse
+		for _, t in j.tentacles do
+			t.part.CFrame = CFrame.new(at.X + t.offset.X, y + t.offset.Y * squash, at.Y + t.offset.Z)
+		end
+		if j.ring then
+			j.ring.CFrame = CFrame.new(at.X, Beach.groundAt(at.X, at.Y) + 0.1, at.Y)
+				* CFrame.Angles(0, 0, math.pi / 2)
+			j.ring.Transparency = 0.75 + 0.1 * pulse
+		end
+	end
+	for _, j in jellies do
+		place(j, 0)
+	end
+	table.insert(running, {
+		folder = folder,
+		step = function(now)
+			for _, j in jellies do
+				place(j, now)
+			end
+		end,
+	})
+end
+
+-- Spears: a field of stone plates that glow and crack, then shoot a spear up, on a rhythm set by
+-- the field's Pattern (see Hazards.luau). Each spot is on the same Period; the pattern only sets
+-- when in the cycle a spot fires, so a wave can be run behind, a checkerboard hopped between,
+-- rings stepped across. The plate is what hits (Active only while the spear is up).
+local SPEAR_HEIGHT = 6
+local SPEAR_RISE = 0.12 -- seconds a spear takes to shoot up
+local SWEEP_SHARE = 0.75 -- the share of a Period a wave or ring takes to cross the field
+
+-- When in the cycle (0-1 of the Period) a spot at (dx, dz) from the middle of a field fires.
+local function spearFire(pattern: string, dx: number, dz: number, radius: number, spacing: number): number
+	if pattern == "All" then
+		return 0
+	elseif pattern == "Checker" then
+		local parity = (math.round(dx / spacing) + math.round(dz / spacing)) % 2
+		return parity * 0.5
+	elseif pattern == "Ring" then
+		local rings = math.max(1, math.round(radius / spacing))
+		return math.min(1, math.round(math.sqrt(dx * dx + dz * dz) / spacing) / rings) * SWEEP_SHARE
+	end
+	return math.clamp((dx + radius) / (2 * radius), 0, 1) * SWEEP_SHARE
+end
+
+function builders.Spears(tile, settings, folder)
+	local spears = {}
+	for _, spot in spotsFor(tile, "Spears", settings) do
+		local placement = spot.placement
+		local radius = placement.Radius or settings.Radius
+		local pattern = placement.Pattern or settings.Pattern
+		local damage = placement.Damage or settings.Damage
+		local spacing = settings.Spacing
+		local n = math.floor(radius / spacing)
+		local scatter = Random.new(math.floor(spot.x * 7 + spot.z * 3))
+		for i = -n, n do
+			for j = -n, n do
+				local dx, dz = i * spacing, j * spacing
+				local x, z = spot.x + dx, spot.z + dz
+				if dx * dx + dz * dz > radius * radius or Beach.feature(x, z) >= 2 then
+					continue
+				end
+				local ground = Beach.groundAt(x, z)
+				local hitRadius = settings.HitRadius
+				local plate = makePart({
+					Name = "SpearPlate",
+					Shape = Enum.PartType.Cylinder,
+					Size = Vector3.new(0.2, hitRadius * 2, hitRadius * 2),
+					CFrame = CFrame.new(x, ground + 0.1, z) * CFrame.Angles(0, 0, math.pi / 2),
+					Color = settings.Color,
+					Material = Palette.Material.Rock,
+				})
+				arm(plate, settings)
+				plate:SetAttribute("Damage", damage)
+				plate:SetAttribute("Active", false)
+				plate.Parent = folder
+				local cracks = {}
+				for k = 1, 2 do
+					local crack = makePart({
+						Name = "SpearCrack",
+						Size = Vector3.new(0.18, 0.05, hitRadius * 1.9),
+						CFrame = CFrame.new(x, ground + 0.24, z)
+							* CFrame.Angles(0, k * 1.2 + scatter:NextNumber(-0.3, 0.3), 0),
+						Color = Color3.fromRGB(255, 120, 50),
+						Material = Enum.Material.Neon,
+						Transparency = 1,
+					})
+					crack.Parent = folder
+					table.insert(cracks, crack)
+				end
+				local shaft = makePart({
+					Name = "Spear",
+					Size = Vector3.new(0.9, SPEAR_HEIGHT - 1, 0.9),
+					CFrame = CFrame.new(x, ground - SPEAR_HEIGHT, z),
+					Color = settings.Color:Lerp(Color3.new(1, 1, 1), 0.2),
+					Material = Palette.Material.Rock,
+					Transparency = 1,
+				})
+				shaft.Parent = folder
+				local tip = makePart({
+					Name = "SpearTip",
+					Size = Vector3.new(0.9, 0.9, 0.9),
+					CFrame = CFrame.new(x, ground - SPEAR_HEIGHT, z),
+					Color = settings.Color:Lerp(Color3.new(1, 1, 1), 0.45),
+					Material = Palette.Material.Rock,
+					Transparency = 1,
+				})
+				tip.Parent = folder
+				table.insert(spears, {
+					plate = plate,
+					cracks = cracks,
+					shaft = shaft,
+					tip = tip,
+					x = x,
+					z = z,
+					ground = ground,
+					fire = spearFire(pattern, dx, dz, radius, spacing) * settings.Period,
+					state = 0,
+				})
+			end
+		end
+	end
+	if #spears == 0 then
+		return
+	end
+	local idle = settings.Color
+	table.insert(running, {
+		folder = folder,
+		step = function(now)
+			for _, s in spears do
+				local phase = (now - s.fire) % settings.Period
+				local state = if phase < settings.Active
+					then 2
+					elseif phase >= settings.Period - settings.Warning then 1
+					else 0
+				if state == 1 then
+					-- Glowing and cracking, flickering faster as it nears.
+					local near = (phase - (settings.Period - settings.Warning)) / settings.Warning
+					local flicker = 0.5 + 0.5 * math.sin(now * (8 + 14 * near))
+					s.plate.Material = Enum.Material.Neon
+					s.plate.Color = idle:Lerp(Color3.fromRGB(255, 110, 40), 0.5 + 0.5 * flicker)
+					for _, crack in s.cracks do
+						crack.Transparency = 0.1
+					end
+				elseif state ~= s.state then
+					s.plate.Material = Palette.Material.Rock
+					s.plate.Color = idle
+					for _, crack in s.cracks do
+						crack.Transparency = if state == 2 then 0.1 else 1
+					end
+				end
+				if state == 2 then
+					-- Up it shoots, quickly.
+					local k = math.min(1, phase / SPEAR_RISE)
+					local rise = SPEAR_HEIGHT * k
+					local top = s.ground - 0.5 + rise
+					s.shaft.CFrame = CFrame.new(s.x, top - (SPEAR_HEIGHT - 1) / 2, s.z)
+					s.tip.CFrame = CFrame.new(s.x, top + 0.2, s.z) * CFrame.Angles(0.8, 0.8, 0)
+					s.shaft.Transparency, s.tip.Transparency = 0, 0
+				elseif s.state == 2 then
+					s.shaft.Transparency, s.tip.Transparency = 1, 1
+					s.shaft.CFrame = CFrame.new(s.x, s.ground - SPEAR_HEIGHT, s.z)
+					s.tip.CFrame = s.shaft.CFrame
+				end
+				if state ~= s.state then
+					s.state = state
+					s.plate:SetAttribute("Active", state == 2)
+				end
+			end
+		end,
+	})
+end
+
+-- Whirlwind: a column of lifted sand circling its Path (a loop) at Speed (see Hazards.luau),
+-- tall enough to be seen from far off. Whoever the Radius at its foot catches is flung
+-- (HazardController). Without a placement, a loop is scattered round a spot on the tile.
+local WHIRL_LAYERS = 8
+
+function builders.Whirlwind(tile, settings, folder)
+	local z0 = Beach.tileRange(tile)
+	local loops = {}
+	for _, placement in Layouts.hazardPlacements(tile, "Whirlwind") do
+		local path = {}
+		for _, point in placement.Path or {} do
+			table.insert(path, Vector2.new(point[1], z0 + point[2]))
+		end
+		if #path >= 2 then
+			table.insert(loops, { path = path, radius = placement.Radius or settings.Radius })
+		end
+	end
+	if #loops == 0 and settings.Scatter then
+		for _ = 1, settings.Count do
+			local x, z = randomSpot(tile)
+			local path = {}
+			for k = 0, 7 do
+				local angle = k / 8 * math.pi * 2
+				table.insert(path, Vector2.new(x + math.cos(angle) * 25, z + math.sin(angle) * 25))
+			end
+			table.insert(loops, { path = path, radius = settings.Radius })
+		end
+	end
+	local winds = {}
+	for _, loop in loops do
+		local closed = table.clone(loop.path)
+		table.insert(closed, loop.path[1]) -- round and round, not back and forth
+		local length = 0
+		for i = 1, #closed - 1 do
+			length += (closed[i + 1] - closed[i]).Magnitude
+		end
+		if length <= 0 then
+			continue
+		end
+		local foot = makePart({
+			Name = "Whirlwind",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.3, loop.radius * 2, loop.radius * 2),
+			Color = settings.Color,
+			Transparency = 1,
+		})
+		arm(foot, settings)
+		foot:SetAttribute("HitRadius", loop.radius)
+		local dust = Instance.new("ParticleEmitter")
+		dust.Color = ColorSequence.new(settings.Color)
+		dust.Size = NumberSequence.new(2.5, 5)
+		dust.Transparency = NumberSequence.new(0.4, 1)
+		dust.Lifetime = NumberRange.new(0.8, 1.4)
+		dust.Rate = 40
+		dust.Speed = NumberRange.new(6, 14)
+		dust.SpreadAngle = Vector2.new(180, 180)
+		dust.Parent = foot
+		foot.Parent = folder
+		-- The column: layers of swirling sand, wider the higher they go.
+		local layers = {}
+		for k = 1, WHIRL_LAYERS do
+			local t = (k - 0.5) / WHIRL_LAYERS
+			local width = loop.radius * (0.5 + 1.3 * t)
+			local layer = makePart({
+				Name = "WhirlwindSand",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(settings.Height / WHIRL_LAYERS, width, width),
+				Color = settings.Color:Lerp(Color3.new(1, 1, 1), 0.15 * t),
+				Material = Enum.Material.Sand,
+				Transparency = 0.55 + 0.25 * t,
+			})
+			layer.Parent = folder
+			table.insert(layers, { part = layer, t = t })
+		end
+		table.insert(winds, {
+			foot = foot,
+			layers = layers,
+			closed = closed,
+			length = length,
+			radius = loop.radius,
+			phase = rng:NextNumber(0, length),
+		})
+	end
+	if #winds == 0 then
+		return
+	end
+	local function place(w, now: number)
+		local at = HazardService.alongPath(w.closed, (w.phase + now * settings.Speed) % w.length)
+		local ground = Beach.groundAt(at.X, at.Y)
+		w.foot.CFrame = CFrame.new(at.X, ground + 0.15, at.Y) * CFrame.Angles(0, 0, math.pi / 2)
+		for _, layer in w.layers do
+			-- Each layer swings round the axis, the higher the further: a leaning, twisting column.
+			local swing = math.sin(now * 2.5 - layer.t * 3) * w.radius * 0.25 * layer.t
+			local swirl = math.cos(now * 2.5 - layer.t * 3) * w.radius * 0.25 * layer.t
+			layer.part.CFrame = CFrame.new(at.X + swing, ground + layer.t * settings.Height, at.Y + swirl)
+				* CFrame.Angles(0, now * (1 + layer.t), math.pi / 2)
+		end
+	end
+	for _, w in winds do
+		place(w, 0)
+	end
+	table.insert(running, {
+		folder = folder,
+		step = function(now)
+			for _, w in winds do
+				place(w, now)
+			end
+		end,
+	})
+end
+
+-- Ice: slippery patches, flat, pale blue-white and glossy, with a few lighter frost streaks. On
+-- one you slide (HazardController reads its Grip). Nothing else happens on it: a cart doesn't
+-- spill.
+function builders.Ice(tile, settings, folder)
+	for _, spot in spotsFor(tile, "Ice", settings) do
+		local radius = spot.placement.Radius or settings.Radius
+		local ground = Beach.groundAt(spot.x, spot.z)
+		local ice = makePart({
+			Name = "IcePatch",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.2, radius * 2, radius * 2),
+			CFrame = CFrame.new(spot.x, ground + 0.1, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = settings.Color,
+			Material = Enum.Material.Ice,
+			Reflectance = 0.2,
+			Transparency = 0.1,
+		})
+		arm(ice, settings)
+		ice:SetAttribute("HitRadius", radius)
+		ice:SetAttribute("Grip", settings.Grip)
+		ice.Parent = folder
+		local scatter = Random.new(math.floor(spot.x * 19 + spot.z * 23))
+		for k = 1, math.clamp(math.floor(radius / 3), 2, 8) do
+			local length = scatter:NextNumber(0.4, 0.9) * radius
+			local angle = scatter:NextNumber() * math.pi
+			local reach = scatter:NextNumber(0, radius * 0.4)
+			local x = spot.x + math.cos(k * 2.1) * reach
+			local z = spot.z + math.sin(k * 2.1) * reach
+			makePart({
+				Name = "Frost",
+				Size = Vector3.new(0.25, 0.05, length),
+				CFrame = CFrame.new(x, Beach.groundAt(x, z) + 0.24, z) * CFrame.Angles(0, angle, 0),
+				Color = Color3.fromRGB(245, 250, 255),
+				Material = Enum.Material.SmoothPlastic,
+				Transparency = 0.35,
+			}).Parent =
+				folder
+		end
+	end
+end
+
+-- Fog: a foghorn (a lighthouse) at each spot (see Hazards.luau). The fog itself is the client's
+-- (MistController): every player on the tile sees it close in to Sight studs, except while the
+-- horn is pulsing. The horn part is tagged with the tile's range (ZMin, ZMax), Sight, Period and
+-- Clear, and its Clearing attribute is true for Clear seconds from each pulse, on the server's
+-- clock, so everyone sees the fog lift together. The lamp blinks faster for the last
+-- FOG_WARN seconds before a pulse (the tell), and at the pulse a ring of light rolls out from
+-- the tower.
+local FOG_WARN = 2 -- seconds the lamp blinks before a pulse
+local FOG_RING = 2.5 -- seconds the ring takes to roll out
+local FOG_RING_REACH = 90 -- studs it rolls out to
+
+function builders.Fog(tile, settings, folder)
+	local z0, z1 = Beach.tileRange(tile)
+	local horns = {}
+	for _, spot in spotsFor(tile, "Fog", settings) do
+		local ground = Beach.groundAt(spot.x, spot.z)
+		local height = 30
+		local tower = makePart({
+			Name = "FoghornTower",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(height, 6, 6),
+			CFrame = CFrame.new(spot.x, ground + height / 2, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = Color3.fromRGB(235, 235, 230),
+			Material = Palette.Material.Smooth,
+			CanCollide = true,
+			CanQuery = true,
+		})
+		tower.Parent = folder
+		local band = makePart({
+			Name = "FoghornBand",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(6, 6.4, 6.4),
+			CFrame = CFrame.new(spot.x, ground + height * 0.55, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = Color3.fromRGB(190, 60, 55),
+			Material = Palette.Material.Smooth,
+		})
+		band.Parent = folder
+		local lamp = makePart({
+			Name = "FoghornLamp",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(5, 5, 5),
+			CFrame = CFrame.new(spot.x, ground + height + 2, spot.z),
+			Color = Color3.fromRGB(255, 240, 180),
+			Material = Enum.Material.Neon,
+		})
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 240, 180)
+		light.Range = 40
+		light.Brightness = 3
+		light.Parent = lamp
+		lamp.Parent = folder
+		local ring = makePart({
+			Name = "FoghornRing",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.4, 2, 2),
+			CFrame = CFrame.new(spot.x, ground + 1.5, spot.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Color = Color3.fromRGB(255, 250, 220),
+			Material = Enum.Material.Neon,
+			Transparency = 1,
+		})
+		ring.Parent = folder
+		-- What the client reads: it's armed like any hazard but hits no one (HitRadius 0).
+		local horn = makePart({
+			Name = "Foghorn",
+			Size = Vector3.new(1, 1, 1),
+			CFrame = CFrame.new(spot.x, ground + height, spot.z),
+			Transparency = 1,
+		})
+		arm(horn, settings)
+		horn:SetAttribute("Sight", settings.Sight)
+		horn:SetAttribute("Period", settings.Period)
+		horn:SetAttribute("Clear", settings.Clear)
+		horn:SetAttribute("ZMin", z0)
+		horn:SetAttribute("ZMax", z1)
+		horn:SetAttribute("Clearing", false)
+		horn.Parent = folder
+		table.insert(
+			horns,
+			{ horn = horn, lamp = lamp, ring = ring, x = spot.x, z = spot.z, ground = ground }
+		)
+	end
+	if #horns == 0 then
+		return
+	end
+	table.insert(running, {
+		folder = folder,
+		step = function(now)
+			-- (Phase 0 of each Period is the pulse; the clock is the same for every horn.)
+			local phase = now % settings.Period
+			local clearing = phase < settings.Clear
+			local untilPulse = settings.Period - phase
+			for _, h in horns do
+				if h.horn:GetAttribute("Clearing") ~= clearing then
+					h.horn:SetAttribute("Clearing", clearing)
+				end
+				-- The lamp: steady, blinking faster before a pulse, flaring at it.
+				local blink = if untilPulse < FOG_WARN then math.sin(now * 18) > 0 else true
+				h.lamp.Transparency = if clearing then 0 elseif blink then 0.15 else 0.8
+				-- The ring of light rolling out, fading as it goes.
+				if phase < FOG_RING then
+					local k = phase / FOG_RING
+					local size = 4 + k * FOG_RING_REACH * 2
+					h.ring.Size = Vector3.new(0.4, size, size)
+					h.ring.Transparency = 0.2 + 0.8 * k
+				elseif h.ring.Transparency < 1 then
+					h.ring.Transparency = 1
+				end
+			end
+		end,
+	})
+end
+
 HazardService.Builders = builders
 
 -- Builds a source's hazards on a tile into its folder: a biome's, or a plain zone's
@@ -1592,7 +2182,7 @@ function HazardService.init()
 		end
 		local effect = part:GetAttribute("Effect")
 		if
-			(effect ~= "Harm" and effect ~= "Sink")
+			(effect ~= "Harm" and effect ~= "Sink" and effect ~= "Sting")
 			or part:GetAttribute("Active") == false
 			or part:GetAttribute("Lethal") == false
 		then

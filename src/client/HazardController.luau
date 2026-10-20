@@ -13,6 +13,16 @@
 --              the world goes black around you (DayController.blind) and only lights show,
 --              until you die or leave the deep (zones 5 and 6). The LocalPlayer's "Benighted"
 --              attribute says so, shown on screen.
+--   Sting      (jellyfish) the server is told (it applies the Damage, checked like Harm), you drop
+--              what you hold, are pushed a little, and in StunZone and deeper you're stunned
+--              (can't move or jump) for Stun seconds.
+--   Fling      (whirlwind) thrown Push studs/s away and up (Push x FLING_LIFT), tumbling for
+--              FLING_TIME, dropping what you hold; not deadly itself.
+--   Slide      (ice) your velocity follows where you want to go at only Grip x SLIDE_RATE per
+--              second: you keep the momentum you came with and turn slowly (the slide is
+--              carried as WaveController.hazardPush on top of the Humanoid's own walking).
+--   Fog        (foghorn) nothing here: MistController thickens the mist while you're on the
+--              hazard's tile (its ZMin/ZMax) and lifts it while its Clearing attribute is set.
 -- A hazard with an Active attribute only hits while it's set.
 
 local CollectionService = game:GetService("CollectionService")
@@ -38,6 +48,16 @@ local BODY = 1.5 -- studs of the character's own width counted in a hit
 local REACH_Y = 6 -- a hazard this far above or below you can't reach you
 local DROP_COOLDOWN = 1.5 -- seconds before the same hazard can knock something out of your hands again
 local HOLD_DEPTH = 0.6 -- how far down sand that holds (Lethal = false) takes you, as a share of swallowed
+
+local STING_COOLDOWN = 2 -- seconds before the same jelly can sting you again
+local stunnedUntil = 0 -- stunned by a sting (can't move) until then
+local FLING_TIME = 1.6 -- seconds tumbling after a whirlwind throws you
+local FLING_LIFT = 0.6 -- the throw's upward speed, as a share of its Push
+local FLING_COOLDOWN = 3.5 -- seconds before a whirlwind can throw you again
+local lastFling = -math.huge
+local SLIDE_RATE = 8 -- on ice, how fast your velocity follows your wish, per second, times Grip
+local FOOTING_RATE = 5 -- off it, how fast you get your footing back, per second
+local slideVelocity: Vector3? = nil -- the velocity you're sliding at, from the first step on ice
 
 local lastDrop: { [Instance]: number } = {}
 local lastHarm: { [Instance]: number } = {}
@@ -86,6 +106,7 @@ local function step(dt: number)
 		WaveController.hazardSlow = 1
 		WaveController.hazardJump = 1
 		WaveController.hazardPush = Vector3.zero
+		stunnedUntil, slideVelocity = 0, nil
 		sunk, warned, baseHip = 0, false, nil
 		benighted = false -- (dying lifts it)
 		DayController.blind = 0
@@ -97,6 +118,7 @@ local function step(dt: number)
 	local push = Vector3.zero
 	local sinking: BasePart? = nil
 	local gloom: BasePart? = nil
+	local grip: number? = nil -- the share of control you keep, on ice
 	for _, part in CollectionService:GetTagged(Hazards.Tag) do
 		if not part:IsA("BasePart") or part:GetAttribute("Active") == false then
 			continue
@@ -128,6 +150,49 @@ local function step(dt: number)
 				WaveController.hit(direction * (part:GetAttribute("Push") or 0))
 				HUD.notify(part:GetAttribute("HitText") or "Ouch!")
 			end
+		elseif effect == "Slide" then
+			grip = math.min(grip or 1, part:GetAttribute("Grip") or 1)
+		elseif effect == "Sting" then
+			-- A sting: the server applies the Damage, what you hold is dropped, a small push, and
+			-- from StunZone down you can't move for Stun seconds.
+			if now - (lastHarm[part] or -math.huge) > STING_COOLDOWN then
+				lastHarm[part] = now
+				Remotes.get("HazardHarm"):FireServer(part)
+				if GrabController.isHolding() then
+					GrabController.release()
+				end
+				local away = Vector3.new(position.X - part.Position.X, 0, position.Z - part.Position.Z)
+				local direction = if across > 0.1 then away.Unit else root.CFrame.LookVector * -1
+				local velocity = root.AssemblyLinearVelocity
+				root.AssemblyLinearVelocity = velocity + direction * (part:GetAttribute("Push") or 0)
+				if (Beach.zoneAt(position.Z) or 0) >= (part:GetAttribute("StunZone") or math.huge) then
+					stunnedUntil = now + (part:GetAttribute("Stun") or 0)
+				end
+				HUD.notify(part:GetAttribute("HitText") or "Stung!")
+			end
+		elseif effect == "Fling" then
+			-- Caught in a whirlwind: thrown up and away, tumbling, dropping what you hold. Not
+			-- deadly itself; the landing is what you make of it.
+			if now - lastFling > FLING_COOLDOWN then
+				lastFling = now
+				if GrabController.isHolding() then
+					GrabController.release()
+				end
+				local away = Vector3.new(position.X - part.Position.X, 0, position.Z - part.Position.Z)
+				local direction = if across > 0.1 then away.Unit else root.CFrame.LookVector * -1
+				local speed = part:GetAttribute("Push") or 0
+				humanoid.PlatformStand = true
+				root.AssemblyLinearVelocity = direction * speed + Vector3.new(0, speed * FLING_LIFT, 0)
+				root.AssemblyAngularVelocity =
+					Vector3.new(math.random() * 12 - 6, math.random() * 12 - 6, math.random() * 12 - 6)
+				task.delay(FLING_TIME, function()
+					if humanoid.Parent and humanoid.Health > 0 then
+						humanoid.PlatformStand = false
+						humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+					end
+				end)
+				HUD.notify(part:GetAttribute("HitText") or "You were thrown!")
+			end
 		elseif effect == "Knockdown" then
 			local away = Vector3.new(position.X - part.Position.X, 0, position.Z - part.Position.Z)
 			local direction = if across > 0.1 then away.Unit else root.CFrame.LookVector * -1
@@ -142,8 +207,28 @@ local function step(dt: number)
 			end
 		end
 	end
-	WaveController.hazardSlow = slow
-	WaveController.hazardJump = if sinking then 0 else 1 -- no jumping out of sinking sand
+	-- Ice: your velocity follows where you want to go only slowly (the less Grip, the slower), so
+	-- you keep sliding the way you were going, and turn slowly. The slide is carried as a push
+	-- (WaveController moves the character by it) on top of the walking the Humanoid does. Off the
+	-- ice you get your footing back within a moment.
+	if grip or slideVelocity then
+		local walk = humanoid.MoveDirection * humanoid.WalkSpeed
+		walk = Vector3.new(walk.X, 0, walk.Z)
+		if not slideVelocity then
+			local velocity = root.AssemblyLinearVelocity
+			slideVelocity = Vector3.new(velocity.X, 0, velocity.Z)
+		end
+		local rate = if grip then grip * SLIDE_RATE else FOOTING_RATE
+		slideVelocity += (walk - slideVelocity) * (1 - math.exp(-rate * dt))
+		if not grip and (slideVelocity - walk).Magnitude < 1 then
+			slideVelocity = nil
+		else
+			push += slideVelocity - walk
+		end
+	end
+	local stunned = now < stunnedUntil -- a sting in the deep: rooted to the spot
+	WaveController.hazardSlow = if stunned then 0 else slow
+	WaveController.hazardJump = if sinking or stunned then 0 else 1 -- no jumping out of sinking sand
 	WaveController.hazardPush = push
 
 	-- Sinking sand: deeper while you're in it (slower if you keep moving), back out of it once

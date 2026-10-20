@@ -2896,5 +2896,295 @@ test("cart ramps keep clear of the rock pools' rocks", function()
 	assert(#problems == 0, table.concat(problems, "\n      "))
 end)
 
+test("jellyfish: stranded ones glow as far as they sting, drifting ones follow their path", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "lagoon",
+		Primitives = {},
+		Hazards = {
+			{ Type = "Jelly", At = { 50, 100 }, Radius = 5, Damage = 10 },
+			{ Type = "Jelly", Path = { { -100, 200 }, { -40, 200 } } },
+		},
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, { Hazards = { { Type = "Jelly" } } }, folder)
+	local settings = Hazards.settings({ Type = "Jelly" })
+	local glow, bell
+	for _, part in folder:GetChildren() do
+		if part.Name == "JellyGlow" then
+			glow = part
+		elseif part.Name == "JellyBell" and part:GetAttribute("Effect") then
+			bell = part
+		end
+	end
+	assert(glow and glow:GetAttribute("Effect") == "Sting", "a stranded jelly stings")
+	assert(glow:GetAttribute("HitRadius") == 5 and glow.Size.Y == 10, "its glow shows its reach")
+	assert(glow:GetAttribute("Damage") == 10, "the placement's Damage")
+	assert(math.abs(glow.CFrame.Z - (z0 + 100)) < 1, "on the sand where it was put")
+	assert(glow:GetAttribute("Stun") == settings.Stun and settings.Stun > 0, "a stun in the deep")
+	assert(settings.StunZone >= 5 and settings.Damage < 100, "not deadly itself, stuns only deep")
+	assert(bell and bell:GetAttribute("Damage") == settings.Damage, "a drifting jelly stings too")
+	local before = bell.CFrame.X
+	HazardService._step(os.clock() + 4, 0.1)
+	assert(
+		bell.CFrame.X ~= before and bell.CFrame.X >= -101 and bell.CFrame.X <= -39,
+		"it drifts along its path"
+	)
+	assert(bell.Transparency > 0 and bell.Material == roblox.Enum.Material.Neon, "translucent and glowing")
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
+end)
+
+test("spearstone fields glow and crack first, then shoot up, in the pattern they're given", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local settings = Hazards.settings({ Type = "Spears" })
+	assert(settings.Warning >= 0.8 and settings.Warning + settings.Active < settings.Period, "a fair rhythm")
+	-- How many plates are live (spear up) / warned (cracks showing) at a time, for a pattern.
+	local function field(pattern: string, damage: number?)
+		Layouts.setActive(tile, {
+			Name = "reef",
+			Primitives = {},
+			Hazards = {
+				{ Type = "Spears", At = { 0, 200 }, Radius = 12, Pattern = pattern, Damage = damage },
+			},
+		})
+		local folder = Harness.wrap(roblox.Instance.new("Folder"))
+		HazardService.start(tile, { Hazards = { { Type = "Spears" } } }, folder)
+		local plates = {}
+		for _, part in folder:GetChildren() do
+			if part.Name == "SpearPlate" then
+				table.insert(plates, part)
+			end
+		end
+		Layouts.setActive(tile, nil)
+		return folder, plates
+	end
+	local function live(plates, now: number): number
+		HazardService._step(now, 0.1)
+		local count = 0
+		for _, plate in plates do
+			if plate:GetAttribute("Active") == true then
+				count += 1
+			end
+		end
+		return count
+	end
+	local base = 400 -- (a multiple of every Period)
+	local folder, plates = field("Wave", 30)
+	assert(#plates > 10 and plates[1]:GetAttribute("Effect") == "Harm", "a field of harming plates")
+	assert(plates[1]:GetAttribute("Damage") == 30, "the placement's Damage overrides the setting")
+	local z0 = Beach.tileRange(tile)
+	assert(math.abs(plates[1].CFrame.Z - (z0 + 200)) <= 13, "where the field was put")
+	-- Telegraph: before a spot fires it glows and its cracks show; it's harmless till then.
+	local warned = false
+	HazardService._step(base + settings.Period - settings.Warning + 0.1, 0.1)
+	for _, crack in folder:GetChildren() do
+		if crack.Name == "SpearCrack" and crack.Transparency < 1 then
+			warned = true
+			break
+		end
+	end
+	assert(warned, "cracks show before a spear shoots up")
+	assert(
+		live(plates, base + settings.Period - settings.Warning + 0.1) < #plates,
+		"not all at once in a wave"
+	)
+	local seen, most = 0, 0
+	for t = 0, settings.Period, 0.1 do
+		local n = live(plates, base + t)
+		seen += if n > 0 then 1 else 0
+		most = math.max(most, n)
+	end
+	assert(seen > 0 and most < #plates, "a wave rolls across: a few live at a time")
+	folder:Destroy()
+	-- Checker: half the squares, then the other half.
+	folder, plates = field("Checker")
+	local first = live(plates, base)
+	local second = live(plates, base + settings.Period / 2)
+	assert(first > 0 and second > 0 and first + second == #plates, "alternating squares")
+	folder:Destroy()
+	-- All: every spot together. Ring: not.
+	folder, plates = field("All")
+	assert(live(plates, base) == #plates, "all together")
+	folder:Destroy()
+	folder, plates = field("Ring")
+	assert(live(plates, base) > 0 and live(plates, base) < #plates, "rings from the middle out")
+	folder:Destroy()
+end)
+
+test("a whirlwind circles its loop, a tall column of sand that flings but doesn't harm", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local z0 = Beach.tileRange(tile)
+	local loop = { { -40, 100 }, { 40, 100 }, { 40, 180 }, { -40, 180 } }
+	Layouts.setActive(tile, {
+		Name = "dunes",
+		Primitives = {},
+		Hazards = { { Type = "Whirlwind", Path = loop, Radius = 8 } },
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, { Hazards = { { Type = "Whirlwind" } } }, folder)
+	local settings = Hazards.settings({ Type = "Whirlwind" })
+	local foot = folder:FindFirstChild("Whirlwind")
+	assert(foot and foot:GetAttribute("Effect") == "Fling", "a whirlwind that flings")
+	assert(foot:GetAttribute("HitRadius") == 8, "the placement's radius")
+	assert(foot:GetAttribute("Damage") == nil and settings.Push > 0, "flung, not hurt")
+	local tops, layers = 0, 0
+	for _, part in folder:GetChildren() do
+		if part.Name == "WhirlwindSand" then
+			layers += 1
+			tops = math.max(tops, part.CFrame.Y - foot.CFrame.Y)
+		end
+	end
+	assert(layers >= 4 and tops >= 30, "a column of sand you can see from far off")
+	-- It goes round the loop (never off it) and comes back to where it began.
+	local perimeter = 80 + 80 + 80 + 80
+	local now = os.clock()
+	for t = 0, 40, 1 do
+		HazardService._step(now + t, 0.1)
+		local x, z = foot.CFrame.X, foot.CFrame.Z - z0
+		assert(
+			math.abs(x) <= 41
+				and z >= 99
+				and z <= 181
+				and (math.abs(math.abs(x) - 40) < 1 or math.abs(z - 140) > 39),
+			"on its loop at " .. t
+		)
+	end
+	local startX, startZ = nil, nil
+	HazardService._step(now, 0.1)
+	startX, startZ = foot.CFrame.X, foot.CFrame.Z
+	HazardService._step(now + perimeter / settings.Speed, 0.1)
+	assert(
+		math.abs(foot.CFrame.X - startX) < 1 and math.abs(foot.CFrame.Z - startZ) < 1,
+		"round and round, not back and forth"
+	)
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
+end)
+
+test("ice patches are flat, pale and slippery but leave you some grip, and harm nothing", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local z0 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "berg",
+		Primitives = {},
+		Hazards = { { Type = "Ice", At = { 20, 150 }, Radius = 12 }, { Type = "Ice", At = { -60, 250 } } },
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, { Hazards = { { Type = "Ice" } } }, folder)
+	local settings = Hazards.settings({ Type = "Ice" })
+	local patches = {}
+	for _, part in folder:GetChildren() do
+		if part.Name == "IcePatch" then
+			table.insert(patches, part)
+		end
+	end
+	assert(#patches == 2, "a patch for each placement")
+	local first = patches[1]
+	assert(
+		first:GetAttribute("Effect") == "Slide" and first:GetAttribute("HitRadius") == 12,
+		"slides, as wide as placed"
+	)
+	assert(
+		math.abs(first.CFrame.X - 20) < 1 and math.abs(first.CFrame.Z - (z0 + 150)) < 1,
+		"where it was put"
+	)
+	assert(patches[2]:GetAttribute("HitRadius") == settings.Radius, "the kind's radius otherwise")
+	assert(first.Size.X < 0.5, "flat")
+	assert(first.Color.B > first.Color.R and first.Color.R > 0.6, "pale blue-white")
+	assert(settings.Grip > 0 and settings.Grip < 0.5, "slippery, but not out of control")
+	assert(first:GetAttribute("Grip") == settings.Grip, "the client reads its grip")
+	assert(
+		first:GetAttribute("Damage") == nil and first:GetAttribute("Spill") == nil,
+		"no harm, no cart spilling"
+	)
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
+end)
+
+test("a foghorn pulses on its Period: the fog is thick, blinks a warning, then lifts for a while", function()
+	local Beach = h.require("Shared/Beach")
+	local Hazards = h.require("Shared/Hazards")
+	local Layouts = h.require("Shared/Layouts")
+	local HazardService = h.require("Server/HazardService")
+	local tile = 3
+	local z0, z1 = Beach.tileRange(tile)
+	Layouts.setActive(tile, {
+		Name = "fogbank",
+		Primitives = {},
+		Hazards = { { Type = "Fog", At = { 30, 120 } } },
+	})
+	local folder = Harness.wrap(roblox.Instance.new("Folder"))
+	HazardService.start(tile, { Hazards = { { Type = "Fog" } } }, folder)
+	local settings = Hazards.settings({ Type = "Fog" })
+	local horn, lamp, ring, tower
+	for _, part in folder:GetChildren() do
+		if part.Name == "Foghorn" then
+			horn = part
+		elseif part.Name == "FoghornLamp" then
+			lamp = part
+		elseif part.Name == "FoghornRing" then
+			ring = part
+		elseif part.Name == "FoghornTower" then
+			tower = part
+		end
+	end
+	assert(horn and horn:GetAttribute("Effect") == "Fog", "a foghorn the client can find")
+	assert(
+		tower and math.abs(tower.CFrame.X - 30) < 1 and math.abs(tower.CFrame.Z - (z0 + 120)) < 1,
+		"where it was put"
+	)
+	assert(horn:GetAttribute("ZMin") == z0 and horn:GetAttribute("ZMax") == z1, "it covers its tile")
+	assert(
+		horn:GetAttribute("Sight") == settings.Sight and settings.Sight <= 20,
+		"the fog closes in to a few studs"
+	)
+	assert(
+		settings.Clear >= 3 and settings.Clear < settings.Period / 2,
+		"a pulse clears it for a while, not for good"
+	)
+	assert(
+		settings.Effect == "Fog" and settings.HitRadius == 0 and not settings.Lantern,
+		"it hits no one; no lantern"
+	)
+	local base = settings.Period * 40 -- (a multiple of the Period: a pulse starts)
+	HazardService._step(base + 0.1, 0.1)
+	assert(
+		horn:GetAttribute("Clearing") == true and ring.Transparency < 1,
+		"the pulse: a ring of light, the fog lifting"
+	)
+	HazardService._step(base + settings.Clear + 0.5, 0.1)
+	assert(horn:GetAttribute("Clearing") == false and ring.Transparency == 1, "then the fog closes in again")
+	-- The lamp blinks before the next pulse.
+	local lit, dark = false, false
+	for t = 0, 1.9, 0.05 do
+		HazardService._step(base + settings.Period - 1.9 + t, 0.05)
+		lit = lit or lamp.Transparency < 0.5
+		dark = dark or lamp.Transparency > 0.5
+	end
+	assert(lit and dark, "the lamp blinks as the horn is about to sound")
+	HazardService._step(base + settings.Period + 0.1, 0.1)
+	assert(horn:GetAttribute("Clearing") == true, "and the next pulse comes on time")
+	folder:Destroy()
+	Layouts.setActive(tile, nil)
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)
