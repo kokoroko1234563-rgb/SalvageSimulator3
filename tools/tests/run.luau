@@ -3209,5 +3209,236 @@ test("a foghorn pulses on its Period: the fog is thick, blinks a warning, then l
 	Layouts.setActive(tile, nil)
 end)
 
+-- Every biome of the initial build has its own secret: its unlock item drops on the beach, there
+-- is an opening in the biome, and using the item there leads into a room with a chest.
+local SECRET_BIOMES = {
+	"DriftwoodCove",
+	"TidepoolRocks",
+	"SeagrassShallows",
+	"CoralGarden",
+	"FogBank",
+	"WhirlwindDunes",
+	"HermitHollows",
+	"SpearstoneReef",
+	"JellyfishLagoon",
+	"StrandedIceberg",
+}
+
+test("secret: every in-build biome has an unlock item, an opening builder and a secret", function()
+	local Items = h.require("Shared/Items")
+	local Catalog = h.require("Shared/Catalog")
+	local Biomes = h.require("Shared/Biomes")
+	local Secrets = h.require("Shared/Secrets")
+	for id, biome in Biomes.List do
+		assert(biome.UnlockItem and Items.get(biome.UnlockItem), id .. " has no unlock item")
+		assert(biome.Secret and Secrets.List[biome.Secret], id .. " has no secret")
+		assert(Secrets.List[biome.Secret].Unlock == biome.UnlockItem, id .. ": the secret wants another item")
+		assert(BiomeService._entranceBuilders[biome.Entrance], id .. " has no entrance builder")
+		assert(type(biome.EntranceName) == "string", id .. " has no prompt text")
+	end
+	for _, id in SECRET_BIOMES do
+		local secret = Secrets.List[Biomes.List[id].Secret]
+		assert(Secrets.isRoom(secret), id .. "'s secret is a room")
+		assert(secret.Coin or secret.Loot, id .. "'s chest holds nothing")
+		for _, entry in secret.Loot or {} do
+			assert(Catalog.get(entry.Id), id .. ": " .. entry.Id .. " isn't an item")
+		end
+	end
+end)
+
+test("unlock: every in-build biome's unlock item can wash up in its own tile, and only there", function()
+	local Beach = h.require("Shared/Beach")
+	local Biomes = h.require("Shared/Biomes")
+	local Config = h.require("Shared/Config")
+	local ItemService = h.require("Server/ItemService")
+	local workspace = h.game.Workspace
+	local tile = 2
+	local z = Beach.tileRange(tile) + 100
+	local zoneIndex = Beach.zoneAt(z) :: number
+	local chance, exotic = Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance
+	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = 1, 1
+	for id, biome in Biomes.List do
+		workspace:SetAttribute(Biomes.attributeFor(tile), id)
+		local def = ItemService._chooseDef(zoneIndex, z, nil, 1)
+		assert(
+			def and def.Id == biome.UnlockItem,
+			id .. ": its unlock item can't spawn (got " .. tostring(def and def.Id) .. ")"
+		)
+	end
+	workspace:SetAttribute(Biomes.attributeFor(tile), nil)
+	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = chance, exotic
+end)
+
+test("entrance: every way each in-build biome can come out has a door in clear ground", function()
+	local Beach = h.require("Shared/Beach")
+	local Biomes = h.require("Shared/Biomes")
+	local Layouts = h.require("Shared/Layouts")
+	local FOOT, STEP, FLAT = 10, 2.5, 3
+	local problems = {}
+	for _, id in SECRET_BIOMES do
+		for zone in Biomes.List[id].Zones do
+			local def = Layouts.forBiome(id, zone)
+			if not def then
+				table.insert(problems, id .. " has no layout in zone " .. zone)
+				continue
+			end
+			local z0 = Beach.tileRange(zone)
+			for _, way in Layouts.options(def) do
+				local where = id .. " zone " .. zone .. " " .. way.Label
+				local spots = Layouts.compose(def, way.Choice).Entrances or {}
+				if #spots == 0 then
+					table.insert(problems, where .. ": no door")
+				end
+				Layouts.setActive(zone, id, zone, way.Choice)
+				for _, at in spots do
+					local low, high = math.huge, -math.huge
+					local clear = true
+					for ix = -FOOT // STEP, FOOT // STEP do
+						for iz = -FOOT // STEP, FOOT // STEP do
+							local px, pz = at[1] + ix * STEP, z0 + at[2] + iz * STEP
+							local _, rock = Beach.shapeAt(px, pz)
+							if rock or Beach.roofAt(px, pz) then
+								clear = false
+							end
+							local y = Beach.groundAt(px, pz)
+							low, high = math.min(low, y), math.max(high, y)
+						end
+					end
+					if not clear or high - low > FLAT then
+						table.insert(
+							problems,
+							string.format(
+								"%s: the door at (%d, %d) is on rock, under a roof or on uneven ground",
+								where,
+								at[1],
+								at[2]
+							)
+						)
+					end
+				end
+				Layouts.setActive(zone, nil)
+			end
+		end
+	end
+	assert(#problems == 0, table.concat(problems, "; "))
+end)
+
+test("entrance: a door stands by its tier's chance, and the item spawns either way", function()
+	local Biomes = h.require("Shared/Biomes")
+	local Config = h.require("Shared/Config")
+	for tier, chance in Config.Secrets.DoorChance do
+		assert(chance > 0 and chance < 1, tier .. " needs a chance between 0 and 1")
+	end
+	assert(
+		Config.Secrets.DoorChance.Common < Config.Secrets.DoorChance.Uncommon,
+		"rarer biomes' doors stand more often"
+	)
+	assert(
+		Config.Secrets.DoorChance.Uncommon < Config.Secrets.DoorChance.Rare,
+		"rarer biomes' doors stand more often"
+	)
+	assert(
+		Config.Secrets.DoorChance.Rare < Config.Secrets.DoorChance.VeryRare,
+		"rarer biomes' doors stand more often"
+	)
+	for id, biome in Biomes.List do
+		assert(Config.Secrets.DoorChance[biome.Tier], id .. "'s tier has no door chance")
+	end
+	for _, id in { "DriftwoodCove", "FogBank", "HermitHollows", "StrandedIceberg" } do
+		local biome = Biomes.List[id]
+		local want = Config.Secrets.DoorChance[biome.Tier]
+		local stood, rolls = 0, 4000
+		for _ = 1, rolls do
+			if BiomeService._doorStands(biome) then
+				stood += 1
+			end
+		end
+		assert(
+			math.abs(stood / rolls - want) < 0.05,
+			string.format("%s: the door stood %.2f of the time, not %.2f", id, stood / rolls, want)
+		)
+	end
+	-- A failed roll builds nothing; a forced build always stands (the roll is the only gate).
+	local Layouts = h.require("Shared/Layouts")
+	local zone = 1
+	local biome = Biomes.List.DriftwoodCove
+	Layouts.setActive(zone, "DriftwoodCove", zone)
+	local built = 0
+	for _ = 1, 200 do
+		local folder = Harness.wrap(roblox.Instance.new("Folder"))
+		BiomeService._buildEntrance(folder, biome, zone)
+		if folder:FindFirstChild("SecretEntrance") then
+			built += 1
+		end
+	end
+	Layouts.setActive(zone, nil)
+	assert(built > 40 and built < 160, "about half of 200 common biomes got a door, got " .. built)
+end)
+
+test("secret: a room run claims its chest, and a claim from away from it is rejected", function()
+	local Secrets = h.require("Shared/Secrets")
+	local SecretService = h.require("Server/SecretService")
+	local Vector3 = roblox.Vector3
+	for _, id in SECRET_BIOMES do
+		local secret = Secrets.List[id]
+		local course = secret.Course
+		assert(Secrets.isRoom(secret) and #course.Checkpoints == 0, id .. " isn't a room without checkpoints")
+		local after = course.MinRunTime + 1
+		-- Standing at the chest, soon enough and in time: it opens.
+		assert(
+			SecretService.claimOk(course, course.Chest, 1, after, course.Seconds),
+			id .. ": the chest won't open"
+		)
+		assert(
+			SecretService.claimOk(course, course.Chest + Vector3.new(2, 0, 2), 1, after, course.Seconds),
+			id .. ": next to the chest"
+		)
+		-- Where the player arrives, across the room: rejected.
+		assert(
+			not SecretService.claimOk(course, course.Spawn, 1, after, course.Seconds),
+			id .. ": claimed from the spawn"
+		)
+		assert(
+			not SecretService.claimOk(course, course.Chest + Vector3.new(0, 0, 20), 1, after, course.Seconds),
+			id .. ": claimed from across the room"
+		)
+		-- Too fast, or after the time is up: rejected.
+		assert(
+			not SecretService.claimOk(course, course.Chest, 1, 0.5, course.Seconds),
+			id .. ": claimed at once"
+		)
+		assert(
+			not SecretService.claimOk(course, course.Chest, 1, course.Seconds + 5, course.Seconds),
+			id .. ": claimed late"
+		)
+		assert(course.Seconds >= 30, id .. ": the time limit is too short")
+		-- The room lasts its limit, never a flood (the water stays far below).
+		assert(
+			Secrets.floodLevel(course, course.Seconds, course.Seconds) < -1000,
+			id .. ": a room doesn't flood"
+		)
+		-- The reward: its coin, or one of its rewards.
+		local rng = {
+			NextNumber = function()
+				return math.random()
+			end,
+		} :: any
+		if secret.Loot then
+			local itemId = Secrets.rollLoot(secret, rng)
+			assert(itemId, id .. ": its chest rolled nothing")
+		end
+	end
+	-- A course (the Sandcastle Vault) still needs its checkpoints.
+	local vault = Secrets.List.SandcastleFlats.Course
+	assert(
+		not SecretService.claimOk(vault, vault.Chest, 1, 30, 100),
+		"the vault's chest needs its checkpoints"
+	)
+	assert(
+		SecretService.claimOk(vault, vault.Chest, #vault.Checkpoints + 1, 30, 100),
+		"the vault's chest opens at the top"
+	)
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)

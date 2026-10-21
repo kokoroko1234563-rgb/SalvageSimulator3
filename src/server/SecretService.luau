@@ -168,6 +168,21 @@ local function onReady(player: Player, ok: any)
 	run.ready = true
 end
 
+-- Whether a chest claim holds up: every checkpoint passed (a room has none), the player at the
+-- chest (`rel`: their position in the course), and a plausible time into the run.
+function SecretService.claimOk(
+	course,
+	rel: Vector3,
+	nextCheckpoint: number,
+	elapsed: number,
+	duration: number
+): boolean
+	return nextCheckpoint > #course.Checkpoints
+		and (rel - course.Chest).Magnitude <= course.ChestRadius
+		and elapsed >= (course.MinRunTime or cfg.MinRunTime)
+		and elapsed <= duration + 2
+end
+
 local function onClaim(player: Player)
 	local run = runs[player]
 	if not run or not run.startedAt or run.finished then
@@ -180,10 +195,7 @@ local function onClaim(player: Player)
 	local course = run.secret.Course
 	local rel = root.Position - run.origin
 	local elapsed = Tide.now() - run.startedAt
-	local ok = run.nextCheckpoint > #course.Checkpoints
-		and (rel - course.Chest).Magnitude <= course.ChestRadius
-		and elapsed >= (course.MinRunTime or cfg.MinRunTime)
-		and elapsed <= run.duration + 2
+	local ok = SecretService.claimOk(course, rel, run.nextCheckpoint, elapsed, run.duration)
 	if not ok then
 		warn(
 			string.format(

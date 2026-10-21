@@ -304,6 +304,8 @@ local function chooseDef(zoneIndex: number, z: number, heavy: boolean?, rarityRo
 	return def
 end
 
+ItemService._chooseDef = chooseDef -- for tools/tests
+
 -- Washes one item up somewhere in the surf around the current waterline. The zone (and so
 -- the value and rarity) comes from where it lands, so low tide brings richer loot.
 function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
