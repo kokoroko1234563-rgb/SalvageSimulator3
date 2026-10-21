@@ -52,6 +52,12 @@ hull's ribs (2), a chain and a broken spear (3).
 ![zone 5](spearstone-reef-z5.png)
 ![zone 6](spearstone-reef-z6.png)
 
+Crossing 2 with its scramble (the thin lane with the rubble bank, west of the first room):
+
+![zone 4, crossing 2](spearstone-reef-z4-c2.png)
+![zone 5, crossing 2](spearstone-reef-z5-c2.png)
+![zone 6, crossing 2](spearstone-reef-z6-c2.png)
+
 ## Checks
 
 - It rolls: moved into `Biomes.List` (Layouts/Biomes/SpearstoneReef.luau).

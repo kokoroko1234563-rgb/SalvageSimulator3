@@ -57,4 +57,4 @@ has to go round the ring while feet cut across.
   (the Range reads them as floating; they hover at the water).
 - Zone 6: 0.25 average, one spot 2.5 off at a pillar edge; no roof problems.
 
-Pictures: `jellyfish-lagoon-z2.png`, `-z4.png`, `-z5.png`, `-z6.png`.
+Pictures (crossing 1): `jellyfish-lagoon-z2.png`, `-z3.png`, `-z4.png`, `-z5.png`, `-z6.png` (zones 2, 3 and 5 redrawn after the shore ring and roof changes).
