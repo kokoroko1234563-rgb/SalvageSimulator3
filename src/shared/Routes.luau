@@ -92,6 +92,10 @@ export type Options = {
 	radius: number?, -- the search ends this close (studs) to the goal; default one cell
 	weight: number?, -- how hard the search leans toward the goal (1 = exact); default 1.15
 	maxNodes: number?,
+	-- Called every `yieldEvery` node expansions (default 200), so a caller can spread a long search
+	-- over frames (it may yield, or raise an error to abandon the search).
+	yield: (() -> ())?,
+	yieldEvery: number?,
 }
 
 export type Grid = {
@@ -269,6 +273,8 @@ function Routes.new(): Grid
 		local cart = opts.cart
 		local weight = opts.weight or 1.15
 		local maxNodes = opts.maxNodes or 60000
+		local yieldFn = opts.yield
+		local yieldEvery = opts.yieldEvery or 200
 		local radius = opts.radius or STEP
 		local sc, sr = self:cellOf(from.x, from.z)
 		local gc, gr = self:cellOf(to.x, to.z)
@@ -297,6 +303,9 @@ function Routes.new(): Grid
 			nodes += 1
 			if nodes > maxNodes then
 				break
+			end
+			if yieldFn and nodes % yieldEvery == 0 then
+				yieldFn()
 			end
 			local col, row = cell % cols, cell // cols
 			if math.max(math.abs(col - gc), math.abs(row - gr)) <= goalCells then

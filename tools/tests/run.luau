@@ -3497,6 +3497,41 @@ test("bot routes avoid rock and walls, and go through the gap", function()
 	Layouts.setActive(tile, nil)
 end)
 
+test("bot route searches are time-sliced: a hopeless one yields and stays within its bound", function()
+	local Beach = h.require("Shared/Beach")
+	local Layouts = h.require("Shared/Layouts")
+	local Routes = h.require("Shared/Routes")
+	local tile = 4
+	local z0 = Beach.tileRange(tile)
+	-- A goal walled in on every side: no way there, so the search has to give up.
+	local function wall(x0, z0w, x1, z1w)
+		return { Kind = "Wall", Area = { { x0, z0w }, { x1, z0w }, { x1, z1w }, { x0, z1w } }, Height = 14 }
+	end
+	Layouts.setActive(tile, {
+		Name = "pocket",
+		Primitives = {
+			wall(-60, 200, 60, 220),
+			wall(-60, 300, 60, 320),
+			wall(-60, 200, -40, 320),
+			wall(40, 200, 60, 320),
+		},
+	})
+	local grid = Routes.new()
+	local yields = 0
+	local path = grid:find({ x = 0, z = z0 + 20 }, { x = 0, z = z0 + 260 }, {
+		radius = 4,
+		maxNodes = 3000,
+		yieldEvery = 100,
+		yield = function()
+			yields += 1
+		end,
+	})
+	assert(path == nil, "no way into a walled pocket")
+	assert(yields >= 5, "a long search yields (" .. yields .. " times)")
+	assert(yields <= 3000 / 100, "and never more than one slice per yieldEvery nodes")
+	Layouts.setActive(tile, nil)
+end)
+
 test("bot buying rule picks the best income per price, and rebirths first", function()
 	local Economy = h.require("Server/BotEconomy")
 	local Rebirth = h.require("Shared/Rebirth")

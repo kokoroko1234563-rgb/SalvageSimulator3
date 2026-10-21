@@ -372,6 +372,37 @@ local function waterBlocker(speed: number, limit: number, delay: number)
 	end
 end
 
+-- Time slicing: route searches run in the bot's own thread and give the frame back once all bots
+-- together have used FRAME_BUDGET seconds of it, so thinking never stalls the server.
+local FRAME_BUDGET = 0.003
+local frameUsed = 0
+local lastMark = 0
+
+local function mark()
+	local t = os.clock()
+	frameUsed += t - lastMark
+	lastMark = t
+end
+
+local function yieldFor(bot: Bot): () -> ()
+	return function()
+		mark()
+		while frameUsed > FRAME_BUDGET do
+			task.wait()
+			if bot.Gone or not running then
+				error("bot gone")
+			end
+			lastMark = os.clock()
+		end
+	end
+end
+
+-- How many node expansions a search over this distance may take before it is given up as hopeless.
+local function nodeBound(ax: number, az: number, bx: number, bz: number): number
+	local cells = math.sqrt((ax - bx) ^ 2 + (az - bz) ^ 2) / Routes.STEP
+	return math.clamp(math.floor(2000 + 60 * cells), 2000, 60000)
+end
+
 -- A route from the bot's spot to (x, z), through the shop's flat ground at either end. Nil if
 -- there's no way that the sea won't cut. `safe` false stops looking at the tide.
 local function routeTo(
@@ -391,7 +422,8 @@ local function routeTo(
 		cart = cart,
 		blocked = waterBlocker(speed, limit, delay or 0),
 		radius = radius,
-		maxNodes = 90000,
+		maxNodes = nodeBound(start.x, start.z, x, z),
+		yield = yieldFor(bot),
 	}
 	local gridStart = { x = start.x, z = math.max(start.z, 0) }
 	local gridGoal = { x = x, z = math.max(z, 0) }
@@ -447,7 +479,8 @@ local function goHome(bot: Bot)
 			slope = if cart then Config.Beach.Terrain.CartSlope else Config.Beach.Terrain.FootSlope,
 			cart = cart,
 			radius = 6,
-			maxNodes = 90000,
+			maxNodes = nodeBound(bot.X, bot.Z, HOME.x, 0),
+			yield = yieldFor(bot),
 		})
 		if path then
 			table.insert(path, { x = HOME.x, z = HOME.z })
@@ -479,13 +512,14 @@ local function stretchOf(bot: Bot): (number, number)
 end
 
 -- Whether another bot is already heading for an item (a soft claim: ItemService knows nothing of it).
-local function reservedByOther(bot: Bot, item: BasePart): boolean
+local function reservedItems(bot: Bot): { [BasePart]: boolean }
+	local set = {}
 	for _, other in bots do
-		if other ~= bot and other.Target == item then
-			return true
+		if other ~= bot and other.Target then
+			set[other.Target] = true
 		end
 	end
-	return false
+	return set
 end
 
 -- Items worth a look: free, not reserved by another bot, in reach of the tool, no heavier than it
@@ -502,6 +536,7 @@ local function candidates(bot: Bot): ({ any }, { any })
 	local lo, hi = stretchOf(bot)
 	local hands = BotEconomy.cartSize(bot.State) == nil and BotEconomy.capacity(bot.State) == 1
 	local mine, others = {}, {}
+	local reserved = reservedItems(bot)
 	for item in ItemService.all() do
 		if
 			ItemService.getState(item) == "Unclaimed"
@@ -509,7 +544,7 @@ local function candidates(bot: Bot): ({ any }, { any })
 			and (item:GetAttribute("Class") or 1) <= lift
 			and (not bot.Skip[item] or bot.Skip[item] < t)
 			and (not bot.Trip or item:GetAttribute("Zone") == bot.Trip.Zone)
-			and not reservedByOther(bot, item)
+			and not reserved[item]
 		then
 			local position = item.Position
 			local band = Beach.depthBand(position, sea)
@@ -525,6 +560,7 @@ local function candidates(bot: Bot): ({ any }, { any })
 				if inStretch or not hands or (there + back) * speedFactor <= 200 then
 					table.insert(if inStretch then mine else others, {
 						Item = item,
+						There = there,
 						Score = (item:GetAttribute("Value") or 0) / (there + back + 2 / speedFactor),
 					})
 				end
@@ -550,6 +586,14 @@ local function chooseTarget(bot: Bot): boolean
 	for i = 1, #list do
 		local item = list[i].Item
 		local position = item.Position
+		local arrival = now() + list[i].There
+		local deepThen = Beach.waterYAt({ Now = arrival }, position.X)
+				- Beach.groundAt(position.X, position.Z)
+			>= Config.Beach.WaistDepth - DEPTH_MARGIN
+		if deepThen then
+			bot.Skip[item] = now() + 20 / speedFactor
+			continue
+		end
 		local out, outLength =
 			routeTo(bot, position.X, position.Z, math.min(BotEconomy.tool(bot.State).Reach * 0.6, 8))
 		if out then
@@ -598,6 +642,20 @@ end
 
 function decide(bot: Bot)
 	bot.Target = nil
+	local pending = bot.Pending
+	if pending then
+		-- Stopped short of an item: step right up to it.
+		bot.Pending = nil
+		if ItemService.isItem(pending) and ItemService.getState(pending) == "Unclaimed" then
+			local path = routeTo(bot, pending.Position.X, pending.Position.Z, 0)
+			if path then
+				bot.Target = pending
+				beginPath(bot, path, "ToItem")
+				return
+			end
+		end
+		bot.Skip[pending] = now() + 20 / speedFactor
+	end
 	local capacity = BotEconomy.capacity(bot.State)
 	if #bot.Cargo < capacity and not bot.Finished then
 		if chooseTarget(bot) then
@@ -836,7 +894,6 @@ local function shopVisit(bot: Bot)
 			return
 		end
 		bot.Mode = nil
-		decide(bot)
 	end
 	step()
 end
@@ -859,12 +916,9 @@ local function arrive(bot: Bot)
 			if reason == "Too far away" and not bot.Reapproached then
 				-- Stopped short of it: step right up to it.
 				bot.Reapproached = true
-				local path = routeTo(bot, item.Position.X, item.Position.Z, 0)
-				if path then
-					bot.Target = item
-					beginPath(bot, path, "ToItem")
-					return
-				end
+				bot.Pending = item
+				bot.Mode = nil
+				return
 			end
 			bot.Skip[item] = now() + 20 / speedFactor
 			bot.Mode = nil
@@ -922,7 +976,25 @@ end
 
 -- The per-frame step ------------------------------------------------------------------------
 
-local function stepBot(bot: Bot, dt: number, sea: Tide.Sea, t: number, budget: { number })
+-- A bot's thinking (decide) runs in its own thread, one at a time; movement carries on meanwhile.
+local function think(bot: Bot)
+	if bot.Thinking or bot.Gone then
+		return
+	end
+	bot.Thinking = true
+	task.spawn(function()
+		mark()
+		local ok, err = pcall(decide, bot)
+		bot.Thinking = false
+		if not ok and not bot.Gone and not string.find(tostring(err), "bot gone", 1, true) then
+			warn("[BotService] bot " .. bot.Id .. " errored while thinking: " .. tostring(err))
+			bot.Path, bot.Target, bot.Mode, bot.After = nil, nil, nil, nil
+			bot.StuckUntil = now() + 2
+		end
+	end)
+end
+
+local function stepBot(bot: Bot, dt: number, sea: Tide.Sea, t: number)
 	if bot.After then
 		if t >= bot.WaitUntil then
 			local fn = bot.After
@@ -973,19 +1045,32 @@ local function stepBot(bot: Bot, dt: number, sea: Tide.Sea, t: number, budget: {
 		if bot.StuckUntil and t < bot.StuckUntil then
 			return
 		end
-		if budget[1] > 0 then
-			budget[1] -= 1
-			decide(bot)
-		end
+		think(bot)
 		if bot.Status == "waiting for the tide" then
 			bot.Stats.IdleSeconds += dt
 		end
 	end
 end
 
-local function onFrame(dt: number)
+-- How long the server's frames take while bots play (Heartbeat's own dt, and the time spent in
+-- onFrame); the sweep reports the worst.
+local frameStats = { Frames = 0, MaxDt = 0, MaxWork = 0, Slow = 0 }
+
+function BotService.resetFrameStats()
+	frameStats = { Frames = 0, MaxDt = 0, MaxWork = 0, Slow = 0 }
+end
+
+local function onFrame(rawDt: number)
+	local started = os.clock()
+	frameUsed = 0
+	lastMark = started
+	frameStats.Frames += 1
+	frameStats.MaxDt = math.max(frameStats.MaxDt, rawDt)
+	if rawDt > 0.05 then
+		frameStats.Slow += 1
+	end
+	local dt = math.min(rawDt, 0.1)
 	local t = now()
-	dt = math.min(dt, 0.1)
 	if t - lastRefresh > 2 then
 		lastRefresh = t
 		grid:refresh()
@@ -999,15 +1084,15 @@ local function onFrame(dt: number)
 		lastCycle = cycle
 	end
 	local sea = Tide.sea(t)
-	local budget = { 1 }
 	for _, bot in bots do
-		local ok, err = pcall(stepBot, bot, dt, sea, t, budget)
+		local ok, err = pcall(stepBot, bot, dt, sea, t)
 		if not ok then
 			warn("[BotService] bot " .. bot.Id .. " errored: " .. tostring(err))
 			bot.Path, bot.Target, bot.Mode, bot.After = nil, nil, nil, nil
 			bot.StuckUntil = t + 2
 		end
 	end
+	frameStats.MaxWork = math.max(frameStats.MaxWork, os.clock() - started)
 end
 
 -- Spawning -------------------------------------------------------------------------------
@@ -1070,6 +1155,7 @@ local function releaseCargo(bot: Bot)
 end
 
 local function despawnBot(bot: Bot)
+	bot.Gone = true
 	flushCycle(bot, true)
 	releaseCargo(bot)
 	destroyCart(bot)
@@ -1221,6 +1307,7 @@ function BotService.snapshot()
 		Server = table.clone(ItemService.stats),
 		Speed = speedFactor,
 		BotCount = #list,
+		Frames = table.clone(frameStats),
 	}
 end
 

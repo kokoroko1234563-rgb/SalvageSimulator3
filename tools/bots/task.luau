@@ -45,6 +45,9 @@ else
 	BotService.setCount(JOB.bots)
 end
 
+-- The first seconds build models and routes; the frame timings are for the play after.
+task.wait(5)
+BotService.resetFrameStats()
 local deadline = os.clock() + (JOB.seconds or 200)
 while os.clock() < deadline do
 	task.wait(if JOB.finalTrip then 1 else 5)

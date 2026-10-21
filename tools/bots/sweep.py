@@ -322,6 +322,10 @@ def main():
             print("\n".join(result.get("logs", [])[-8:]))
             if result.get("trip"):
                 print(json.dumps(result["trip"]))
+            frames = result["snapshot"].get("Frames")
+            if frames:
+                print(f"frames: {frames['Frames']}, worst Heartbeat {1000 * frames['MaxDt']:.0f} ms, "
+                      f"worst bot work {1000 * frames['MaxWork']:.1f} ms, over 50 ms: {frames['Slow']}")
             print(f"(setup {result['setupSeconds']:.1f}s, played {result['ranSeconds']:.0f}s)")
     write_report()
 
