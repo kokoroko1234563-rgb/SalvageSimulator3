@@ -1,355 +1,3610 @@
--- Zone 5, The Shoals: flooded ground between four rock bars, drawn as one whole zone.
---
--- The frame is four bars across the beach (each with five 20-wide doors) and the Grotto, a roofed
--- tunnel in the middle lane. A crossing plugs all the doors but two on each bar: a ford for feet
--- (a cut with a sand sill, too steep for a cart) and the door the cart ramp uses, and adds its own
--- low walls and boulders in the lanes. Seven slots, against the bars between the doors, each roll a
--- walled pocket: a drowned pool, a dead-end cave, a boulder scramble, a weed-choked channel.
-
-local BARS = { 124, 248, 372, 496 }
-local DOORS = { -280, -144, 0, 144, 280 }
-
-local function wall(x0, z0, x1, z1, height)
-	return { Kind = "Wall", Path = { { x0, z0 }, { x1, z1 } }, Height = height or 14, Width = 12 }
-end
-
-local function add(into, list)
-	for _, p in list do
-		table.insert(into, p)
-	end
-end
-
--- A bar across the beach with a door at every x in DOORS.
-local function bar(z)
-	local out = {}
-	local x = -362
-	for _, c in DOORS do
-		table.insert(out, wall(x, z, c - 14, z))
-		x = c + 14
-	end
-	table.insert(out, wall(x, z, 362, z))
-	return out
-end
-
--- Plugs every door of every bar except the xs listed (open[i] for bar i).
-local function plugs(open)
-	local out = {}
-	for i, z in BARS do
-		for _, c in DOORS do
-			if not table.find(open[i], c) then
-				table.insert(out, wall(c - 14, z, c + 14, z))
-			end
-		end
-	end
-	return out
-end
-
--- A ford: a cut through a bar's door with a sand sill across it.
-local function ford(c, z)
-	return {
-		{ Kind = "Channel", Path = { { c, z - 22 }, { c, z + 22 } }, Depth = 4, Width = 12 },
-		{ Kind = "Ridge", Path = { { c - 4, z }, { c + 4, z } }, Height = 5, Width = 16 },
-	}
-end
-
-local function mound(x, z, r, h, rock)
-	return { Kind = "Mound", At = { x, z }, Radius = r, Height = h, Rock = rock }
-end
-
--- Slots (their corners; each is 100 x 64) and the cart ramp's router -----------------------------
-
-local SLOT_AT = {
-	{ -260, 56 },
-	{ 160, 128 },
-	{ -120, 128 },
-	{ 160, 252 },
-	{ -260, 376 },
-	{ 20, 376 },
-	{ -120, 500 },
-}
-
--- What a cart ramp keeps 15 studs clear of: the Grotto and every slot.
-local OBSTACLES = { { -62, 62, 282, 338 } }
-for _, at in SLOT_AT do
-	table.insert(OBSTACLES, { at[1], at[1] + 100, at[2], at[2] + 64 })
-end
-
-local function clearOf(a, b)
-	local len = math.sqrt((b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2)
-	for i = 0, math.ceil(len / 6) do
-		local t = i / math.max(math.ceil(len / 6), 1)
-		local x = a[1] + (b[1] - a[1]) * t
-		local z = a[2] + (b[2] - a[2]) * t
-		for _, r in OBSTACLES do
-			local dx = math.max(r[1] - x, 0, x - r[2])
-			local dz = math.max(r[3] - z, 0, z - r[4])
-			if dx * dx + dz * dz < 15 * 15 then
-				return false
-			end
-		end
-	end
-	return true
-end
-
-local function length(pts)
-	local n = 0
-	for i = 2, #pts do
-		n += math.sqrt((pts[i][1] - pts[i - 1][1]) ^ 2 + (pts[i][2] - pts[i - 1][2]) ^ 2)
-	end
-	return n
-end
-
--- The waypoints that carry a ramp from a to b across a lane (z from zlo to zhi) clear of the
--- Grotto and the slots: none if the straight line does, else the shortest one or two bends.
-local function leg(a, b, zlo, zhi)
-	if clearOf(a, b) then
-		return {}
-	end
-	local best, bestLen = nil, math.huge
-	for zm = zlo, zhi, 8 do
-		for xm = -340, 340, 10 do
-			local w = { xm, zm }
-			if clearOf(a, w) and clearOf(w, b) then
-				local n = length({ a, w, b })
-				if n < bestLen then
-					best, bestLen = { w }, n
-				end
-			end
-		end
-	end
-	if best then
-		return best
-	end
-	for z1 = zlo, zhi, 12 do
-		for x1 = -340, 340, 20 do
-			local w1 = { x1, z1 }
-			if clearOf(a, w1) then
-				for z2 = zlo, zhi, 12 do
-					for x2 = -340, 340, 20 do
-						local w2 = { x2, z2 }
-						if clearOf(w1, w2) and clearOf(w2, b) then
-							local n = length({ a, w1, w2, b })
-							if n < bestLen then
-								best, bestLen = { w1, w2 }, n
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-	assert(best, `no ramp route across a lane: {a[1]},{a[2]} to {b[1]},{b[2]}`)
-	return best
-end
-
--- A crossing: the ford door and the ramp door of each bar, and its own lane furniture.
--- A reef across a lane with two gaps: one for feet at g and one wide enough for the cart ramp at r.
-local function baffle(z, g, r)
-	local gaps = { { g - 14, g + 14 }, { r - 30, r + 30 } }
-	table.sort(gaps, function(p, q)
-		return p[1] < q[1]
-	end)
-	local out = {}
-	local x = -362
-	for _, gap in gaps do
-		if gap[1] > x then
-			table.insert(out, wall(x, z, gap[1], z))
-		end
-		x = math.max(x, gap[2])
-	end
-	table.insert(out, wall(x, z, 362, z))
-	return out
-end
-
-local function crossing(name, fords, rampXs, gaps, loot)
-	local open = {}
-	for i = 1, 4 do
-		open[i] = { fords[i], rampXs[i] }
-	end
-	local out = plugs(open)
-	for i, z in BARS do
-		if fords[i] ~= rampXs[i] then
-			add(out, ford(fords[i], z))
-		end
-	end
-	-- The wet approach to each ford: a shallow cut that floods before the open ground.
-	for i, z in BARS do
-		table.insert(
-			out,
-			{ Kind = "Channel", Path = { { fords[i], z - 44 }, { fords[i], z + 44 } }, Depth = 2, Width = 16 }
-		)
-	end
-	local path = { { rampXs[1], 0 } }
-	for i, z in BARS do
-		table.insert(path, { rampXs[i], z - 24 })
-		table.insert(path, { rampXs[i], z + 24 })
-		if BARS[i + 1] then
-			for _, w in
-				leg({ rampXs[i], z + 24 }, { rampXs[i + 1], BARS[i + 1] - 24 }, z + 30, BARS[i + 1] - 30)
-			do
-				table.insert(path, w)
-			end
-		end
-	end
-	table.insert(path, { rampXs[4], 608 })
-	table.insert(out, { Kind = "Ramp", Path = path, Width = 16 })
-	-- A low reef across the top lane and another across the bottom lane, each with a gap off the
-	-- ford, so the first and last stretch wind.
-	add(out, baffle(36, gaps[1], rampXs[1]))
-	add(out, baffle(584, gaps[2], rampXs[4]))
-	return { Name = name, Primitives = out, Loot = loot or {} }
-end
-
--- Rooms --------------------------------------------------------------------------------------
--- Slots are 100 x 64. A room is drawn with its bar along the top (z = 2) and its door in the far
--- wall (x 42 to 58); slots that sit above a bar are flipped.
-
-local W, D = 100, 64
-
-local function shell()
-	return {
-		wall(8, 2, 8, 62),
-		wall(92, 2, 92, 62),
-		wall(14, 56, 42, 56),
-		wall(58, 56, 86, 56),
-	}
-end
-
-local function room(name, extra, loot)
-	local prims = shell()
-	add(prims, extra)
-	return { Name = name, Primitives = prims, Loot = loot }
-end
-
-local function flip(r)
-	local function f(p)
-		return { p[1], D - p[2] }
-	end
-	local prims = {}
-	for _, p in r.Primitives do
-		local q = table.clone(p)
-		if q.Path then
-			q.Path = table.create(#p.Path)
-			for i, pt in p.Path do
-				q.Path[i] = f(pt)
-			end
-		end
-		if q.At then
-			q.At = f(p.At)
-		end
-		table.insert(prims, q)
-	end
-	local loot = {}
-	for _, l in r.Loot or {} do
-		local q = table.clone(l)
-		q.At = f(l.At)
-		table.insert(loot, q)
-	end
-	return { Name = r.Name, Primitives = prims, Loot = loot }
-end
-
-local function pool()
-	return room("Drowned pool", {
-		{ Kind = "Hollow", At = { 50, 26 }, Radius = 18, Depth = 4 },
-		mound(22, 12, 8, 4, true),
-		mound(78, 12, 8, 4, true),
-	}, {
-		{ At = { 50, 26 }, Radius = 6, Weight = 3 },
-		{ At = { 24, 38 }, Radius = 5, Weight = 1 },
-		{ At = { 78, 38 }, Radius = 5, Weight = 1 },
-	})
-end
-
-local function cave()
-	return room("Dead-end cave", {
-		wall(14, 28, 62, 28),
-		{ Kind = "Roof", Path = { { 14, 42 }, { 86, 42 } }, Width = 28, Clearance = 10, Thickness = 6 },
-	}, {
-		{ At = { 50, 12 }, Radius = 6, Weight = 4 },
-		{ At = { 76, 12 }, Radius = 5, Weight = 3 },
-		{ At = { 76, 42 }, Radius = 5, Weight = 1 },
-	})
-end
-
-local function scramble()
-	return room("Boulder scramble", {
-		mound(30, 22, 10, 7, true),
-		mound(54, 40, 9, 7, true),
-		mound(72, 18, 10, 7, true),
-		mound(40, 8, 7, 5, true),
-	}, {
-		{ At = { 52, 14 }, Radius = 5, Weight = 3 },
-		{ At = { 22, 42 }, Radius = 5, Weight = 1 },
-		{ At = { 78, 44 }, Radius = 5, Weight = 2 },
-	})
-end
-
-local function weeds()
-	return room("Weed-choked channel", {
-		{ Kind = "Channel", Path = { { 14, 26 }, { 86, 26 } }, Depth = 3, Width = 16 },
-		mound(34, 26, 8, 3, false),
-		mound(62, 26, 8, 3, false),
-	}, {
-		{ At = { 22, 26 }, Radius = 5, Weight = 2 },
-		{ At = { 78, 26 }, Radius = 5, Weight = 2 },
-		{ At = { 50, 8 }, Radius = 5, Weight = 3 },
-	})
-end
-
-local function slot(name, x, z, flipped, makers)
-	local rooms = {}
-	for _, m in makers do
-		local r = m()
-		table.insert(rooms, if flipped then flip(r) else r)
-	end
-	return { Name = name, At = { x, z }, Size = { W, D }, Rooms = rooms }
-end
-
--- Frame --------------------------------------------------------------------------------------
-
-local frame = {}
-for _, z in BARS do
-	add(frame, bar(z))
-end
--- The Grotto: a roofed tunnel across the middle lane, 32 wide inside.
-add(frame, {
-	wall(-62, 288, 62, 288),
-	wall(-62, 332, 62, 332),
-	{ Kind = "Roof", Path = { { -62, 310 }, { 62, 310 } }, Width = 44, Clearance = 10, Thickness = 6 },
-})
--- Boulders in the lanes.
-add(frame, {
-	mound(-200, 190, 10, 7, true),
-	mound(200, 440, 10, 7, true),
-	mound(-300, 440, 10, 7, true),
-	mound(300, 190, 10, 7, true),
-	mound(-200, 550, 9, 6, true),
-	mound(200, 70, 9, 6, true),
-})
-
+-- Zone 5, The Shoals: drawn with the layout kit from tools/kit/plans/zone5.py (edit the plan
+-- and re-run it, not this file). Its card: docs/design/cards/zone5.md.
 return {
-	Name = "The Shoals",
-	Primitives = frame,
-	Loot = {
-		{ At = { 0, 310 }, Radius = 6, Weight = 3 },
-		{ At = { -320, 310 }, Radius = 6, Weight = 1 },
-		{ At = { 320, 310 }, Radius = 6, Weight = 1 },
-		{ At = { -210, 40 }, Radius = 6, Weight = 1 },
+	Primitives = {
+		{
+			Kind = "Wall",
+			Area = {
+				{ -380, -12 },
+				{ 380, -12 },
+				{ 380, 620 },
+				{ -380, 620 },
+			},
+			Height = 14,
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -360, -12 },
+				{ 360, -12 },
+				{ 360, 20 },
+				{ -360, 20 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -360, 592 },
+				{ 360, 592 },
+				{ 360, 620 },
+				{ -360, 620 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -96, 306 },
+				{ -96, 286 },
+				{ 96, 286 },
+				{ 96, 306 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -96, 318 },
+				{ -96, 306 },
+				{ -78, 306 },
+				{ -78, 318 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -66, 318 },
+				{ -66, 306 },
+				{ -42, 306 },
+				{ -42, 318 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -30, 318 },
+				{ -30, 306 },
+				{ 30, 306 },
+				{ 30, 318 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ 42, 318 },
+				{ 42, 306 },
+				{ 66, 306 },
+				{ 66, 318 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ 78, 318 },
+				{ 78, 306 },
+				{ 96, 306 },
+				{ 96, 318 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -96, 318 },
+				{ 96, 318 },
+				{ 96, 334 },
+				{ -96, 334 },
+			},
+		},
+		{
+			Kind = "Wall",
+			Area = {
+				{ -78, 306 },
+				{ -66, 306 },
+				{ -66, 318 },
+				{ -78, 318 },
+			},
+			Height = 14,
+			Over = true,
+		},
+		{
+			Kind = "Wall",
+			Area = {
+				{ -42, 306 },
+				{ -30, 306 },
+				{ -30, 318 },
+				{ -42, 318 },
+			},
+			Height = 14,
+			Over = true,
+		},
+		{
+			Kind = "Wall",
+			Area = {
+				{ 30, 306 },
+				{ 42, 306 },
+				{ 42, 318 },
+				{ 30, 318 },
+			},
+			Height = 14,
+			Over = true,
+		},
+		{
+			Kind = "Wall",
+			Area = {
+				{ 66, 306 },
+				{ 78, 306 },
+				{ 78, 318 },
+				{ 66, 318 },
+			},
+			Height = 14,
+			Over = true,
+		},
+		{
+			Kind = "Roof",
+			Area = {
+				{ -105.7, 283.57 },
+				{ 105.7, 283.57 },
+				{ 105.7, 336.43 },
+				{ -105.7, 336.43 },
+			},
+			Clearance = 12,
+			Thickness = 6,
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -240, 58 },
+				{ -184, 58 },
+				{ -184, 126 },
+				{ -240, 126 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -240, 178 },
+				{ -184, 178 },
+				{ -184, 246 },
+				{ -240, 246 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -240, 282 },
+				{ -184, 282 },
+				{ -184, 350 },
+				{ -240, 350 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -240, 398 },
+				{ -184, 398 },
+				{ -184, 466 },
+				{ -240, 466 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ 184, 150 },
+				{ 240, 150 },
+				{ 240, 218 },
+				{ 184, 218 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ 184, 274 },
+				{ 240, 274 },
+				{ 240, 342 },
+				{ 184, 342 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ 184, 398 },
+				{ 240, 398 },
+				{ 240, 466 },
+				{ 184, 466 },
+			},
+		},
+		{
+			Kind = "Flat",
+			Area = {
+				{ -264, 98 },
+				{ -240, 98 },
+				{ -240, 86 },
+				{ -264, 86 },
+			},
+		},
+		{ Kind = "Flat", At = { -264, 92 }, Radius = 6 },
+		{ Kind = "Flat", At = { -240, 92 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ -264, 218 },
+				{ -240, 218 },
+				{ -240, 206 },
+				{ -264, 206 },
+			},
+		},
+		{ Kind = "Flat", At = { -264, 212 }, Radius = 6 },
+		{ Kind = "Flat", At = { -240, 212 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ -264, 322 },
+				{ -240, 322 },
+				{ -240, 310 },
+				{ -264, 310 },
+			},
+		},
+		{ Kind = "Flat", At = { -264, 316 }, Radius = 6 },
+		{ Kind = "Flat", At = { -240, 316 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ -264, 438 },
+				{ -240, 438 },
+				{ -240, 426 },
+				{ -264, 426 },
+			},
+		},
+		{ Kind = "Flat", At = { -264, 432 }, Radius = 6 },
+		{ Kind = "Flat", At = { -240, 432 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ 264, 178 },
+				{ 240, 178 },
+				{ 240, 190 },
+				{ 264, 190 },
+			},
+		},
+		{ Kind = "Flat", At = { 264, 184 }, Radius = 6 },
+		{ Kind = "Flat", At = { 240, 184 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ 264, 302 },
+				{ 240, 302 },
+				{ 240, 314 },
+				{ 264, 314 },
+			},
+		},
+		{ Kind = "Flat", At = { 264, 308 }, Radius = 6 },
+		{ Kind = "Flat", At = { 240, 308 }, Radius = 6 },
+		{
+			Kind = "Flat",
+			Area = {
+				{ 264, 426 },
+				{ 240, 426 },
+				{ 240, 438 },
+				{ 264, 438 },
+			},
+		},
+		{ Kind = "Flat", At = { 264, 432 }, Radius = 6 },
+		{ Kind = "Flat", At = { 240, 432 }, Radius = 6 },
 	},
+	Loot = {
+		{ At = { 0, 324 }, Radius = 6, Weight = 3 },
+	},
+	Decor = {
+		{
+			Kind = "Weed",
+			Area = {
+				{ -340, 2 },
+				{ 340, 2 },
+				{ 340, 16 },
+				{ -340, 16 },
+			},
+			Count = 10,
+		},
+		{ Kind = "GlowShells", At = { -60, 296 } },
+		{ Kind = "GlowShells", At = { 60, 328 } },
+		{ Kind = "Starfish", At = { -20, 296 }, Scale = 0.9 },
+		{ Kind = "Urchins", At = { 24, 296 }, Scale = 0.9 },
+		{
+			Kind = "Weed",
+			Area = {
+				{ -90, 290 },
+				{ 90, 290 },
+				{ 90, 330 },
+				{ -90, 330 },
+			},
+			Count = 5,
+		},
+		{
+			Kind = "Pebbles",
+			Area = {
+				{ -236, 62 },
+				{ -188, 62 },
+				{ -188, 122 },
+				{ -236, 122 },
+			},
+			Count = 4,
+		},
+		{
+			Kind = "Weed",
+			Area = {
+				{ -236, 62 },
+				{ -188, 62 },
+				{ -188, 122 },
+				{ -236, 122 },
+			},
+			Count = 2,
+		},
+		{
+			Kind = "Pebbles",
+			Area = {
+				{ -236, 182 },
+				{ -188, 182 },
+				{ -188, 242 },
+				{ -236, 242 },
+			},
+			Count = 4,
+		},
+		{
+			Kind = "Weed",
+			Area = {
+				{ -236, 182 },
+				{ -188, 182 },
+				{ -188, 242 },
+				{ -236, 242 },
+			},
+			Count = 2,
+		},
+		{
+			Kind = "Pebbles",
+			Area = {
+				{ -236, 286 },
+				{ -188, 286 },
+				{ -188, 346 },
+				{ -236, 346 },
+			},
+			Count = 4,
+		},
+		{
+			Kind = "Weed",
+			Area = {
+				{ -236, 286 },
+				{ -188, 286 },
+				{ -188, 346 },
+				{ -236, 346 },
+			},
+			Count = 2,
+		},
+		{
+			Kind = "Pebbles",
+			Area = {
+				{ -236, 402 },
+				{ -188, 402 },
+				{ -188, 462 },
+				{ -236, 462 },
+			},
+			Count = 4,
+		},
+		{
+			Kind = "Weed",
+			Area = {
+				{ -236, 402 },
+				{ -188, 402 },
+				{ -188, 462 },
+				{ -236, 462 },
+			},
+			Count = 2,
+		},
+		{
+			Kind = "Pebbles",
+			Area = {
+				{ 188, 154 },
+				{ 236, 154 },
+				{ 236, 214 },
+				{ 188, 214 },
+			},
+			Count = 4,
+		},
+		{
+			Kind = "Weed",
+			Area = {
+				{ 188, 154 },
+				{ 236, 154 },
+				{ 236, 214 },
+				{ 188, 214 },
+			},
+			Count = 2,
+		},
+		{
+			Kind = "Pebbles",
+			Area = {
+				{ 188, 278 },
+				{ 236, 278 },
+				{ 236, 338 },
+				{ 188, 338 },
+			},
+			Count = 4,
+		},
+		{
+			Kind = "Weed",
+			Area = {
+				{ 188, 278 },
+				{ 236, 278 },
+				{ 236, 338 },
+				{ 188, 338 },
+			},
+			Count = 2,
+		},
+		{
+			Kind = "Pebbles",
+			Area = {
+				{ 188, 402 },
+				{ 236, 402 },
+				{ 236, 462 },
+				{ 188, 462 },
+			},
+			Count = 4,
+		},
+		{
+			Kind = "Weed",
+			Area = {
+				{ 188, 402 },
+				{ 236, 402 },
+				{ 236, 462 },
+				{ 188, 462 },
+			},
+			Count = 2,
+		},
+	},
+	Name = "The Shoals",
 	Crossings = {
-		crossing("Zigzag fords", { -144, 280, -144, 0 }, { -280, 144, 280, -280 }, { -32, 112 }),
-		crossing("West bank", { -280, 280, -280, 0 }, { -144, 144, 280, -280 }, { -168, -112 }),
-		crossing("Crossover", { 0, 280, -280, 144 }, { 280, -280, -144, 280 }, { 104, 32 }),
-		crossing("East bank", { 280, -280, 280, 0 }, { 144, -144, -280, 280 }, { 168, -112 }),
-		crossing("Grotto way", { 0, -280, 280, -144 }, { -280, 280, 144, -280 }, { -104, -32 }),
+		{
+			Name = "Mussel run",
+			Paths = 2,
+			Primitives = {
+				{
+					Kind = "Ramp",
+					Path = {
+						{ 148, 12 },
+						{ 148, 52 },
+						{ -112, 52 },
+						{ -112, 92 },
+						{ 148, 92 },
+						{ 148, 144 },
+						{ -112, 144 },
+						{ -112, 184 },
+						{ 148, 184 },
+						{ 148, 392 },
+						{ 40, 392 },
+						{ 40, 432 },
+						{ 148, 432 },
+						{ 148, 608 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -66, 12 },
+						{ -66, 52 },
+						{ -54, 52 },
+						{ -54, 12 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -60, 46 },
+						{ -152, 46 },
+						{ -152, 58 },
+						{ -60, 58 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 52 },
+						{ -158, 392 },
+						{ -146, 392 },
+						{ -146, 52 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 398 },
+						{ -40, 398 },
+						{ -40, 386 },
+						{ -152, 386 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -46, 392 },
+						{ -46, 432 },
+						{ -34, 432 },
+						{ -34, 392 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -40, 426 },
+						{ -152, 426 },
+						{ -152, 438 },
+						{ -40, 438 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 432 },
+						{ -158, 472 },
+						{ -146, 472 },
+						{ -146, 432 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 478 },
+						{ -40, 478 },
+						{ -40, 466 },
+						{ -152, 466 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -46, 472 },
+						{ -46, 516 },
+						{ -34, 516 },
+						{ -34, 472 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -40, 510 },
+						{ -152, 510 },
+						{ -152, 522 },
+						{ -40, 522 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 516 },
+						{ -158, 608 },
+						{ -146, 608 },
+						{ -146, 516 },
+					},
+				},
+				{ Kind = "Flat", At = { -60, 12 }, Radius = 6 },
+				{ Kind = "Flat", At = { -60, 52 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 52 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 392 }, Radius = 6 },
+				{ Kind = "Flat", At = { -40, 392 }, Radius = 6 },
+				{ Kind = "Flat", At = { -40, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 472 }, Radius = 6 },
+				{ Kind = "Flat", At = { -40, 472 }, Radius = 6 },
+				{ Kind = "Flat", At = { -40, 516 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 516 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 608 }, Radius = 6 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ -152, 104 },
+						{ -152, 144 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -152, 118 },
+						{ -152, 130 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 80 },
+						{ -158, 96 },
+						{ -130, 96 },
+						{ -130, 80 },
+					},
+				},
+				{ Kind = "Flat", At = { -144, 80 }, Radius = 14 },
+				{ Kind = "Flat", At = { -144, 96 }, Radius = 14 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ -152, 228 },
+						{ -152, 268 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -152, 242 },
+						{ -152, 254 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 200 },
+						{ -158, 220 },
+						{ -130, 220 },
+						{ -130, 200 },
+					},
+				},
+				{ Kind = "Flat", At = { -144, 200 }, Radius = 14 },
+				{ Kind = "Flat", At = { -144, 220 }, Radius = 14 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ -152, 352 },
+						{ -152, 392 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -152, 366 },
+						{ -152, 378 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Channel",
+					Path = {
+						{ -40, 476 },
+						{ -40, 516 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -40, 490 },
+						{ -40, 502 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 66 },
+						{ -184, 66 },
+						{ -184, 78 },
+						{ -152, 78 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 72 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 72 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 226 },
+						{ -184, 226 },
+						{ -184, 238 },
+						{ -152, 238 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 232 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 232 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 310 },
+						{ -184, 310 },
+						{ -184, 322 },
+						{ -152, 322 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 316 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 316 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 426 },
+						{ -184, 426 },
+						{ -184, 438 },
+						{ -152, 438 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 432 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 190 },
+						{ 184, 190 },
+						{ 184, 178 },
+						{ 152, 178 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 184 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 184 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 314 },
+						{ 184, 314 },
+						{ 184, 302 },
+						{ 152, 302 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 308 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 308 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 438 },
+						{ 184, 438 },
+						{ 184, 426 },
+						{ 152, 426 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 432 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 302 },
+						{ -96, 302 },
+						{ -96, 290 },
+						{ -152, 290 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 296 }, Radius = 6 },
+				{ Kind = "Flat", At = { -96, 296 }, Radius = 6 },
+			},
+			Hazards = {
+				{
+					Type = "Undertow",
+					Path = {
+						{ -152, 100 },
+						{ -152, 148 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -152, 62 }, Radius = 9 },
+				{ Type = "Pit", At = { -136, 86 }, Radius = 4, Covered = false },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -152, 224 },
+						{ -152, 272 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -152, 186 }, Radius = 9 },
+				{ Type = "Pit", At = { -136, 210 }, Radius = 4, Covered = false },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -152, 348 },
+						{ -152, 396 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -152, 336 }, Radius = 9 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -40, 472 },
+						{ -40, 520 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -40, 472 }, Radius = 9 },
+			},
+			Decor = {
+				{ Kind = "Pebbles", At = { 103, 41 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 13, 63 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -77, 41 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -34, 81 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 56, 103 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 146, 81 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 37, 133 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -53, 155 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 21, 195 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 111, 173 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 137, 339 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 159, 598 }, Scale = 1.1 },
+				{ Kind = "Timber", At = { -157, 100 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -147, 100 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -156, 100 },
+						{ -148, 100 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -157, 106 },
+						{ -147, 106 },
+						{ -147, 142 },
+						{ -157, 142 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { -157, 224 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -147, 224 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -156, 224 },
+						{ -148, 224 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -157, 230 },
+						{ -147, 230 },
+						{ -147, 266 },
+						{ -157, 266 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { -157, 348 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -147, 348 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -156, 348 },
+						{ -148, 348 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -157, 354 },
+						{ -147, 354 },
+						{ -147, 390 },
+						{ -157, 390 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { -45, 472 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -35, 472 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -44, 472 },
+						{ -36, 472 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -45, 478 },
+						{ -35, 478 },
+						{ -35, 514 },
+						{ -45, 514 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { -160, 8 }, Yaw = 80 },
+				{ Kind = "Timber", At = { -136, 8 }, Yaw = 80 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -160, 8 },
+						{ -136, 8 },
+					},
+					Count = 2,
+				},
+			},
+		},
+		{
+			Name = "Reed bank",
+			Paths = 2,
+			Primitives = {
+				{
+					Kind = "Ramp",
+					Path = {
+						{ -148, 12 },
+						{ -148, 392 },
+						{ 70, 392 },
+						{ 70, 432 },
+						{ -148, 432 },
+						{ -148, 472 },
+						{ 70, 472 },
+						{ 70, 516 },
+						{ -148, 516 },
+						{ -148, 556 },
+						{ 70, 556 },
+						{ 70, 608 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 14, 12 },
+						{ 14, 52 },
+						{ 26, 52 },
+						{ 26, 12 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 20, 58 },
+						{ 152, 58 },
+						{ 152, 46 },
+						{ 20, 46 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 146, 52 },
+						{ 146, 92 },
+						{ 158, 92 },
+						{ 158, 52 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 86 },
+						{ 20, 86 },
+						{ 20, 98 },
+						{ 152, 98 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 14, 92 },
+						{ 14, 144 },
+						{ 26, 144 },
+						{ 26, 92 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 20, 150 },
+						{ 152, 150 },
+						{ 152, 138 },
+						{ 20, 138 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 146, 144 },
+						{ 146, 184 },
+						{ 158, 184 },
+						{ 158, 144 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 178 },
+						{ 20, 178 },
+						{ 20, 190 },
+						{ 152, 190 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 14, 184 },
+						{ 14, 224 },
+						{ 26, 224 },
+						{ 26, 184 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 20, 230 },
+						{ 152, 230 },
+						{ 152, 218 },
+						{ 20, 218 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 146, 224 },
+						{ 146, 420 },
+						{ 158, 420 },
+						{ 158, 224 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 414 },
+						{ 112, 414 },
+						{ 112, 426 },
+						{ 152, 426 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 106, 420 },
+						{ 106, 460 },
+						{ 118, 460 },
+						{ 118, 420 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 112, 466 },
+						{ 152, 466 },
+						{ 152, 454 },
+						{ 112, 454 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 146, 460 },
+						{ 146, 608 },
+						{ 158, 608 },
+						{ 158, 460 },
+					},
+				},
+				{ Kind = "Flat", At = { 20, 12 }, Radius = 6 },
+				{ Kind = "Flat", At = { 20, 52 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 52 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 92 }, Radius = 6 },
+				{ Kind = "Flat", At = { 20, 92 }, Radius = 6 },
+				{ Kind = "Flat", At = { 20, 144 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 144 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 184 }, Radius = 6 },
+				{ Kind = "Flat", At = { 20, 184 }, Radius = 6 },
+				{ Kind = "Flat", At = { 20, 224 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 224 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 420 }, Radius = 6 },
+				{ Kind = "Flat", At = { 112, 420 }, Radius = 6 },
+				{ Kind = "Flat", At = { 112, 460 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 460 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 608 }, Radius = 6 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ 20, 104 },
+						{ 20, 144 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ 20, 118 },
+						{ 20, 130 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Channel",
+					Path = {
+						{ 152, 228 },
+						{ 152, 268 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ 152, 242 },
+						{ 152, 254 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 130, 200 },
+						{ 130, 220 },
+						{ 158, 220 },
+						{ 158, 200 },
+					},
+				},
+				{ Kind = "Flat", At = { 144, 200 }, Radius = 14 },
+				{ Kind = "Flat", At = { 144, 220 }, Radius = 14 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ 152, 352 },
+						{ 152, 392 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ 152, 366 },
+						{ 152, 378 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 130, 328 },
+						{ 130, 344 },
+						{ 158, 344 },
+						{ 158, 328 },
+					},
+				},
+				{ Kind = "Flat", At = { 144, 328 }, Radius = 14 },
+				{ Kind = "Flat", At = { 144, 344 }, Radius = 14 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ 152, 476 },
+						{ 152, 516 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ 152, 490 },
+						{ 152, 502 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 66 },
+						{ -184, 66 },
+						{ -184, 78 },
+						{ -152, 78 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 72 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 72 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 226 },
+						{ -184, 226 },
+						{ -184, 238 },
+						{ -152, 238 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 232 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 232 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 310 },
+						{ -184, 310 },
+						{ -184, 322 },
+						{ -152, 322 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 316 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 316 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 426 },
+						{ -184, 426 },
+						{ -184, 438 },
+						{ -152, 438 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 432 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 190 },
+						{ 184, 190 },
+						{ 184, 178 },
+						{ 152, 178 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 184 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 184 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 314 },
+						{ 184, 314 },
+						{ 184, 302 },
+						{ 152, 302 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 308 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 308 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 438 },
+						{ 184, 438 },
+						{ 184, 426 },
+						{ 152, 426 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 432 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 290 },
+						{ 96, 290 },
+						{ 96, 302 },
+						{ 152, 302 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 296 }, Radius = 6 },
+				{ Kind = "Flat", At = { 96, 296 }, Radius = 6 },
+			},
+			Hazards = {
+				{
+					Type = "Undertow",
+					Path = {
+						{ 20, 100 },
+						{ 20, 148 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { 20, 96 }, Radius = 9 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ 152, 224 },
+						{ 152, 272 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { 152, 186 }, Radius = 9 },
+				{ Type = "Pit", At = { 136, 210 }, Radius = 4, Covered = false },
+				{
+					Type = "Undertow",
+					Path = {
+						{ 152, 348 },
+						{ 152, 396 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { 152, 336 }, Radius = 9 },
+				{ Type = "Pit", At = { 136, 334 }, Radius = 4, Covered = false },
+				{
+					Type = "Undertow",
+					Path = {
+						{ 152, 472 },
+						{ 152, 520 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { 152, 460 }, Radius = 9 },
+			},
+			Decor = {
+				{ Kind = "Pebbles", At = { -159, 57 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -137, 147 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -159, 237 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -137, 327 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -59, 403 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 31, 381 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -41, 421 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -131, 443 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -15, 483 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -74, 527 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 7, 567 }, Scale = 1.1 },
+				{ Kind = "Timber", At = { 15, 100 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { 25, 100 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ 16, 100 },
+						{ 24, 100 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ 15, 106 },
+						{ 25, 106 },
+						{ 25, 142 },
+						{ 15, 142 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { 147, 224 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { 157, 224 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ 148, 224 },
+						{ 156, 224 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ 147, 230 },
+						{ 157, 230 },
+						{ 157, 266 },
+						{ 147, 266 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { 147, 348 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { 157, 348 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ 148, 348 },
+						{ 156, 348 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ 147, 354 },
+						{ 157, 354 },
+						{ 157, 390 },
+						{ 147, 390 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { 147, 472 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { 157, 472 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ 148, 472 },
+						{ 156, 472 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ 147, 478 },
+						{ 157, 478 },
+						{ 157, 514 },
+						{ 147, 514 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Anchor", At = { -160, 8 }, Yaw = 120 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -156, 14 },
+						{ -140, 8 },
+					},
+					Count = 2,
+				},
+			},
+		},
+		{
+			Name = "Three lanes",
+			Paths = 3,
+			Primitives = {
+				{
+					Kind = "Ramp",
+					Path = {
+						{ -112, 12 },
+						{ -112, 52 },
+						{ 112, 52 },
+						{ 112, 92 },
+						{ -112, 92 },
+						{ -112, 144 },
+						{ 112, 144 },
+						{ 112, 184 },
+						{ -112, 184 },
+						{ -112, 224 },
+						{ 0, 224 },
+						{ 0, 608 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 12 },
+						{ -158, 392 },
+						{ -146, 392 },
+						{ -146, 12 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 398 },
+						{ -40, 398 },
+						{ -40, 386 },
+						{ -152, 386 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -46, 392 },
+						{ -46, 432 },
+						{ -34, 432 },
+						{ -34, 392 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -40, 426 },
+						{ -152, 426 },
+						{ -152, 438 },
+						{ -40, 438 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 432 },
+						{ -158, 472 },
+						{ -146, 472 },
+						{ -146, 432 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 478 },
+						{ -40, 478 },
+						{ -40, 466 },
+						{ -152, 466 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -46, 472 },
+						{ -46, 516 },
+						{ -34, 516 },
+						{ -34, 472 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -40, 510 },
+						{ -152, 510 },
+						{ -152, 522 },
+						{ -40, 522 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 516 },
+						{ -158, 608 },
+						{ -146, 608 },
+						{ -146, 516 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 12 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 392 }, Radius = 6 },
+				{ Kind = "Flat", At = { -40, 392 }, Radius = 6 },
+				{ Kind = "Flat", At = { -40, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 472 }, Radius = 6 },
+				{ Kind = "Flat", At = { -40, 472 }, Radius = 6 },
+				{ Kind = "Flat", At = { -40, 516 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 516 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 608 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 146, 12 },
+						{ 146, 392 },
+						{ 158, 392 },
+						{ 158, 12 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 386 },
+						{ 40, 386 },
+						{ 40, 398 },
+						{ 152, 398 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 34, 392 },
+						{ 34, 432 },
+						{ 46, 432 },
+						{ 46, 392 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 40, 438 },
+						{ 152, 438 },
+						{ 152, 426 },
+						{ 40, 426 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 146, 432 },
+						{ 146, 472 },
+						{ 158, 472 },
+						{ 158, 432 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 466 },
+						{ 40, 466 },
+						{ 40, 478 },
+						{ 152, 478 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 34, 472 },
+						{ 34, 516 },
+						{ 46, 516 },
+						{ 46, 472 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 40, 522 },
+						{ 152, 522 },
+						{ 152, 510 },
+						{ 40, 510 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 146, 516 },
+						{ 146, 556 },
+						{ 158, 556 },
+						{ 158, 516 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 550 },
+						{ 40, 550 },
+						{ 40, 562 },
+						{ 152, 562 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ 34, 556 },
+						{ 34, 608 },
+						{ 46, 608 },
+						{ 46, 556 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 12 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 392 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 392 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 472 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 472 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 516 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 516 }, Radius = 6 },
+				{ Kind = "Flat", At = { 152, 556 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 556 }, Radius = 6 },
+				{ Kind = "Flat", At = { 40, 608 }, Radius = 6 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ -152, 104 },
+						{ -152, 144 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -152, 118 },
+						{ -152, 130 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Channel",
+					Path = {
+						{ -152, 228 },
+						{ -152, 268 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -152, 242 },
+						{ -152, 254 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 200 },
+						{ -158, 220 },
+						{ -130, 220 },
+						{ -130, 200 },
+					},
+				},
+				{ Kind = "Flat", At = { -144, 200 }, Radius = 14 },
+				{ Kind = "Flat", At = { -144, 220 }, Radius = 14 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ -152, 352 },
+						{ -152, 392 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -152, 366 },
+						{ -152, 378 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Channel",
+					Path = {
+						{ -40, 476 },
+						{ -40, 516 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -40, 490 },
+						{ -40, 502 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Channel",
+					Path = {
+						{ 110, 472 },
+						{ 70, 472 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 66 },
+						{ -184, 66 },
+						{ -184, 78 },
+						{ -152, 78 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 72 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 72 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 226 },
+						{ -184, 226 },
+						{ -184, 238 },
+						{ -152, 238 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 232 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 232 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 310 },
+						{ -184, 310 },
+						{ -184, 322 },
+						{ -152, 322 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 316 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 316 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 426 },
+						{ -184, 426 },
+						{ -184, 438 },
+						{ -152, 438 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 432 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 190 },
+						{ 184, 190 },
+						{ 184, 178 },
+						{ 152, 178 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 184 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 184 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 314 },
+						{ 184, 314 },
+						{ 184, 302 },
+						{ 152, 302 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 308 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 308 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 438 },
+						{ 184, 438 },
+						{ 184, 426 },
+						{ 152, 426 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 432 }, Radius = 6 },
+			},
+			Hazards = {
+				{
+					Type = "Undertow",
+					Path = {
+						{ -152, 100 },
+						{ -152, 148 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -152, 62 }, Radius = 9 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -152, 224 },
+						{ -152, 272 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -152, 186 }, Radius = 9 },
+				{ Type = "Pit", At = { -136, 210 }, Radius = 4, Covered = false },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -152, 348 },
+						{ -152, 396 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -152, 336 }, Radius = 9 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -40, 472 },
+						{ -40, 520 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -40, 472 }, Radius = 9 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ 110, 472 },
+						{ 70, 472 },
+					},
+					Width = 12,
+				},
+			},
+			Decor = {
+				{ Kind = "Pebbles", At = { -67, 63 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 23, 41 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 45, 81 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -45, 103 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -23, 155 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 67, 133 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 1, 173 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -89, 195 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -11, 357 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 11, 447 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -11, 537 }, Scale = 1.1 },
+				{ Kind = "Timber", At = { -157, 100 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -147, 100 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -156, 100 },
+						{ -148, 100 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -157, 106 },
+						{ -147, 106 },
+						{ -147, 142 },
+						{ -157, 142 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { -157, 224 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -147, 224 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -156, 224 },
+						{ -148, 224 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -157, 230 },
+						{ -147, 230 },
+						{ -147, 266 },
+						{ -157, 266 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { -157, 348 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -147, 348 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -156, 348 },
+						{ -148, 348 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -157, 354 },
+						{ -147, 354 },
+						{ -147, 390 },
+						{ -157, 390 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { -45, 472 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -35, 472 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -44, 472 },
+						{ -36, 472 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -45, 478 },
+						{ -35, 478 },
+						{ -35, 514 },
+						{ -45, 514 },
+					},
+					Count = 3,
+				},
+				{
+					Kind = "Weed",
+					Path = {
+						{ 110, 472 },
+						{ 70, 472 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Bones", At = { -8, 8 }, Scale = 1.3 },
+				{ Kind = "GlowShells", At = { 8, 14 } },
+			},
+		},
+		{
+			Name = "The Grotto way",
+			Paths = 1,
+			Primitives = {
+				{
+					Kind = "Ramp",
+					Path = {
+						{ -112, 12 },
+						{ -112, 52 },
+						{ 112, 52 },
+						{ 112, 92 },
+						{ -112, 92 },
+						{ -112, 144 },
+						{ 112, 144 },
+						{ 112, 184 },
+						{ -112, 184 },
+						{ -112, 224 },
+						{ 0, 224 },
+						{ 0, 608 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -6, 52 },
+						{ -6, 92 },
+						{ 6, 92 },
+						{ 6, 52 },
+					},
+				},
+				{ Kind = "Flat", At = { 0, 52 }, Radius = 6 },
+				{ Kind = "Flat", At = { 0, 92 }, Radius = 6 },
+				{
+					Kind = "Ridge",
+					Path = {
+						{ 0, 68 },
+						{ 0, 76 },
+					},
+					Height = 2.5,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -6, 144 },
+						{ -6, 184 },
+						{ 6, 184 },
+						{ 6, 144 },
+					},
+				},
+				{ Kind = "Flat", At = { 0, 144 }, Radius = 6 },
+				{ Kind = "Flat", At = { 0, 184 }, Radius = 6 },
+				{
+					Kind = "Ridge",
+					Path = {
+						{ 0, 160 },
+						{ 0, 168 },
+					},
+					Height = 2.5,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -96, 290 },
+						{ -184, 290 },
+						{ -184, 302 },
+						{ -96, 302 },
+					},
+				},
+				{ Kind = "Flat", At = { -96, 296 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 296 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 96, 302 },
+						{ 184, 302 },
+						{ 184, 290 },
+						{ 96, 290 },
+					},
+				},
+				{ Kind = "Flat", At = { 96, 296 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 296 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -112, 86 },
+						{ -184, 86 },
+						{ -184, 98 },
+						{ -112, 98 },
+					},
+				},
+				{ Kind = "Flat", At = { -112, 92 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 92 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -112, 178 },
+						{ -184, 178 },
+						{ -184, 190 },
+						{ -112, 190 },
+					},
+				},
+				{ Kind = "Flat", At = { -112, 184 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 184 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 112, 190 },
+						{ 184, 190 },
+						{ 184, 178 },
+						{ 112, 178 },
+					},
+				},
+				{ Kind = "Flat", At = { 112, 184 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 184 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -184, 438 },
+						{ 184, 438 },
+						{ 184, 426 },
+						{ -184, 426 },
+					},
+				},
+				{ Kind = "Flat", At = { -184, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 432 }, Radius = 6 },
+			},
+			Decor = {
+				{ Kind = "Pebbles", At = { -67, 63 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 23, 41 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 45, 81 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -45, 103 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -23, 155 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 67, 133 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 1, 173 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -89, 195 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -11, 357 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 11, 447 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { -11, 537 }, Scale = 1.1 },
+				{ Kind = "LanternPost", At = { -12, 8 } },
+				{ Kind = "LanternPost", At = { 12, 8 } },
+			},
+		},
+		{
+			Name = "Sandbar loop",
+			Paths = 2,
+			Primitives = {
+				{
+					Kind = "Ramp",
+					Path = {
+						{ 148, 12 },
+						{ 148, 52 },
+						{ 0, 52 },
+						{ 0, 92 },
+						{ 148, 92 },
+						{ 148, 144 },
+						{ 0, 144 },
+						{ 0, 184 },
+						{ 148, 184 },
+						{ 148, 392 },
+						{ 0, 392 },
+						{ 0, 432 },
+						{ 148, 432 },
+						{ 148, 472 },
+						{ 0, 472 },
+						{ 0, 516 },
+						{ 148, 516 },
+						{ 148, 608 },
+					},
+					Width = 16,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -58, 12 },
+						{ -58, 52 },
+						{ -46, 52 },
+						{ -46, 12 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -52, 46 },
+						{ -152, 46 },
+						{ -152, 58 },
+						{ -52, 58 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 52 },
+						{ -158, 92 },
+						{ -146, 92 },
+						{ -146, 52 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 98 },
+						{ -52, 98 },
+						{ -52, 86 },
+						{ -152, 86 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -58, 92 },
+						{ -58, 144 },
+						{ -46, 144 },
+						{ -46, 92 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -52, 138 },
+						{ -152, 138 },
+						{ -152, 150 },
+						{ -52, 150 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 144 },
+						{ -158, 392 },
+						{ -146, 392 },
+						{ -146, 144 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 398 },
+						{ -52, 398 },
+						{ -52, 386 },
+						{ -152, 386 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -58, 392 },
+						{ -58, 432 },
+						{ -46, 432 },
+						{ -46, 392 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -52, 426 },
+						{ -152, 426 },
+						{ -152, 438 },
+						{ -52, 438 },
+					},
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 432 },
+						{ -158, 608 },
+						{ -146, 608 },
+						{ -146, 432 },
+					},
+				},
+				{ Kind = "Flat", At = { -52, 12 }, Radius = 6 },
+				{ Kind = "Flat", At = { -52, 52 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 52 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 92 }, Radius = 6 },
+				{ Kind = "Flat", At = { -52, 92 }, Radius = 6 },
+				{ Kind = "Flat", At = { -52, 144 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 144 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 392 }, Radius = 6 },
+				{ Kind = "Flat", At = { -52, 392 }, Radius = 6 },
+				{ Kind = "Flat", At = { -52, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { -152, 608 }, Radius = 6 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ -52, 104 },
+						{ -52, 144 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -52, 118 },
+						{ -52, 130 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Channel",
+					Path = {
+						{ -152, 228 },
+						{ -152, 268 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -152, 242 },
+						{ -152, 254 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 200 },
+						{ -158, 220 },
+						{ -130, 220 },
+						{ -130, 200 },
+					},
+				},
+				{ Kind = "Flat", At = { -144, 200 }, Radius = 14 },
+				{ Kind = "Flat", At = { -144, 220 }, Radius = 14 },
+				{
+					Kind = "Channel",
+					Path = {
+						{ -152, 352 },
+						{ -152, 392 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -152, 366 },
+						{ -152, 378 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Channel",
+					Path = {
+						{ -152, 476 },
+						{ -152, 516 },
+					},
+					Depth = 3,
+					Width = 12,
+					Rough = 1,
+					Material = "Mud",
+					Over = true,
+				},
+				{
+					Kind = "Ridge",
+					Path = {
+						{ -152, 490 },
+						{ -152, 502 },
+					},
+					Height = 3,
+					Width = 12,
+					Rough = 0,
+					Over = true,
+				},
+				{
+					Kind = "Flat",
+					Area = {
+						{ -158, 448 },
+						{ -158, 468 },
+						{ -130, 468 },
+						{ -130, 448 },
+					},
+				},
+				{ Kind = "Flat", At = { -144, 448 }, Radius = 14 },
+				{ Kind = "Flat", At = { -144, 468 }, Radius = 14 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 66 },
+						{ -184, 66 },
+						{ -184, 78 },
+						{ -152, 78 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 72 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 72 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 226 },
+						{ -184, 226 },
+						{ -184, 238 },
+						{ -152, 238 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 232 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 232 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 310 },
+						{ -184, 310 },
+						{ -184, 322 },
+						{ -152, 322 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 316 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 316 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ -152, 426 },
+						{ -184, 426 },
+						{ -184, 438 },
+						{ -152, 438 },
+					},
+				},
+				{ Kind = "Flat", At = { -152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { -184, 432 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 190 },
+						{ 184, 190 },
+						{ 184, 178 },
+						{ 152, 178 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 184 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 184 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 314 },
+						{ 184, 314 },
+						{ 184, 302 },
+						{ 152, 302 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 308 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 308 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 438 },
+						{ 184, 438 },
+						{ 184, 426 },
+						{ 152, 426 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 432 }, Radius = 6 },
+				{ Kind = "Flat", At = { 184, 432 }, Radius = 6 },
+				{
+					Kind = "Flat",
+					Area = {
+						{ 152, 290 },
+						{ 96, 290 },
+						{ 96, 302 },
+						{ 152, 302 },
+					},
+				},
+				{ Kind = "Flat", At = { 152, 296 }, Radius = 6 },
+				{ Kind = "Flat", At = { 96, 296 }, Radius = 6 },
+			},
+			Hazards = {
+				{
+					Type = "Undertow",
+					Path = {
+						{ -52, 100 },
+						{ -52, 148 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -52, 96 }, Radius = 9 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -152, 224 },
+						{ -152, 272 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -152, 186 }, Radius = 9 },
+				{ Type = "Pit", At = { -136, 210 }, Radius = 4, Covered = false },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -152, 348 },
+						{ -152, 396 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -152, 336 }, Radius = 9 },
+				{
+					Type = "Undertow",
+					Path = {
+						{ -152, 472 },
+						{ -152, 520 },
+					},
+					Width = 12,
+				},
+				{ Type = "Sink", At = { -152, 450 }, Radius = 9 },
+				{ Type = "Pit", At = { -136, 458 }, Radius = 4, Covered = false },
+			},
+			Decor = {
+				{ Kind = "Pebbles", At = { 103, 41 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 13, 63 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 67, 103 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 70, 155 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 89, 195 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 159, 284 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 137, 374 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 26, 403 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 133, 443 }, Scale = 1.1 },
+				{ Kind = "Pebbles", At = { 4, 483 }, Scale = 1.1 },
+				{ Kind = "Timber", At = { -57, 100 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -47, 100 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -56, 100 },
+						{ -48, 100 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -57, 106 },
+						{ -47, 106 },
+						{ -47, 142 },
+						{ -57, 142 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { -157, 224 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -147, 224 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -156, 224 },
+						{ -148, 224 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -157, 230 },
+						{ -147, 230 },
+						{ -147, 266 },
+						{ -157, 266 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { -157, 348 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -147, 348 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -156, 348 },
+						{ -148, 348 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -157, 354 },
+						{ -147, 354 },
+						{ -147, 390 },
+						{ -157, 390 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Timber", At = { -157, 472 }, Yaw = 90, Scale = 0.8 },
+				{ Kind = "Timber", At = { -147, 472 }, Yaw = 90, Scale = 0.8 },
+				{
+					Kind = "Chain",
+					Path = {
+						{ -156, 472 },
+						{ -148, 472 },
+					},
+					Count = 2,
+				},
+				{
+					Kind = "Weed",
+					Area = {
+						{ -157, 478 },
+						{ -147, 478 },
+						{ -147, 514 },
+						{ -157, 514 },
+					},
+					Count = 3,
+				},
+				{ Kind = "Urchins", At = { -60, 8 } },
+				{ Kind = "Starfish", At = { -40, 10 } },
+				{ Kind = "Starfish", At = { -50, 4 }, Scale = 1.2 },
+			},
+		},
 	},
 	Slots = {
-		slot("Weed cove", -260, 56, true, { pool, cave, weeds }),
-		slot("Eastern shelf", 160, 128, false, { scramble, pool, cave }),
-		slot("Reef cave", -120, 128, false, { cave, scramble, pool }),
-		slot("Drowned yard", 160, 252, false, { weeds, pool, scramble }),
-		slot("Western hollow", -260, 376, false, { pool, weeds, cave }),
-		slot("Stack gallery", 20, 376, false, { scramble, cave, weeds }),
-		slot("Outer cove", -120, 500, false, { cave, pool, scramble, weeds }),
+		{
+			Name = "Weed cove",
+			At = { -352, 60 },
+			Size = { 96, 64 },
+			Rooms = {
+				{
+					Name = "Drowned pool",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 96, 26 },
+								{ 48, 26 },
+								{ 48, 38 },
+								{ 96, 38 },
+							},
+						},
+						{ Kind = "Flat", At = { 96, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+						},
+						{
+							Kind = "Hollow",
+							At = { 12, 32 },
+							Radius = 20,
+							Depth = 4,
+							Rough = 3,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 12, 32 }, Radius = 4, Weight = 4 },
+					},
+					Decor = {
+						{
+							Kind = "Starfish",
+							Area = {
+								{ 14, 14 },
+								{ 82, 14 },
+								{ 82, 50 },
+								{ 14, 50 },
+							},
+							Count = 3,
+						},
+						{
+							Kind = "Urchins",
+							Area = {
+								{ 14, 14 },
+								{ 82, 14 },
+								{ 82, 50 },
+								{ 14, 50 },
+							},
+							Count = 3,
+						},
+						{
+							Kind = "Weed",
+							Area = {
+								{ 12, 12 },
+								{ 84, 12 },
+								{ 84, 52 },
+								{ 12, 52 },
+							},
+							Count = 4,
+						},
+					},
+				},
+				{
+					Name = "Dead-end cave",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 96, 26 },
+								{ 12, 26 },
+								{ 12, 38 },
+								{ 96, 38 },
+							},
+						},
+						{ Kind = "Flat", At = { 96, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 12, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 82, 32 },
+								{ 82, 8 },
+								{ 70, 8 },
+								{ 70, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 76, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 76, 8 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 50, 32 },
+								{ 50, 56 },
+								{ 62, 56 },
+								{ 62, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 56, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 56, 56 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 38, 32 },
+								{ 38, 8 },
+								{ 26, 8 },
+								{ 26, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 32, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 32, 8 }, Radius = 6 },
+					},
+					Loot = {
+						{ At = { 76, 10 }, Radius = 3, Weight = 1 },
+						{ At = { 54, 54 }, Radius = 3, Weight = 1 },
+						{ At = { 32, 10 }, Radius = 3, Weight = 1 },
+						{ At = { 12, 32 }, Radius = 4, Weight = 3 },
+					},
+					Hazards = {
+						{ Type = "Pit", At = { 12, 32 }, Radius = 4, Covered = true },
+					},
+					Decor = {
+						{
+							Kind = "Barnacles",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+							Count = 6,
+						},
+					},
+				},
+			},
+		},
+		{
+			Name = "Fallen stacks",
+			At = { -352, 180 },
+			Size = { 96, 64 },
+			Rooms = {
+				{
+					Name = "Boulder scramble",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 96, 26 },
+								{ 48, 26 },
+								{ 48, 38 },
+								{ 96, 38 },
+							},
+						},
+						{ Kind = "Flat", At = { 96, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+						},
+						{ Kind = "Mound", At = { 29, 22 }, Radius = 7, Height = 5, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 67, 32 }, Radius = 7, Height = 6, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 38, 45 }, Radius = 7, Height = 5, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 62, 16 }, Radius = 7, Height = 6, Rock = true, Over = true },
+					},
+					Loot = {
+						{ At = { 12, 32 }, Radius = 4, Weight = 2 },
+					},
+					Decor = {
+						{
+							Kind = "Barnacles",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+							Count = 4,
+						},
+					},
+				},
+				{
+					Name = "Weed channel",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 96, 26 },
+								{ 48, 26 },
+								{ 48, 38 },
+								{ 96, 38 },
+							},
+						},
+						{ Kind = "Flat", At = { 96, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+						},
+						{
+							Kind = "Channel",
+							Path = {
+								{ 82, 32 },
+								{ 12, 32 },
+							},
+							Depth = 3,
+							Width = 12,
+							Rough = 2,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 12, 32 }, Radius = 4, Weight = 2 },
+					},
+					Hazards = {
+						{
+							Type = "Undertow",
+							Path = {
+								{ 82, 32 },
+								{ 12, 32 },
+							},
+							Width = 12,
+						},
+					},
+					Decor = {
+						{
+							Kind = "Weed",
+							Path = {
+								{ 82, 32 },
+								{ 12, 32 },
+							},
+							Count = 8,
+						},
+						{
+							Kind = "Kelp",
+							Area = {
+								{ 12, 12 },
+								{ 84, 12 },
+								{ 84, 52 },
+								{ 12, 52 },
+							},
+							Count = 3,
+						},
+					},
+				},
+			},
+		},
+		{
+			Name = "Reef cave",
+			At = { -352, 284 },
+			Size = { 96, 64 },
+			Rooms = {
+				{
+					Name = "Reef cave",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 96, 26 },
+								{ 12, 26 },
+								{ 12, 38 },
+								{ 96, 38 },
+							},
+						},
+						{ Kind = "Flat", At = { 96, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 12, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 82, 32 },
+								{ 82, 8 },
+								{ 70, 8 },
+								{ 70, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 76, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 76, 8 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 50, 32 },
+								{ 50, 56 },
+								{ 62, 56 },
+								{ 62, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 56, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 56, 56 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 38, 32 },
+								{ 38, 8 },
+								{ 26, 8 },
+								{ 26, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 32, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 32, 8 }, Radius = 6 },
+					},
+					Loot = {
+						{ At = { 76, 10 }, Radius = 3, Weight = 1 },
+						{ At = { 54, 54 }, Radius = 3, Weight = 1 },
+						{ At = { 32, 10 }, Radius = 3, Weight = 1 },
+						{ At = { 12, 32 }, Radius = 4, Weight = 4 },
+					},
+					Hazards = {
+						{ Type = "Pit", At = { 12, 32 }, Radius = 4, Covered = true },
+					},
+					Decor = {
+						{
+							Kind = "Barnacles",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+							Count = 6,
+						},
+					},
+				},
+				{
+					Name = "Sunk pool",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 96, 26 },
+								{ 48, 26 },
+								{ 48, 38 },
+								{ 96, 38 },
+							},
+						},
+						{ Kind = "Flat", At = { 96, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+						},
+						{
+							Kind = "Hollow",
+							At = { 12, 32 },
+							Radius = 20,
+							Depth = 4,
+							Rough = 3,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 12, 32 }, Radius = 4, Weight = 3 },
+					},
+					Decor = {
+						{
+							Kind = "Starfish",
+							Area = {
+								{ 14, 14 },
+								{ 82, 14 },
+								{ 82, 50 },
+								{ 14, 50 },
+							},
+							Count = 3,
+						},
+						{
+							Kind = "Urchins",
+							Area = {
+								{ 14, 14 },
+								{ 82, 14 },
+								{ 82, 50 },
+								{ 14, 50 },
+							},
+							Count = 3,
+						},
+						{
+							Kind = "Weed",
+							Area = {
+								{ 12, 12 },
+								{ 84, 12 },
+								{ 84, 52 },
+								{ 12, 52 },
+							},
+							Count = 4,
+						},
+					},
+				},
+			},
+		},
+		{
+			Name = "Outer hollow",
+			At = { -352, 400 },
+			Size = { 96, 64 },
+			Rooms = {
+				{
+					Name = "Weed channel",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 96, 26 },
+								{ 48, 26 },
+								{ 48, 38 },
+								{ 96, 38 },
+							},
+						},
+						{ Kind = "Flat", At = { 96, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+						},
+						{
+							Kind = "Channel",
+							Path = {
+								{ 82, 32 },
+								{ 12, 32 },
+							},
+							Depth = 3,
+							Width = 12,
+							Rough = 2,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 12, 32 }, Radius = 4, Weight = 2 },
+					},
+					Hazards = {
+						{
+							Type = "Undertow",
+							Path = {
+								{ 82, 32 },
+								{ 12, 32 },
+							},
+							Width = 12,
+						},
+					},
+					Decor = {
+						{
+							Kind = "Weed",
+							Path = {
+								{ 82, 32 },
+								{ 12, 32 },
+							},
+							Count = 8,
+						},
+						{
+							Kind = "Kelp",
+							Area = {
+								{ 12, 12 },
+								{ 84, 12 },
+								{ 84, 52 },
+								{ 12, 52 },
+							},
+							Count = 3,
+						},
+					},
+				},
+				{
+					Name = "Boulder scramble",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 96, 26 },
+								{ 48, 26 },
+								{ 48, 38 },
+								{ 96, 38 },
+							},
+						},
+						{ Kind = "Flat", At = { 96, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+						},
+						{ Kind = "Mound", At = { 29, 22 }, Radius = 7, Height = 5, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 67, 32 }, Radius = 7, Height = 6, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 38, 45 }, Radius = 7, Height = 5, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 62, 16 }, Radius = 7, Height = 6, Rock = true, Over = true },
+					},
+					Loot = {
+						{ At = { 12, 32 }, Radius = 4, Weight = 2 },
+					},
+					Decor = {
+						{
+							Kind = "Barnacles",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+							Count = 4,
+						},
+					},
+				},
+			},
+		},
+		{
+			Name = "Eastern shelf",
+			At = { 256, 152 },
+			Size = { 96, 64 },
+			Rooms = {
+				{
+					Name = "Drowned pool",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 0, 38 },
+								{ 48, 38 },
+								{ 48, 26 },
+								{ 0, 26 },
+							},
+						},
+						{ Kind = "Flat", At = { 0, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+						},
+						{
+							Kind = "Hollow",
+							At = { 84, 32 },
+							Radius = 20,
+							Depth = 4,
+							Rough = 3,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 84, 32 }, Radius = 4, Weight = 4 },
+					},
+					Decor = {
+						{
+							Kind = "Starfish",
+							Area = {
+								{ 14, 14 },
+								{ 82, 14 },
+								{ 82, 50 },
+								{ 14, 50 },
+							},
+							Count = 3,
+						},
+						{
+							Kind = "Urchins",
+							Area = {
+								{ 14, 14 },
+								{ 82, 14 },
+								{ 82, 50 },
+								{ 14, 50 },
+							},
+							Count = 3,
+						},
+						{
+							Kind = "Weed",
+							Area = {
+								{ 12, 12 },
+								{ 84, 12 },
+								{ 84, 52 },
+								{ 12, 52 },
+							},
+							Count = 4,
+						},
+					},
+				},
+				{
+					Name = "Weed channel",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 0, 38 },
+								{ 48, 38 },
+								{ 48, 26 },
+								{ 0, 26 },
+							},
+						},
+						{ Kind = "Flat", At = { 0, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+						},
+						{
+							Kind = "Channel",
+							Path = {
+								{ 14, 32 },
+								{ 84, 32 },
+							},
+							Depth = 3,
+							Width = 12,
+							Rough = 2,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 84, 32 }, Radius = 4, Weight = 2 },
+					},
+					Hazards = {
+						{
+							Type = "Undertow",
+							Path = {
+								{ 14, 32 },
+								{ 84, 32 },
+							},
+							Width = 12,
+						},
+					},
+					Decor = {
+						{
+							Kind = "Weed",
+							Path = {
+								{ 14, 32 },
+								{ 84, 32 },
+							},
+							Count = 8,
+						},
+						{
+							Kind = "Kelp",
+							Area = {
+								{ 12, 12 },
+								{ 84, 12 },
+								{ 84, 52 },
+								{ 12, 52 },
+							},
+							Count = 3,
+						},
+					},
+				},
+			},
+		},
+		{
+			Name = "Stack gallery",
+			At = { 256, 276 },
+			Size = { 96, 64 },
+			Rooms = {
+				{
+					Name = "Dead-end cave",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 0, 38 },
+								{ 84, 38 },
+								{ 84, 26 },
+								{ 0, 26 },
+							},
+						},
+						{ Kind = "Flat", At = { 0, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 84, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 14, 32 },
+								{ 14, 56 },
+								{ 26, 56 },
+								{ 26, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 20, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 20, 56 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 46, 32 },
+								{ 46, 8 },
+								{ 34, 8 },
+								{ 34, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 40, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 40, 8 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 58, 32 },
+								{ 58, 56 },
+								{ 70, 56 },
+								{ 70, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 64, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 64, 56 }, Radius = 6 },
+					},
+					Loot = {
+						{ At = { 20, 54 }, Radius = 3, Weight = 1 },
+						{ At = { 42, 10 }, Radius = 3, Weight = 1 },
+						{ At = { 64, 54 }, Radius = 3, Weight = 1 },
+						{ At = { 84, 32 }, Radius = 4, Weight = 4 },
+					},
+					Hazards = {
+						{ Type = "Pit", At = { 84, 32 }, Radius = 4, Covered = true },
+					},
+					Decor = {
+						{
+							Kind = "Barnacles",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+							Count = 6,
+						},
+					},
+				},
+				{
+					Name = "Boulder scramble",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 0, 38 },
+								{ 48, 38 },
+								{ 48, 26 },
+								{ 0, 26 },
+							},
+						},
+						{ Kind = "Flat", At = { 0, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+						},
+						{ Kind = "Mound", At = { 29, 22 }, Radius = 7, Height = 5, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 67, 32 }, Radius = 7, Height = 6, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 38, 45 }, Radius = 7, Height = 5, Rock = true, Over = true },
+						{ Kind = "Mound", At = { 62, 16 }, Radius = 7, Height = 6, Rock = true, Over = true },
+					},
+					Loot = {
+						{ At = { 84, 32 }, Radius = 4, Weight = 2 },
+					},
+					Decor = {
+						{
+							Kind = "Barnacles",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+							Count = 4,
+						},
+					},
+				},
+			},
+		},
+		{
+			Name = "Outer cove",
+			At = { 256, 400 },
+			Size = { 96, 64 },
+			Rooms = {
+				{
+					Name = "Drowned pool",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 0, 38 },
+								{ 48, 38 },
+								{ 48, 26 },
+								{ 0, 26 },
+							},
+						},
+						{ Kind = "Flat", At = { 0, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 48, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+						},
+						{
+							Kind = "Hollow",
+							At = { 84, 32 },
+							Radius = 20,
+							Depth = 4,
+							Rough = 3,
+							Material = "Mud",
+							Over = true,
+						},
+					},
+					Loot = {
+						{ At = { 84, 32 }, Radius = 4, Weight = 4 },
+					},
+					Decor = {
+						{
+							Kind = "Starfish",
+							Area = {
+								{ 14, 14 },
+								{ 82, 14 },
+								{ 82, 50 },
+								{ 14, 50 },
+							},
+							Count = 3,
+						},
+						{
+							Kind = "Urchins",
+							Area = {
+								{ 14, 14 },
+								{ 82, 14 },
+								{ 82, 50 },
+								{ 14, 50 },
+							},
+							Count = 3,
+						},
+						{
+							Kind = "Weed",
+							Area = {
+								{ 12, 12 },
+								{ 84, 12 },
+								{ 84, 52 },
+								{ 12, 52 },
+							},
+							Count = 4,
+						},
+					},
+				},
+				{
+					Name = "Dead-end cave",
+					Primitives = {
+						{
+							Kind = "Flat",
+							Area = {
+								{ 0, 38 },
+								{ 84, 38 },
+								{ 84, 26 },
+								{ 0, 26 },
+							},
+						},
+						{ Kind = "Flat", At = { 0, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 84, 32 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 14, 32 },
+								{ 14, 56 },
+								{ 26, 56 },
+								{ 26, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 20, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 20, 56 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 46, 32 },
+								{ 46, 8 },
+								{ 34, 8 },
+								{ 34, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 40, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 40, 8 }, Radius = 6 },
+						{
+							Kind = "Flat",
+							Area = {
+								{ 58, 32 },
+								{ 58, 56 },
+								{ 70, 56 },
+								{ 70, 32 },
+							},
+						},
+						{ Kind = "Flat", At = { 64, 32 }, Radius = 6 },
+						{ Kind = "Flat", At = { 64, 56 }, Radius = 6 },
+					},
+					Loot = {
+						{ At = { 20, 54 }, Radius = 3, Weight = 1 },
+						{ At = { 42, 10 }, Radius = 3, Weight = 1 },
+						{ At = { 64, 54 }, Radius = 3, Weight = 1 },
+						{ At = { 84, 32 }, Radius = 4, Weight = 3 },
+					},
+					Hazards = {
+						{ Type = "Pit", At = { 84, 32 }, Radius = 4, Covered = true },
+					},
+					Decor = {
+						{
+							Kind = "Barnacles",
+							Area = {
+								{ 8, 8 },
+								{ 88, 8 },
+								{ 88, 56 },
+								{ 8, 56 },
+							},
+							Count = 6,
+						},
+					},
+				},
+			},
+		},
 	},
 }
