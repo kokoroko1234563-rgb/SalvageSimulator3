@@ -136,6 +136,18 @@ for _, id in ids do
 			if inRoom then
 				roomDoor += 1
 			end
+			if not far and #spots > 0 then
+				local at = spots[1]
+				table.insert(
+					problems,
+					string.format(
+						"  %s: door (%d, %d) is near the cart route",
+						way.Label ~= "" and way.Label or "base",
+						at[1],
+						at[2]
+					)
+				)
+			end
 			if far then
 				farDoor += 1
 			end

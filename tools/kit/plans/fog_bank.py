@@ -181,12 +181,17 @@ def snake(band, rows, flip=False):
     return pts
 
 
-def dead_end(part, at, direction, length, weight=None, pit=False):
+def dead_end(part, at, direction, length, weight=None, pit=False, door=False):
     """A lane out of a corner, away from the band, ending where the fog hides it: the prize at
-    its end (over a covered pit if `pit`)."""
+    its end (over a covered pit if `pit`). With `door`, the lane ends in a small chamber at the
+    edge of the map with the secret's lighthouse door in it (and no pit)."""
     x, zz = at
     end = (x + direction * length, zz)
     part.lane([at, end], width=12)
+    if door:
+        part.add(Kind="Flat", At=list(end), Radius=16)
+        part.entrance(end)
+        pit = False
     part.decor("Bones", at=(end[0] - direction * 8, end[1] + 3), scale=0.8)
     part.decor("Pebbles", at=(end[0] - direction * 4, end[1] - 3))
     if weight:
@@ -203,12 +208,11 @@ def walled(n, rock, loot_court):
     f.hall([(-310, 530), (310, 530), (310, 620), (-310, 620)])
     f.decor("Pebbles", area=box(0, 6, 560, 24), count=6)
     f.decor("DuneGrass", area=box(0, 600, 560, 40), count=8)
-    # The lighthouse: a tall tower of rock in the court, its door the entrance.
+    # The lighthouse: a tall tower of rock in the court (the secret's own door is in a dead end).
     lh = (-120, 585)
     f.add(Kind="Wall", Area=[[-130, 574], [-110, 574], [-110, 594], [-130, 594]], Height=24,
           Over=True)
     lighthouse(f, (lh[0] + 34, lh[1] + 6), scale=3)
-    f.entrance((lh[0], lh[1] - 30))
     f.hazard("Fog", at=lh)
     f.loot((loot_court, 575), radius=6, weight=4)
     f.decor(POST, path=[(-290, 548), (290, 548)], count=12, scale=1.5)
@@ -249,8 +253,12 @@ def zone_walled(n, rock, rows, loot_court, specs):
             fp = snake(fb, rows, flip=(fb != "W"))
             way(c, fp, pits=[run_mid(fp, i) for i in pits.get(fb, ())])
             tell(c, fp[0][0], (kind + 1) % 3)
-        for band, i, side, length, w, pit in dead:
-            dead_end(c, (BAND[band] + side * HALF_RUN, rows[i]), side, length, w, pit)
+        # The longest dead end of each way ends in the door's chamber.
+        # (Not off the cart's own band, so it stays off the cart's way.)
+        pool_ = [j for j in range(len(dead)) if dead[j][0] != rb] or list(range(len(dead)))
+        door_i = max(pool_, key=lambda j: (dead[j][3], -j))
+        for j, (band, i, side, length, w, pit) in enumerate(dead):
+            dead_end(c, (BAND[band] + side * HALF_RUN, rows[i]), side, length, w, pit, door=(j == door_i))
         for a, b, i in links:  # a lane across the gap at row i
             lo, hi = sorted((BAND[a], BAND[b]))
             c.lane([(lo + HALF_RUN, rows[i]), (hi - HALF_RUN, rows[i])], width=12)

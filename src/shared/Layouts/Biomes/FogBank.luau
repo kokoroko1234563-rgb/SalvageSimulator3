@@ -1280,9 +1280,6 @@ return {
 		Loot = {
 			{ At = { 100, 575 }, Radius = 6, Weight = 4 },
 		},
-		Entrances = {
-			{ -120, 555 },
-		},
 		Hazards = {
 			{ Type = "Fog", At = { -120, 585 } },
 		},
@@ -1701,6 +1698,7 @@ return {
 					},
 					{ Kind = "Flat", At = { -248, 228 }, Radius = 6 },
 					{ Kind = "Flat", At = { -304, 228 }, Radius = 6 },
+					{ Kind = "Flat", At = { -306, 228 }, Radius = 16 },
 					{
 						Kind = "Flat",
 						Area = {
@@ -1740,12 +1738,14 @@ return {
 					{ At = { 74, 348 }, Radius = 4, Weight = 1 },
 					{ At = { 306, 408 }, Radius = 4, Weight = 3 },
 				},
+				Entrances = {
+					{ -306, 228 },
+				},
 				Hazards = {
 					{ Type = "Pit", At = { 0, 228 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 0, 408 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { -200, 168 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { -200, 348 }, Radius = 4, Covered = true },
-					{ Type = "Pit", At = { -306, 228 }, Radius = 4, Covered = true },
 				},
 				Decor = {
 					{
@@ -2620,6 +2620,7 @@ return {
 					},
 					{ Kind = "Flat", At = { -248, 348 }, Radius = 6 },
 					{ Kind = "Flat", At = { -304, 348 }, Radius = 6 },
+					{ Kind = "Flat", At = { -306, 348 }, Radius = 16 },
 					{
 						Kind = "Flat",
 						Area = {
@@ -2659,11 +2660,13 @@ return {
 					{ At = { 306, 168 }, Radius = 4, Weight = 2 },
 					{ At = { 274, 408 }, Radius = 4, Weight = 1 },
 				},
+				Entrances = {
+					{ -306, 348 },
+				},
 				Hazards = {
 					{ Type = "Pit", At = { -200, 288 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 200, 228 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 200, 348 }, Radius = 4, Covered = true },
-					{ Type = "Pit", At = { -306, 348 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 274, 408 }, Radius = 4, Covered = true },
 				},
 				Decor = {
@@ -3376,6 +3379,7 @@ return {
 					},
 					{ Kind = "Flat", At = { 48, 228 }, Radius = 6 },
 					{ Kind = "Flat", At = { 72, 228 }, Radius = 6 },
+					{ Kind = "Flat", At = { 74, 228 }, Radius = 16 },
 					{
 						Kind = "Flat",
 						Area = {
@@ -3404,11 +3408,13 @@ return {
 					{ At = { 74, 228 }, Radius = 4, Weight = 2 },
 					{ At = { -74, 408 }, Radius = 4, Weight = 1 },
 				},
+				Entrances = {
+					{ 74, 228 },
+				},
 				Hazards = {
 					{ Type = "Pit", At = { 0, 168 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 0, 288 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 0, 408 }, Radius = 4, Covered = true },
-					{ Type = "Pit", At = { 74, 228 }, Radius = 4, Covered = true },
 				},
 				Decor = {
 					{
@@ -3821,9 +3827,6 @@ return {
 		},
 		Loot = {
 			{ At = { -60, 575 }, Radius = 6, Weight = 4 },
-		},
-		Entrances = {
-			{ -120, 555 },
 		},
 		Hazards = {
 			{ Type = "Fog", At = { -120, 585 } },
@@ -4327,6 +4330,7 @@ return {
 					},
 					{ Kind = "Flat", At = { -248, 224 }, Radius = 6 },
 					{ Kind = "Flat", At = { -304, 224 }, Radius = 6 },
+					{ Kind = "Flat", At = { -306, 224 }, Radius = 16 },
 					{
 						Kind = "Flat",
 						Area = {
@@ -4366,13 +4370,15 @@ return {
 					{ At = { 74, 368 }, Radius = 4, Weight = 2 },
 					{ At = { 306, 420 }, Radius = 4, Weight = 4 },
 				},
+				Entrances = {
+					{ -306, 224 },
+				},
 				Hazards = {
 					{ Type = "Pit", At = { 0, 176 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 0, 320 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 0, 420 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { -200, 124 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { -200, 320 }, Radius = 4, Covered = true },
-					{ Type = "Pit", At = { -306, 224 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 306, 420 }, Radius = 4, Covered = true },
 				},
 				Decor = {
@@ -5457,6 +5463,7 @@ return {
 					},
 					{ Kind = "Flat", At = { -248, 368 }, Radius = 6 },
 					{ Kind = "Flat", At = { -304, 368 }, Radius = 6 },
+					{ Kind = "Flat", At = { -306, 368 }, Radius = 16 },
 					{
 						Kind = "Flat",
 						Area = {
@@ -5496,12 +5503,14 @@ return {
 					{ At = { 306, 176 }, Radius = 4, Weight = 3 },
 					{ At = { 274, 420 }, Radius = 4, Weight = 2 },
 				},
+				Entrances = {
+					{ -306, 368 },
+				},
 				Hazards = {
 					{ Type = "Pit", At = { -200, 176 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { -200, 272 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 200, 224 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 200, 368 }, Radius = 4, Covered = true },
-					{ Type = "Pit", At = { -306, 368 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 274, 420 }, Radius = 4, Covered = true },
 				},
 				Decor = {
@@ -6585,6 +6594,7 @@ return {
 					},
 					{ Kind = "Flat", At = { 248, 272 }, Radius = 6 },
 					{ Kind = "Flat", At = { 304, 272 }, Radius = 6 },
+					{ Kind = "Flat", At = { 306, 272 }, Radius = 16 },
 					{
 						Kind = "Flat",
 						Area = {
@@ -6601,6 +6611,9 @@ return {
 					{ At = { -306, 176 }, Radius = 4, Weight = 3 },
 					{ At = { 74, 224 }, Radius = 4, Weight = 3 },
 					{ At = { 306, 272 }, Radius = 4, Weight = 4 },
+				},
+				Entrances = {
+					{ 306, 272 },
 				},
 				Hazards = {
 					{ Type = "Pit", At = { 0, 124 }, Radius = 4, Covered = true },
@@ -7319,9 +7332,6 @@ return {
 		Loot = {
 			{ At = { 100, 575 }, Radius = 6, Weight = 4 },
 		},
-		Entrances = {
-			{ -120, 555 },
-		},
 		Hazards = {
 			{ Type = "Fog", At = { -120, 585 } },
 		},
@@ -7908,6 +7918,7 @@ return {
 					},
 					{ Kind = "Flat", At = { -248, 192 }, Radius = 6 },
 					{ Kind = "Flat", At = { -312, 192 }, Radius = 6 },
+					{ Kind = "Flat", At = { -310, 192 }, Radius = 16 },
 					{
 						Kind = "Flat",
 						Area = {
@@ -7947,13 +7958,15 @@ return {
 					{ At = { 74, 316 }, Radius = 4, Weight = 3 },
 					{ At = { 310, 396 }, Radius = 4, Weight = 5 },
 				},
+				Entrances = {
+					{ -310, 192 },
+				},
 				Hazards = {
 					{ Type = "Pit", At = { 0, 152 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 0, 356 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { -200, 112 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { -200, 272 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { -200, 396 }, Radius = 4, Covered = true },
-					{ Type = "Pit", At = { -310, 192 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 310, 396 }, Radius = 4, Covered = true },
 				},
 				Decor = {
@@ -9239,6 +9252,7 @@ return {
 					},
 					{ Kind = "Flat", At = { -248, 356 }, Radius = 6 },
 					{ Kind = "Flat", At = { -312, 356 }, Radius = 6 },
+					{ Kind = "Flat", At = { -310, 356 }, Radius = 16 },
 					{
 						Kind = "Flat",
 						Area = {
@@ -9278,12 +9292,14 @@ return {
 					{ At = { 310, 152 }, Radius = 4, Weight = 4 },
 					{ At = { 274, 396 }, Radius = 4, Weight = 3 },
 				},
+				Entrances = {
+					{ -310, 356 },
+				},
 				Hazards = {
 					{ Type = "Pit", At = { -200, 152 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { -200, 316 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 200, 192 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 200, 316 }, Radius = 4, Covered = true },
-					{ Type = "Pit", At = { -310, 356 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 274, 396 }, Radius = 4, Covered = true },
 				},
 				Decor = {
@@ -10568,6 +10584,7 @@ return {
 					},
 					{ Kind = "Flat", At = { 248, 272 }, Radius = 6 },
 					{ Kind = "Flat", At = { 312, 272 }, Radius = 6 },
+					{ Kind = "Flat", At = { 310, 272 }, Radius = 16 },
 					{
 						Kind = "Flat",
 						Area = {
@@ -10585,13 +10602,15 @@ return {
 					{ At = { 74, 192 }, Radius = 4, Weight = 3 },
 					{ At = { 310, 272 }, Radius = 4, Weight = 5 },
 				},
+				Entrances = {
+					{ 310, 272 },
+				},
 				Hazards = {
 					{ Type = "Pit", At = { 0, 112 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 0, 272 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 200, 152 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 200, 396 }, Radius = 4, Covered = true },
 					{ Type = "Pit", At = { 74, 192 }, Radius = 4, Covered = true },
-					{ Type = "Pit", At = { 310, 272 }, Radius = 4, Covered = true },
 				},
 				Decor = {
 					{
