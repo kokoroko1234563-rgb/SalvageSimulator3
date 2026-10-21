@@ -463,13 +463,45 @@ end
 
 -- Items worth a look: free, in reach of the tool, no heavier than it lifts, not ones we
 -- gave up on, and for a trip bot only in its zone. Scored by value per second there and back.
-local function candidates(bot: Bot): { any }
+-- A bot's own stretch of the beach along X: the width is split between the bots present, in
+-- order of their numbers, so it is re-split whenever bots join or leave.
+local function stretchOf(bot: Bot): (number, number)
+	local ids = {}
+	for id in bots do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	local rank = table.find(ids, bot.Id) or 1
+	local n = math.max(#ids, 1)
+	local edge = Beach.HalfWidth - 30
+	local width = 2 * edge / n
+	return -edge + (rank - 1) * width, -edge + rank * width
+end
+
+-- Whether another bot is already heading for an item (a soft claim: ItemService knows nothing of it).
+local function reservedByOther(bot: Bot, item: BasePart): boolean
+	for _, other in bots do
+		if other ~= bot and other.Target == item then
+			return true
+		end
+	end
+	return false
+end
+
+-- Items worth a look: free, not reserved by another bot, in reach of the tool, no heavier than it
+-- lifts, not ones we gave up on, and for a trip bot only in its zone. Scored by value per second
+-- of the walk there and on home. Those in the bot's own stretch come first; the rest only when
+-- the stretch has nothing it can take (a bot with no cart, carrying one thing at a time, keeps to
+-- short trips then).
+local function candidates(bot: Bot): ({ any }, { any })
 	local tool = BotEconomy.tool(bot.State)
 	local lift = BotEconomy.lift(bot.State, tool)
 	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor
 	local sea = Tide.sea()
 	local t = now()
-	local list = {}
+	local lo, hi = stretchOf(bot)
+	local hands = BotEconomy.cartSize(bot.State) == nil and BotEconomy.capacity(bot.State) == 1
+	local mine, others = {}, {}
 	for item in ItemService.all() do
 		if
 			ItemService.getState(item) == "Unclaimed"
@@ -477,6 +509,7 @@ local function candidates(bot: Bot): { any }
 			and (item:GetAttribute("Class") or 1) <= lift
 			and (not bot.Skip[item] or bot.Skip[item] < t)
 			and (not bot.Trip or item:GetAttribute("Zone") == bot.Trip.Zone)
+			and not reservedByOther(bot, item)
 		then
 			local position = item.Position
 			local band = Beach.depthBand(position, sea)
@@ -487,22 +520,34 @@ local function candidates(bot: Bot): { any }
 				local back = math.sqrt((position.X - HOME.x) ^ 2 + (position.Z - HOME.z) ^ 2)
 					* BotEconomy.MazeFactor
 					/ speed
-				table.insert(list, {
-					Item = item,
-					Score = (item:GetAttribute("Value") or 0) / (there + 0.6 * back + 6 / speedFactor),
-				})
+				local inStretch = position.X >= lo and position.X <= hi
+				-- Hands-only bots stay on short trips (200 game seconds there and back at most).
+				if inStretch or not hands or (there + back) * speedFactor <= 200 then
+					table.insert(if inStretch then mine else others, {
+						Item = item,
+						Score = (item:GetAttribute("Value") or 0) / (there + back + 2 / speedFactor),
+					})
+				end
 			end
 		end
 	end
-	table.sort(list, function(a, b)
+	local function byScore(a, b)
 		return a.Score > b.Score
-	end)
-	return list
+	end
+	table.sort(mine, byScore)
+	table.sort(others, byScore)
+	return mine, others
 end
 
 local function chooseTarget(bot: Bot): boolean
-	local list = candidates(bot)
-	for i = 1, math.min(#list, 4) do
+	local mine, others = candidates(bot)
+	local list = {}
+	for _, group in { mine, others } do
+		for i = 1, math.min(#group, 4) do
+			table.insert(list, group[i])
+		end
+	end
+	for i = 1, #list do
 		local item = list[i].Item
 		local position = item.Position
 		local out, outLength =
@@ -534,7 +579,8 @@ end
 -- Where a bot waits for what the tide washes up: just landward of the waterline as it will be when
 -- the bot gets there, along the bot's own lane of the beach (a trip bot: inside its zone).
 local function stagingPoint(bot: Bot): (number, number)
-	local x = bot.LaneX
+	local lo, hi = stretchOf(bot)
+	local x = (lo + hi) / 2
 	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor
 	local t = now()
 	local z = bot.Z
@@ -998,7 +1044,6 @@ local function spawnBot(id: number, state: any, trip: any): Bot
 	bot.X = HOME.x + ((id - 1) % 5 - 2) * 6
 	bot.Z = HOME.z + ((id - 1) // 5 - 1.5) * 5
 	bot.GroundY = Beach.groundAt(bot.X, bot.Z)
-	bot.LaneX = rng:NextNumber(-Beach.HalfWidth + 60, Beach.HalfWidth - 60)
 	dropTrail(bot)
 	bot.Model = buildMan(bot)
 	CollectionService:AddTag(bot.Model, BotService.Tag)
