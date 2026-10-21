@@ -118,7 +118,7 @@ Config.Zones = {
 	-- medium are equally likely). The first zones favour light things, which bare hands lift.
 	{
 		Name = "Shopside Shore",
-		Multiplier = 1,
+		Multiplier = 2,
 		CrossTime = 35,
 		Rarity = { Common = 90, Uncommon = 10 },
 		HeavyShare = 0.03,
@@ -126,7 +126,7 @@ Config.Zones = {
 	},
 	{
 		Name = "Sunny Stretch",
-		Multiplier = 2,
+		Multiplier = 3,
 		CrossTime = 36,
 		Rarity = { Common = 70, Uncommon = 25, Rare = 5 },
 		HeavyShare = 0.08,
@@ -134,7 +134,7 @@ Config.Zones = {
 	},
 	{
 		Name = "Middle Banks",
-		Multiplier = 4,
+		Multiplier = 5,
 		CrossTime = 38,
 		Rarity = { Common = 50, Uncommon = 32, Rare = 15, VeryRare = 3 },
 		HeavyShare = 0.15,
