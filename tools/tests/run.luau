@@ -3249,6 +3249,23 @@ test("secret: every in-build biome has an unlock item, an opening builder and a 
 	end
 end)
 
+test("the first zones wash up mostly light things, which bare hands lift", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Gear = h.require("Shared/Gear")
+	local ItemService = h.require("Server/ItemService")
+	local z = Beach.tileRange(1) + 100
+	local zoneIndex = Beach.zoneAt(z) :: number
+	assert(Config.Zones[zoneIndex].LightShare > 0.5, "zone 1 favours light things")
+	for _ = 1, 50 do
+		local def = ItemService._chooseDef(zoneIndex, z, false, 1, true)
+		assert(
+			def and def.Class == Gear.WeightClass.Light,
+			"a light pick is light: " .. tostring(def and def.Id)
+		)
+	end
+end)
+
 test("unlock: every in-build biome's unlock item can wash up in its own tile, and only there", function()
 	local Beach = h.require("Shared/Beach")
 	local Biomes = h.require("Shared/Biomes")
@@ -3259,7 +3276,10 @@ test("unlock: every in-build biome's unlock item can wash up in its own tile, an
 	local z = Beach.tileRange(tile) + 100
 	local zoneIndex = Beach.zoneAt(z) :: number
 	local chance, exotic = Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance
+	local maxOnMap = Config.Unlocks.MaxOnMap
 	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = 1, 1
+	-- (Earlier tests may have left one on the map, which would stop another spawning.)
+	Config.Unlocks.MaxOnMap = math.huge
 	for id, biome in Biomes.List do
 		workspace:SetAttribute(Biomes.attributeFor(tile), id)
 		local def = ItemService._chooseDef(zoneIndex, z, nil, 1)
@@ -3269,6 +3289,7 @@ test("unlock: every in-build biome's unlock item can wash up in its own tile, an
 		)
 	end
 	workspace:SetAttribute(Biomes.attributeFor(tile), nil)
+	Config.Unlocks.MaxOnMap = maxOnMap
 	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = chance, exotic
 end)
 
@@ -3566,9 +3587,9 @@ test("bot buying rule picks the best income per price, and rebirths first", func
 		)
 		assert(pick.Price <= coins, "affordable")
 	end
-	-- 250 coins can only buy a wheelbarrow, which is the best buy then.
+	-- The wheelbarrow's price can only buy a wheelbarrow, which is the best buy then.
 	state = Economy.newState()
-	state.Coins = 250
+	state.Coins = (h.require("Shared/Gear").getVessel("Wheelbarrow") :: any).Price
 	assert(Economy.nextPurchase(state).Id == "Wheelbarrow", "the wheelbarrow first")
 	assert(Economy.buy(state, Economy.nextPurchase(state)) and state.Coins == 0, "buying spends the price")
 	-- Rebirth: as soon as it's affordable, resets coins and shop gear, adds a pick.

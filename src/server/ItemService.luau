@@ -17,6 +17,7 @@ local Palette = require(Shared.Palette)
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 local Biomes = require(Shared.Biomes)
+local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
 local Layouts = require(Shared.Layouts)
 local Tide = require(Shared.Tide)
@@ -303,7 +304,7 @@ end
 -- What washes up at a point in a zone: a biome's secret unlock item or own loot sometimes,
 -- the sky-beam item on the Far Sandbar, else an item of the zone's rarity (the rarest of
 -- `rarityRolls` rolls). `heavy` keeps to heavy (true) or lighter (false) items, nil for any.
-local function chooseDef(zoneIndex: number, z: number, heavy: boolean?, rarityRolls: number)
+local function chooseDef(zoneIndex: number, z: number, heavy: boolean?, rarityRolls: number, light: boolean?)
 	local biome = Biomes.activeIn(Beach.tileAt(z))
 	local def
 	-- Private servers scale rare spawns down with the player count (MonetizationService).
@@ -335,11 +336,20 @@ local function chooseDef(zoneIndex: number, z: number, heavy: boolean?, rarityRo
 	if not def then
 		local rarity = rollRarity(Items.scaleRare(Config.Zones[zoneIndex].Rarity, rareScale), rarityRolls)
 		local choices = {}
-		for _, candidate in Items.ofRarity(rarity) do
-			-- Only heavy items in the deeper spots, only lighter ones in the shallows.
-			if heavy == nil or (candidate.Class >= 3) == heavy then
-				table.insert(choices, candidate)
+		local function gather(onlyLight: boolean?)
+			for _, candidate in Items.ofRarity(rarity) do
+				-- Only heavy items in the deeper spots, only lighter ones in the shallows.
+				if
+					(heavy == nil or (candidate.Class >= 3) == heavy)
+					and (not onlyLight or candidate.Class == Gear.WeightClass.Light)
+				then
+					table.insert(choices, candidate)
+				end
 			end
+		end
+		gather(light)
+		if #choices == 0 and light then
+			gather(false) -- no light item of that rarity: any lighter one
 		end
 		if #choices == 0 then
 			return nil
@@ -351,12 +361,14 @@ end
 
 ItemService._chooseDef = chooseDef -- for tools/tests
 
+local HEAVY_SHARE = 0.3 -- the share of surf spawns that are heavy, where a zone doesn't say
+
 -- Washes one item up somewhere in the surf around the current waterline. The zone (and so
 -- the value and rarity) comes from where it lands, so low tide brings richer loot.
 function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
 	local beach = Config.Beach
 	-- Heavy things sit out in deeper water; lighter ones anywhere from the wet sand out.
-	local heavy = rng:NextNumber() < 0.3
+	local heavy = rng:NextNumber() < HEAVY_SHARE
 	local x, z
 	for _ = 1, 6 do
 		local depth = if heavy
@@ -376,7 +388,18 @@ function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
 	if not zoneIndex or zoneIndex < 1 then
 		return nil
 	end
-	local def = chooseDef(zoneIndex, z, heavy, 1)
+	-- The zone's own mix (Config.Zones: HeavyShare, LightShare). Where the item lies was picked
+	-- for the most heavy things any zone has; a zone with fewer turns some into lighter ones.
+	local zone = Config.Zones[zoneIndex]
+	local heavyShare = zone.HeavyShare or HEAVY_SHARE
+	if heavy and rng:NextNumber() >= heavyShare / HEAVY_SHARE then
+		heavy = false
+	end
+	local light = nil
+	if not heavy and zone.LightShare then
+		light = rng:NextNumber() < zone.LightShare / (1 - heavyShare)
+	end
+	local def = chooseDef(zoneIndex, z, heavy, 1, light)
 	if not def then
 		return nil
 	end

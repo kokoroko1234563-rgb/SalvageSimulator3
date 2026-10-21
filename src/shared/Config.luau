@@ -113,18 +113,32 @@ Config.Beach = {
 -- they make the walk down about 7 minutes, with wading, waves and wrong turns: the lower
 -- zones are slower, more maze-like ground.
 Config.Zones = {
-	{ Name = "Shopside Shore", Multiplier = 1, CrossTime = 35, Rarity = { Common = 90, Uncommon = 10 } },
+	-- HeavyShare: the share of surf spawns that are heavy (out in deeper water; 0.3 if not
+	-- set). LightShare: the share that are light, the rest medium (if not set, light and
+	-- medium are equally likely). The first zones favour light things, which bare hands lift.
+	{
+		Name = "Shopside Shore",
+		Multiplier = 1,
+		CrossTime = 35,
+		Rarity = { Common = 90, Uncommon = 10 },
+		HeavyShare = 0.03,
+		LightShare = 0.9,
+	},
 	{
 		Name = "Sunny Stretch",
 		Multiplier = 2,
 		CrossTime = 36,
 		Rarity = { Common = 70, Uncommon = 25, Rare = 5 },
+		HeavyShare = 0.08,
+		LightShare = 0.75,
 	},
 	{
 		Name = "Middle Banks",
 		Multiplier = 4,
 		CrossTime = 38,
 		Rarity = { Common = 50, Uncommon = 32, Rare = 15, VeryRare = 3 },
+		HeavyShare = 0.15,
+		LightShare = 0.55,
 	},
 	{
 		Name = "Outer Shore",
