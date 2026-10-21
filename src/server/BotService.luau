@@ -630,7 +630,9 @@ local function stagingPoint(bot: Bot): (number, number)
 	local z = bot.Z
 	for _ = 1, 3 do
 		local eta = math.sqrt((x - bot.X) ^ 2 + (z - bot.Z) ^ 2) * BotEconomy.MazeFactor / speed
-		z = Tide.waterlineAt({ Now = t + eta }, x) - 8
+		-- (Further up the beach while the sea comes in: it gains on a bot standing at its edge.)
+		local margin = if Tide.getState(t).Phase == "In" then 30 else 8
+		z = Tide.waterlineAt({ Now = t + eta }, x) - margin
 	end
 	local top, bottom = 0, Beach.Depth - 20
 	if bot.Trip then
