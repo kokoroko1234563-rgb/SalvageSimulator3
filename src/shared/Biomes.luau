@@ -266,13 +266,6 @@ Biomes.List = {
 		Rewards = { "FrostSled", "FreezeWand" },
 		Variant = "Frosted",
 	},
-}
-
--- The doc's other biomes, written down so their items exist and point somewhere. They don't
--- roll yet: each needs its decor, entrance, secret course and hazard built first. Moving one
--- into Biomes.List (with those) is what turns it on. Coin = the normal secret's colored coin;
--- Rewards = the exotic secret's lootbox (all in Gear); Variant = its rare cosmetic variant.
-Biomes.Planned = {
 	SpearstoneReef = {
 		Id = "SpearstoneReef",
 		Zones = { [4] = 10, [5] = 10, [6] = 10 },
@@ -289,6 +282,12 @@ Biomes.Planned = {
 		Rewards = { "TidewalkerBoots" },
 	},
 	JellyfishLagoon = {
+		Id = "JellyfishLagoon",
+		Zones = { [2] = 12, [3] = 12, [4] = 14, [5] = 14, [6] = 14 },
+		Loot = {},
+		LootShare = 0,
+		Decor = Color3.fromRGB(190, 150, 230),
+		Hazards = { { Type = "Jelly", Scatter = false } },
 		Name = "Jellyfish Lagoon",
 		Tier = "Uncommon",
 		UnlockItem = "JellyJar",
@@ -301,6 +300,13 @@ Biomes.Planned = {
 		},
 		Rewards = { "JellyRaft", "GlowPearl" },
 	},
+}
+
+-- The doc's other biomes, written down so their items exist and point somewhere. They don't
+-- roll yet: each needs its decor, entrance, secret course and hazard built first. Moving one
+-- into Biomes.List (with those) is what turns it on. Coin = the normal secret's colored coin;
+-- Rewards = the exotic secret's lootbox (all in Gear); Variant = its rare cosmetic variant.
+Biomes.Planned = {
 	SeaGlassShore = {
 		Name = "Sea-Glass Shore",
 		Tier = "VeryRare",

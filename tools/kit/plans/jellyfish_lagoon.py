@@ -5,7 +5,7 @@ jellyfish. Jellies drift in the water (`Path`) and lie stranded on the sand and 
 sting area): a sting drops what you hold and does damage; from zone 5 it stuns too.
 
 Run it with the quick check, once per zone:
-    python3 tools/kit/quick.py 2 Biomes/Planned/JellyfishLagoon --plan tools/kit/plans/jellyfish_lagoon.py
+    python3 tools/kit/quick.py 2 Biomes/JellyfishLagoon --plan tools/kit/plans/jellyfish_lagoon.py
 
 Zones 2 and 3 are open shore (no walls, no rock; banks no taller than the zone allows, 5 and 7):
   the lagoon is a hollow (deeper on its seaward side, so it floods from there first) ringed by a
@@ -30,7 +30,7 @@ import math
 
 from kit import Zone, write_zones, segment_box, rounded
 
-OUT = "src/shared/Layouts/Biomes/Planned/JellyfishLagoon.luau"
+OUT = "src/shared/Layouts/Biomes/JellyfishLagoon.luau"
 NAME = "Jellyfish Lagoon"
 MUD = "Mud"
 SAND = "Sand"
@@ -87,7 +87,7 @@ def shore(n, bank, hollow_depth):
         f.hollow((x, 315), radius=88, depth=hollow_depth - 1, rough=3, material=MUD)
         f.hollow((x * 0.85, 395), radius=84, depth=hollow_depth, rough=3, material=MUD)
     # Its ring of sand: wide enough that carts must go round it.
-    ring = ellipse(cx, cz, 250, 190, 28)
+    ring = ellipse(cx, cz, 250, 176, 28)  # clear of the pier (x 40, z 0 to 150)
     f.ridge(closed(ring), height=bank, width=16, rock=False, rough=1)
     # Two causeways across, north to south: one with a ford cut in it (foot only).
     f.ridge([(-70, 165), (-72, 340), (-70, 515)], height=bank - 0.6, width=16, rough=0)
@@ -168,7 +168,12 @@ def lagoon_hall(z, cz, rz, roof, pillars):
         f.hollow((x, cz + 15), radius=r, depth=4, rough=2, material=MUD)
     f.paint(poly, SAND)
     if roof:
-        f.roof_area(poly)
+        # `roof` is True (the kit's default roof) or (clearance, thickness). The zone 5 roof is
+        # low and thick, flush with the rock round it: the terrain draws a thin roof's underside
+        # up to 2.9 studs off, a thick one true.
+        f.roof_area(poly) if roof is True else f.roof_area(poly, roof[0])
+        if roof is not True:
+            f.primitives[-1]["Thickness"] = roof[1]
     f.decor("Weed", area=box(0, cz, 300, rz * 1.4), count=12)
     f.decor(GLOW, area=box(0, cz, 300, rz * 1.4), count=8)
     f.decor("Shells", area=box(0, cz, 2 * RX - 20, rz * 1.8), count=6)
@@ -297,7 +302,7 @@ def zone4():
 
 
 def zone5():
-    return walled(5, 18, True, 340, 150, {"p1": (2, 1), "p2": (2, 0), "p3": (2, 1)}, 10,
+    return walled(5, 18, (10, 8), 340, 150, {"p1": (2, 1), "p2": (2, 0), "p3": (2, 1)}, 10,
                   (tell_a, tell_a), -325)
 
 
@@ -306,7 +311,7 @@ def zone6():
                   (tell_a, tell_a), -325)
 
 
-COMMENT = ("-- Jellyfish Lagoon (planned): drawn with the layout kit from tools/kit/plans/jellyfish_lagoon.py\n"
+COMMENT = ("-- Jellyfish Lagoon: drawn with the layout kit from tools/kit/plans/jellyfish_lagoon.py\n"
            "-- (edit the plan and re-run it, not this file). The card: docs/design/cards/jellyfish-lagoon.md.")
 if __name__ == "__main__":
     write_zones(OUT, [zone2(), zone3(), zone4(), zone5(), zone6()], COMMENT)

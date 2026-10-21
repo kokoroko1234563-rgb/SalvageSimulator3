@@ -521,6 +521,28 @@ return {
 					},
 					{ Kind = "Flat", At = { 0, 304 }, Radius = 6 },
 					{ Kind = "Flat", At = { 128, 304 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -246, 156 },
+							{ -246, 304 },
+							{ -234, 304 },
+							{ -234, 156 },
+						},
+					},
+					{ Kind = "Flat", At = { -240, 156 }, Radius = 6 },
+					{ Kind = "Flat", At = { -240, 304 }, Radius = 6 },
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -254, 228 },
+							{ -226, 228 },
+						},
+						Height = 3,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
 				},
 				Decor = {
 					{ Kind = "WreckRibs", At = { 70, 8 }, Scale = 0.8, Yaw = 90 },
@@ -1064,6 +1086,28 @@ return {
 					},
 					{ Kind = "Flat", At = { 0, 304 }, Radius = 6 },
 					{ Kind = "Flat", At = { 128, 304 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -246, 156 },
+							{ -246, 304 },
+							{ -234, 304 },
+							{ -234, 156 },
+						},
+					},
+					{ Kind = "Flat", At = { -240, 156 }, Radius = 6 },
+					{ Kind = "Flat", At = { -240, 304 }, Radius = 6 },
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -254, 228 },
+							{ -226, 228 },
+						},
+						Height = 3,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
 				},
 				Decor = {
 					{ Kind = "WreckRibs", At = { 70, 8 }, Scale = 0.8, Yaw = 90 },
@@ -1779,6 +1823,28 @@ return {
 					},
 					{ Kind = "Flat", At = { 0, 304 }, Radius = 6 },
 					{ Kind = "Flat", At = { 128, 304 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -246, 156 },
+							{ -246, 304 },
+							{ -234, 304 },
+							{ -234, 156 },
+						},
+					},
+					{ Kind = "Flat", At = { -240, 156 }, Radius = 6 },
+					{ Kind = "Flat", At = { -240, 304 }, Radius = 6 },
+					{
+						Kind = "Ridge",
+						Path = {
+							{ -254, 228 },
+							{ -226, 228 },
+						},
+						Height = 3,
+						Width = 12,
+						Rough = 0,
+						Over = true,
+					},
 				},
 				Decor = {
 					{ Kind = "WreckRibs", At = { 70, 8 }, Scale = 0.8, Yaw = 90 },
