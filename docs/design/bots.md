@@ -14,7 +14,7 @@ rule), `src/shared/Routes.luau` (walkable routes), `tools/bots/` (the sweep).
   (16 studs/s, slowed by water as `Beach.wading` says, times the sweep's speed factor). Its cart, in the
   same colour, is anchored too and trails it along its own track; what it carries rides in the cart
   (in the hands, one thing, until it owns a vessel). Twenty distinct colours are in `BotService.Colors`.
-- **Real motions.** Walks out with the tide (waits just landward of the waterline while it goes out),
+- **Real motions.** Walks out with the tide (waits just landward of the waterline, following it out and back in again, so the incoming tide is still worked),
   walks to an item, claims it, loads it, walks back, sells at the buyer, walks to the shopkeeper to buy
   gear or rebirth.
 - **Routes.** `Routes` is a lazily filled grid (4 studs) over `Beach.shapeAt`, so it follows the active

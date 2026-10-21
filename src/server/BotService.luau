@@ -667,9 +667,11 @@ function decide(bot: Bot)
 		return
 	end
 	local t = now()
-	-- Nothing to take: walk out with the tide while it's going out (or low), as long as the way
-	-- back stays open for a minute longer than it needs to; otherwise wait where it's safe.
-	if not bot.Finished and Tide.getState(t).Phase ~= "In" then
+	-- Nothing to take: wait at the waterline in the bot's own stretch, following the sea out and
+	-- back in again (as it comes in, what it washes up lands in the earlier zones, still worth
+	-- working), as long as the way back stays open for a minute longer than it needs to;
+	-- otherwise wait where it's safe.
+	if not bot.Finished then
 		local sx, sz = stagingPoint(bot)
 		if math.sqrt((sx - bot.X) ^ 2 + (sz - bot.Z) ^ 2) > 40 then
 			local out, outLength = routeTo(bot, sx, sz, 8)
