@@ -49,6 +49,16 @@ rule), `src/shared/Routes.luau` (walkable routes), `tools/bots/` (the sweep).
   together may use about 3 ms of a frame; searches are bounded by the distance. The sweep reports the
   worst Heartbeat and bot work time.
 
+- **Tide safety.** Routes assume a slower bot (0.7 of its speed) and keep 1 stud short of waist depth (wading
+  is slow); a bot only sets out for an item if the way home would still be open 40 game seconds after
+  it got there (double while the sea is coming in, 1.5x with a load). If no route keeps those margins the
+  way home falls back to looser ones, then to the shortest way. A bot with gear that reaches heavier
+  or deeper items goes anywhere along the beach for them; the stretch is for the cheap shallow finds.
+  A trip bot sets out once the tide is 40% out and plans with the looser margins.
+- **Crowds.** `Config.Items.CrowdSpawn = { Players = 20, Scale = 3 }`: the shallow, light surf spawns
+  (and their share of `MaxSurfItems`) grow linearly with the players on the server, bots counted, to
+  Scale times a solo server's. Heavy and deep spawns don't change. `--scale` on the sweep sets Scale.
+
 ## One buying rule, for every bot
 
 1. Rebirth as soon as it can be afforded, taking the reward after which its estimated income is highest.

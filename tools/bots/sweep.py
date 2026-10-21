@@ -92,7 +92,7 @@ def run_task(job):
     messages = [m for entry in logs.get("luauExecutionSessionTaskLogs", []) for m in entry.get("messages", [])]
     if task.get("state") != "COMPLETE":
         print("\n".join(messages[-30:]))
-        sys.exit(f"the task failed in the engine: {json.dumps(task.get('error'))}")
+        raise RuntimeError(f"the task failed in the engine: {json.dumps(task.get('error'))}")
     result = json.loads(task["output"]["results"][0])
     result["logs"] = [m for m in messages if "BotService" in m][-20:]
     return result
@@ -319,7 +319,7 @@ def main():
 
     jobs = []
     if args.final_trip:
-        jobs.append(("final_trip", {"finalTrip": True, "speed": args.speed, "seconds": args.seconds,
+        jobs.append(("final_trip" + (f"_{args.tag}" if args.tag else ""), {"finalTrip": True, "speed": args.speed, "seconds": args.seconds,
                                     "zone": 6, "tool": "BoatHook", "vessel": "Wheelbarrow"}))
     else:
         for x in [int(v) for v in args.xs.split(",")]:
@@ -339,7 +339,11 @@ def main():
             publish()
         for name, job in jobs:
             print(f"== {name}: {json.dumps(job)}")
-            result = run_task(job)
+            try:
+                result = run_task(job)
+            except RuntimeError as error:
+                print(f"{name}: {error} (skipped)")
+                continue
             with open(os.path.join(OUT, name + ".json"), "w") as f:
                 json.dump(result, f, indent=1)
             print("\n".join(result.get("report", [])))

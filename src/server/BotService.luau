@@ -405,7 +405,7 @@ end
 -- How many node expansions a search over this distance may take before it is given up as hopeless.
 local function nodeBound(ax: number, az: number, bx: number, bz: number): number
 	local cells = math.sqrt((ax - bx) ^ 2 + (az - bz) ^ 2) / Routes.STEP
-	return math.clamp(math.floor(2000 + 60 * cells), 2000, 60000)
+	return math.clamp(math.floor(2000 + 150 * cells), 2000, 150000)
 end
 
 -- A route from the bot's spot to (x, z), through the shop's flat ground at either end. Nil if
@@ -417,16 +417,20 @@ local function routeTo(
 	radius: number?,
 	from: { x: number, z: number }?,
 	delay: number?,
-	loose: boolean?
+	loose: boolean?,
+	ignoreTide: boolean?
 ): ({ any }?, number?)
 	local start = from or { x = bot.X, z = bot.Z }
+	-- (A trip bot is a measurement of what one trip can earn, at the pace the tide allows: it
+	-- plans with the second try's margins, which the zone 6 round trip needs.)
+	loose = loose or bot.Trip ~= nil
 	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor * (if loose then LOOSE_SPEED else SAFE_SPEED)
 	local cart = BotEconomy.cartSize(bot.State)
 	local limit = Config.Beach.WaistDepth - (if loose then LOOSE_MARGIN else DEPTH_MARGIN)
 	local options = {
 		slope = if cart then Config.Beach.Terrain.CartSlope else Config.Beach.Terrain.FootSlope,
 		cart = cart,
-		blocked = waterBlocker(speed, limit, delay or 0),
+		blocked = if ignoreTide then nil else waterBlocker(speed, limit, delay or 0),
 		radius = radius,
 		maxNodes = nodeBound(start.x, start.z, x, z),
 		yield = yieldFor(bot),
@@ -591,6 +595,9 @@ end
 
 -- Real seconds of slack to leave the way home: more while the sea is coming in, more with a load.
 local function tideSlack(bot: Bot): number
+	if bot.Trip then
+		return 0
+	end
 	local game = TIDE_SLACK
 	if Tide.getState(now()).Phase == "In" then
 		game *= 2
@@ -665,7 +672,27 @@ local function stagingPoint(bot: Bot): (number, number)
 		local z0, z1 = Beach.zoneRange(bot.Trip.Zone)
 		top, bottom = z0 + 10, z1 - 20
 	end
-	return x, math.clamp(z, top, bottom)
+	z = math.clamp(z, top, bottom)
+	-- Not inside a wall: the nearest open ground.
+	local col, row = grid:cellOf(x, z)
+	for radius = 0, 25 do
+		for dc = -radius, radius do
+			for dr = -radius, radius do
+				if
+					math.max(math.abs(dc), math.abs(dr)) == radius
+					and col + dc >= 0
+					and col + dc < grid.cols
+					and row + dr >= 0
+					and row + dr < grid.rows
+					and not grid:isRock(col + dc, row + dr)
+				then
+					local ox, oz = grid:centerOf(col + dc, row + dr)
+					return ox, math.clamp(oz, top, bottom)
+				end
+			end
+		end
+	end
+	return x, z
 end
 
 function decide(bot: Bot)
@@ -702,7 +729,25 @@ function decide(bot: Bot)
 	if not bot.Finished then
 		local sx, sz = stagingPoint(bot)
 		if math.sqrt((sx - bot.X) ^ 2 + (sz - bot.Z) ^ 2) > 40 then
-			local out, outLength = routeTo(bot, sx, sz, 8)
+			-- (The trip bot sets out once the tide is well on its way out, so it trails the waterline
+			-- all the way: its outbound leg needn't look at the water.)
+			local state = Tide.getState(t)
+			local tripReady = state.Phase ~= "Out" or state.PhaseProgress >= 0.4
+			local out, outLength
+			if not bot.Trip or tripReady then
+				out, outLength = routeTo(bot, sx, sz, 8, nil, nil, nil, bot.Trip ~= nil)
+			end
+			if bot.Trip then
+				bot.Trip.Diag = string.format(
+					"stage (%.0f, %.0f) from (%.0f, %.0f): out %s %.0f",
+					sx,
+					sz,
+					bot.X,
+					bot.Z,
+					tostring(out ~= nil),
+					outLength or -1
+				)
+			end
 			if out then
 				local walk = BotEconomy.walkSpeed(bot.State) * speedFactor * SAFE_SPEED
 				local back = routeTo(
@@ -711,8 +756,17 @@ function decide(bot: Bot)
 					HOME.z,
 					6,
 					{ x = out[#out].x, z = out[#out].z },
-					(outLength or 0) / walk + 60 / speedFactor
+					(outLength or 0) / walk + (if bot.Trip then 0 else 60) / speedFactor
 				)
+				if bot.Trip then
+					bot.Trip.Diag = string.format(
+						"%s, back %s (tide %s %.0f%%)",
+						bot.Trip.Diag,
+						tostring(back ~= nil),
+						Tide.getState(t).Phase,
+						Tide.getState(t).PhaseProgress * 100
+					)
+				end
 				if back then
 					setStatus(bot, "walking out")
 					beginPath(bot, out, "Stage")
