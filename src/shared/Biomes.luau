@@ -1,7 +1,10 @@
 -- Biomes. Each tide cycle every tile of the beach rolls a biome (or none). The server stores
 -- the result on Workspace attributes ("TileBiome1", ...) so every client sees the same thing.
--- So far: Sandcastle Flats (common, normal secret) and Shipwreck Shallows (rare, exotic
--- secret). The rest of the doc's biomes slot in here.
+-- Every biome of the initial build is here, and every one has a secret: its unlock item washes
+-- up on the beach, its opening stands in the biome (Entrance, built by BiomeService where its
+-- layout's Entrances say), and using the item there leads into the secret (src/shared/Secrets).
+-- Sandcastle Flats and Shipwreck Shallows lead into flooding courses; each of the other ten
+-- into a small room with a chest. Sea-Glass Shore and Black Sand Vents wait in Planned.
 
 local Workspace = game:GetService("Workspace")
 
@@ -13,8 +16,11 @@ local Biomes = {}
 --                Config.Biomes.Chance). Each biome turns up at most once a tide.
 --   Loot, LootShare  the zone's surf spawns: this share comes from Loot.
 --   Hazards      a list of hazard entries (see Hazards.luau): { Type = "Patrol", ... }.
---   Secret, UnlockItem, Entrance, EntranceSpots  its secret and the entrance to it. A biome
---                without a Secret has no entrance (its secret isn't built yet).
+--   Secret, UnlockItem, Entrance, EntranceName, EntranceSpots  its secret, the entrance to it
+--                (the name of its builder in BiomeService), what the opening's prompt calls it,
+--                and spots across the tile to fall back on if the layout names none (the layouts
+--                do: their Entrances put each opening in a far-off room). A biome without a
+--                Secret has no entrance.
 --   Scenery      which decor builder dresses it (BiomeService); without one, it's scattered
 --                with mounds in its Decor colour.
 --   Look         how it looks over its zone: its ground, rock, fog and light (see Looks.luau).
@@ -31,6 +37,7 @@ Biomes.List = {
 		Secret = "SandcastleFlats",
 		EntranceSpots = { -110, -40, 40, 110 }, -- X positions the secret's sandcastle can stand at
 		Entrance = "Sandcastle",
+		EntranceName = "Sandcastle door",
 		Scenery = "Sandcastle",
 		Decor = Color3.fromRGB(230, 200, 140),
 		-- Bright, warm and clear: a holiday in the sun.
@@ -55,6 +62,7 @@ Biomes.List = {
 		Secret = "ShipwreckShallows",
 		EntranceSpots = { -100, -20, 60, 120 },
 		Entrance = "Wreck",
+		EntranceName = "Ship's hatch",
 		Scenery = "Wreck",
 		-- Barrels roll down the sand on a fixed timer: getting hit knocks what you hold out of
 		-- your hands. Learnable, so a hit feels like a mistake.
@@ -88,7 +96,10 @@ Biomes.List = {
 		Zones = { [4] = 8, [5] = 12, [6] = 15 },
 		Loot = { "BigShell" },
 		LootShare = 0.5,
-		UnlockItem = "SpiralConch", -- (its secret isn't built yet, so it has no entrance)
+		UnlockItem = "SpiralConch",
+		Secret = "HermitHollows",
+		Entrance = "Burrow",
+		EntranceName = "Shell burrow",
 		-- Hermit crabs patrol the maze's corridors: run into one and you're knocked flat. The giant
 		-- one hunts down the longest of them.
 		Hazards = {
@@ -133,7 +144,9 @@ Biomes.List = {
 		Tier = "Common",
 		Loot = { "Plank", "Rope", "GlassBottle", "OldBoot" },
 		UnlockItem = "CarvedIdol",
-		Entrance = "Hollow beached tree trunk",
+		Secret = "DriftwoodCove",
+		Entrance = "Trunk",
+		EntranceName = "Hollow trunk",
 		Coin = "Orange",
 		Look = { Haze = Color3.fromRGB(225, 190, 150), Tint = Color3.fromRGB(255, 235, 210), Mix = 0.4 },
 	},
@@ -163,7 +176,9 @@ Biomes.List = {
 		Tier = "Common",
 		Loot = { "Seashell", "Starfish", "FishingLure" },
 		UnlockItem = "PearlEyedShell",
-		Entrance = "Blowhole in the rocks",
+		Secret = "TidepoolRocks",
+		Entrance = "Blowhole",
+		EntranceName = "Blowhole",
 		Coin = "Blue",
 		Look = { Rock = "Slate", Haze = Color3.fromRGB(160, 205, 230), Saturation = 0.1, Mix = 0.4 },
 	},
@@ -178,7 +193,9 @@ Biomes.List = {
 		Tier = "Common",
 		Loot = { "Buoy", "Net", "GlassFloat" },
 		UnlockItem = "BarnacledLantern",
-		Entrance = "Under a collapsed jetty",
+		Secret = "SeagrassShallows",
+		Entrance = "Jetty",
+		EntranceName = "Collapsed jetty",
 		Coin = "Green",
 		Look = {
 			Floor = "LeafyGrass",
@@ -198,7 +215,9 @@ Biomes.List = {
 		Tier = "Common",
 		Loot = { "Coral", "Snorkel", "Coconut" },
 		UnlockItem = "CoralComb",
-		Entrance = "Arch in the reef",
+		Secret = "CoralGarden",
+		Entrance = "ReefArch",
+		EntranceName = "Reef arch",
 		Coin = "Pink",
 		Look = {
 			Haze = Color3.fromRGB(240, 175, 190),
@@ -218,6 +237,9 @@ Biomes.List = {
 		Name = "Fog Bank",
 		Tier = "Uncommon",
 		UnlockItem = "LighthouseKey",
+		Secret = "FogBank",
+		Entrance = "Lighthouse",
+		EntranceName = "Lighthouse door",
 		Hazard = "Thick fog, cleared briefly by a foghorn pulse",
 		Look = { Fog = 0.3, Haze = Color3.fromRGB(215, 220, 225), Saturation = -0.25, Mix = 0.8 },
 		Rewards = { "LanternOfClearSight", "Foghorn" },
@@ -233,6 +255,9 @@ Biomes.List = {
 		Name = "Whirlwind Dunes",
 		Tier = "Rare",
 		UnlockItem = "WindChime",
+		Secret = "WhirlwindDunes",
+		Entrance = "DuneArch",
+		EntranceName = "Wind-carved arch",
 		Hazard = "Tornado circling the zone",
 		Look = {
 			Floor = "Sand",
@@ -254,6 +279,9 @@ Biomes.List = {
 		Tier = "VeryRare",
 		Loot = { "FrozenFish" },
 		UnlockItem = "FrozenCompass",
+		Secret = "StrandedIceberg",
+		Entrance = "IceCave",
+		EntranceName = "Ice cave",
 		Hazard = "Slippery ice: vessels slide and spill",
 		Look = {
 			Floor = "Snow",
@@ -277,6 +305,9 @@ Biomes.List = {
 		Name = "Spearstone Reef",
 		Tier = "Rare",
 		UnlockItem = "SpearstoneShard",
+		Secret = "SpearstoneReef",
+		Entrance = "Cleft",
+		EntranceName = "Spearstone cleft",
 		Hazard = "Spears shooting from the floor on a timer",
 		Look = { Rock = "Basalt", Haze = Color3.fromRGB(120, 150, 170), Contrast = 0.12, Mix = 0.5 },
 		Rewards = { "TidewalkerBoots" },
@@ -291,6 +322,9 @@ Biomes.List = {
 		Name = "Jellyfish Lagoon",
 		Tier = "Uncommon",
 		UnlockItem = "JellyJar",
+		Secret = "JellyfishLagoon",
+		Entrance = "Grotto",
+		EntranceName = "Glowing grotto",
 		Hazard = "Jellyfish: a sting drops what you hold",
 		Look = {
 			Haze = Color3.fromRGB(170, 140, 220),

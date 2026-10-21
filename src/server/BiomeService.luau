@@ -182,9 +182,11 @@ local function buildEntrance(tileFolder: Folder, biome, tile: number)
 	if #spots > 0 then
 		local spot = spots[rng:NextInteger(1, #spots)]
 		x, z = spot.X, spot.Y
-	else
+	elseif biome.EntranceSpots and #biome.EntranceSpots > 0 then
 		x = biome.EntranceSpots[rng:NextInteger(1, #biome.EntranceSpots)]
 		z = startZ + 30 -- where the layouts keep the spots flat
+	else
+		return -- the layout names no spot and the biome has no fallback: no opening here
 	end
 	local groundY = Beach.groundAt(x, z)
 	local model = Instance.new("Model")
@@ -195,7 +197,7 @@ local function buildEntrance(tileFolder: Folder, biome, tile: number)
 	local unlock = Items.get(biome.UnlockItem)
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Use " .. unlock.Name
-	prompt.ObjectText = if biome.Entrance == "Wreck" then "Ship's hatch" else "Sandcastle door"
+	prompt.ObjectText = biome.EntranceName
 	prompt.HoldDuration = 0.5
 	prompt.MaxActivationDistance = 10
 	prompt.RequiresLineOfSight = false

@@ -361,7 +361,7 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 				Secrets.List[biome.Secret] ~= nil,
 				where .. ": secret " .. tostring(biome.Secret) .. " doesn't exist"
 			)
-			check(#(biome.EntranceSpots or {}) > 0, where .. ": needs at least one entrance spot")
+			check(type(biome.EntranceName) == "string", where .. ": needs an EntranceName for the prompt")
 			if extra and extra.Entrances then
 				check(
 					extra.Entrances[biome.Entrance] ~= nil,
