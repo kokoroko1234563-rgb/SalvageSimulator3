@@ -317,8 +317,7 @@ class Part:
         p = {"Kind": "Wall", "Area": rounded(area), "Height": height or self.zone.rock or 14}
         if material:
             p["Material"] = material
-        self.primitives.append(p)
-        return self
+        return self._over(p)
 
     def ridge(self, points, height=4, width=16, rock=False, rough=3):
         p = {"Kind": "Ridge", "Path": rounded(points), "Height": height, "Width": width, "Rough": rough}
