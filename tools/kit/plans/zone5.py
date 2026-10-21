@@ -179,7 +179,7 @@ for cz in COURTS_E:
 # the south-west and the last ford at bar 4. Dry (the cart's): the top rows winding east and
 # west, the east gap, then two rows in the south-east. The Grotto is open on the west.
 c = z.crossing("Mussel run", paths=2)
-dry_way(c, [(RC, 12), (RC, 52), (-112, 52), (-112, 92), (RC, 92), (RC, 144), (-112, 144), (-112, 184),
+dry_way(c, [(RC, 0), (RC, 52), (-112, 52), (-112, 92), (RC, 92), (RC, 144), (-112, 144), (-112, 184),
             (RC, 184), (RC, 392), (40, 392), (40, 432), (RC, 432), (RC, 608)])
 wet_way(c, [(-60, 12), (-60, 52), (-COL, 52), (-COL, 392), (-40, 392), (-40, 432), (-COL, 432),
             (-COL, 472), (-40, 472), (-40, 516), (-COL, 516), (-COL, 608)])
@@ -199,7 +199,7 @@ c.decor("Chain", path=[(-160, 8), (-136, 8)], count=2)
 # Dry (the cart's): straight down the west gap, then five long rows in the south. The Grotto is
 # open on the east.
 c = z.crossing("Reed bank", paths=2)
-dry_way(c, [(-RC, 12), (-RC, 392), (70, 392), (70, 432), (-RC, 432), (-RC, 472), (70, 472),
+dry_way(c, [(-RC, 0), (-RC, 392), (70, 392), (70, 432), (-RC, 432), (-RC, 472), (70, 472),
             (70, 516), (-RC, 516), (-RC, 556), (70, 556), (70, 608)])
 wet_way(c, [(20, 12), (20, 52), (COL, 52), (COL, 92), (20, 92), (20, 144), (COL, 144), (COL, 184),
             (20, 184), (20, 224), (COL, 224), (COL, 420), (112, 420), (112, 460), (COL, 460), (COL, 608)])
@@ -218,7 +218,7 @@ c.decor("Chain", path=[(-156, 14), (-140, 8)], count=2)
 # top, then straight down through the Grotto (a rift in its roof). A third, dry foot lane down
 # the east gap, with a runnel, and runs in the south-east.
 c = z.crossing("Three lanes", paths=3)
-dry_way(c, [(-112, 12), (-112, 52), (112, 52), (112, 92), (-112, 92), (-112, 144), (112, 144),
+dry_way(c, [(-112, 0), (-112, 52), (112, 52), (112, 92), (-112, 92), (-112, 144), (112, 144),
             (112, 184), (-112, 184), (-112, 224), (0, 224), (0, 608)])
 wet_way(c, [(-COL, 12), (-COL, 392), (-40, 392), (-40, 432), (-COL, 432),
             (-COL, 472), (-40, 472), (-40, 516), (-COL, 516), (-COL, 608)])
@@ -239,7 +239,7 @@ c.decor("GlowShells", at=(8, 14))
 # cart passes), then straight down. Two rubble scrambles shortcut the rows on foot; the gaps
 # beside the Grotto are rock. The courts are reached from the rows and the Grotto's doors.
 c = z.crossing("The Grotto way", paths=1)
-dry_way(c, [(-112, 12), (-112, 52), (112, 52), (112, 92), (-112, 92), (-112, 144), (112, 144),
+dry_way(c, [(-112, 0), (-112, 52), (112, 52), (112, 92), (-112, 92), (-112, 144), (112, 144),
             (112, 184), (-112, 184), (-112, 224), (0, 224), (0, 608)])
 scramble(c, (0, 52), (0, 92))
 scramble(c, (0, 144), (0, 184))
@@ -257,7 +257,7 @@ c.decor("LanternPost", at=(12, 8))
 # Wet: the west edge, three runs at the top and two at the bottom. Dry (the cart's): the east,
 # four rows at the top and four at the bottom. The Grotto is open on the east.
 c = z.crossing("Sandbar loop", paths=2)
-dry_way(c, [(RC, 12), (RC, 52), (0, 52), (0, 92), (RC, 92), (RC, 144), (0, 144), (0, 184),
+dry_way(c, [(RC, 0), (RC, 52), (0, 52), (0, 92), (RC, 92), (RC, 144), (0, 144), (0, 184),
             (RC, 184), (RC, 392), (0, 392), (0, 432), (RC, 432), (RC, 472), (0, 472), (0, 516),
             (RC, 516), (RC, 608)])
 wet_way(c, [(-52, 12), (-52, 52), (-COL, 52), (-COL, 92), (-52, 92), (-52, 144), (-COL, 144),
