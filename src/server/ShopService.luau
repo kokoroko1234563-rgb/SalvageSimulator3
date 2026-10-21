@@ -30,6 +30,26 @@ function ShopService.nearShop(player: Player): boolean
 	return root ~= nil and (root.Position - target).Magnitude <= Config.Selling.ShopkeeperRange
 end
 
+-- What the buyer pays for items worth `value` in all (their Value attributes, which already
+-- hold the zone's multiplier): times the rebirth multiplier and any pass multiplier. Takes
+-- plain numbers, so the bots (which have no Player) are paid the same way.
+function ShopService.payout(value: number, rebirths: number, passMultiplier: number?): number
+	return math.floor(value * Rebirth.multiplier(rebirths) * (passMultiplier or 1))
+end
+
+-- A shop listing: the tool or vessel (category "Tool" or "Vessel") with this id if the shop
+-- sells it, else nil. Its Price is what the shop charges.
+function ShopService.listing(category: string, id: string)
+	if category == "Tool" then
+		local tool = Gear.getTool(id)
+		return if tool.Id == id and tool.Available then tool else nil
+	elseif category == "Vessel" then
+		local vessel = Gear.getVessel(id)
+		return if vessel and vessel.Available then vessel else nil
+	end
+	return nil
+end
+
 local function onBuy(player: Player, category: any, id: any): (boolean, string?)
 	if type(category) ~= "string" or type(id) ~= "string" then
 		return false, "Invalid"
@@ -150,10 +170,10 @@ local function sellFromPad(player: Player)
 		return
 	end
 	local profile = DataService.get(player)
-	local total = math.floor(
-		earned
-			* Rebirth.multiplier(if profile then profile.Rebirths else 0)
-			* MonetizationService.sellMultiplier(player)
+	local total = ShopService.payout(
+		earned,
+		if profile then profile.Rebirths else 0,
+		MonetizationService.sellMultiplier(player)
 	)
 	DataService.addCoins(player, total)
 	local plural = if count == 1 then "" else "s"

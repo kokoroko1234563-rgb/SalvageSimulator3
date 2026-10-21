@@ -46,30 +46,50 @@ function GrabService.forceRelease(player: Player)
 	end
 end
 
-local function grabItem(player: Player, item: BasePart, root: BasePart): (boolean, string?)
+-- The rules for lifting an item, whoever lifts it (a player or a bot): the item must be free
+-- (or already the owner's), the tool must be able to pick things up, the item within its reach
+-- of `from`, no heavier than `lift`, and no deeper in the water than the tool reaches.
+-- Returns ok, reason.
+function GrabService.canClaim(
+	item: BasePart,
+	ownerId: number,
+	tool,
+	lift: number,
+	from: Vector3
+): (boolean, string?)
 	local state = ItemService.getState(item)
 	if state == "Held" then
-		if heldBy[player] == item then
-			return true
-		end
 		return false, "Someone is already holding that"
 	end
-	if state ~= "Unclaimed" and not ItemService.isOwnedBy(item, player) then
+	if state ~= "Unclaimed" and ItemService.getOwnerId(item) ~= ownerId then
 		return false, "That belongs to someone else"
 	end
-
-	local tool = Gear.getTool(player:GetAttribute("Tool"))
 	if tool.NoGrab then
 		return false, "Your " .. tool.Name .. " can't pick things up"
 	end
-	if (item.Position - root.Position).Magnitude > tool.Reach + cfg.ReachSlack then
+	local position = item.CFrame.Position
+	if (position - from).Magnitude > tool.Reach + cfg.ReachSlack then
 		return false, "Too far away"
 	end
-	if (item:GetAttribute("Class") or 1) > Stats.lift(player, tool) then
+	if (item:GetAttribute("Class") or 1) > lift then
 		return false, "Too heavy for your " .. tool.Name
 	end
-	if state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(item.Position, Tide.sea())) then
+	if state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(position, Tide.sea())) then
 		return false, "Too deep for your " .. tool.Name
+	end
+	return true
+end
+
+local function grabItem(player: Player, item: BasePart, root: BasePart): (boolean, string?)
+	local state = ItemService.getState(item)
+	if state == "Held" and heldBy[player] == item then
+		return true
+	end
+	local tool = Gear.getTool(player:GetAttribute("Tool"))
+	local ok, reason =
+		GrabService.canClaim(item, player.UserId, tool, Stats.lift(player, tool), root.Position)
+	if not ok then
+		return false, reason
 	end
 
 	GrabService.forceRelease(player)

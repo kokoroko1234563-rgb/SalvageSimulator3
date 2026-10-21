@@ -57,11 +57,12 @@ function Stats.wadeBonus(player: Player): number
 end
 
 -- The heaviest weight class a player can lift with a tool.
+function Stats.liftWith(tool, strongBack: boolean): number
+	return math.min(tool.Lift + (if strongBack then 1 else 0), Gear.WeightClass.VeryHeavy)
+end
+
 function Stats.lift(player: Player, tool): number
-	return math.min(
-		tool.Lift + (if hasReward(player, "StrongBack") then 1 else 0),
-		Gear.WeightClass.VeryHeavy
-	)
+	return Stats.liftWith(tool, hasReward(player, "StrongBack"))
 end
 
 function Stats.grip(player: Player): number

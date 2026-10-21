@@ -39,6 +39,23 @@ local rng = Random.new()
 local destroyedCallbacks = {}
 local createdCallbacks = {}
 
+-- Server-wide counts for the bots' measurements (BotService reports them, `bots report`).
+ItemService.stats = {
+	SurfSpawned = 0, -- items washed up in the surf
+	SpotSpawned = 0, -- finds left at loot spots
+	Claimed = 0, -- free items taken by anyone (a player or a bot)
+	ClaimedByBots = 0,
+	Despawned = 0, -- items that went unclaimed: timed out, drowned, or lost to the sea
+	SpawnTicks = 0, -- spawn attempts...
+	SurfFullTicks = 0, -- ...and how many found the surf full (MaxSurfItems)
+}
+
+function ItemService.resetStats()
+	for key in ItemService.stats do
+		ItemService.stats[key] = 0
+	end
+end
+
 local function now(): number
 	return Tide.now()
 end
@@ -130,6 +147,9 @@ function ItemService.setUnclaimed(item: BasePart, timedOut: boolean)
 end
 
 function ItemService.setHeld(item: BasePart, player: Player)
+	if ItemService.getState(item) == "Unclaimed" then
+		ItemService.stats.Claimed += 1
+	end
 	loose[item] = nil
 	detachFromVessel(item)
 	item.Anchored = false
@@ -140,6 +160,31 @@ function ItemService.setHeld(item: BasePart, player: Player)
 	item:SetAttribute("Fresh", false)
 	item:SetAttribute("Since", now())
 	trySetNetworkOwner(item, player)
+end
+
+-- A bot takes a free item (bots are anchored and have no physics, so it stays anchored).
+-- `botId` is the bot's owner id: negative, so it never matches a player's UserId. Whoever asks
+-- first gets it: false if the item is no longer free.
+function ItemService.claimForBot(item: BasePart, botId: number): boolean
+	if not all[item] or ItemService.getState(item) ~= "Unclaimed" then
+		return false
+	end
+	ItemService.stats.Claimed += 1
+	ItemService.stats.ClaimedByBots += 1
+	item:SetAttribute("Owner", botId)
+	item:SetAttribute("State", "Held")
+	item:SetAttribute("Fresh", false)
+	item:SetAttribute("Since", now())
+	item.CanCollide = false
+	return true
+end
+
+-- A bot puts what it holds into its cart.
+function ItemService.setInCart(item: BasePart, cartId: string, botId: number)
+	item:SetAttribute("Owner", botId)
+	item:SetAttribute("State", "InVessel")
+	item:SetAttribute("VesselId", cartId)
+	item:SetAttribute("Since", now())
 end
 
 function ItemService.setLoose(item: BasePart)
@@ -379,6 +424,7 @@ function ItemService.settleSpots(sea: Tide.Sea, cycle: number): number
 			local def = x and chooseDef(zoneIndex, z, nil, rolls)
 			if def then
 				createItem(def, zoneIndex, Vector3.new(x, Beach.groundAt(x, z) + def.Size.Y / 2, z))
+				ItemService.stats.SpotSpawned += 1
 				spawned += 1
 			end
 		end
@@ -398,8 +444,14 @@ local function spawnTick()
 			end
 		end
 	end
+	ItemService.stats.SpawnTicks += 1
+	if inSurf >= cfg.MaxSurfItems then
+		ItemService.stats.SurfFullTicks += 1
+	end
 	if total < cfg.MaxTotal and inSurf < cfg.MaxSurfItems then
-		ItemService.spawnInSurf(sea)
+		if ItemService.spawnInSurf(sea) then
+			ItemService.stats.SurfSpawned += 1
+		end
 	end
 	if total < cfg.MaxTotal then
 		ItemService.settleSpots(sea, Tide.getState().Cycle)
@@ -423,10 +475,14 @@ local function maintenanceTick()
 			else Beach.isLost(position, sea)
 		local drowned = lostAt and (state == "Unclaimed" or state == "Loose")
 		if fellOut or drowned then
+			if state == "Unclaimed" then
+				ItemService.stats.Despawned += 1
+			end
 			ItemService.destroy(item)
 		elseif state == "Unclaimed" then
 			local lifetime = if item:GetAttribute("Fresh") then cfg.FreshLifetime else cfg.TimedOutLifetime
 			if t - since > lifetime then
+				ItemService.stats.Despawned += 1
 				ItemService.destroy(item)
 			end
 		elseif state == "Loose" then
