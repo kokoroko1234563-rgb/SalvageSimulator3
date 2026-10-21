@@ -9,9 +9,9 @@
 -- The one buying rule, for every bot: rebirth as soon as it can be afforded (taking the reward
 -- that raises income most); otherwise buy the thing that raises income most for its price,
 -- among what it can afford. "Income" is `BotEconomy.income`, the bot's own estimate of what a
--- tide's worth of work brings in with some gear: the items its tool can lift and reach in the
--- zones the tide leaves it time to work, as many per trip as its vessel carries, against the
--- walk there and back.
+-- tide's worth of work brings in with some gear: the items of the zones its tool works (every
+-- item up to the tool's tier) in the zones the tide leaves it time to work, as many per trip as
+-- its vessel carries, against the walk there and back.
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
@@ -53,12 +53,11 @@ end
 
 -- Gear -----------------------------------------------------------------------------------
 
--- The tool a bot uses: the best it owns (the most it can lift, then the deepest it reaches,
--- then the longest reach).
+-- The tool a bot uses: the best it owns (the highest tier, then the longest reach).
 function BotEconomy.tool(state: State)
 	local best = Gear.Tools[1]
 	local function rank(tool): number
-		return tool.Lift * 1e6 + tool.Depth * 1e3 + tool.Reach
+		return tool.Tier * 1e3 + tool.Reach
 	end
 	for _, tool in Gear.Tools do
 		if state.Tools[tool.Id] and not tool.NoGrab and not tool.Exotic and rank(tool) > rank(best) then
@@ -79,7 +78,7 @@ function BotEconomy.vessel(state: State)
 	return best
 end
 
--- The heaviest weight class it lifts.
+-- The highest zone tier it lifts (its tool's, one more with Strong Back).
 function BotEconomy.lift(state: State, tool): number
 	return Stats.liftWith(tool, state.Rewards.StrongBack == true)
 end
@@ -135,45 +134,37 @@ do
 end
 BotEconomy.CycleSeconds = Config.Tide.OutTime + Config.Tide.HoldTime + Config.Tide.InTime
 
--- The share of items washing up at a water depth a tool can reach: light things wash up
--- anywhere from the wet sand to waist depth, heavy ones from knee depth (ItemService).
-local function reachShare(tool, heavy: boolean): number
-	local beach = Config.Beach
-	local lo, hi = if heavy then beach.ShallowDepth else -0.3, beach.WaistDepth - 0.3
-	local limit = if tool.Depth >= Gear.Depth.Waist
-		then hi
-		elseif tool.Depth == Gear.Depth.KneeDeep then beach.KneeDepth
-		elseif tool.Depth == Gear.Depth.Shallow then beach.ShallowDepth
-		else 0
-	return math.clamp((math.min(limit, hi) - lo) / (hi - lo), 0, 1)
-end
+-- The share of the water where heavy things lie (ItemService moves them out into knee- to
+-- waist-deep water) that a bot will wade into: it keeps this far short of waist depth.
+BotEconomy.WadeMargin = 1.0
+local heavyReach = math.clamp(
+	(Config.Beach.WaistDepth - BotEconomy.WadeMargin - Config.Beach.ShallowDepth)
+		/ (Config.Beach.WaistDepth - 0.3 - Config.Beach.ShallowDepth),
+	0,
+	1
+)
 
 -- What a spawned item in zone `z` is worth to a bot, and how likely it can take it:
--- (expected value over all spawns, chance a spawn can be taken).
-local function zoneYield(z: number, lift: number, tool): (number, number)
+-- (expected value over all spawns, chance a spawn can be taken). Zone `z` washes up only items of
+-- tier `z`, so a tool that works the zone (its lift tier at least `z`) can take them all, bar the
+-- heavy things lying in water deeper than a bot wades; one that doesn't can take none.
+local function zoneYield(z: number, lift: number): (number, number)
+	if z > lift then
+		return 0, 0
+	end
 	local weights = Config.Zones[z].Rarity or {}
 	local total = 0
 	for _, w in weights do
 		total += w
 	end
 	local value, chance = 0, 0
-	for _, heavy in { false, true } do
-		local group = if heavy then 0.3 else 0.7
-		local reach = reachShare(tool, heavy)
-		for rarity, w in weights do
-			local pool = {}
-			for _, def in Items.ofRarity(rarity) do
-				if not def.Unlock and (def.Class >= 3) == heavy then
-					table.insert(pool, def)
-				end
-			end
-			for _, def in pool do
-				local share = group * (w / total) / #pool
-				if def.Class <= lift then
-					value += share * reach * def.Value * Config.Zones[z].Multiplier
-					chance += share * reach
-				end
-			end
+	for rarity, w in weights do
+		local pool = Items.ofTier(z, rarity)
+		for _, def in pool do
+			local share = (w / total) / #pool
+			local reach = if def.Class >= Gear.WeightClass.Heavy then heavyReach else 1
+			value += share * reach * def.Value * Config.Zones[z].Multiplier
+			chance += share * reach
 		end
 	end
 	return value, chance
@@ -190,7 +181,7 @@ function BotEconomy.income(state: State): number
 		local window = zoneWindow[z] * BotEconomy.CycleSeconds
 		local z0, z1 = Beach.zoneRange(z)
 		local travel = (z0 + z1) / 2 / speed * BotEconomy.MazeFactor
-		local value, chance = zoneYield(z, lift, tool)
+		local value, chance = zoneYield(z, lift)
 		if value > 0 and chance > 0 then
 			local perItem = value / chance
 			-- Filling the cart takes a while when few of what washes up can be taken.

@@ -13,7 +13,7 @@
 --     size), and never into water deeper than a player can stand in at the moment the bot would
 --     be there (the sea's level is predicted along the route from the tide).
 --   * Claims are the real ones: the item must be free in ItemService, and GrabService.canClaim
---     (the player's rules: reach, weight class, water depth) must allow it; ItemService.claimForBot
+--     (the player's rules: reach, and the zone tier its tool lifts) must allow it; ItemService.claimForBot
 --     then takes it atomically, so whoever arrives first gets it. Bots and players share the
 --     surf, the loot spots and the despawn timers. Bots own negative ids, never a UserId.
 --   * Money is the game's: ShopService.payout (Value x zone x rebirth multiplier), ShopService
@@ -22,7 +22,8 @@
 --   * One rule for every bot (BotEconomy): rebirth as soon as it can be afforded, taking the
 --     reward that raises income most; otherwise buy what raises income most for its price. It
 --     goes for the item with the best value for the time it costs (there and back), among what
---     its tool can reach and lift, whose way back the tide won't cut. It heads home when its
+--     its tool can reach and lift (every item up to the tool's tier, at any depth the bot can
+--     stand in), whose way back the tide won't cut. It heads home when its
 --     cart is full or nothing else will do; one the sea catches loses its cart load.
 --   * Measures: per bot (coins, items, trips, items lost to another bot, idle time, deaths and
 --     lost loads) and an income-per-tide log with gear, zones and bot count (for the Monte
@@ -508,8 +509,6 @@ local function goHome(bot: Bot)
 	beginPath(bot, path, "Home")
 end
 
--- Items worth a look: free, in reach of the tool, no heavier than it lifts, not ones we
--- gave up on, and for a trip bot only in its zone. Scored by value per second there and back.
 -- A bot's own stretch of the beach along X: the width is split between the bots present, in
 -- order of their numbers, so it is re-split whenever bots join or leave.
 local function stretchOf(bot: Bot): (number, number)
@@ -536,14 +535,13 @@ local function reservedItems(bot: Bot): { [BasePart]: boolean }
 	return set
 end
 
--- Items worth a look: free, not reserved by another bot, in reach of the tool, no heavier than it
--- lifts, not ones we gave up on, and for a trip bot only in its zone. Scored by value per second
+-- Items worth a look: free, not reserved by another bot, of a zone tier the tool lifts, not ones we
+-- gave up on, and for a trip bot only in its zone. Scored by value per second
 -- of the walk there and on home. Those in the bot's own stretch come first; the rest only when
 -- the stretch has nothing it can take (a bot with no cart, carrying one thing at a time, keeps to
 -- short trips then).
 local function candidates(bot: Bot): ({ any }, { any })
-	local tool = BotEconomy.tool(bot.State)
-	local lift = BotEconomy.lift(bot.State, tool)
+	local lift = BotEconomy.lift(bot.State, BotEconomy.tool(bot.State))
 	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor
 	local sea = Tide.sea()
 	local t = now()
@@ -555,24 +553,23 @@ local function candidates(bot: Bot): ({ any }, { any })
 		if
 			ItemService.getState(item) == "Unclaimed"
 			and not item:GetAttribute("Unlock")
-			and (item:GetAttribute("Class") or 1) <= lift
+			and Gear.canLift(lift, item:GetAttribute("Tier"))
 			and (not bot.Skip[item] or bot.Skip[item] < t)
 			and (not bot.Trip or item:GetAttribute("Zone") == bot.Trip.Zone)
 			and not reserved[item]
 		then
 			local position = item.Position
 			local band = Beach.depthBand(position, sea)
-			if Gear.canReachDepth(tool, band) and not Beach.isLost(position, sea) then
+			if not Beach.isLost(position, sea) then
 				local there = math.sqrt((position.X - bot.X) ^ 2 + (position.Z - bot.Z) ^ 2)
 					* BotEconomy.MazeFactor
 					/ speed
 				local back = math.sqrt((position.X - HOME.x) ^ 2 + (position.Z - HOME.z) ^ 2)
 					* BotEconomy.MazeFactor
 					/ speed
-				-- What its gear reaches beyond the shallows (heavier, or in deeper water) is worth
-				-- going anywhere along the beach for; the stretch is for the cheap shallow finds.
-				local premium = (item:GetAttribute("Class") or 1) >= Gear.WeightClass.Medium
-					or band >= Gear.Depth.KneeDeep
+				-- What lies beyond the first zone (or in deeper water) is worth going anywhere
+				-- along the beach for; the stretch is for the cheap finds of the first zone's shallows.
+				local premium = (item:GetAttribute("Tier") or 1) >= 2 or band >= Gear.Depth.KneeDeep
 				local inStretch = premium or (position.X >= lo and position.X <= hi)
 				-- Hands-only bots stay on short trips (200 game seconds there and back at most).
 				if inStretch or not hands or (there + back) * speedFactor <= 200 then
