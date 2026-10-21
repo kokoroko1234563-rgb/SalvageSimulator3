@@ -163,6 +163,23 @@ def frozen_pool(slot, name, weight=3):
     r.hazard("Ice", at=(round(deep[0]), round(deep[1])), radius=16)
     r.loot(deep, radius=4, weight=weight)
     r.decor("Bones", at=(round(w / 2), round(d / 2)), scale=0.8)
+    # The secret's door: an ice cave mouth on the floor opposite the pool.
+    r.entrance((52, d - 20 if deep[1] < d / 2 else 20))
+    return r
+
+
+def grotto(slot, name, weight=3):
+    """A cave with a frozen pool to one side and the secret's ice cave mouth on the clear floor
+    on the other."""
+    r = slot.room(name)
+    r.hall(inset(slot), floor=ICE)
+    w, d = slot.size
+    pool = (round(w * 0.72), round(d / 2))
+    r.hollow(pool, radius=14, depth=2, material=ICE)
+    r.hazard("Ice", at=pool, radius=14)
+    r.loot(pool, radius=4, weight=weight)
+    r.entrance((round(w * 0.28), round(d / 2)))
+    r.decor("GlowShells", at=(round(w * 0.28), round(d / 2 + 22)))
     return r
 
 
@@ -207,7 +224,7 @@ def boulder_cave(slot, name, weight=2):
     return r
 
 
-KINDS = {"comb": comb_of_caves, "pool": frozen_pool, "ring": tunnel_ring,
+KINDS = {"comb": comb_of_caves, "pool": frozen_pool, "grotto": grotto, "ring": tunnel_ring,
          "pillar": pillar_cave, "boulder": boulder_cave}
 
 
@@ -226,7 +243,8 @@ def bands(f):
 
 
 def pips_court(f, cx=0, top=52):
-    """Pip's court: flat, open sky, just off the top band (the way in), with the entrance."""
+    """Pip's court: flat, open sky, just off the top band (the way in). The secret's door is in the
+    caves."""
     area = [(cx - 24, top), (cx + 24, top), (cx + 24, top + 56), (cx - 24, top + 56)]
     f.court(area)
     f.paint(area, SNOW)
@@ -234,7 +252,6 @@ def pips_court(f, cx=0, top=52):
     f.decor("Pebbles", area=box(cx, top + 28, 50, 40), count=4)
     f.decor("Bones", at=(cx - 18, top + 40), scale=0.7, yaw=40)
     f.decor("Rocks", at=(cx + 20, top + 12), scale=0.8)
-    f.entrance((cx + 20, top + 40))
 
 
 # ==== zone 5 ====================================================================================
@@ -311,7 +328,7 @@ def z5_slots(z):
     slots(z, [
         ("Ice caves west", (-352, 36), (104, 72), (52, 0), ("comb", 2), ("boulder", 1)),
         ("Ice caves east", (248, 36), (104, 72), (52, 0), ("pool", 2), ("pillar", 2)),
-        ("Deep caves west", (-352, 504), (104, 72), (52, 72), ("ring", 3), ("pool", 3)),
+        ("Deep caves west", (-352, 504), (104, 72), (52, 72), ("grotto", 3), ("pool", 3)),
         ("Deep caves east", (248, 504), (104, 72), (52, 72), ("comb", 3), ("pillar", 3)),
     ])
 
@@ -391,7 +408,7 @@ def z6_slots(z):
         ("Blue caves west", (-352, 36), (104, 72), (52, 0), ("pool", 2), ("pillar", 2)),
         ("Blue caves east", (248, 36), (104, 72), (52, 0), ("comb", 2), ("boulder", 2)),
         ("Deep grottos west", (-352, 504), (104, 72), (52, 72), ("pillar", 4), ("comb", 4)),
-        ("Deep grottos east", (248, 504), (104, 72), (52, 72), ("ring", 4), ("pool", 4)),
+        ("Deep grottos east", (248, 504), (104, 72), (52, 72), ("grotto", 4), ("pool", 4)),
     ])
 
 

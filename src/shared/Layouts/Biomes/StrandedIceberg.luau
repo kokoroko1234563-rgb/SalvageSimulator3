@@ -127,9 +127,6 @@ return {
 			{ Kind = "Flat", At = { 300, 568 }, Radius = 6 },
 			{ Kind = "Flat", At = { 300, 592 }, Radius = 6 },
 		},
-		Entrances = {
-			{ 20, 92 },
-		},
 		Decor = {
 			{
 				Kind = "Pebbles",
@@ -1409,6 +1406,9 @@ return {
 						Loot = {
 							{ At = { 52, 60 }, Radius = 4, Weight = 2 },
 						},
+						Entrances = {
+							{ 52, 20 },
+						},
 						Hazards = {
 							{ Type = "Ice", At = { 52, 60 }, Radius = 16 },
 						},
@@ -1526,164 +1526,59 @@ return {
 				Size = { 104, 72 },
 				Rooms = {
 					{
-						Name = "Deep caves west, ring",
+						Name = "Deep caves west, grotto",
 						Primitives = {
 							{
 								Kind = "Flat",
 								Area = {
-									{ 16, 22 },
-									{ 88, 22 },
-									{ 88, 10 },
-									{ 16, 10 },
-								},
-							},
-							{
-								Kind = "Paint",
-								Area = {
-									{ 16, 22 },
-									{ 88, 22 },
-									{ 88, 10 },
-									{ 16, 10 },
-								},
-								Material = "Snow",
-							},
-							{
-								Kind = "Flat",
-								Area = {
-									{ 82, 16 },
-									{ 82, 56 },
-									{ 94, 56 },
-									{ 94, 16 },
-								},
-							},
-							{
-								Kind = "Paint",
-								Area = {
-									{ 82, 16 },
-									{ 82, 56 },
-									{ 94, 56 },
-									{ 94, 16 },
-								},
-								Material = "Snow",
-							},
-							{
-								Kind = "Flat",
-								Area = {
-									{ 88, 50 },
-									{ 16, 50 },
-									{ 16, 62 },
-									{ 88, 62 },
-								},
-							},
-							{
-								Kind = "Paint",
-								Area = {
-									{ 88, 50 },
-									{ 16, 50 },
-									{ 16, 62 },
-									{ 88, 62 },
-								},
-								Material = "Snow",
-							},
-							{
-								Kind = "Flat",
-								Area = {
-									{ 22, 56 },
-									{ 22, 16 },
-									{ 10, 16 },
-									{ 10, 56 },
-								},
-							},
-							{
-								Kind = "Paint",
-								Area = {
-									{ 22, 56 },
-									{ 22, 16 },
-									{ 10, 16 },
-									{ 10, 56 },
-								},
-								Material = "Snow",
-							},
-							{ Kind = "Flat", At = { 16, 16 }, Radius = 6 },
-							{ Kind = "Flat", At = { 88, 16 }, Radius = 6 },
-							{ Kind = "Flat", At = { 88, 56 }, Radius = 6 },
-							{ Kind = "Flat", At = { 16, 56 }, Radius = 6 },
-							{ Kind = "Flat", At = { 16, 16 }, Radius = 6 },
-							{
-								Kind = "Roof",
-								Area = {
-									{ 14, 0 },
-									{ 14, 30 },
-									{ 90, 30 },
-									{ 90, 0 },
-								},
-								Clearance = 18,
-								Thickness = 6,
-								Material = "Glacier",
-							},
-							{
-								Kind = "Roof",
-								Area = {
-									{ 104, 14 },
-									{ 74, 14 },
-									{ 74, 58 },
-									{ 104, 58 },
-								},
-								Clearance = 18,
-								Thickness = 6,
-								Material = "Glacier",
-							},
-							{
-								Kind = "Roof",
-								Area = {
-									{ 90, 72 },
-									{ 90, 42 },
-									{ 14, 42 },
-									{ 14, 72 },
-								},
-								Clearance = 18,
-								Thickness = 6,
-								Material = "Glacier",
-							},
-							{
-								Kind = "Roof",
-								Area = {
-									{ 0, 58 },
-									{ 30, 58 },
-									{ 30, 14 },
-									{ 0, 14 },
-								},
-								Clearance = 18,
-								Thickness = 6,
-								Material = "Glacier",
-							},
-							{
-								Kind = "Flat",
-								Area = {
 									{ 58, 72 },
-									{ 58, 56 },
-									{ 46, 56 },
+									{ 58, 36 },
+									{ 46, 36 },
 									{ 46, 72 },
 								},
-							},
-							{
-								Kind = "Paint",
-								Area = {
-									{ 58, 72 },
-									{ 58, 56 },
-									{ 46, 56 },
-									{ 46, 72 },
-								},
-								Material = "Snow",
 							},
 							{ Kind = "Flat", At = { 52, 72 }, Radius = 6 },
-							{ Kind = "Flat", At = { 52, 56 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Paint",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+								Material = "Glacier",
+							},
+							{
+								Kind = "Hollow",
+								At = { 75, 36 },
+								Radius = 14,
+								Depth = 2,
+								Rough = 3,
+								Material = "Glacier",
+								Over = true,
+							},
 						},
 						Loot = {
-							{ At = { 52, 12 }, Radius = 3, Weight = 3 },
+							{ At = { 75, 36 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 29, 36 },
+						},
+						Hazards = {
+							{ Type = "Ice", At = { 75, 36 }, Radius = 14 },
 						},
 						Decor = {
-							{ Kind = "GlowShells", At = { 52, 12 } },
+							{ Kind = "GlowShells", At = { 29, 58 } },
 						},
 					},
 					{
@@ -1731,6 +1626,9 @@ return {
 						},
 						Loot = {
 							{ At = { 52, 12 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 52, 52 },
 						},
 						Hazards = {
 							{ Type = "Ice", At = { 52, 12 }, Radius = 16 },
@@ -2065,9 +1963,6 @@ return {
 			},
 			{ Kind = "Flat", At = { 300, 568 }, Radius = 6 },
 			{ Kind = "Flat", At = { 300, 592 }, Radius = 6 },
-		},
-		Entrances = {
-			{ 20, 92 },
 		},
 		Decor = {
 			{
@@ -3456,6 +3351,9 @@ return {
 						Loot = {
 							{ At = { 52, 60 }, Radius = 4, Weight = 2 },
 						},
+						Entrances = {
+							{ 52, 20 },
+						},
 						Hazards = {
 							{ Type = "Ice", At = { 52, 60 }, Radius = 16 },
 						},
@@ -3928,164 +3826,59 @@ return {
 				Size = { 104, 72 },
 				Rooms = {
 					{
-						Name = "Deep grottos east, ring",
+						Name = "Deep grottos east, grotto",
 						Primitives = {
 							{
 								Kind = "Flat",
 								Area = {
-									{ 16, 22 },
-									{ 88, 22 },
-									{ 88, 10 },
-									{ 16, 10 },
-								},
-							},
-							{
-								Kind = "Paint",
-								Area = {
-									{ 16, 22 },
-									{ 88, 22 },
-									{ 88, 10 },
-									{ 16, 10 },
-								},
-								Material = "Snow",
-							},
-							{
-								Kind = "Flat",
-								Area = {
-									{ 82, 16 },
-									{ 82, 56 },
-									{ 94, 56 },
-									{ 94, 16 },
-								},
-							},
-							{
-								Kind = "Paint",
-								Area = {
-									{ 82, 16 },
-									{ 82, 56 },
-									{ 94, 56 },
-									{ 94, 16 },
-								},
-								Material = "Snow",
-							},
-							{
-								Kind = "Flat",
-								Area = {
-									{ 88, 50 },
-									{ 16, 50 },
-									{ 16, 62 },
-									{ 88, 62 },
-								},
-							},
-							{
-								Kind = "Paint",
-								Area = {
-									{ 88, 50 },
-									{ 16, 50 },
-									{ 16, 62 },
-									{ 88, 62 },
-								},
-								Material = "Snow",
-							},
-							{
-								Kind = "Flat",
-								Area = {
-									{ 22, 56 },
-									{ 22, 16 },
-									{ 10, 16 },
-									{ 10, 56 },
-								},
-							},
-							{
-								Kind = "Paint",
-								Area = {
-									{ 22, 56 },
-									{ 22, 16 },
-									{ 10, 16 },
-									{ 10, 56 },
-								},
-								Material = "Snow",
-							},
-							{ Kind = "Flat", At = { 16, 16 }, Radius = 6 },
-							{ Kind = "Flat", At = { 88, 16 }, Radius = 6 },
-							{ Kind = "Flat", At = { 88, 56 }, Radius = 6 },
-							{ Kind = "Flat", At = { 16, 56 }, Radius = 6 },
-							{ Kind = "Flat", At = { 16, 16 }, Radius = 6 },
-							{
-								Kind = "Roof",
-								Area = {
-									{ 14, 0 },
-									{ 14, 30 },
-									{ 90, 30 },
-									{ 90, 0 },
-								},
-								Clearance = 18,
-								Thickness = 6,
-								Material = "Glacier",
-							},
-							{
-								Kind = "Roof",
-								Area = {
-									{ 104, 14 },
-									{ 74, 14 },
-									{ 74, 58 },
-									{ 104, 58 },
-								},
-								Clearance = 18,
-								Thickness = 6,
-								Material = "Glacier",
-							},
-							{
-								Kind = "Roof",
-								Area = {
-									{ 90, 72 },
-									{ 90, 42 },
-									{ 14, 42 },
-									{ 14, 72 },
-								},
-								Clearance = 18,
-								Thickness = 6,
-								Material = "Glacier",
-							},
-							{
-								Kind = "Roof",
-								Area = {
-									{ 0, 58 },
-									{ 30, 58 },
-									{ 30, 14 },
-									{ 0, 14 },
-								},
-								Clearance = 18,
-								Thickness = 6,
-								Material = "Glacier",
-							},
-							{
-								Kind = "Flat",
-								Area = {
 									{ 58, 72 },
-									{ 58, 56 },
-									{ 46, 56 },
+									{ 58, 36 },
+									{ 46, 36 },
 									{ 46, 72 },
 								},
-							},
-							{
-								Kind = "Paint",
-								Area = {
-									{ 58, 72 },
-									{ 58, 56 },
-									{ 46, 56 },
-									{ 46, 72 },
-								},
-								Material = "Snow",
 							},
 							{ Kind = "Flat", At = { 52, 72 }, Radius = 6 },
-							{ Kind = "Flat", At = { 52, 56 }, Radius = 6 },
+							{ Kind = "Flat", At = { 52, 36 }, Radius = 6 },
+							{
+								Kind = "Flat",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+							},
+							{
+								Kind = "Paint",
+								Area = {
+									{ 8, 8 },
+									{ 96, 8 },
+									{ 96, 64 },
+									{ 8, 64 },
+								},
+								Material = "Glacier",
+							},
+							{
+								Kind = "Hollow",
+								At = { 75, 36 },
+								Radius = 14,
+								Depth = 2,
+								Rough = 3,
+								Material = "Glacier",
+								Over = true,
+							},
 						},
 						Loot = {
-							{ At = { 52, 12 }, Radius = 3, Weight = 4 },
+							{ At = { 75, 36 }, Radius = 4, Weight = 4 },
+						},
+						Entrances = {
+							{ 29, 36 },
+						},
+						Hazards = {
+							{ Type = "Ice", At = { 75, 36 }, Radius = 14 },
 						},
 						Decor = {
-							{ Kind = "GlowShells", At = { 52, 12 } },
+							{ Kind = "GlowShells", At = { 29, 58 } },
 						},
 					},
 					{
@@ -4133,6 +3926,9 @@ return {
 						},
 						Loot = {
 							{ At = { 52, 12 }, Radius = 4, Weight = 4 },
+						},
+						Entrances = {
+							{ 52, 52 },
 						},
 						Hazards = {
 							{ Type = "Ice", At = { 52, 12 }, Radius = 16 },
