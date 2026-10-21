@@ -171,12 +171,15 @@ local function zoneYield(z: number, lift: number): (number, number)
 end
 
 -- Estimated coins a tide brings in with this gear (coins as paid, with the rebirth multiplier).
+-- The tide works through the zones one after another, and a tool works every zone up to its
+-- tier, so the estimate adds up what each of those zones brings in while the waterline is there.
+-- (A bot walks out ahead of the tide, so the walk out isn't taken off the zone's time.)
 function BotEconomy.income(state: State): number
 	local tool = BotEconomy.tool(state)
 	local lift = BotEconomy.lift(state, tool)
 	local capacity = BotEconomy.capacity(state)
 	local speed = BotEconomy.walkSpeed(state)
-	local best = 0
+	local total = 0
 	for z = 1, #Config.Zones do
 		local window = zoneWindow[z] * BotEconomy.CycleSeconds
 		local z0, z1 = Beach.zoneRange(z)
@@ -187,11 +190,10 @@ function BotEconomy.income(state: State): number
 			-- Filling the cart takes a while when few of what washes up can be taken.
 			local fill = capacity * BotEconomy.ItemSeconds * (1 + 0.5 / math.max(chance, 0.05))
 			local trip = 2 * travel + fill + BotEconomy.SellSeconds
-			local trips = math.max(0, (window - travel) / trip)
-			best = math.max(best, trips * capacity * perItem)
+			total += window / trip * capacity * perItem
 		end
 	end
-	return best * Rebirth.multiplier(state.Rebirths)
+	return total * Rebirth.multiplier(state.Rebirths)
 end
 
 -- Buying --------------------------------------------------------------------------------

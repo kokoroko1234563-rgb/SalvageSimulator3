@@ -326,8 +326,9 @@ test("rebirth rewards stack in Stats", function()
 	assert(Stats.breath(rewarded) == 2 * Stats.breath(plain), "Sea Legs doubles breath")
 	assert(Stats.wavePush(rewarded) >= 0.3 and Stats.wavePush(rewarded) < 0.6, "Sea Legs and the crown stack")
 	local tool = Gear.getTool("BasicGrabber") or Gear.Tools[1]
-	assert(Stats.lift(rewarded, tool) == tool.Lift + 1, "Strong Back lifts one class heavier")
-	assert(Stats.lift(rewarded, Gear.getTool("BubbleWand")) == 4, "lift is capped at Very Heavy")
+	assert(Stats.lift(rewarded, tool) == tool.Tier + 1, "Strong Back lifts one zone tier further")
+	assert(Stats.lift(plain, tool) == tool.Tier, "without it, the tool's own tier")
+	assert(Stats.lift(rewarded, Gear.getTool("BubbleWand")) == 7, "lift is capped at the last zone")
 end)
 
 test("private servers scale rare spawns", function()
@@ -3249,20 +3250,22 @@ test("secret: every in-build biome has an unlock item, an opening builder and a 
 	end
 end)
 
-test("the first zones wash up mostly light things, which bare hands lift", function()
+test("item tiers: a zone washes up only items of its own tier", function()
 	local Beach = h.require("Shared/Beach")
 	local Config = h.require("Shared/Config")
-	local Gear = h.require("Shared/Gear")
 	local ItemService = h.require("Server/ItemService")
-	local z = Beach.tileRange(1) + 100
-	local zoneIndex = Beach.zoneAt(z) :: number
-	assert(Config.Zones[zoneIndex].LightShare > 0.5, "zone 1 favours light things")
-	for _ = 1, 50 do
-		local def = ItemService._chooseDef(zoneIndex, z, false, 1, true)
-		assert(
-			def and def.Class == Gear.WeightClass.Light,
-			"a light pick is light: " .. tostring(def and def.Id)
-		)
+	for zoneIndex = 1, Config.Beach.ActiveZones do
+		local z0 = Beach.zoneRange(zoneIndex)
+		local z = z0 + 100
+		assert(Beach.zoneAt(z) == zoneIndex, "the test point is in zone " .. zoneIndex)
+		for _ = 1, 100 do
+			local def = ItemService._chooseDef(zoneIndex, z, 1)
+			assert(def and not def.Unlock, "something washes up in zone " .. zoneIndex)
+			assert(
+				def.Tier == zoneIndex,
+				string.format("zone %d picked %s of tier %s", zoneIndex, def.Id, tostring(def.Tier))
+			)
+		end
 	end
 end)
 
@@ -3282,7 +3285,7 @@ test("unlock: every in-build biome's unlock item can wash up in its own tile, an
 	Config.Unlocks.MaxOnMap = math.huge
 	for id, biome in Biomes.List do
 		workspace:SetAttribute(Biomes.attributeFor(tile), id)
-		local def = ItemService._chooseDef(zoneIndex, z, nil, 1)
+		local def = ItemService._chooseDef(zoneIndex, z, 1)
 		assert(
 			def and def.Id == biome.UnlockItem,
 			id .. ": its unlock item can't spawn (got " .. tostring(def and def.Id) .. ")"
@@ -3518,47 +3521,41 @@ test("bot routes avoid rock and walls, and go through the gap", function()
 	Layouts.setActive(tile, nil)
 end)
 
-test(
-	"item crowds: shallow, light surf spawns scale with the players on the server, heavy ones don't",
-	function()
-		local Config = h.require("Shared/Config")
-		local Tide = h.require("Shared/Tide")
-		local ItemService = h.require("Server/ItemService")
-		local saved = Config.Items.CrowdSpawn
-		Config.Items.CrowdSpawn = { Players = 20, Scale = 3 }
-		assert(ItemService.crowdScale(1) == 1, "a solo server is the base rate")
-		assert(math.abs(ItemService.crowdScale(20) - 3) < 1e-9, "full crowd: three times")
-		assert(math.abs(ItemService.crowdScale(10.5) - 2) < 1e-9, "linear in between")
-		assert(ItemService.crowdScale(40) == 3, "no more than Scale")
-		local max = Config.Items.MaxSurfItems
-		assert(ItemService.surfCap(1) == max, "the cap is MaxSurfItems at the base rate")
-		assert(
-			math.abs(ItemService.surfCap(3) - max * (0.3 + 0.7 * 3)) < 1e-9,
-			"the shallow share of the cap triples, the heavy share doesn't"
-		)
-		ItemService.setBotCount(19)
-		assert(
-			math.abs(ItemService.crowdScale() - 1 - 2 * 18 / 19) < 1e-9,
-			"bots count as players (one other player: none here)"
-		)
-		ItemService.setBotCount(0)
-		Config.Items.CrowdSpawn = { Players = 20, Scale = 1 }
-		assert(ItemService.crowdScale(20) == 1, "Scale 1 turns it off")
-		Config.Items.CrowdSpawn = saved
-		-- The extra spawns are never heavy.
-		local sea = Tide.sea(1000)
-		local made = 0
-		for _ = 1, 80 do
-			local item = ItemService.spawnInSurf(sea, true)
-			if item then
-				made += 1
-				assert((item:GetAttribute("Class") or 1) < 3, "a light spawn is never heavy")
-				ItemService.destroy(item)
-			end
+test("item crowds: the zones' ordinary surf spawns scale with the players on the server", function()
+	local Config = h.require("Shared/Config")
+	local Tide = h.require("Shared/Tide")
+	local ItemService = h.require("Server/ItemService")
+	local saved = Config.Items.CrowdSpawn
+	Config.Items.CrowdSpawn = { Players = 20, Scale = 3 }
+	assert(ItemService.crowdScale(1) == 1, "a solo server is the base rate")
+	assert(math.abs(ItemService.crowdScale(20) - 3) < 1e-9, "full crowd: three times")
+	assert(math.abs(ItemService.crowdScale(10.5) - 2) < 1e-9, "linear in between")
+	assert(ItemService.crowdScale(40) == 3, "no more than Scale")
+	local max = Config.Items.MaxSurfItems
+	assert(ItemService.surfCap(1) == max, "the cap is MaxSurfItems at the base rate")
+	assert(math.abs(ItemService.surfCap(3) - max * 3) < 1e-9, "and it triples with the spawns")
+	ItemService.setBotCount(19)
+	assert(
+		math.abs(ItemService.crowdScale() - 1 - 2 * 18 / 19) < 1e-9,
+		"bots count as players (one other player: none here)"
+	)
+	ItemService.setBotCount(0)
+	Config.Items.CrowdSpawn = { Players = 20, Scale = 1 }
+	assert(ItemService.crowdScale(20) == 1, "Scale 1 turns it off")
+	Config.Items.CrowdSpawn = saved
+	-- A surf spawn is an item of its zone's tier, and carries that tier.
+	local sea = Tide.sea(1000)
+	local made = 0
+	for _ = 1, 80 do
+		local item = ItemService.spawnInSurf(sea)
+		if item then
+			made += 1
+			assert(item:GetAttribute("Tier") == item:GetAttribute("Zone"), "a surf spawn has its zone's tier")
+			ItemService.destroy(item)
 		end
-		assert(made > 20, "light spawns happen (" .. made .. ")")
 	end
-)
+	assert(made > 20, "surf spawns happen (" .. made .. ")")
+end)
 
 test("bot route searches are time-sliced: a hopeless one yields and stays within its bound", function()
 	local Beach = h.require("Shared/Beach")
@@ -3664,9 +3661,7 @@ test("bot can't claim an item another already claimed", function()
 	local ItemService = h.require("Server/ItemService")
 	local GrabService = h.require("Server/GrabService")
 	local item = ItemService.spawnAt(Items.get("Seashell"), 1, roblox.Vector3.new(0, 0, 100))
-	-- (Reaching any depth: wherever the real tide is, the item's water doesn't matter here.)
-	local tool = table.clone(Gear.getTool("BareHands"))
-	tool.Depth = Gear.Depth.Deep
+	local tool = Gear.getTool("BareHands")
 	local near = item.CFrame.Position
 	local ok, why = GrabService.canClaim(item, -1, tool, 1, near)
 	assert(ok, "free and in reach: " .. tostring(why))
@@ -3678,10 +3673,12 @@ test("bot can't claim an item another already claimed", function()
 	assert(ItemService.stats.ClaimedByBots >= 1, "counted")
 	ItemService.destroy(item)
 	assert(not ItemService.claimForBot(item, -3), "a destroyed item can't be claimed")
-	-- Heavy items need a tool that lifts them.
-	local anchor = ItemService.spawnAt(Items.get("TreasureChest"), 1, roblox.Vector3.new(0, 0, 100))
-	assert(not GrabService.canClaim(anchor, -1, tool, 1, anchor.CFrame.Position), "too heavy for bare hands")
-	ItemService.destroy(anchor)
+	-- Items of a zone farther out need a tool that works that far.
+	local chest = ItemService.spawnAt(Items.get("TreasureChest"), 1, roblox.Vector3.new(0, 0, 100))
+	assert(chest:GetAttribute("Tier") == 7, "the chest is a zone 7 item")
+	assert(not GrabService.canClaim(chest, -1, tool, 1, chest.CFrame.Position), "too far out for bare hands")
+	assert(GrabService.canClaim(chest, -1, tool, 7, chest.CFrame.Position), "but a tier 7 lift takes it")
+	ItemService.destroy(chest)
 end)
 
 test("bot state never touches DataService", function()
@@ -3723,6 +3720,300 @@ test("bot state never touches DataService", function()
 		assert(not string.find(text, "DataService", 1, true), file .. " mentions DataService")
 		assert(not string.find(text, "DataStore", 1, true), file .. " mentions a DataStore")
 	end
+end)
+
+-- Tools and item tiers (one tool per zone) -------------------------------------------------------
+
+test("item tiers: every tier holds each rarity its zone rolls, 4 to 7 items each", function()
+	local Config = h.require("Shared/Config")
+	local Items = h.require("Shared/Items")
+	assert(Items.MaxTier == #Config.Zones, "one tier per zone")
+	for tier, zone in Config.Zones do
+		for rarity, weight in zone.Rarity do
+			assert(
+				weight <= 0 or #Items.ofTier(tier, rarity) > 0,
+				string.format("tier %d (%s) has no %s item", tier, zone.Name, rarity)
+			)
+		end
+		local count = 0
+		for _, rarity in Items.Rarities do
+			count += #Items.ofTier(tier, rarity)
+		end
+		assert(count >= 4 and count <= 7, string.format("tier %d holds %d items", tier, count))
+	end
+	-- Every sellable item is in exactly one tier; unlock items are in none.
+	local sellable, tiered = 0, 0
+	for _, def in Items.Catalog do
+		if def.Unlock then
+			assert(def.Tier == nil, def.Id .. ": unlock items have no tier")
+		else
+			sellable += 1
+			assert(
+				Items.ofTier(def.Tier, def.Rarity) ~= nil
+					and table.find(Items.ofTier(def.Tier, def.Rarity), def),
+				def.Id
+			)
+		end
+	end
+	for tier = 1, Items.MaxTier do
+		for _, rarity in Items.Rarities do
+			tiered += #Items.ofTier(tier, rarity)
+		end
+	end
+	assert(sellable == tiered, "every sellable item has a tier")
+end)
+
+test("item tiers: the look rises with the tier and the items keep a class", function()
+	local Items = h.require("Shared/Items")
+	local ItemService = h.require("Server/ItemService")
+	for tier = 1, Items.MaxTier do
+		for _, rarity in Items.Rarities do
+			for _, def in Items.ofTier(tier, rarity) do
+				assert(Items.ClassDensity[def.Class] ~= nil, def.Id .. ": class")
+				assert(h.require("Server/ItemModels").has(def.Id), def.Id .. ": a model")
+			end
+		end
+	end
+	-- (A far-out item spawned by hand carries its own tier.)
+	local anchor = ItemService.spawnAt(Items.get("Anchor"), 1, roblox.Vector3.new(0, 0, 100))
+	assert(anchor:GetAttribute("Tier") == 6, "the anchor is a zone 6 item")
+	ItemService.destroy(anchor)
+	local gold = ItemService.spawnAt(Items.get("Anchor"), 1, roblox.Vector3.new(0, 0, 100), 2)
+	assert(gold:GetAttribute("Tier") == 2, "an explicit tier wins")
+	ItemService.destroy(gold)
+end)
+
+test("tool tiers: a tool lifts exactly up to its tier, Strong Back one more", function()
+	local Gear = h.require("Shared/Gear")
+	local Items = h.require("Shared/Items")
+	local Stats = h.require("Shared/Stats")
+	local ItemService = h.require("Server/ItemService")
+	local GrabService = h.require("Server/GrabService")
+	local ladder = {
+		BareHands = 1,
+		BeachRake = 2,
+		FishingNet = 3,
+		GrabberClaw = 4,
+		BoatHook = 5,
+		HandWinch = 6,
+		ElectricWinch = 7,
+	}
+	for id, tier in ladder do
+		local tool = Gear.getTool(id)
+		assert(tool.Id == id and tool.Tier == tier, id .. " is tier " .. tier)
+		assert(tool.Available, id .. " is in the shop")
+		assert(tool.Lift == nil and tool.Depth == nil, id .. " has no Lift or Depth")
+		for itemTier = 1, Items.MaxTier do
+			local def = Items.ofTier(itemTier, itemTier == 7 and "Rare" or "Common")[1]
+			local item = ItemService.spawnAt(def, itemTier, roblox.Vector3.new(0, 0, 100))
+			local from = item.CFrame.Position
+			local lift = Stats.liftWith(tool, false)
+			assert(
+				GrabService.canClaim(item, -1, tool, lift, from) == (itemTier <= tier),
+				string.format("%s on a tier %d item", id, itemTier)
+			)
+			local strong = Stats.liftWith(tool, true)
+			assert(strong == math.min(tier + 1, 7), id .. ": Strong Back adds one tier, up to 7")
+			assert(
+				GrabService.canClaim(item, -1, tool, strong, from) == (itemTier <= tier + 1),
+				string.format("%s with Strong Back on a tier %d item", id, itemTier)
+			)
+			ItemService.destroy(item)
+		end
+	end
+	-- Unlock items are always liftable.
+	local key = ItemService.spawnAt(Items.get("GoldenSpade"), 1, roblox.Vector3.new(0, 0, 100))
+	assert(key:GetAttribute("Tier") == nil, "unlock items carry no tier")
+	assert(
+		GrabService.canClaim(key, -1, Gear.getTool("BareHands"), 1, key.CFrame.Position),
+		"unlock items lift"
+	)
+	ItemService.destroy(key)
+	assert(Gear.canLift(1, nil) and Gear.canLift(3, 3) and not Gear.canLift(3, 4), "Gear.canLift")
+	-- Exotic and magical tools sit on the ladder by their strength.
+	for _, tool in Gear.Tools do
+		assert(tool.Tier >= 1 and tool.Tier <= 7, tool.Id .. " has a tier")
+	end
+	assert(Gear.getTool("CrabClaw").Tier == 7 and Gear.getTool("FreezeWand").Tier == 4, "exotics by strength")
+end)
+
+test("grab: water depth no longer blocks a lift", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Gear = h.require("Shared/Gear")
+	local Items = h.require("Shared/Items")
+	local Tide = h.require("Shared/Tide")
+	local ItemService = h.require("Server/ItemService")
+	local GrabService = h.require("Server/GrabService")
+	assert(Gear.canReachDepth == nil, "the depth rule is gone")
+	local sea = Tide.sea()
+	local hands = Gear.getTool("BareHands")
+	-- Somewhere the sea is about `depth` deep, wherever the layouts put the ground.
+	local function spotAt(depth: number): Vector3?
+		local z = Tide.waterlineAt(sea, 0)
+		while z < Tide.waterlineAt(sea, 0) + 400 do
+			local at = roblox.Vector3.new(0, 0, z)
+			if Beach.seaDepthAt(at, sea) >= depth then
+				return at
+			end
+			z += 0.5
+		end
+		return nil
+	end
+	for _, depth in { 0.5, Config.Beach.KneeDepth + 0.2, Config.Beach.WaistDepth - 0.3 } do
+		local spot = spotAt(depth)
+		assert(spot, "the sea gets " .. depth .. " deep somewhere")
+		local item = ItemService.spawnAt(Items.get("Seashell"), 1, spot)
+		local at = item.CFrame.Position
+		assert(
+			Beach.seaDepthAt(at, sea) >= depth - 0.01,
+			"the shell lies in water at least " .. depth .. " deep"
+		)
+		local ok, why = GrabService.canClaim(item, -1, hands, 1, at)
+		assert(ok, "bare hands take a zone 1 item at depth " .. depth .. ": " .. tostring(why))
+		ItemService.destroy(item)
+	end
+end)
+
+test("biome: loot takes the tier of the zone it washes up in", function()
+	local Beach = h.require("Shared/Beach")
+	local Biomes = h.require("Shared/Biomes")
+	local Config = h.require("Shared/Config")
+	local Items = h.require("Shared/Items")
+	local Tide = h.require("Shared/Tide")
+	local ItemService = h.require("Server/ItemService")
+	local workspace = h.game.Workspace
+	local biome = Biomes.List.SandcastleFlats
+	local share, chance, exotic =
+		biome.LootShare, Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance
+	biome.LootShare = 1
+	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = 0, 0
+	for tile = 1, Beach.ActiveTiles do
+		workspace:SetAttribute(Biomes.attributeFor(tile), "SandcastleFlats")
+	end
+	local loot = {}
+	for _, id in biome.Loot do
+		loot[id] = true
+	end
+	local differs, made = 0, 0
+	for _, time in { 0, 200, 450, 700, 1100 } do
+		for _ = 1, 40 do
+			local item = ItemService.spawnInSurf(Tide.sea(time))
+			if item then
+				made += 1
+				local id = item:GetAttribute("ItemId")
+				local zone = item:GetAttribute("Zone")
+				if zone > Config.Beach.ActiveZones then
+					ItemService.destroy(item) -- (the Far Sandbar has no biomes)
+					continue
+				end
+				assert(loot[id], id .. " isn't the biome's loot")
+				assert(
+					item:GetAttribute("Tier") == zone,
+					id .. " in zone " .. zone .. " has tier " .. tostring(item:GetAttribute("Tier"))
+				)
+				if Items.get(id).Tier ~= zone then
+					differs += 1
+				end
+				ItemService.destroy(item)
+			end
+		end
+	end
+	for tile = 1, Beach.ActiveTiles do
+		workspace:SetAttribute(Biomes.attributeFor(tile), nil)
+	end
+	biome.LootShare = share
+	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = chance, exotic
+	assert(made > 50, "biome loot washes up (" .. made .. ")")
+	assert(differs > 0, "some loot washed up in a zone other than its own tier")
+end)
+
+test("data: Validate checks the tier fields", function()
+	local Gear = h.require("Shared/Gear")
+	local Items = h.require("Shared/Items")
+	local Config = h.require("Shared/Config")
+	local Validate = h.require("Shared/Validate")
+	local function problems(): string
+		return table.concat(Validate.run(), "\n")
+	end
+	local function broken(setup: () -> (), restore: () -> (), expect: string)
+		setup()
+		local text = problems()
+		restore()
+		assert(string.find(text, expect, 1, true), "Validate missed: " .. expect)
+	end
+	local shell = Items.get("Seashell")
+	local tier = shell.Tier
+	broken(function()
+		shell.Tier = nil
+	end, function()
+		shell.Tier = tier
+	end, "Seashell: Tier must be")
+	broken(function()
+		shell.Tier = 8
+	end, function()
+		shell.Tier = tier
+	end, "Seashell: Tier must be")
+	local spade = Items.get("GoldenSpade")
+	broken(function()
+		spade.Tier = 1
+	end, function()
+		spade.Tier = nil
+	end, "unlock items have no Tier")
+	local hands = Gear.getTool("BareHands")
+	broken(function()
+		hands.Tier = 0
+	end, function()
+		hands.Tier = 1
+	end, "Tool BareHands: Tier must be")
+	broken(function()
+		hands.Lift = 1
+	end, function()
+		hands.Lift = nil
+	end, "Lift and Depth are gone")
+	-- A zone that rolls a rarity its tier has no item of.
+	local zone = Config.Zones[7]
+	local rarity = zone.Rarity
+	broken(function()
+		zone.Rarity = { Common = 50, Rare = 50 }
+	end, function()
+		zone.Rarity = rarity
+	end, "Zone 7 rolls rarity Common, which has no items of tier 7")
+	assert(problems() == "", "and the data is clean again: " .. problems())
+end)
+
+test("bot: income follows the tool's tier, not depth or weight", function()
+	local Economy = h.require("Server/BotEconomy")
+	local Gear = h.require("Shared/Gear")
+	local function with(tool: string?, rewards: { string }?)
+		local state = Economy.newState()
+		state.Vessels.BeachWagon = true
+		if tool then
+			state.Tools[tool] = true
+		end
+		for _, id in rewards or {} do
+			state.Rewards[id] = true
+		end
+		return state
+	end
+	assert(Economy.tool(with("FishingNet")).Id == "FishingNet", "the best tool is used")
+	assert(Economy.lift(with("FishingNet"), Gear.getTool("FishingNet")) == 3, "a net lifts tier 3")
+	assert(
+		Economy.lift(with("FishingNet", { "StrongBack" }), Gear.getTool("FishingNet")) == 4,
+		"Strong Back adds one"
+	)
+	local last = 0
+	for _, id in
+		{ "BareHands", "BeachRake", "FishingNet", "GrabberClaw", "BoatHook", "HandWinch", "ElectricWinch" }
+	do
+		local income = Economy.income(with(id))
+		assert(income > last, id .. " earns more than the tool before it does")
+		last = income
+	end
+	assert(
+		Economy.income(with("BeachRake", { "StrongBack" })) > Economy.income(with("BeachRake")),
+		"Strong Back opens another zone"
+	)
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failures))
