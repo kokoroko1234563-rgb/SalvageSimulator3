@@ -352,12 +352,13 @@ end
 
 local function waterBlocker(speed: number, limit: number, delay: number)
 	-- Whether the sea would be too deep to stand in at a cell when the bot reaches it (`delay`
-	-- seconds from now it sets out).
+	-- seconds from now it sets out). The bot may be slower than planned (the water slows it) or
+	-- quicker, and the sea goes both ways, so both arrivals count.
 	local t0 = now() + delay
 	local cache: { [number]: number } = {}
 	local factor = speedFactor
-	return function(x: number, _z: number, ground: number, walked: number): boolean
-		local t = t0 + walked / speed
+	local fast = speed / SAFE_SPEED * 1.1
+	local function deepAt(x: number, ground: number, t: number): boolean
 		local key = math.floor(t * factor) * 4096 + (x + 400) // 4
 		local level = cache[key]
 		if not level then
@@ -365,6 +366,9 @@ local function waterBlocker(speed: number, limit: number, delay: number)
 			cache[key] = level
 		end
 		return level - ground >= limit
+	end
+	return function(x: number, _z: number, ground: number, walked: number): boolean
+		return deepAt(x, ground, t0 + walked / speed) or deepAt(x, ground, t0 + walked / fast)
 	end
 end
 
@@ -527,6 +531,25 @@ local function chooseTarget(bot: Bot): boolean
 	return false
 end
 
+-- Where a bot waits for what the tide washes up: just landward of the waterline as it will be when
+-- the bot gets there, along the bot's own lane of the beach (a trip bot: inside its zone).
+local function stagingPoint(bot: Bot): (number, number)
+	local x = bot.LaneX
+	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor
+	local t = now()
+	local z = bot.Z
+	for _ = 1, 3 do
+		local eta = math.sqrt((x - bot.X) ^ 2 + (z - bot.Z) ^ 2) * BotEconomy.MazeFactor / speed
+		z = Tide.waterlineAt({ Now = t + eta }, x) - 8
+	end
+	local top, bottom = 0, Beach.Depth - 20
+	if bot.Trip then
+		local z0, z1 = Beach.zoneRange(bot.Trip.Zone)
+		top, bottom = z0 + 10, z1 - 20
+	end
+	return x, math.clamp(z, top, bottom)
+end
+
 function decide(bot: Bot)
 	bot.Target = nil
 	local capacity = BotEconomy.capacity(bot.State)
@@ -535,7 +558,51 @@ function decide(bot: Bot)
 			return
 		end
 	end
-	if #bot.Cargo > 0 or not atHome(bot) then
+	if #bot.Cargo > 0 then
+		goHome(bot)
+		return
+	end
+	local t = now()
+	-- Nothing to take: walk out with the tide while it's going out (or low), as long as the way
+	-- back stays open for a minute longer than it needs to; otherwise wait where it's safe.
+	if not bot.Finished and Tide.getState(t).Phase ~= "In" then
+		local sx, sz = stagingPoint(bot)
+		if math.sqrt((sx - bot.X) ^ 2 + (sz - bot.Z) ^ 2) > 40 then
+			local out, outLength = routeTo(bot, sx, sz, 8)
+			if out then
+				local walk = BotEconomy.walkSpeed(bot.State) * speedFactor * SAFE_SPEED
+				local back = routeTo(
+					bot,
+					HOME.x,
+					HOME.z,
+					6,
+					{ x = out[#out].x, z = out[#out].z },
+					(outLength or 0) / walk + 60 / speedFactor
+				)
+				if back then
+					setStatus(bot, "walking out")
+					beginPath(bot, out, "Stage")
+					return
+				end
+			end
+		elseif atHome(bot) then
+			-- (waiting at home)
+		elseif (bot.BackCheckAt or 0) > t then
+			setStatus(bot, "waiting for the tide")
+			bot.WaitUntil = t + 0.3
+			bot.After = function() end
+			return
+		else
+			bot.BackCheckAt = t + 3 / speedFactor
+			if routeTo(bot, HOME.x, HOME.z, 6, nil, 60 / speedFactor) then
+				setStatus(bot, "waiting for the tide")
+				bot.WaitUntil = t + 0.3
+				bot.After = function() end
+				return
+			end
+		end
+	end
+	if not atHome(bot) then
 		goHome(bot)
 		return
 	end
@@ -618,6 +685,19 @@ local function loseLoad(bot: Bot)
 end
 
 local function die(bot: Bot)
+	local state = Tide.getState()
+	warn(
+		string.format(
+			"[BotService] bot %d swept away at z %.0f (zone %s) in the %s tide (%.0f%%), %s, carrying %d",
+			bot.Id,
+			bot.Z,
+			tostring(Beach.zoneAt(bot.Z)),
+			state.Phase,
+			state.PhaseProgress * 100,
+			tostring(bot.Mode),
+			#bot.Cargo
+		)
+	)
 	bot.Stats.Deaths += 1
 	if #bot.Cargo > 0 then
 		bot.Stats.LostLoads += 1
@@ -769,7 +849,7 @@ local function arrive(bot: Bot)
 		end
 		later(bot, if count > 0 then 1 + 0.3 * count else 0.2, function()
 			sell(bot)
-			if bot.Trip then
+			if bot.Trip and bot.Trip.Items then
 				bot.Finished = true
 				bot.Trip.Done = true
 				bot.Trip.EndedAt = now()
@@ -918,6 +998,7 @@ local function spawnBot(id: number, state: any, trip: any): Bot
 	bot.X = HOME.x + ((id - 1) % 5 - 2) * 6
 	bot.Z = HOME.z + ((id - 1) // 5 - 1.5) * 5
 	bot.GroundY = Beach.groundAt(bot.X, bot.Z)
+	bot.LaneX = rng:NextNumber(-Beach.HalfWidth + 60, Beach.HalfWidth - 60)
 	dropTrail(bot)
 	bot.Model = buildMan(bot)
 	CollectionService:AddTag(bot.Model, BotService.Tag)
@@ -1179,7 +1260,7 @@ function BotService.report(): { string }
 				total.Idle / math.max(total.Hours * 3600, 1) * 100,
 				total.Deaths,
 				total.LostLoads,
-				commas(total.Coins / math.max(total.Hours, 1e-9) / n)
+				commas(total.Coins / math.max(total.Hours, 1e-9))
 			)
 		)
 	end

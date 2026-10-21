@@ -1,0 +1,84 @@
+--[[
+	One bot task of the sweep, run inside the real Roblox engine (Open Cloud Luau Execution, in the
+	Test Range place; tools/bots/sweep.py puts the job in front of this script as JOB_JSON):
+
+	  { bots = 8, speed = 10, seconds = 200 }                 X bots play for `seconds` real seconds
+	  { finalTrip = true, speed = 10, seconds = 250,          one bot, one trip to `zone` and back
+	    zone = 6, tool = "BoatHook", vessel = "Wheelbarrow" }
+
+	It brings up what the bots need of the server (the tide, the item system with its real spawn
+	rules, collision groups) without building the map's terrain: the bots walk the layouts' ground
+	(Beach.groundAt), which doesn't need it. Every tile has its zone's base layout (no biomes).
+	It returns the report as JSON: per-bot measures, the server's item counts and the income log.
+]]
+
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Workspace = game:GetService("Workspace")
+
+local JOB = HttpService:JSONDecode(JOB_JSON) -- luacheck: ignore (set by sweep.py)
+
+local Shared = ReplicatedStorage.Shared
+local Server = ServerScriptService.Server
+local Config = require(Shared.Config)
+local Tide = require(Shared.Tide)
+
+local started = os.clock()
+Workspace:SetAttribute(Tide.StartAttribute, Workspace:GetServerTimeNow())
+Workspace:SetAttribute(Tide.SeedAttribute, Random.new():NextInteger(1, 999999))
+
+require(Server.CollisionGroups).init()
+local map = Instance.new("Folder")
+map.Name = "Map"
+map.Parent = Workspace
+local ItemService = require(Server.ItemService)
+ItemService.init(map)
+local BotService = require(Server.BotService)
+local setup = os.clock() - started
+
+BotService.clearLog()
+BotService.setSpeed(JOB.speed or 1)
+if JOB.finalTrip then
+	BotService.startTrip(JOB.zone or 6, JOB.tool or "BoatHook", JOB.vessel or "Wheelbarrow")
+else
+	BotService.setCount(JOB.bots)
+end
+
+local deadline = os.clock() + (JOB.seconds or 200)
+while os.clock() < deadline do
+	task.wait(if JOB.finalTrip then 1 else 5)
+	if JOB.finalTrip then
+		local trip = BotService.tripResult()
+		if trip and trip.Done then
+			break
+		end
+	end
+end
+
+BotService.closeLog()
+local snapshot = BotService.snapshot()
+local trip = BotService.tripResult()
+local logLines = BotService.report()
+local result = {
+	job = JOB,
+	setupSeconds = setup,
+	ranSeconds = os.clock() - started - setup,
+	snapshot = snapshot,
+	log = BotService.incomeLog(),
+	trip = if trip
+		then {
+			zone = trip.Zone,
+			tool = trip.Tool,
+			vessel = trip.Vessel,
+			done = trip.Done == true,
+			earned = trip.Earned or 0,
+			items = trip.Items or 0,
+			gameSeconds = if trip.EndedAt then (trip.EndedAt - trip.StartedAt) * (JOB.speed or 1) else nil,
+			baseCost = Config.Rebirth.BaseCost,
+		}
+		else nil,
+	report = logLines,
+}
+BotService.stop()
+return HttpService:JSONEncode(result)
