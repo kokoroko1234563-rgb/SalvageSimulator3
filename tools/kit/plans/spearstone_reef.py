@@ -4,7 +4,7 @@ A black basalt reef: walled halls and corridors, each hall its own spear challen
 are the frame (islands in the rock: no way between them), the crossings wind between them.
 
 Run it with the quick check, once per zone:
-    python3 tools/kit/quick.py 4 Biomes/Planned/SpearstoneReef --plan tools/kit/plans/spearstone_reef.py
+    python3 tools/kit/quick.py 4 Biomes/SpearstoneReef --plan tools/kit/plans/spearstone_reef.py
 
 The halls (zone coordinates, x -360 west to 360 east, z 0 top to 608 sea):
 
@@ -21,7 +21,7 @@ Damage by zone: 35, 60, 100. Paths: through the fields (quick, timed) or round t
 
 from kit import Zone, write_zones
 
-OUT = "src/shared/Layouts/Biomes/Planned/SpearstoneReef.luau"
+OUT = "src/shared/Layouts/Biomes/SpearstoneReef.luau"
 ROCK = 18
 DAMAGE = {4: 35, 5: 60, 6: 100}
 
@@ -67,6 +67,18 @@ def frame(z, n, entrance):
     f.decor("Rocks", area=box(0, 424, 130, 90), count=5)
     f.decor("Bones", at=(52, 392), scale=1.3, yaw=300)
     f.entrance(entrance)
+
+
+def scramble(part, a, b):
+    """A foot-only shortcut between two lanes: a gap choked with rubble (a bank across it, too
+    steep for a cart), so it cuts a bend without making a path of its own. Axis-aligned."""
+    part.lane([a, b], width=12)
+    (ax, az), (bx, bz) = a, b
+    mx, mz = round((ax + bx) / 8) * 4, round((az + bz) / 8) * 4
+    if ax == bx:  # runs along z: the bank lies across it
+        part.ridge([(mx - 14, mz), (mx + 14, mz)], height=3, width=12, rough=0)
+    else:
+        part.ridge([(mx, mz - 14), (mx, mz + 14)], height=3, width=12, rough=0)
 
 
 def spurs(c, pts):
@@ -120,6 +132,7 @@ def checker_hop(z, n):
     r += end[n]
     c.lane(r, width=12)
     spurs(c, [(0, 302), (130, 302)])  # to the Overlap hall
+    scramble(c, (-240, 156), (-240, 302))  # rubble across the west detour, a cart can not climb it
     c.decor("WreckRibs", at=(70, 8), scale=0.8, yaw=90)  # the tell
     return c
 

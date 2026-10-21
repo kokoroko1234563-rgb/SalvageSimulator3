@@ -1,7 +1,7 @@
-# Jellyfish Lagoon (biome, planned; zones 2 to 6)
+# Jellyfish Lagoon (biome, rolls in zones 2 to 6)
 
 Drawn with the kit from `tools/kit/plans/jellyfish_lagoon.py` (edit the plan and re-run it),
-written to `src/shared/Layouts/Biomes/Planned/JellyfishLagoon.luau`. Card:
+written to `src/shared/Layouts/Biomes/JellyfishLagoon.luau`. Card:
 `docs/design/cards/jellyfish-lagoon.md`. Decisions from the card's answers: some jellies lie
 stranded on land with a sting area (radius 4, they also damage); in zones 5 and 6 the stun
 applies and the whole lagoon sits under a rock ceiling.
@@ -9,7 +9,7 @@ applies and the whole lagoon sits under a rock ceiling.
 ## What was built
 
 - **Zones 2 and 3 (open shore, no walls or rock).** A lagoon of six overlapping hollows (the
-  seaward row deeper, so it floods from the sea side first) in a ring of sand (a ridge, 4.2 high in
+  seaward row deeper, so it floods from the sea side first) in a ring of sand (a ridge, drawn 250 by 176 and 20 wide so it clears the zone 2 pier, 4.2 high in
   zone 2, 6 in zone 3), two causeways across it north to south (one has a foot-only ford cut in
   it), mud and glowing weed in the water, six loot coves round the ring (best on the sea side)
   and the entrance on the east. Two crossings (West ring, East ring): the cart's ramp swings round
@@ -37,6 +37,9 @@ applies and the whole lagoon sits under a rock ceiling.
 | 5 | 65 | 61 (causeway) / 63 (floor) / 72 (ring) | 77 |
 | 6 | 85 | 76 (causeway) / 77 (floor) / 86 (ring) | 91 |
 
+Shortcut test (feet faster than a cart from the five starts): zones 2 and 3 three of five on both
+crossings (the ring costs carts 10 to 25 cells more at three starts), zones 4 to 6 all five.
+
 Each crossing has a Huge cart's way (the ring ramp, 16 wide, top to bottom). On the shore a cart
 has to go round the ring while feet cut across.
 
@@ -46,9 +49,12 @@ has to go round the ring while feet cut across.
   props are the zone's own (shell grit, lounge chairs), none of this biome's.
 - Zone 3: 0.06 average, worst 2.5 (causeways widened to 16 to stop crests coming out low).
 - Zone 4: 0.15 average; nothing of ours reported.
-- Zone 5: 0.3 average; **open**: the roof's underside is 2.5 to 2.9 studs off its layout at some
-  rows (z 2628 to 2844, at every clearance tried: 12, 14, 16, 17), tolerance 2.5; seems to be the
-  terrain's 4-stud steps under a wide roof, zone 6 comes within 2.4 of it.
+- Zone 5: 0.3 average; the roof's underside was 2.5 to 2.9 studs off its layout (tolerance 2.5)
+  with the kit's roof (clearance 16, thickness 6: once the terrain's drawing is allowed for, a
+  2 stud slab, which the voxels draw crudely). Fixed by a low thick roof flush with the rock
+  round it (clearance 10, thickness 8, top at 18): no roof problems now. (Splitting the roof was
+  not needed.) The only reports left are the zone's own cosmetic specks and the drifting jellies
+  (the Range reads them as floating; they hover at the water).
 - Zone 6: 0.25 average, one spot 2.5 off at a pillar edge; no roof problems.
 
 Pictures: `jellyfish-lagoon-z2.png`, `-z4.png`, `-z5.png`, `-z6.png`.
