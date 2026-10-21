@@ -162,8 +162,6 @@ end
 
 -- Gear with no model of its own (grabbers are a pull, accessories are worn stats): an info
 -- board with its name, kind and what it does.
-local CLASS_NAMES = { "Light", "Medium", "Heavy", "Very heavy" }
-
 local function board(p: Instance, at: CFrame, title: string, body: string, color: Color3)
 	MapParts.part({
 		Name = "Stand",
@@ -192,10 +190,10 @@ local function tools()
 					at,
 					tool.Name,
 					string.format(
-						"%s · reach %d · lifts %s\n%s",
+						"%s · reach %d · works up to zone %d\n%s",
 						kind(tool),
 						tool.Reach,
-						CLASS_NAMES[tool.Lift] or "?",
+						tool.Tier,
 						tool.Note or ""
 					),
 					Palette.Rarity[tool.Rarity] or W.Post

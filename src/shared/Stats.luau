@@ -56,9 +56,10 @@ function Stats.wadeBonus(player: Player): number
 	return if worn and worn.WadeBonus then worn.WadeBonus else 0
 end
 
--- The heaviest weight class a player can lift with a tool.
+-- The highest zone tier a player can lift with a tool: the tool's own Tier, one more with Strong
+-- Back, never past the last zone.
 function Stats.liftWith(tool, strongBack: boolean): number
-	return math.min(tool.Lift + (if strongBack then 1 else 0), Gear.WeightClass.VeryHeavy)
+	return math.min(tool.Tier + (if strongBack then 1 else 0), #Config.Zones)
 end
 
 function Stats.lift(player: Player, tool): number

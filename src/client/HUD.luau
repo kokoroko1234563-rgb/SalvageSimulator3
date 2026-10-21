@@ -262,10 +262,6 @@ local function owned(attribute: string): { [string]: boolean }
 	return set
 end
 
-local CLASS_NAMES = { "Light", "Medium", "Heavy", "Very heavy" }
-local DEPTH_NAMES =
-	{ [0] = "Dry sand", [1] = "Shallows", [2] = "Knee-deep", [3] = "Waist-deep", [4] = "Deep" }
-
 local ROW_BG = Palette.UI.Card
 local MUTED = Palette.UI.Muted
 local BUY = Palette.UI.Buy
@@ -355,12 +351,7 @@ local function refreshShop()
 		end
 
 		local stats = if category == "Tool"
-			then string.format(
-				"Reach %d  ·  Lifts %s  ·  %s",
-				entry.Reach,
-				CLASS_NAMES[entry.Lift],
-				DEPTH_NAMES[entry.Depth]
-			)
+			then string.format("Reach %d", entry.Reach)
 			else string.format("Holds %d items", entry.Capacity)
 		text({
 			Text = stats .. "\n" .. (entry.Note or ""),

@@ -21,7 +21,7 @@ local notify: (Player, string) -> () = function(_player: Player, _text: string) 
 -- Puts a pocketed item back into the world as a loose item owned by the player.
 local function release(player: Player, entry: DataService.PocketEntry, position: Vector3)
 	local def = Items.get(entry.ItemId)
-	local item = ItemService.spawnAt(def, entry.Zone, position)
+	local item = ItemService.spawnAt(def, entry.Zone, position, entry.Zone)
 	item:SetAttribute("Owner", player.UserId)
 	ItemService.setLoose(item)
 end

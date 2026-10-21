@@ -11,6 +11,7 @@
 -- Exotic items (from exotic secrets) can only be used once the player is attuned to that
 -- item type (an attunement core, see InventoryService).
 
+local Config = require(script.Parent.Config)
 local Gear = require(script.Parent.Gear)
 local Items = require(script.Parent.Items)
 
@@ -46,15 +47,6 @@ local function add(entry)
 	entries[entry.Id] = entry
 end
 
-local DEPTH_NAMES = {
-	[0] = "dry sand",
-	[1] = "shallows",
-	[2] = "knee-deep water",
-	[3] = "waist-deep water",
-	[4] = "deep water",
-}
-local CLASS_NAMES = { "Light", "Medium", "Heavy", "Very heavy" }
-
 for _, tool in Gear.Tools do
 	if tool.Id ~= "BareHands" then -- everyone always has their hands
 		add({
@@ -66,12 +58,18 @@ for _, tool in Gear.Tools do
 			Resets = if tool.Exotic then "Never" elseif tool.Magical then "TrueRebirth" else "Rebirth",
 			ShopItem = not tool.Exotic and not tool.Magical,
 			Exotic = tool.Exotic == true,
+			-- (The shop tools' notes already say which zone they work.)
 			Description = string.format(
-				"%s. Reach %d, lifts %s, reaches %s.",
+				"%s. Reach %d.%s",
 				tool.Note,
 				tool.Reach,
-				CLASS_NAMES[tool.Lift],
-				DEPTH_NAMES[tool.Depth]
+				if string.find(tool.Note, "Works up to", 1, true)
+					then ""
+					else string.format(
+						" Works up to zone %d (%s).",
+						tool.Tier,
+						Config.Zones[tool.Tier].Name
+					)
 			),
 		})
 	end

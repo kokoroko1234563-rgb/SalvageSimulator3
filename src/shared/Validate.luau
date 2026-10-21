@@ -64,6 +64,17 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		check(isColor(item.Color), where .. ": Color must be a Color3")
 		check(type(item.Value) == "number", where .. ": missing Value")
 		if item.Unlock then
+			check(item.Tier == nil, where .. ": unlock items have no Tier (they are always liftable)")
+		else
+			check(
+				type(item.Tier) == "number"
+					and item.Tier == math.floor(item.Tier)
+					and item.Tier >= 1
+					and item.Tier <= #Config.Zones,
+				where .. ": Tier must be a whole zone number from 1 to " .. #Config.Zones
+			)
+		end
+		if item.Unlock then
 			check(
 				Biomes.List[item.Unlock] ~= nil
 					or Secrets.List[item.Unlock] ~= nil
@@ -94,8 +105,14 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 			type(tool.Reach) == "number" and type(tool.Grip) == "number",
 			where .. ": missing Reach or Grip"
 		)
-		check(tool.Lift >= 1 and tool.Lift <= 4, where .. ": bad Lift")
-		check(tool.Depth >= 0 and tool.Depth <= 4, where .. ": bad Depth")
+		check(
+			type(tool.Tier) == "number"
+				and tool.Tier == math.floor(tool.Tier)
+				and tool.Tier >= 1
+				and tool.Tier <= #Config.Zones,
+			where .. ": Tier must be a whole zone number from 1 to " .. #Config.Zones
+		)
+		check(tool.Lift == nil and tool.Depth == nil, where .. ": Lift and Depth are gone: use Tier")
 	end
 	for _, vessel in Gear.Vessels do
 		local where = "Vessel " .. vessel.Id
@@ -316,11 +333,17 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		)
 	end
 
+	-- Zone N washes up only items of Tier N: every rarity a zone rolls needs an item in its tier.
+	check(Items.MaxTier == #Config.Zones, "Items.MaxTier must be the number of Config.Zones")
 	for index, zone in Config.Zones do
+		check(
+			zone.HeavyShare == nil and zone.LightShare == nil,
+			"Config.Zones[" .. index .. "]: HeavyShare and LightShare are gone: zones draw by tier"
+		)
 		for rarity in zone.Rarity do
 			check(
-				#Items.ofRarity(rarity) > 0,
-				string.format("Zone %d rolls rarity %s, which has no items", index, rarity)
+				#Items.ofTier(index, rarity) > 0,
+				string.format("Zone %d rolls rarity %s, which has no items of tier %d", index, rarity, index)
 			)
 		end
 	end

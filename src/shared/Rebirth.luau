@@ -24,7 +24,7 @@ Rebirth.Rewards = {
 		Id = "StrongBack",
 		Name = "Strong Back",
 		Type = "Modifier",
-		Description = "Every grabber lifts one weight class heavier",
+		Description = "Every grabber works one zone further out (+1 tier)",
 	},
 	DeepPockets = {
 		Id = "DeepPockets",
@@ -36,14 +36,14 @@ Rebirth.Rewards = {
 		Id = "TideMagnet",
 		Name = "Tide Magnet",
 		Type = "Magical grabber",
-		Description = "Pulls items toward you through the water. Lifts up to Heavy.",
+		Description = "Pulls items toward you through the water. Works up to zone 5 (The Shoals).",
 		GrantsItem = "TideMagnet",
 	},
 	BubbleWand = {
 		Id = "BubbleWand",
 		Name = "Bubble Wand",
 		Type = "Magical grabber",
-		Description = "Floats any item toward you in a bubble, slowly. Waves can't knock it loose.",
+		Description = "Floats items from every zone toward you in a bubble, slowly. Waves can't knock it loose.",
 		GrantsItem = "BubbleWand",
 	},
 	FloatingClamshell = {

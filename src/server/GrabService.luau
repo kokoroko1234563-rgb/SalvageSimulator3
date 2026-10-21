@@ -6,12 +6,10 @@ local Players = game:GetService("Players")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Config = require(Shared.Config)
-local Beach = require(Shared.Beach)
 local Gear = require(Shared.Gear)
 local Stats = require(Shared.Stats)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
-local Tide = require(Shared.Tide)
 
 local DataService = require(script.Parent.DataService)
 local ItemService = require(script.Parent.ItemService)
@@ -48,8 +46,9 @@ end
 
 -- The rules for lifting an item, whoever lifts it (a player or a bot): the item must be free
 -- (or already the owner's), the tool must be able to pick things up, the item within its reach
--- of `from`, no heavier than `lift`, and no deeper in the water than the tool reaches.
--- Returns ok, reason.
+-- of `from`, and from no farther out than `lift` (a zone tier: the tool's, plus one with Strong
+-- Back; Stats.lift). Inside a zone the tool works, it lifts everything, and the water's depth
+-- doesn't matter. Returns ok, reason.
 function GrabService.canClaim(
 	item: BasePart,
 	ownerId: number,
@@ -71,11 +70,8 @@ function GrabService.canClaim(
 	if (position - from).Magnitude > tool.Reach + cfg.ReachSlack then
 		return false, "Too far away"
 	end
-	if (item:GetAttribute("Class") or 1) > lift then
-		return false, "Too heavy for your " .. tool.Name
-	end
-	if state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(position, Tide.sea())) then
-		return false, "Too deep for your " .. tool.Name
+	if not Gear.canLift(lift, item:GetAttribute("Tier")) then
+		return false, "Too far out for your " .. tool.Name
 	end
 	return true
 end

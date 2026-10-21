@@ -230,7 +230,9 @@ function ItemService.itemsOwnedBy(player: Player): { BasePart }
 	return result
 end
 
-local function createItem(def, zoneIndex: number, position: Vector3): BasePart
+-- `tier` is the zone tier the tool must reach to lift it: where the item washed up (so a biome's
+-- loot takes its zone's tier), else its own Tier. Unlock items have none: always liftable.
+local function createItem(def, zoneIndex: number, position: Vector3, tier: number?): BasePart
 	local part = Instance.new("Part")
 	part.Name = def.Name
 	part.Shape = Enum.PartType[def.Shape]
@@ -252,6 +254,9 @@ local function createItem(def, zoneIndex: number, position: Vector3): BasePart
 	part:SetAttribute("Floats", Items.floats(def))
 	part:SetAttribute("Rarity", def.Rarity)
 	part:SetAttribute("Zone", zoneIndex)
+	if not def.Unlock then
+		part:SetAttribute("Tier", tier or def.Tier or zoneIndex)
+	end
 	part:SetAttribute("Value", math.floor(def.Value * Config.Zones[zoneIndex].Multiplier))
 	if def.Unlock then
 		-- Unlock items glow so they're findable, and are banked rather than sold.
@@ -280,8 +285,8 @@ local function createItem(def, zoneIndex: number, position: Vector3): BasePart
 	return part
 end
 
-function ItemService.spawnAt(def, zoneIndex: number, position: Vector3): BasePart
-	return createItem(def, zoneIndex, position)
+function ItemService.spawnAt(def, zoneIndex: number, position: Vector3, tier: number?): BasePart
+	return createItem(def, zoneIndex, position, tier)
 end
 
 -- Whether an item can rest at (x, z): not on rock (a wall's top, a boulder), where nobody
@@ -301,10 +306,11 @@ local function rollRarity(weights: { [string]: number }, rolls: number): string
 	return Items.Rarities[best]
 end
 
--- What washes up at a point in a zone: a biome's secret unlock item or own loot sometimes,
--- the sky-beam item on the Far Sandbar, else an item of the zone's rarity (the rarest of
--- `rarityRolls` rolls). `heavy` keeps to heavy (true) or lighter (false) items, nil for any.
-local function chooseDef(zoneIndex: number, z: number, heavy: boolean?, rarityRolls: number, light: boolean?)
+-- What washes up at a point in a zone: a biome's secret unlock item or own loot sometimes, the
+-- sky-beam item on the Far Sandbar, else an item of the zone's own tier (Items.Catalog Tier) at
+-- a rarity from the zone's table (the rarest of `rarityRolls` rolls). Biome loot takes the
+-- tier of the zone it washes up in, whatever its own Tier (createItem).
+local function chooseDef(zoneIndex: number, z: number, rarityRolls: number)
 	local biome = Biomes.activeIn(Beach.tileAt(z))
 	local def
 	-- Private servers scale rare spawns down with the player count (MonetizationService).
@@ -335,21 +341,19 @@ local function chooseDef(zoneIndex: number, z: number, heavy: boolean?, rarityRo
 	end
 	if not def then
 		local rarity = rollRarity(Items.scaleRare(Config.Zones[zoneIndex].Rarity, rareScale), rarityRolls)
-		local choices = {}
-		local function gather(onlyLight: boolean?)
-			for _, candidate in Items.ofRarity(rarity) do
-				-- Only heavy items in the deeper spots, only lighter ones in the shallows.
-				if
-					(heavy == nil or (candidate.Class >= 3) == heavy)
-					and (not onlyLight or candidate.Class == Gear.WeightClass.Light)
-				then
-					table.insert(choices, candidate)
+		local choices = Items.ofTier(zoneIndex, rarity)
+		if #choices == 0 then
+			-- (A rarity the tier has none of, such as the commons that scaled-down rare spawns
+			-- turn the Far Sandbar's rolls into: the nearest rarer one, else the nearest common.)
+			local index = table.find(Items.Rarities, rarity) or 1
+			for offset = 1, #Items.Rarities do
+				for _, step in { offset, -offset } do
+					local other = Items.Rarities[index + step]
+					if other and #choices == 0 then
+						choices = Items.ofTier(zoneIndex, other)
+					end
 				end
 			end
-		end
-		gather(light)
-		if #choices == 0 and light then
-			gather(false) -- no light item of that rarity: any lighter one
 		end
 		if #choices == 0 then
 			return nil
@@ -361,50 +365,49 @@ end
 
 ItemService._chooseDef = chooseDef -- for tools/tests
 
-local HEAVY_SHARE = 0.3 -- the share of surf spawns that are heavy, where a zone doesn't say
+-- Somewhere to wash an item up: a point at a random depth between `lo` and `hi` of the sea, off
+-- the rocks.
+local function surfPoint(sea: Tide.Sea, lo: number, hi: number): (number?, number?)
+	for _ = 1, 6 do
+		local x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
+		local z = Beach.zForDepth(rng:NextNumber(lo, hi), sea, x)
+		if restsAt(x, z) then
+			return x, z
+		end
+	end
+	return nil, nil
+end
 
 -- Washes one item up somewhere in the surf around the current waterline. The zone (and so
--- the value and rarity) comes from where it lands, so low tide brings richer loot.
-function ItemService.spawnInSurf(sea: Tide.Sea, notHeavy: boolean?): BasePart?
+-- the value, rarity and tier) comes from where it lands, so low tide brings richer loot. Heavy
+-- things (by Class) are moved out into deeper water, within the same stretch of beach.
+function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
 	local beach = Config.Beach
-	-- Heavy things sit out in deeper water; lighter ones anywhere from the wet sand out.
-	local heavy = not notHeavy and rng:NextNumber() < HEAVY_SHARE
-	local x, z
-	for _ = 1, 6 do
-		local depth = if heavy
-			then rng:NextNumber(beach.ShallowDepth, beach.WaistDepth - 0.3)
-			else rng:NextNumber(-0.3, beach.WaistDepth - 0.3)
-		x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
-		z = Beach.zForDepth(depth, sea, x)
-		if restsAt(x, z) then
-			break
-		end
-		x = nil
-	end
-	if not x then
+	local x, z = surfPoint(sea, -0.3, beach.WaistDepth - 0.3)
+	if not x or not z then
 		return nil
 	end
 	local zoneIndex = Beach.zoneAt(z)
 	if not zoneIndex or zoneIndex < 1 then
 		return nil
 	end
-	-- The zone's own mix (Config.Zones: HeavyShare, LightShare). Where the item lies was picked
-	-- for the most heavy things any zone has; a zone with fewer turns some into lighter ones.
-	local zone = Config.Zones[zoneIndex]
-	local heavyShare = zone.HeavyShare or HEAVY_SHARE
-	if heavy and rng:NextNumber() >= heavyShare / HEAVY_SHARE then
-		heavy = false
-	end
-	local light = nil
-	if not heavy and zone.LightShare then
-		light = rng:NextNumber() < zone.LightShare / (1 - heavyShare)
-	end
-	local def = chooseDef(zoneIndex, z, heavy, 1, light)
+	local def = chooseDef(zoneIndex, z, 1)
 	if not def then
 		return nil
 	end
+	if def.Class >= Gear.WeightClass.Heavy and not def.Unlock then
+		local deepX, deepZ = surfPoint(sea, beach.ShallowDepth, beach.WaistDepth - 0.3)
+		if
+			deepX
+			and deepZ
+			and Beach.zoneAt(deepZ) == zoneIndex
+			and Beach.tileAt(deepZ) == Beach.tileAt(z)
+		then
+			x, z = deepX, deepZ
+		end
+	end
 	local y = Beach.groundAt(x, z) + def.Size.Y / 2
-	return createItem(def, zoneIndex, Vector3.new(x, y, z))
+	return createItem(def, zoneIndex, Vector3.new(x, y, z), zoneIndex)
 end
 
 -- The layouts' loot spots: once each tide, as the sea goes out and leaves a spot dry, it
@@ -444,9 +447,14 @@ function ItemService.settleSpots(sea: Tide.Sea, cycle: number): number
 				x = nil
 			end
 			local rolls = math.clamp(math.round(spot.Weight), 1, cfg.SpotRarityRolls)
-			local def = x and chooseDef(zoneIndex, z, nil, rolls)
+			local def = x and chooseDef(zoneIndex, z, rolls)
 			if def then
-				createItem(def, zoneIndex, Vector3.new(x, Beach.groundAt(x, z) + def.Size.Y / 2, z))
+				createItem(
+					def,
+					zoneIndex,
+					Vector3.new(x, Beach.groundAt(x, z) + def.Size.Y / 2, z),
+					zoneIndex
+				)
 				ItemService.stats.SpotSpawned += 1
 				spawned += 1
 			end
@@ -456,8 +464,8 @@ function ItemService.settleSpots(sea: Tide.Sea, cycle: number): number
 end
 
 -- Crowds (Config.Items.CrowdSpawn): the more players on the server (bots count), the more of the
--- shallow, light finds wash up, up to Scale times a solo server's at Players players, linear in
--- between. Heavy and deep spawns don't change.
+-- zones' ordinary surf spawns wash up, up to Scale times a solo server's at Players players,
+-- linear in between.
 local botCount = 0
 
 function ItemService.setBotCount(n: number)
@@ -473,10 +481,9 @@ function ItemService.crowdScale(players: number?): number
 	return 1 + (crowd.Scale - 1) * math.clamp((count - 1) / (crowd.Players - 1), 0, 1)
 end
 
--- The most items kept in the surf at a crowd scale: the shallow, light share (all but the heavy
--- spawns' share) grows with it, the heavy share doesn't.
+-- The most items kept in the surf at a crowd scale: MaxSurfItems times the scale.
 function ItemService.surfCap(scale: number): number
-	return cfg.MaxSurfItems * (HEAVY_SHARE + (1 - HEAVY_SHARE) * scale)
+	return cfg.MaxSurfItems * scale
 end
 
 local function spawnTick()
@@ -502,11 +509,11 @@ local function spawnTick()
 			ItemService.stats.SurfSpawned += 1
 			inSurf += 1
 		end
-		-- The extra shallow, light finds a crowd brings (the light share of a normal tick's spawns
-		-- is about 1 - HEAVY_SHARE, so that many extra tries per unit of scale above 1).
-		local extra = (scale - 1) * (1 - HEAVY_SHARE)
+		-- The extra spawns a crowd brings: one more try per unit of scale above 1 (the last one
+		-- only with the chance left over).
+		local extra = scale - 1
 		while extra > 0 and total < cfg.MaxTotal and inSurf < cap do
-			if rng:NextNumber() < extra and ItemService.spawnInSurf(sea, true) then
+			if rng:NextNumber() < extra and ItemService.spawnInSurf(sea) then
 				ItemService.stats.SurfSpawned += 1
 				inSurf += 1
 			end

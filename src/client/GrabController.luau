@@ -710,11 +710,8 @@ local function describe(part: BasePart): (string, Color3)
 		return line .. " (claimed)", Palette.UI.Claimed
 	end
 	local tool = currentTool()
-	if class > Stats.lift(player, tool) then
-		return line .. " (too heavy)", Palette.UI.Bad
-	end
-	if state ~= "InVessel" and not Gear.canReachDepth(tool, Beach.depthBand(part.Position, Tide.sea())) then
-		return line .. " (too deep)", Palette.UI.Bad
+	if not Gear.canLift(Stats.lift(player, tool), part:GetAttribute("Tier")) then
+		return line .. " (zone " .. tostring(part:GetAttribute("Tier")) .. ": too far out)", Palette.UI.Bad
 	end
 	local rarityColor = Items.RarityColors[part:GetAttribute("Rarity") or "Common"]
 	return line, rarityColor or Palette.UI.Text

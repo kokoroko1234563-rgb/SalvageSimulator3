@@ -113,32 +113,25 @@ Config.Beach = {
 -- they make the walk down about 7 minutes, with wading, waves and wrong turns: the lower
 -- zones are slower, more maze-like ground.
 Config.Zones = {
-	-- HeavyShare: the share of surf spawns that are heavy (out in deeper water; 0.3 if not
-	-- set). LightShare: the share that are light, the rest medium (if not set, light and
-	-- medium are equally likely). The first zones favour light things, which bare hands lift.
+	-- Zone N washes up only the items of Tier N (Items.Catalog), at the rarities in Rarity, and
+	-- the tool of that tier (Gear.Tools) lifts all of them.
 	{
 		Name = "Shopside Shore",
 		Multiplier = 2,
 		CrossTime = 35,
 		Rarity = { Common = 90, Uncommon = 10 },
-		HeavyShare = 0.03,
-		LightShare = 0.9,
 	},
 	{
 		Name = "Sunny Stretch",
 		Multiplier = 3,
 		CrossTime = 36,
 		Rarity = { Common = 70, Uncommon = 25, Rare = 5 },
-		HeavyShare = 0.08,
-		LightShare = 0.75,
 	},
 	{
 		Name = "Middle Banks",
 		Multiplier = 5,
 		CrossTime = 38,
 		Rarity = { Common = 50, Uncommon = 32, Rare = 15, VeryRare = 3 },
-		HeavyShare = 0.15,
-		LightShare = 0.55,
 	},
 	{
 		Name = "Outer Shore",
@@ -735,9 +728,9 @@ Config.Pockets = {
 Config.Items = {
 	SpawnInterval = 1.25, -- seconds between spawn attempts
 	MaxSurfItems = 45, -- unclaimed items kept washing around the current waterline
-	-- Crowds: at Players players on the server (bots count) the shallow, light surf spawns, and the
-	-- share of MaxSurfItems they fill, are Scale times a solo server's, linear in between. Heavy and
-	-- deep spawns don't change. Scale 1 turns it off.
+	-- Crowds: at Players players on the server (bots count) the zones' ordinary surf spawns, and
+	-- the MaxSurfItems they fill, are Scale times a solo server's, linear in between. Scale 1
+	-- turns it off.
 	CrowdSpawn = { Players = 20, Scale = 3 },
 	MaxTotal = 450,
 	LooseTimeout = 25, -- a claimed item left alone this long freezes and becomes unclaimed
