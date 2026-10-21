@@ -78,8 +78,12 @@ BotService.Colors = {
 local HOME = { x = 90, z = -30 }
 local SHOP = { x = -200, z = -31 }
 local HIP = 2.9 -- the root's height over the ground
-local DEPTH_MARGIN = 0.4 -- routes keep this far short of waist depth (deeper drowns)
-local SAFE_SPEED = 0.85 -- routes assume the bot walks this much of its speed (wading, corners)
+local DEPTH_MARGIN = 1.0 -- routes keep this far short of waist depth (deeper drowns, and wading is slow)
+local SAFE_SPEED = 0.7 -- routes assume the bot walks this much of its speed (wading, corners)
+local LOOSE_MARGIN, LOOSE_SPEED = 0.3, 0.85 -- the second try, when no route keeps the full margins
+-- A bot only sets out for an item (or on) if the way home would still be open this many game seconds
+-- after it got there; more once the sea is coming in, and more again with a load.
+local TIDE_SLACK = 40
 
 type Bot = any
 
@@ -387,7 +391,8 @@ end
 local function yieldFor(bot: Bot): () -> ()
 	return function()
 		mark()
-		while frameUsed > FRAME_BUDGET do
+		-- (A bot with a load to get home gets more of the frame.)
+		while frameUsed > FRAME_BUDGET * (if #bot.Cargo > 0 then 3 else 1) do
 			task.wait()
 			if bot.Gone or not running then
 				error("bot gone")
@@ -411,12 +416,13 @@ local function routeTo(
 	z: number,
 	radius: number?,
 	from: { x: number, z: number }?,
-	delay: number?
+	delay: number?,
+	loose: boolean?
 ): ({ any }?, number?)
 	local start = from or { x = bot.X, z = bot.Z }
-	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor * SAFE_SPEED
+	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor * (if loose then LOOSE_SPEED else SAFE_SPEED)
 	local cart = BotEconomy.cartSize(bot.State)
-	local limit = Config.Beach.WaistDepth - DEPTH_MARGIN
+	local limit = Config.Beach.WaistDepth - (if loose then LOOSE_MARGIN else DEPTH_MARGIN)
 	local options = {
 		slope = if cart then Config.Beach.Terrain.CartSlope else Config.Beach.Terrain.FootSlope,
 		cart = cart,
@@ -472,6 +478,10 @@ end
 
 local function goHome(bot: Bot)
 	local path = routeTo(bot, HOME.x, HOME.z, 6)
+	if not path then
+		-- No way with the full margins: the tightest the sea allows.
+		path = routeTo(bot, HOME.x, HOME.z, 6, nil, nil, true)
+	end
 	if not path then
 		-- Nothing the tide won't cut: try anyway on the shortest way, rather than stand and drown.
 		local cart = BotEconomy.cartSize(bot.State)
@@ -555,7 +565,11 @@ local function candidates(bot: Bot): ({ any }, { any })
 				local back = math.sqrt((position.X - HOME.x) ^ 2 + (position.Z - HOME.z) ^ 2)
 					* BotEconomy.MazeFactor
 					/ speed
-				local inStretch = position.X >= lo and position.X <= hi
+				-- What its gear reaches beyond the shallows (heavier, or in deeper water) is worth
+				-- going anywhere along the beach for; the stretch is for the cheap shallow finds.
+				local premium = (item:GetAttribute("Class") or 1) >= Gear.WeightClass.Medium
+					or band >= Gear.Depth.KneeDeep
+				local inStretch = premium or (position.X >= lo and position.X <= hi)
 				-- Hands-only bots stay on short trips (200 game seconds there and back at most).
 				if inStretch or not hands or (there + back) * speedFactor <= 200 then
 					table.insert(if inStretch then mine else others, {
@@ -573,6 +587,18 @@ local function candidates(bot: Bot): ({ any }, { any })
 	table.sort(mine, byScore)
 	table.sort(others, byScore)
 	return mine, others
+end
+
+-- Real seconds of slack to leave the way home: more while the sea is coming in, more with a load.
+local function tideSlack(bot: Bot): number
+	local game = TIDE_SLACK
+	if Tide.getState(now()).Phase == "In" then
+		game *= 2
+	end
+	if #bot.Cargo > 0 then
+		game *= 1.5
+	end
+	return game / speedFactor
 end
 
 local function chooseTarget(bot: Bot): boolean
@@ -605,7 +631,7 @@ local function chooseTarget(bot: Bot): boolean
 				HOME.z,
 				6,
 				{ x = out[#out].x, z = out[#out].z },
-				(outLength or 0) / walk + 1.2 / speedFactor
+				(outLength or 0) / walk + 1.2 / speedFactor + tideSlack(bot)
 			)
 			if back then
 				bot.Target = item
@@ -1240,6 +1266,7 @@ function BotService.setCount(n: number)
 			despawnBot(bots[id])
 		end
 	end
+	ItemService.setBotCount(BotService.count())
 	if n == 0 then
 		BotService.stop()
 	end
@@ -1268,6 +1295,7 @@ function BotService.stop()
 		connection:Disconnect()
 		connection = nil
 	end
+	ItemService.setBotCount(0)
 	running = false
 	if botFolder then
 		botFolder:Destroy()
