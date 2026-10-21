@@ -4,7 +4,7 @@
 
 	  { bots = 8, speed = 10, seconds = 200 }                 X bots play for `seconds` real seconds
 	  { finalTrip = true, speed = 10, seconds = 250,          one bot, one trip to `zone` and back
-	    zone = 6, tool = "BoatHook", vessel = "Wheelbarrow" }
+	    zone = 6, tool = "HandWinch", vessel = "Wheelbarrow" }
 
 	It brings up what the bots need of the server (the tide, the item system with its real spawn
 	rules, collision groups) without building the map's terrain: the bots walk the layouts' ground
@@ -44,7 +44,7 @@ end
 BotService.clearLog()
 BotService.setSpeed(JOB.speed or 1)
 if JOB.finalTrip then
-	BotService.startTrip(JOB.zone or 6, JOB.tool or "BoatHook", JOB.vessel or "Wheelbarrow")
+	BotService.startTrip(JOB.zone or 6, JOB.tool or "HandWinch", JOB.vessel or "Wheelbarrow")
 else
 	BotService.setCount(JOB.bots)
 end

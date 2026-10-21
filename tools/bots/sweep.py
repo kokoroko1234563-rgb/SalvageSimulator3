@@ -320,7 +320,7 @@ def main():
     jobs = []
     if args.final_trip:
         jobs.append(("final_trip" + (f"_{args.tag}" if args.tag else ""), {"finalTrip": True, "speed": args.speed, "seconds": args.seconds,
-                                    "zone": 6, "tool": "BoatHook", "vessel": "Wheelbarrow"}))
+                                    "zone": 6, "tool": "HandWinch", "vessel": "Wheelbarrow"}))
     else:
         for x in [int(v) for v in args.xs.split(",")]:
             job = {"bots": x, "speed": args.speed, "seconds": args.seconds}

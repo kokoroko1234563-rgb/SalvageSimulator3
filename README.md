@@ -80,8 +80,8 @@ node tools/preview/render.cjs /tmp/out /tmp/png            # needs `playwright` 
 | Grabbing | `GrabController` (client) and `GrabService` (server). Items are claimed when grabbed, get physics, are network-owned by the holder, become *Loose* when put down, freeze and turn *Unclaimed* after 25 s, then despawn. |
 | Assist grab | Tap an item to lift it, then tap your vessel (or press **To vessel**). This works on every platform. On touch screens, a lifted item is only dropped with the **Drop** button, so panning the camera never drops it. |
 | Vessels | `VesselService`: Wheelbarrow (one wheel, tips easily) and Beach Wagon (4 wheels). Wheels are visual; vessels slide on hidden low-friction ball skids. Tow them by the handle. Loaded items are welded into slots, so a vessel always holds its full capacity; they only spill if it tips over. Your client keeps your vessel upright (less so for the wheelbarrow) and parks it when you let go. Other players can't touch the vessel or what's in it (collision groups). A vessel covered by deep water is lost with everything in it, and you can spawn it again for free from your inventory, in front of you, anywhere except deep water or a secret. |
-| Shop and selling | `ShopService`: shopkeeper prompt, fixed prices, Bare Hands → Grabber Claw (plus Boat Hook, so Heavy items can be tested). Drop items, or park your vessel, on the yellow sell pad, then talk to the **buyer** beside it to sell them. Nothing sells on its own. Your pockets sell when you talk to the buyer, from anywhere. |
-| Items | `src/shared/Items.luau` has 14 placeholder items across Light, Medium and Heavy, with each zone's value multiplier applied. |
+| Shop and selling | `ShopService`: shopkeeper prompt, fixed prices, Bare Hands → Electric Winch, one tool per zone (see `docs/design/tools.md`). Drop items, or park your vessel, on the yellow sell pad, then talk to the **buyer** beside it to sell them. Nothing sells on its own. Your pockets sell when you talk to the buyer, from anywhere. |
+| Items | `src/shared/Items.luau` has 41 sellable items, each with a zone `Tier` (1 to 7): zone N washes up only tier N, and the tool of tier N lifts all of it (`docs/design/tools.md`). Each zone's value multiplier is applied. |
 | Tide | `src/shared/Tide.luau`: the sea level falls, uncovering the outer zones, holds at low tide, then rises again. The cycle is shortened ×0.4 (10 min) for testing. The sea surface and the foam line at the waterline are drawn on each client from the shared clock. There's a warning when the tide turns each way and no on-screen clock; Studio shows a debug readout in the bottom-right. |
 | Drowning | `DrowningService`: you lose breath in water deeper than waist height, which moves in and out with the tide, and then take damage. What you were carrying drops when you die. |
 | Saving | `DataService`: coins and gear are saved with UpdateAsync and a session lock, with retries, on PlayerRemoving, BindToClose and every 2 minutes. |
@@ -236,7 +236,7 @@ All 8 are in. Each rebirth lets you pick one you don't have yet. They stay throu
 |---|---|
 | Swift Feet | +20% walk speed and faster vessel towing |
 | Sea Legs | Waves push you 40% less, and your breath lasts twice as long |
-| Strong Back | Every grabber lifts one weight class heavier, up to Very heavy |
+| Strong Back | Every grabber works one zone further out (+1 tier), up to the Far Sandbar |
 | Deep Pockets | 3 pocket slots for Light items (press **Q** or **Pocket**). They sell to the buyer |
 | Tide Magnet | A magical grabber. It reels whatever it holds toward you while that item is in the water, and waves push it half as hard |
 | Bubble Wand | A magical grabber. It lifts anything, reaches into deep water and floats items to you slowly in a bubble. Waves can't push or knock it loose |
@@ -306,8 +306,8 @@ Everything the design doc names now exists, with a model. See it all with `tp sh
 **Beach loot:**
 - Light: rope, old boots, coconuts, snorkels, starfish, fishing lures, glass floats, coral.
 - Medium: driftwood planks, tangled nets, buoys, big shells, frozen fish.
-- Very heavy (new class: Electric Winch, Crab Claw, Obsidian Grabber, Bubble Wand, or Strong Back): treasure chests and old statues.
-- Their biomes don't roll yet, so for now they wash up anywhere by rarity.
+- Very heavy: treasure chests and old statues (zone 7, the Far Sandbar, so they need the Electric Winch or one tier of Strong Back on the Hand Winch).
+- Which tool lifts what no longer depends on weight class: every item has a zone tier (`docs/design/tools.md`).
 - The traders' payment items (nets for Old Nell, big shells for Captain Pebble, frozen fish for Pip) are among them.
 
 **Unlock items for the other secrets:**

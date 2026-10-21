@@ -26,7 +26,8 @@ rule), `src/shared/Routes.luau` (walkable routes), `tools/bots/` (the sweep).
   quicker bot. `tools/paths.luau` itself is unchanged: it measures a tile at a time with penalties for
   repeated runs, and the runtime needs one grid with one-off searches, so the two only share their rules.
 - **Real claims.** A bot takes an item from the real item system. `GrabService.canClaim` is the player's
-  rule (free item, tool able to pick up, reach plus slack, weight class, water depth) and
+  rule (free item, tool able to pick up, reach plus slack, and the item's zone tier within the tool's
+  tier; see [tools.md](tools.md)) and
   `ItemService.claimForBot` takes it atomically, so whoever arrives first gets it; bots and players
   compete for the same surf spawns and loot spots, and share the despawn timers. Bots own negative ids.
 - **Real prices.** `ShopService.payout` (item Value, which holds the zone multiplier, times the rebirth
@@ -52,22 +53,25 @@ rule), `src/shared/Routes.luau` (walkable routes), `tools/bots/` (the sweep).
 - **Tide safety.** Routes assume a slower bot (0.7 of its speed) and keep 1 stud short of waist depth (wading
   is slow); a bot only sets out for an item if the way home would still be open 40 game seconds after
   it got there (double while the sea is coming in, 1.5x with a load). If no route keeps those margins the
-  way home falls back to looser ones, then to the shortest way. A bot with gear that reaches heavier
-  or deeper items goes anywhere along the beach for them; the stretch is for the cheap shallow finds.
+  way home falls back to looser ones, then to the shortest way. A bot goes anywhere along the beach for
+  an item beyond the first zone (or in knee-deep water or deeper); the stretch is for the cheap finds of
+  the first zone's shallows.
   A trip bot sets out once the tide is 40% out and plans with the looser margins.
-- **Crowds.** `Config.Items.CrowdSpawn = { Players = 20, Scale = 3 }`: the shallow, light surf spawns
-  (and their share of `MaxSurfItems`) grow linearly with the players on the server, bots counted, to
-  Scale times a solo server's. Heavy and deep spawns don't change. `--scale` on the sweep sets Scale.
+- **Crowds.** `Config.Items.CrowdSpawn = { Players = 20, Scale = 3 }`: the zones' ordinary surf spawns
+  (and `MaxSurfItems`) grow linearly with the players on the server, bots counted, to Scale times a solo
+  server's. `--scale` on the sweep sets Scale.
 
 ## One buying rule, for every bot
 
 1. Rebirth as soon as it can be afforded, taking the reward after which its estimated income is highest.
 2. Otherwise buy what raises estimated income most for its price among what it can afford.
 
-`BotEconomy.income` is the bot's own estimate of a tide's income with some gear: for each zone, how
-long the waterline leaves its surf items there, the walk to it and back, the items its tool can lift
-and reach (weight class, water depth), as many per trip as its vessel carries. It targets the item with
-the best value per second there and back among what it can reach and lift. Trading, the auction,
+`BotEconomy.income` is the bot's own estimate of a tide's income with some gear. The tide works through
+the zones one after another, and a tool works every zone up to its tier, so it adds up, for each of
+those zones, how long the waterline leaves its surf items there, the walk to it and back, and the
+average item of that zone's tier, as many per trip as its vessel carries (heavy things only where a bot
+wades). A bot targets the free item with the best value per second there and back among what its tier
+lifts and the tide leaves open. Trading, the auction,
 traders and Robux are out of scope.
 
 ## Commands (admin console)
@@ -116,8 +120,8 @@ no coins and is still early in its game when the run ends (250 s at x10 is about
 
 ### The final-zone trip
 
-`--final-trip` runs one bot alone, with a Boat Hook (the best tool the shop sells, lifting Heavy and
-reaching waist-deep water) and a Wheelbarrow (the cheapest vessel), on one trip to zone 6 and back,
+`--final-trip` runs one bot alone, with a Hand Winch (the zone 6 tool) and a Wheelbarrow (the cheapest
+vessel), on one trip to zone 6 and back,
 taking zone 6 items only. It reports what the trip earned against `Config.Rebirth.BaseCost`. Prices are
 not changed.
 
@@ -125,6 +129,6 @@ not changed.
 
 - Hazards (rockfall, pits, undertow, sinking sand, the gloom), waves and knock-downs don't touch bots.
 - Vessel speed, stability and the tow don't matter; Magical grabbers' pulling (Tide Magnet, Bubble Wand)
-  is treated as plain reach, lift and depth; Deep Pockets adds three slots of capacity.
+  is treated as plain reach and tier; Deep Pockets adds three slots of capacity.
 - Unlock items are skipped (they are banked, not sold). Pass multipliers are 1.
 - Carts follow along the bot's track; their clearance on corners is checked on the grid, not simulated.
