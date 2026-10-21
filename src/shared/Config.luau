@@ -468,6 +468,9 @@ Config.Secrets = {
 	MinRunTime = 12, -- a chest claimed faster than this is rejected as implausible
 	MinFlood = 60, -- the course floods over at least this many seconds...
 	MaxFlood = 180, -- ...and at most this many, depending on when in the tide cycle you enter
+	-- The chance a biome's door stands in a tide it rolls, by the biome's Tier (the unlock
+	-- item spawns either way).
+	DoorChance = { Common = 0.5, Uncommon = 0.65, Rare = 0.8, VeryRare = 0.9 },
 }
 
 -- The showroom: a gallery off the map showing every model, material and colour (Showroom,

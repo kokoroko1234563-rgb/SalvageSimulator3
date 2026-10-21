@@ -174,7 +174,406 @@ function entranceBuilders.Wreck(wreck: Model, biome, x: number, z: number, groun
 	})
 end
 
-local function buildEntrance(tileFolder: Folder, biome, tile: number)
+-- The ten rooms' openings. Each is a small model on the entrance's spot (its footprint stays
+-- within about 10 studs either side, so it fits the flat the layout clears) with a dark door
+-- part on its -Z face, where the prompt sits and the player comes back out.
+local DOOR_DARK = Color3.fromRGB(35, 28, 24)
+
+-- Adds a part to the model at an offset from the spot, resting on the ground's height there.
+local function put(model: Model, props: { [string]: any }, x: number, y: number, z: number, rotation: CFrame?)
+	local part = makePart(props)
+	part.CFrame = CFrame.new(x, y, z) * (rotation or CFrame.identity)
+	part.Parent = model
+	return part
+end
+
+local function door(
+	x: number,
+	y: number,
+	z: number,
+	size: Vector3,
+	color: Color3?,
+	props: { [string]: any }?
+): BasePart
+	local all: { [string]: any } = {
+		Name = "Door",
+		Size = size,
+		CFrame = CFrame.new(x, y, z),
+		Color = color or DOOR_DARK,
+		Material = Palette.Material.Wood,
+	}
+	for key, value in props or {} do
+		all[key] = value
+	end
+	return makePart(all)
+end
+
+local UPRIGHT = CFrame.Angles(0, 0, math.pi / 2) -- a Cylinder's axis, turned to stand
+
+-- Driftwood Cove: a hollow beached tree trunk lying along Z, its cut end open toward the shop.
+function entranceBuilders.Trunk(model: Model, biome, x: number, z: number, groundY: number): BasePart
+	local bark = Color3.fromRGB(120, 92, 66)
+	local trunk = put(model, {
+		Name = "Trunk",
+		Size = Vector3.new(14, 9, 9),
+		Color = bark,
+		Material = Palette.Material.Wood,
+		Shape = Enum.PartType.Cylinder,
+	}, x, groundY + 4.5, z + 1, CFrame.Angles(0, math.pi / 2, 0))
+	model.PrimaryPart = trunk
+	-- Roots and boughs at the far end.
+	for _, side in { -1, 1 } do
+		put(model, {
+			Name = "Bough",
+			Size = Vector3.new(1.4, 1.4, 8),
+			Color = biome.Decor,
+			Material = Palette.Material.Wood,
+		}, x + side * 4, groundY + 7, z + 6, CFrame.Angles(math.rad(-20), side * math.rad(25), 0))
+	end
+	put(model, {
+		Name = "Root",
+		Size = Vector3.new(7, 3, 3),
+		Color = bark,
+		Material = Palette.Material.Wood,
+	}, x - 3, groundY + 1, z + 7, CFrame.Angles(0, math.rad(30), 0))
+	return door(x, groundY + 3.5, z - 6.3, Vector3.new(5, 6.5, 0.6))
+end
+
+-- Tidepool Rocks: a blowhole, a dark hole in the rock ringed by boulders, open toward the shop.
+function entranceBuilders.Blowhole(model: Model, biome, x: number, z: number, groundY: number): BasePart
+	local rock = biome.Decor
+	local ring = {
+		{ -5.5, 1, 3.5 },
+		{ 5.5, 1, 3.5 },
+		{ -4.5, 0, 7.5 },
+		{ 4.5, 0, 7.5 },
+		{ 0, 0, 9 },
+	}
+	for index, spot in ring do
+		local boulder = put(model, {
+			Name = "Rock",
+			Size = Vector3.new(5 + (index % 2), 4 + (index % 3), 5),
+			Color = rock:Lerp(Color3.new(0, 0, 0), 0.1 * (index % 3)),
+			Material = Palette.Material.Rock,
+		}, x + spot[1], groundY + 2 + spot[2], z + spot[3] - 3, CFrame.Angles(0, index, 0))
+		if index == 1 then
+			model.PrimaryPart = boulder
+		end
+	end
+	put(model, {
+		Name = "Spray",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(2, 2, 2),
+		Color = Color3.fromRGB(200, 225, 235),
+		Material = Palette.Material.Glass,
+		Transparency = 0.5,
+		CanCollide = false,
+	}, x, groundY + 4.5, z + 2)
+	-- The hole itself: a dark disc lying on the ground.
+	return door(x, groundY + 0.4, z, Vector3.new(0.8, 5, 5), DOOR_DARK, {
+		Shape = Enum.PartType.Cylinder,
+		CFrame = CFrame.new(x, groundY + 0.4, z) * UPRIGHT,
+		Material = Palette.Material.Rock,
+	})
+end
+
+-- Seagrass Shallows: a collapsed jetty, its deck fallen with one end up on posts; the way in is
+-- under the high end.
+function entranceBuilders.Jetty(model: Model, biome, x: number, z: number, groundY: number): BasePart
+	local planks = Color3.fromRGB(125, 100, 72)
+	local deck = put(model, {
+		Name = "Deck",
+		Size = Vector3.new(10, 0.8, 14),
+		Color = planks,
+		Material = Palette.Material.WoodPlanks,
+	}, x, groundY + 5, z + 1, CFrame.Angles(math.rad(20), 0, 0))
+	model.PrimaryPart = deck
+	for _, side in { -1, 1 } do
+		put(model, {
+			Name = "Post",
+			Size = Vector3.new(1.2, 7, 1.2),
+			Color = biome.Decor:Lerp(Color3.new(0, 0, 0), 0.5),
+			Material = Palette.Material.Wood,
+		}, x + side * 4.6, groundY + 3.5, z - 6, CFrame.Angles(0, 0, side * math.rad(4)))
+		put(model, {
+			Name = "Barnacles",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(1.6, 1.2, 1.6),
+			Color = Palette.ItemModel.Barnacle,
+			CanCollide = false,
+		}, x + side * 4.6, groundY + 1.2, z - 6.7)
+	end
+	put(model, {
+		Name = "Rail",
+		Size = Vector3.new(0.6, 3, 7),
+		Color = planks,
+		Material = Palette.Material.WoodPlanks,
+	}, x + 5, groundY + 2, z + 6, CFrame.Angles(math.rad(10), 0, math.rad(-35)))
+	return door(x, groundY + 2.2, z - 4.2, Vector3.new(5, 4.4, 0.6))
+end
+
+-- Coral Garden: an arch in the reef, two coral pillars and a lintel with a glowing way through.
+function entranceBuilders.ReefArch(model: Model, biome, x: number, z: number, groundY: number): BasePart
+	local coral = biome.Decor
+	for _, side in { -1, 1 } do
+		local pillar = put(model, {
+			Name = "Pillar",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(10, 4.5, 4.5),
+			Color = coral,
+			Material = Palette.Material.Rock,
+		}, x + side * 4.5, groundY + 5, z, UPRIGHT)
+		if side == -1 then
+			model.PrimaryPart = pillar
+		end
+		put(model, {
+			Name = "Coral",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(4, 3.5, 4),
+			Color = coral:Lerp(Color3.fromRGB(255, 255, 255), 0.25),
+			Material = Palette.Material.Rock,
+		}, x + side * 6.5, groundY + 1.6, z - 2)
+	end
+	put(model, {
+		Name = "Lintel",
+		Size = Vector3.new(14, 3, 4.5),
+		Color = coral:Lerp(Color3.fromRGB(255, 255, 255), 0.15),
+		Material = Palette.Material.Rock,
+	}, x, groundY + 11.5, z)
+	put(model, {
+		Name = "Fan",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(4, 4, 3),
+		Color = coral:Lerp(Color3.fromRGB(255, 255, 255), 0.4),
+		Material = Palette.Material.Rock,
+	}, x + 2, groundY + 14, z)
+	return door(x, groundY + 4.5, z + 0.2, Vector3.new(4.6, 9, 0.6), Color3.fromRGB(255, 190, 215), {
+		Material = Palette.Material.Neon,
+		Transparency = 0.35,
+	})
+end
+
+-- Fog Bank: a lighthouse; its door is the way in.
+function entranceBuilders.Lighthouse(model: Model, biome, x: number, z: number, groundY: number): BasePart
+	local white = Color3.fromRGB(225, 228, 230)
+	local base = put(model, {
+		Name = "Tower",
+		Size = Vector3.new(10, 16, 10),
+		Color = white,
+		Material = Palette.Material.Rock,
+	}, x, groundY + 8, z + 1)
+	model.PrimaryPart = base
+	put(model, {
+		Name = "Stripe",
+		Size = Vector3.new(10.4, 3, 10.4),
+		Color = Color3.fromRGB(140, 60, 55),
+		Material = Palette.Material.Rock,
+	}, x, groundY + 11, z + 1)
+	put(model, {
+		Name = "Upper",
+		Size = Vector3.new(7, 9, 7),
+		Color = white,
+		Material = Palette.Material.Rock,
+	}, x, groundY + 20.5, z + 1)
+	put(model, {
+		Name = "Gallery",
+		Size = Vector3.new(11, 1, 11),
+		Color = Color3.fromRGB(70, 75, 82),
+		Material = Palette.Material.Metal,
+	}, x, groundY + 25.5, z + 1)
+	local lamp = put(model, {
+		Name = "Lamp",
+		Size = Vector3.new(4.5, 4, 4.5),
+		Color = Palette.ItemModel.LanternGlass,
+		Material = Palette.Material.Neon,
+	}, x, groundY + 28, z + 1)
+	local light = Instance.new("PointLight")
+	light.Range = 30
+	light.Color = Palette.ItemModel.LanternGlass
+	light.Parent = lamp
+	put(model, {
+		Name = "Roof",
+		Size = Vector3.new(6.5, 2, 6.5),
+		Color = Color3.fromRGB(140, 60, 55),
+		Material = Palette.Material.Metal,
+	}, x, groundY + 31, z + 1)
+	return door(x, groundY + 3.2, z - 4.2, Vector3.new(3.6, 6.4, 0.6))
+end
+
+-- Whirlwind Dunes: a hollow in a dune, framed by a wind-carved arch of sandstone.
+function entranceBuilders.DuneArch(model: Model, biome, x: number, z: number, groundY: number): BasePart
+	local sand = biome.Decor
+	local dune = put(model, {
+		Name = "Dune",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(22, 14, 18),
+		Color = sand,
+	}, x, groundY + 1, z + 4)
+	model.PrimaryPart = dune
+	local stone = sand:Lerp(Color3.fromRGB(150, 105, 70), 0.4)
+	for _, side in { -1, 1 } do
+		put(model, {
+			Name = "Pier",
+			Size = Vector3.new(3.5, 9, 4),
+			Color = stone,
+			Material = Palette.Material.Rock,
+		}, x + side * 3.8, groundY + 4.5, z - 3.5, CFrame.Angles(0, 0, side * math.rad(-4)))
+	end
+	put(model, {
+		Name = "Lintel",
+		Size = Vector3.new(11.5, 2.6, 4),
+		Color = stone,
+		Material = Palette.Material.Rock,
+	}, x, groundY + 10, z - 3.5, CFrame.Angles(0, 0, math.rad(3)))
+	return door(x, groundY + 4, z - 1.6, Vector3.new(4.2, 8, 0.6), Color3.fromRGB(110, 78, 50), {
+		Material = Palette.Material.Sand,
+	})
+end
+
+-- Hermit Hollows: a giant empty shell lying in the chamber, its mouth a burrow.
+function entranceBuilders.Burrow(model: Model, biome, x: number, z: number, groundY: number): BasePart
+	local shell = biome.Decor
+	local body = put(model, {
+		Name = "Shell",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(14, 11, 14),
+		Color = shell,
+		Material = Palette.Material.Rock,
+	}, x, groundY + 4, z + 1)
+	model.PrimaryPart = body
+	put(model, {
+		Name = "Whorl",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(8, 7, 8),
+		Color = shell:Lerp(Color3.fromRGB(200, 120, 100), 0.35),
+		Material = Palette.Material.Rock,
+	}, x + 3, groundY + 10, z + 3)
+	put(model, {
+		Name = "Tip",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(4, 4, 4),
+		Color = shell:Lerp(Color3.fromRGB(200, 120, 100), 0.6),
+		Material = Palette.Material.Rock,
+	}, x + 5, groundY + 14, z + 4)
+	put(model, {
+		Name = "Lip",
+		Size = Vector3.new(7.5, 1.2, 2),
+		Color = shell:Lerp(Color3.fromRGB(255, 255, 255), 0.3),
+		Material = Palette.Material.Rock,
+	}, x, groundY + 0.6, z - 6.6)
+	return door(x, groundY + 3.2, z - 5.9, Vector3.new(5, 5.6, 0.6))
+end
+
+-- Spearstone Reef: a cleft between two leaning slabs, ringed with spearstones.
+function entranceBuilders.Cleft(model: Model, biome, x: number, z: number, groundY: number): BasePart
+	local stone = biome.Decor
+	for _, side in { -1, 1 } do
+		local slab = put(model, {
+			Name = "Slab",
+			Size = Vector3.new(5, 15, 10),
+			Color = stone,
+			Material = Palette.Material.Rock,
+		}, x + side * 4.6, groundY + 7, z, CFrame.Angles(0, 0, side * math.rad(-5)))
+		if side == -1 then
+			model.PrimaryPart = slab
+		end
+	end
+	put(model, {
+		Name = "Back",
+		Size = Vector3.new(14, 15, 2),
+		Color = stone:Lerp(Color3.new(0, 0, 0), 0.2),
+		Material = Palette.Material.Rock,
+	}, x, groundY + 7, z + 5.5)
+	for index, spot in { { -8, -4 }, { 8, -4 }, { -9, 3 }, { 9, 3 } } do
+		put(model, {
+			Name = "Spearstone",
+			Size = Vector3.new(1.2, 5 + index % 2, 1.2),
+			Color = stone:Lerp(Color3.fromRGB(150, 175, 190), 0.4),
+			Material = Palette.Material.Rock,
+		}, x + spot[1], groundY + 2.5, z + spot[2], CFrame.Angles(math.rad(8), 0, math.rad(index * 6 - 15)))
+	end
+	return door(x, groundY + 5, z + 3, Vector3.new(4, 10, 0.6))
+end
+
+-- Jellyfish Lagoon: a glowing grotto, a mound of rock with a lit hollow and jellies drifting.
+function entranceBuilders.Grotto(model: Model, biome, x: number, z: number, groundY: number): BasePart
+	local rock = Color3.fromRGB(80, 62, 120)
+	local mound = put(model, {
+		Name = "Mound",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(20, 14, 16),
+		Color = rock,
+		Material = Palette.Material.Rock,
+	}, x, groundY + 1, z + 3)
+	model.PrimaryPart = mound
+	for index, spot in { { -7, 8, -3 }, { 6, 10, -2 }, { 1, 12, 0 } } do
+		local jelly = put(model, {
+			Name = "Jelly",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(2.2, 2, 2.2),
+			Color = biome.Decor:Lerp(Palette.ItemModel.Jelly, 0.4),
+			Material = Palette.Material.Neon,
+			Transparency = 0.25,
+			CanCollide = false,
+		}, x + spot[1], groundY + spot[2], z + spot[3])
+		jelly.Name = "Jelly" .. index
+	end
+	local mouth = door(x, groundY + 3.2, z - 4.4, Vector3.new(5, 5.4, 0.6), biome.Decor, {
+		Material = Palette.Material.Neon,
+		Transparency = 0.3,
+	})
+	local glow = Instance.new("PointLight")
+	glow.Color = biome.Decor
+	glow.Range = 24
+	glow.Parent = mouth
+	return mouth
+end
+
+-- Stranded Iceberg: the mouth of an ice cave in a bluff of ice, icicles hanging over it.
+function entranceBuilders.IceCave(model: Model, biome, x: number, z: number, groundY: number): BasePart
+	local ice = Color3.fromRGB(185, 220, 240)
+	local bluff = put(model, {
+		Name = "Bluff",
+		Size = Vector3.new(18, 11, 11),
+		Color = ice,
+		Material = Enum.Material.Ice,
+	}, x, groundY + 5, z + 2)
+	model.PrimaryPart = bluff
+	put(model, {
+		Name = "Crest",
+		Size = Vector3.new(11, 5, 8),
+		Color = ice:Lerp(Color3.fromRGB(255, 255, 255), 0.4),
+		Material = Enum.Material.Ice,
+	}, x - 2, groundY + 12, z + 3, CFrame.Angles(0, math.rad(12), math.rad(4)))
+	put(model, {
+		Name = "Brow",
+		Size = Vector3.new(8, 1.6, 2),
+		Color = ice,
+		Material = Enum.Material.Ice,
+	}, x, groundY + 7.3, z - 3.6)
+	for index, dx in { -3, -1, 1, 3 } do
+		put(model, {
+			Name = "Icicle",
+			Size = Vector3.new(0.7, 2.2 + index % 2, 0.7),
+			Color = ice:Lerp(Color3.fromRGB(255, 255, 255), 0.5),
+			Material = Enum.Material.Ice,
+			CanCollide = false,
+		}, x + dx, groundY + 5.9, z - 3.6)
+	end
+	return door(x, groundY + 3, z - 3.7, Vector3.new(5, 6, 0.6), Color3.fromRGB(25, 45, 70))
+end
+
+-- Whether a biome's door stands this tide: a chance by its tier (Config.Secrets.DoorChance).
+-- The unlock item's spawn doesn't depend on it: a banked item waits for a tide with a door.
+local function doorStands(biome): boolean
+	return rng:NextNumber() < (Config.Secrets.DoorChance[biome.Tier] or 1)
+end
+
+-- `force` skips the roll (tools/tests).
+local function buildEntrance(tileFolder: Folder, biome, tile: number, force: boolean?)
+	if not force and not doorStands(biome) then
+		return
+	end
 	local startZ = Beach.tileRange(tile)
 	-- The layout says where the entrance can stand, or the biome's spots across the tile.
 	local spots = Layouts.entrances(tile, startZ)
@@ -350,6 +749,7 @@ end
 BiomeService._entranceBuilders = entranceBuilders
 BiomeService._decorBuilders = decorBuilders
 BiomeService._buildEntrance = buildEntrance
+BiomeService._doorStands = doorStands
 
 function BiomeService.init(entranceCallback: (Player, string, CFrame) -> (), _notify: (Player, string) -> ())
 	onEntrance = entranceCallback

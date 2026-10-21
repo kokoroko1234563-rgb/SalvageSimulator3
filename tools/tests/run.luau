@@ -20,7 +20,8 @@ local SLOW = 5 -- seconds: a test slower than this says so
 -- `lune run tools/tests/run.luau <words>` runs only the tests whose names contain them.
 local ONLY = table.concat(require("@lune/process").args, " ")
 local function test(name: string, fn: () -> ())
-	if ONLY ~= "" and not string.find(name, ONLY, 1, true) then
+	-- (Loading the services always runs: the tests after it use them.)
+	if ONLY ~= "" and name ~= "load server services" and not string.find(name, ONLY, 1, true) then
 		return
 	end
 	local started = os.clock()
@@ -287,7 +288,15 @@ for id, biome in Biomes.List do
 			or BiomeService._decorBuilders.Mounds
 		decor(folder, biome, 200, 400)
 		if biome.Secret then
-			BiomeService._buildEntrance(folder, biome, 2)
+			-- On the first zone it rolls in, with its layout's entrance spot.
+			local Layouts = h.require("Shared/Layouts")
+			local zone = 99
+			for rolls in biome.Zones do
+				zone = math.min(zone, rolls)
+			end
+			Layouts.setActive(zone, id, zone)
+			BiomeService._buildEntrance(folder, biome, zone, true)
+			Layouts.setActive(zone, nil)
 			assert(folder:FindFirstChild("SecretEntrance"), "no entrance was built")
 		end
 		HazardService.start(2, biome, folder)
