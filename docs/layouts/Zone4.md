@@ -47,6 +47,8 @@ Feet beat carts at the test starts in every crossing (the foot ways and scramble
   ways cut a channel that floods when the sea arrives. Safe going down, deadly coming back late.
 - **Covered spike pits** under the best finds (the Arch's prize, the cove, deep caves).
 
-## Test Range
+## Test Range (every way it comes out)
 
-See the end of the commit log for the run; tolerances are small wall-foot offsets in the terrain.
+Clean but for small tolerances: one wall near x -228, z 2081 to 2087 drawn 35.5 wide instead of 28
+(terrain rounding at a slot door, every crossing), and a few rolling stones and rubble specks
+1 to 2.3 studs above the ground in crossings 2 to 4.
