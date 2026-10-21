@@ -113,7 +113,10 @@ f.decor("Starfish", at=(242, 58))
 
 # The Bend: the west rib curls back on itself into a cove (loot in the cove).
 f.hall([(-280, 190), (-184, 190), (-184, 300), (-280, 300)])
-f.wall([(-288, 252), (-228, 252), (-228, 268)], width=28, height=ROCK)
+# The wall's short return (16 long) is drawn as an area, 28 wide like the rest: as a path leg it
+# would overlap the corner and the Range would measure the corner (35.5), not the wall.
+f.wall([(-288, 252), (-228, 252)], width=28, height=ROCK)
+f.wall_area([(-242, 252), (-214, 252), (-214, 268), (-242, 268)], height=ROCK)
 f.loot((-262, 284), radius=5, weight=2)
 f.decor("WreckRibs", at=(-262, 218), scale=1.2, yaw=70)  # one rib broken (its ribs are)
 f.decor("Kelp", area=[(-274, 276), (-250, 276), (-250, 296), (-274, 296)], count=3)
