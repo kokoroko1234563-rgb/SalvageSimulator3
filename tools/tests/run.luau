@@ -2091,7 +2091,7 @@ test("scenery only stands on level ground, not across walls or under roofs", fun
 	Layouts.setActive(tile, {
 		Name = "walled",
 		Primitives = {
-			{ Kind = "Wall", Path = { { -150, 75 }, { 150, 75 } }, Height = 18, Width = 14 },
+			{ Kind = "Wall", Path = { { -150, 75 }, { 150, 75 } }, Height = 18, Width = 24 },
 			{ Kind = "Roof", At = { 100, 30 }, Radius = 20, Clearance = 10, Thickness = 6 },
 		},
 	})
