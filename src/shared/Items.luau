@@ -1,6 +1,12 @@
 -- Beach loot. Value is the base sell price before the zone multiplier. Size, Shape and
 -- Color set the physics body and the colour the item is named by; the visible model is
 -- built from them in src/server/ItemModels.luau.
+--
+-- Tier (1 to 7) is the zone the item washes up in: a zone's surf and loot spots draw only from
+-- items of its own tier (the zone's Rarity table still picks the rarity within it), and a tool
+-- lifts every item up to its own tier (Gear.Tools). Unlock items have no tier: they are always
+-- liftable. Class (Light to Very heavy) is only the physical feel: density when dragged, what
+-- fits in pockets, and where in the water it lies.
 
 local Gear = require(script.Parent.Gear)
 local Palette = require(script.Parent.Palette)
@@ -31,6 +37,7 @@ Items.Catalog = {
 		Name = "Seashell",
 		Class = Light,
 		Rarity = "Common",
+		Tier = 1,
 		Value = 16,
 		Size = Vector3.new(1, 0.5, 1.2),
 		Shape = "Ball",
@@ -41,6 +48,7 @@ Items.Catalog = {
 		Name = "Glass Bottle",
 		Class = Light,
 		Rarity = "Common",
+		Tier = 1,
 		Value = 24,
 		Size = Vector3.new(1.6, 0.6, 0.6),
 		Shape = "Cylinder",
@@ -52,6 +60,7 @@ Items.Catalog = {
 		Name = "Flip-Flop",
 		Class = Light,
 		Rarity = "Common",
+		Tier = 1,
 		Value = 20,
 		Size = Vector3.new(0.8, 0.25, 1.8),
 		Shape = "Block",
@@ -62,6 +71,7 @@ Items.Catalog = {
 		Name = "Sunglasses",
 		Class = Light,
 		Rarity = "Uncommon",
+		Tier = 1,
 		Value = 56,
 		Size = Vector3.new(1.4, 0.4, 0.5),
 		Shape = "Block",
@@ -72,6 +82,7 @@ Items.Catalog = {
 		Name = "Message in a Bottle",
 		Class = Light,
 		Rarity = "Rare",
+		Tier = 2,
 		Value = 160,
 		Size = Vector3.new(1.8, 0.7, 0.7),
 		Shape = "Cylinder",
@@ -83,6 +94,7 @@ Items.Catalog = {
 		Name = "Pearl",
 		Class = Light,
 		Rarity = "VeryRare",
+		Tier = 3,
 		Value = 480,
 		Size = Vector3.new(0.7, 0.7, 0.7),
 		Shape = "Ball",
@@ -94,6 +106,7 @@ Items.Catalog = {
 		Name = "Beach Ball",
 		Class = Light,
 		Rarity = "Common",
+		Tier = 1,
 		Value = 28,
 		Size = Vector3.new(1.6, 1.6, 1.6),
 		Shape = "Ball",
@@ -303,6 +316,7 @@ Items.Catalog = {
 		Name = "Coil of Rope",
 		Class = Light,
 		Rarity = "Common",
+		Tier = 3,
 		Value = 24,
 		Size = Vector3.new(1.6, 0.5, 1.6),
 		Shape = "Block",
@@ -314,6 +328,7 @@ Items.Catalog = {
 		Name = "Old Boot",
 		Class = Light,
 		Rarity = "Common",
+		Tier = 2,
 		Value = 20,
 		Size = Vector3.new(0.8, 1.1, 1.6),
 		Shape = "Block",
@@ -325,6 +340,7 @@ Items.Catalog = {
 		Name = "Coconut",
 		Class = Light,
 		Rarity = "Common",
+		Tier = 2,
 		Value = 24,
 		Size = Vector3.new(1.1, 1.1, 1.1),
 		Shape = "Ball",
@@ -335,6 +351,7 @@ Items.Catalog = {
 		Name = "Snorkel",
 		Class = Light,
 		Rarity = "Common",
+		Tier = 2,
 		Value = 36,
 		Size = Vector3.new(0.6, 1.8, 0.5),
 		Shape = "Block",
@@ -345,6 +362,7 @@ Items.Catalog = {
 		Name = "Starfish",
 		Class = Light,
 		Rarity = "Uncommon",
+		Tier = 1,
 		Value = 64,
 		Size = Vector3.new(1.6, 0.3, 1.6),
 		Shape = "Block",
@@ -355,6 +373,7 @@ Items.Catalog = {
 		Name = "Fishing Lure",
 		Class = Light,
 		Rarity = "Uncommon",
+		Tier = 2,
 		Value = 80,
 		Size = Vector3.new(0.4, 0.4, 1.1),
 		Shape = "Block",
@@ -365,6 +384,7 @@ Items.Catalog = {
 		Name = "Glass Float",
 		Class = Light,
 		Rarity = "Uncommon",
+		Tier = 3,
 		Value = 96,
 		Size = Vector3.new(1.2, 1.2, 1.2),
 		Shape = "Ball",
@@ -376,6 +396,7 @@ Items.Catalog = {
 		Name = "Coral Branch",
 		Class = Light,
 		Rarity = "Rare",
+		Tier = 3,
 		Value = 180,
 		Size = Vector3.new(1.2, 1.4, 1.2),
 		Shape = "Block",
@@ -387,6 +408,7 @@ Items.Catalog = {
 		Name = "Driftwood Plank",
 		Class = Medium,
 		Rarity = "Common",
+		Tier = 4,
 		Value = 56,
 		Size = Vector3.new(4, 0.35, 1),
 		Shape = "Block",
@@ -399,6 +421,7 @@ Items.Catalog = {
 		Name = "Tangled Net",
 		Class = Medium,
 		Rarity = "Common",
+		Tier = 3,
 		Value = 64,
 		Size = Vector3.new(2, 0.7, 2),
 		Shape = "Block",
@@ -410,6 +433,7 @@ Items.Catalog = {
 		Name = "Buoy",
 		Class = Medium,
 		Rarity = "Uncommon",
+		Tier = 3,
 		Value = 112,
 		Size = Vector3.new(1.8, 1.8, 1.8),
 		Shape = "Ball",
@@ -421,6 +445,7 @@ Items.Catalog = {
 		Name = "Big Shell",
 		Class = Medium,
 		Rarity = "Uncommon",
+		Tier = 2,
 		Value = 128,
 		Size = Vector3.new(1.8, 1.1, 2),
 		Shape = "Block",
@@ -432,6 +457,7 @@ Items.Catalog = {
 		Name = "Frozen Fish",
 		Class = Medium,
 		Rarity = "Rare",
+		Tier = 4,
 		Value = 168,
 		Size = Vector3.new(0.8, 0.6, 2.2),
 		Shape = "Block",
@@ -445,6 +471,7 @@ Items.Catalog = {
 		Name = "Treasure Chest",
 		Class = VeryHeavy,
 		Rarity = "VeryRare",
+		Tier = 7,
 		Value = 1600,
 		Size = Vector3.new(3, 2.2, 2.2),
 		Shape = "Block",
@@ -456,6 +483,7 @@ Items.Catalog = {
 		Name = "Old Statue",
 		Class = VeryHeavy,
 		Rarity = "VeryRare",
+		Tier = 7,
 		Value = 1440,
 		Size = Vector3.new(1.6, 4, 1.6),
 		Shape = "Block",
@@ -468,6 +496,7 @@ Items.Catalog = {
 		Name = "Bucket",
 		Class = Medium,
 		Rarity = "Common",
+		Tier = 3,
 		Value = 60,
 		Size = Vector3.new(1.6, 1.8, 1.6),
 		Shape = "Cylinder",
@@ -478,6 +507,7 @@ Items.Catalog = {
 		Name = "Small Crate",
 		Class = Medium,
 		Rarity = "Uncommon",
+		Tier = 4,
 		Value = 140,
 		Size = Vector3.new(2, 2, 2),
 		Shape = "Block",
@@ -489,6 +519,7 @@ Items.Catalog = {
 		Name = "Lantern",
 		Class = Medium,
 		Rarity = "Rare",
+		Tier = 5,
 		Value = 320,
 		Size = Vector3.new(1.2, 2, 1.2),
 		Shape = "Block",
@@ -500,6 +531,7 @@ Items.Catalog = {
 		Name = "Spyglass",
 		Class = Medium,
 		Rarity = "VeryRare",
+		Tier = 4,
 		Value = 800,
 		Size = Vector3.new(2.6, 0.7, 0.7),
 		Shape = "Cylinder",
@@ -512,6 +544,7 @@ Items.Catalog = {
 		Name = "Ship's Bell",
 		Class = Heavy,
 		Rarity = "Uncommon",
+		Tier = 6,
 		Value = 440,
 		Size = Vector3.new(2, 2.2, 2),
 		Shape = "Cylinder",
@@ -523,6 +556,7 @@ Items.Catalog = {
 		Name = "Barrel",
 		Class = Heavy,
 		Rarity = "Common",
+		Tier = 5,
 		Value = 220,
 		Size = Vector3.new(3, 2.4, 2.4),
 		Shape = "Cylinder",
@@ -534,6 +568,7 @@ Items.Catalog = {
 		Name = "Big Crate",
 		Class = Heavy,
 		Rarity = "Uncommon",
+		Tier = 5,
 		Value = 360,
 		Size = Vector3.new(3.2, 3.2, 3.2),
 		Shape = "Block",
@@ -545,6 +580,7 @@ Items.Catalog = {
 		Name = "Anchor",
 		Class = Heavy,
 		Rarity = "Rare",
+		Tier = 6,
 		Value = 880,
 		Size = Vector3.new(2.4, 3, 0.8),
 		Shape = "Block",
@@ -556,23 +592,161 @@ Items.Catalog = {
 		Name = "Ship's Wheel",
 		Class = Heavy,
 		Rarity = "VeryRare",
+		Tier = 6,
 		Value = 1800,
 		Size = Vector3.new(0.6, 3.4, 3.4),
 		Shape = "Cylinder",
 		Color = Color3.fromRGB(176, 112, 60),
 		Material = Palette.Material.Wood,
 	},
+	-- Zone 4 to 7 additions: every zone's tier holds at least one item of each rarity the zone rolls.
+	{
+		Id = "Oar",
+		Name = "Wooden Oar",
+		Class = Medium,
+		Rarity = "Common",
+		Tier = 4,
+		Value = 60,
+		Size = Vector3.new(3.8, 0.3, 0.7),
+		Shape = "Block",
+		Color = Color3.fromRGB(190, 140, 85),
+		Material = Palette.Material.Wood,
+	},
+	{
+		Id = "LobsterTrap",
+		Name = "Lobster Trap",
+		Class = Medium,
+		Rarity = "Uncommon",
+		Tier = 4,
+		Value = 136,
+		Size = Vector3.new(2.4, 1.3, 1.6),
+		Shape = "Block",
+		Color = Color3.fromRGB(150, 120, 80),
+		Material = Palette.Material.Wood,
+	},
+	{
+		Id = "Cannonball",
+		Name = "Cannonball",
+		Class = Heavy,
+		Rarity = "Common",
+		Tier = 5,
+		Value = 200,
+		Size = Vector3.new(1.2, 1.2, 1.2),
+		Shape = "Ball",
+		Floats = false,
+		Color = Color3.fromRGB(70, 72, 82),
+		Material = Palette.Material.Metal,
+	},
+	{
+		Id = "BrassCompass",
+		Name = "Brass Compass",
+		Class = Light,
+		Rarity = "Uncommon",
+		Tier = 5,
+		Value = 96,
+		Size = Vector3.new(1, 0.4, 1.3),
+		Shape = "Block",
+		Color = Color3.fromRGB(215, 170, 70),
+		Material = Palette.Material.Metal,
+	},
+	{
+		Id = "DivingHelmet",
+		Name = "Diving Helmet",
+		Class = Medium,
+		Rarity = "VeryRare",
+		Tier = 5,
+		Value = 800,
+		Size = Vector3.new(1.8, 1.8, 1.8),
+		Shape = "Ball",
+		Floats = false,
+		Color = Color3.fromRGB(190, 145, 65),
+		Material = Palette.Material.Metal,
+	},
+	{
+		Id = "IronChain",
+		Name = "Iron Chain",
+		Class = Heavy,
+		Rarity = "Common",
+		Tier = 6,
+		Value = 200,
+		Size = Vector3.new(2.8, 0.5, 1.4),
+		Shape = "Block",
+		Color = Color3.fromRGB(95, 95, 105),
+		Material = Palette.Material.Rust,
+	},
+	{
+		Id = "ShipCannon",
+		Name = "Ship's Cannon",
+		Class = Heavy,
+		Rarity = "VeryRare",
+		Tier = 6,
+		Value = 1700,
+		Size = Vector3.new(3.4, 1.3, 1.3),
+		Shape = "Cylinder",
+		Floats = false,
+		Color = Color3.fromRGB(52, 54, 60),
+		Material = Palette.Material.Metal,
+	},
+	{
+		Id = "GoldIngots",
+		Name = "Gold Ingots",
+		Class = Heavy,
+		Rarity = "Rare",
+		Tier = 7,
+		Value = 880,
+		Size = Vector3.new(2.2, 1.2, 1.4),
+		Shape = "Block",
+		Color = Color3.fromRGB(240, 195, 60),
+		Material = Palette.Material.Foil,
+	},
+	{
+		Id = "JeweledGoblet",
+		Name = "Jeweled Goblet",
+		Class = Medium,
+		Rarity = "Rare",
+		Tier = 7,
+		Value = 320,
+		Size = Vector3.new(1, 1.5, 1),
+		Shape = "Block",
+		Color = Color3.fromRGB(235, 190, 70),
+		Material = Palette.Material.Foil,
+	},
+	{
+		Id = "GoldCrown",
+		Name = "Golden Crown",
+		Class = Medium,
+		Rarity = "VeryRare",
+		Tier = 7,
+		Value = 800,
+		Size = Vector3.new(1.6, 1, 1.6),
+		Shape = "Block",
+		Color = Color3.fromRGB(245, 200, 60),
+		Material = Palette.Material.Foil,
+	},
 }
+
+-- The highest tier: the Far Sandbar (Config.Zones[7]).
+Items.MaxTier = 7
 
 local byId = {}
 local byRarity = {}
+local byTier = {} -- tier -> rarity -> items
 for _, rarity in Items.Rarities do
 	byRarity[rarity] = {}
+end
+for tier = 1, Items.MaxTier do
+	byTier[tier] = {}
+	for _, rarity in Items.Rarities do
+		byTier[tier][rarity] = {}
+	end
 end
 for _, item in Items.Catalog do
 	byId[item.Id] = item
 	if byRarity[item.Rarity] then
 		table.insert(byRarity[item.Rarity], item)
+	end
+	if item.Tier and byTier[item.Tier] and byTier[item.Tier][item.Rarity] then
+		table.insert(byTier[item.Tier][item.Rarity], item)
 	end
 end
 
@@ -591,6 +765,12 @@ end
 
 function Items.ofRarity(rarity: string)
 	return byRarity[rarity] or {}
+end
+
+-- The items of a zone tier and rarity (what that zone's surf can wash up at that rarity).
+function Items.ofTier(tier: number, rarity: string)
+	local tierItems = byTier[tier]
+	return if tierItems then tierItems[rarity] or {} else {}
 end
 
 -- Rolls a rarity from a weight table such as { Common = 70, Uncommon = 25, Rare = 5 }.

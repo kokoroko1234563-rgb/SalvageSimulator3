@@ -1440,6 +1440,242 @@ builders.Statue = function(root, def)
 	piece(root, "Nose", Block, Vector3.new(0.08, 0.14, 0.08), CFrame.new(0, 1.38, -0.31), color, Rock)
 end
 
+-- Zone 4 to 7 additions.
+builders.Oar = function(root, def)
+	local color = def.Color
+	piece(root, "Shaft", Cylinder, Vector3.new(2.8, 0.14, 0.14), along(-1.6, 1.2), color, Wood)
+	piece(root, "Grip", Cylinder, Vector3.new(0.45, 0.2, 0.2), along(-1.9, -1.45), shade(color, -0.3), Wood)
+	-- The blade, wider than the shaft, with a darker stripe along its edge.
+	piece(root, "Blade", Block, Vector3.new(1.1, 0.1, 0.66), CFrame.new(1.3, 0, 0), shade(color, 0.12), Wood)
+	piece(root, "Stripe", Block, Vector3.new(1.0, 0.12, 0.1), CFrame.new(1.3, 0, 0.22), M.Aqua, Smooth)
+end
+
+builders.LobsterTrap = function(root, def)
+	local color = def.Color
+	local netting = shade(color, 0.2)
+	-- A half-round pot of wooden hoops and slats, netted over, with the funnel in one end.
+	piece(root, "Base", Block, Vector3.new(2.4, 0.12, 1.6), CFrame.new(0, -0.59, 0), shade(color, -0.2), Wood)
+	piece(root, "Net", Cylinder, Vector3.new(2.3, 1.2, 1.4), CFrame.new(0, -0.05, 0), netting, Fabric, 0.35)
+	for _, x in { -1, 0, 1 } do
+		piece(root, "Hoop", Cylinder, Vector3.new(0.1, 1.25, 1.45), CFrame.new(x, -0.05, 0), color, Wood)
+	end
+	piece(root, "Funnel", Cylinder, Vector3.new(0.12, 0.6, 0.6), CFrame.new(1.17, -0.1, 0), M.Hole)
+	piece(root, "Float", Ball, Vector3.new(0.3, 0.3, 0.3), CFrame.new(-1.0, 0.62, 0.3), M.Float, Smooth)
+end
+
+builders.Cannonball = function(root, def)
+	piece(root, "Shot", Ball, Vector3.new(1.2, 1.2, 1.2), CFrame.new(), def.Color, Metal)
+	-- A patch of rust, and the seam round the middle.
+	piece(root, "Rust", Ball, Vector3.new(0.4, 0.4, 0.4), CFrame.new(0.38, 0.32, 0.3), M.Rock, Rust)
+	piece(root, "Seam", Cylinder, Vector3.new(0.05, 1.19, 1.19), CFrame.new(), shade(def.Color, -0.3), Metal)
+end
+
+builders.BrassCompass = function(root, def)
+	local color = def.Color
+	piece(
+		root,
+		"Case",
+		Cylinder,
+		Vector3.new(0.3, 1.0, 1.0),
+		CFrame.new(0, -0.05, 0.15) * ALONG_Y,
+		color,
+		Metal
+	)
+	piece(root, "Face", Cylinder, Vector3.new(0.04, 0.84, 0.84), CFrame.new(0, 0.12, 0.15) * ALONG_Y, M.Paper)
+	piece(
+		root,
+		"Rim",
+		Cylinder,
+		Vector3.new(0.05, 0.9, 0.9),
+		CFrame.new(0, 0.14, 0.15) * ALONG_Y,
+		shade(color, -0.25),
+		Metal
+	)
+	bar(root, "North", Vector3.new(0, 0.18, 0.15), Vector3.new(0, 0.18, -0.2), 0.08, M.Needle)
+	bar(root, "South", Vector3.new(0, 0.18, 0.15), Vector3.new(0, 0.18, 0.5), 0.08, M.White)
+	piece(root, "Knob", Block, Vector3.new(0.22, 0.22, 0.22), CFrame.new(0, -0.05, -0.5), color, Metal)
+end
+
+builders.DivingHelmet = function(root, def)
+	local color = def.Color
+	local dark = shade(color, -0.3)
+	piece(root, "Dome", Ball, Vector3.new(1.8, 1.8, 1.8), CFrame.new(0, 0.1, 0), color, Metal)
+	piece(root, "Collar", Cylinder, Vector3.new(0.3, 1.6, 1.6), CFrame.new(0, -0.7, 0) * ALONG_Y, dark, Metal)
+	-- The front window, with a ring round it, and two small ports at the sides.
+	piece(
+		root,
+		"FrontRing",
+		Cylinder,
+		Vector3.new(0.12, 0.8, 0.8),
+		CFrame.new(0, 0.15, -0.82) * ALONG_Z,
+		dark,
+		Metal
+	)
+	piece(
+		root,
+		"Front",
+		Cylinder,
+		Vector3.new(0.12, 0.6, 0.6),
+		CFrame.new(0, 0.15, -0.88) * ALONG_Z,
+		M.MaskGlass,
+		Glass,
+		0.25
+	)
+	for _, side in { -1, 1 } do
+		piece(
+			root,
+			"Port",
+			Cylinder,
+			Vector3.new(0.12, 0.32, 0.32),
+			CFrame.new(side * 0.88, 0.15, 0),
+			M.MaskGlass,
+			Glass,
+			0.25
+		)
+	end
+	piece(root, "Valve", Ball, Vector3.new(0.28, 0.28, 0.28), CFrame.new(0, 1.0, 0), M.Gold, Metal)
+end
+
+builders.IronChain = function(root, def)
+	local color = def.Color
+	-- Links lying in a loose heap: flat ones and upright ones alternating, drifting a little.
+	for index = 0, 5 do
+		local x = -1.15 + index * 0.46
+		local z = math.sin(index * 1.3) * 0.25
+		if index % 2 == 0 then
+			loop(root, "Link", CFrame.new(x, -0.12, z), 0.34, 6, 0.14, color, Rust)
+		else
+			loop(
+				root,
+				"Link",
+				CFrame.new(x, 0, z) * CFrame.Angles(math.pi / 2, 0, 0),
+				0.3,
+				6,
+				0.14,
+				shade(color, -0.1),
+				Rust
+			)
+		end
+	end
+end
+
+builders.ShipCannon = function(root, def)
+	local color = def.Color
+	piece(root, "Barrel", Cylinder, Vector3.new(2.9, 0.95, 0.95), along(-1.5, 1.4), color, Metal)
+	piece(
+		root,
+		"Muzzle",
+		Cylinder,
+		Vector3.new(0.25, 1.15, 1.15),
+		CFrame.new(1.55, 0, 0),
+		shade(color, 0.08),
+		Metal
+	)
+	piece(root, "Mouth", Cylinder, Vector3.new(0.04, 0.6, 0.6), CFrame.new(1.68, 0, 0), M.Hole)
+	piece(root, "Cascabel", Ball, Vector3.new(0.5, 0.5, 0.5), CFrame.new(-1.62, 0, 0), color, Metal)
+	piece(root, "Band", Cylinder, Vector3.new(0.14, 1.05, 1.05), CFrame.new(0.6, 0, 0), M.Iron, Metal)
+	-- A wooden carriage under it, on four small wheels.
+	piece(root, "Carriage", Block, Vector3.new(1.8, 0.25, 1.1), CFrame.new(0.1, -0.5, 0), M.Cork, Wood)
+	for _, x in { -0.55, 0.75 } do
+		for _, z in { -0.6, 0.6 } do
+			piece(
+				root,
+				"Wheel",
+				Cylinder,
+				Vector3.new(0.14, 0.6, 0.6),
+				CFrame.new(x, -0.4, z) * ALONG_Z,
+				M.Iron,
+				Metal
+			)
+		end
+	end
+end
+
+builders.GoldIngots = function(root, def)
+	local color = def.Color
+	local function ingot(x: number, y: number, z: number, turned: boolean)
+		local size = if turned then Vector3.new(0.6, 0.4, 1.0) else Vector3.new(1.0, 0.4, 0.6)
+		piece(root, "Ingot", Block, size, CFrame.new(x, y, z), color, Foil)
+		piece(
+			root,
+			"Shine",
+			Block,
+			Vector3.new(size.X * 0.8, 0.04, size.Z * 0.7),
+			CFrame.new(x, y + 0.2, z),
+			shade(color, 0.3),
+			Foil
+		)
+	end
+	-- A little stack: two rows of two, one row of two across them, and one on top.
+	for _, x in { -0.55, 0.55 } do
+		for _, z in { -0.38, 0.38 } do
+			ingot(x, -0.4, z, false)
+		end
+	end
+	for _, z in { -0.38, 0.38 } do
+		ingot(0, 0, z, false)
+	end
+	ingot(0, 0.4, 0, false)
+end
+
+builders.JeweledGoblet = function(root, def)
+	local color = def.Color
+	piece(root, "Foot", Cylinder, Vector3.new(0.1, 0.75, 0.75), CFrame.new(0, -0.7, 0) * ALONG_Y, color, Foil)
+	piece(
+		root,
+		"Stem",
+		Cylinder,
+		Vector3.new(0.6, 0.16, 0.16),
+		CFrame.new(0, -0.35, 0) * ALONG_Y,
+		color,
+		Foil
+	)
+	piece(root, "Knop", Ball, Vector3.new(0.3, 0.3, 0.3), CFrame.new(0, -0.3, 0), shade(color, -0.1), Foil)
+	piece(root, "Cup", Cylinder, Vector3.new(0.75, 0.95, 0.95), CFrame.new(0, 0.3, 0) * ALONG_Y, color, Foil)
+	piece(
+		root,
+		"Wine",
+		Cylinder,
+		Vector3.new(0.04, 0.78, 0.78),
+		CFrame.new(0, 0.66, 0) * ALONG_Y,
+		M.Wax,
+		Smooth
+	)
+	piece(root, "Ruby", Ball, Vector3.new(0.2, 0.2, 0.2), CFrame.new(0, 0.25, -0.48), M.Wax, Glass)
+	piece(root, "Emerald", Ball, Vector3.new(0.16, 0.16, 0.16), CFrame.new(0.4, 0.25, 0.25), M.Moss, Glass)
+end
+
+builders.GoldCrown = function(root, def)
+	local color = def.Color
+	piece(root, "Band", Cylinder, Vector3.new(0.45, 1.4, 1.4), CFrame.new(0, -0.27, 0) * ALONG_Y, color, Foil)
+	piece(
+		root,
+		"Lining",
+		Cylinder,
+		Vector3.new(0.4, 1.2, 1.2),
+		CFrame.new(0, -0.27, 0) * ALONG_Y,
+		M.Wax,
+		Fabric
+	)
+	-- Five points round the rim, each tipped with a pearl, and jewels on the band.
+	for index = 0, 4 do
+		local angle = index / 5 * 2 * math.pi
+		local x, z = math.cos(angle) * 0.6, math.sin(angle) * 0.6
+		piece(root, "Point", Block, Vector3.new(0.22, 0.55, 0.22), CFrame.new(x, 0.2, z), color, Foil)
+		piece(root, "Pearl", Ball, Vector3.new(0.22, 0.22, 0.22), CFrame.new(x, 0.52, z), M.Glint, Smooth)
+		local jx, jz = math.cos(angle + 0.63) * 0.71, math.sin(angle + 0.63) * 0.71
+		piece(
+			root,
+			"Jewel",
+			Ball,
+			Vector3.new(0.18, 0.18, 0.18),
+			CFrame.new(jx, -0.27, jz),
+			if index % 2 == 0 then M.Wax else M.Aqua,
+			Glass
+		)
+	end
+end
+
 -- Whether an item has a model. Items without one keep their plain catalog look.
 function ItemModels.has(id: string): boolean
 	return builders[id] ~= nil

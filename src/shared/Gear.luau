@@ -3,10 +3,17 @@
 
 local Gear = {}
 
--- Weight classes and water depth bands are numbered so they can be compared.
+-- Weight classes and water depth bands are numbered so they can be compared. A weight class is
+-- only an item's physical feel (Items.ClassDensity, pockets, where it lies in the water); what a
+-- tool can lift is decided by zone tier, below.
 Gear.WeightClass = { Light = 1, Medium = 2, Heavy = 3, VeryHeavy = 4 }
 Gear.Depth = { Dry = 0, Shallow = 1, KneeDeep = 2, Waist = 3, Deep = 4 }
 
+-- One tool per zone: Tier (1 to 7) is the farthest zone a tool works. Inside a zone it works, it
+-- lifts everything there (an item's Tier, Items.Catalog; Config.Zones[tier] is its zone), and
+-- there is no water-depth limit on lifting: the sea itself (drowning, waves) limits players.
+-- Strong Back adds one tier (Stats.liftWith). Reach and Grip still differ between tools.
+--
 -- Grip is the acceleration (studs/s^2) the tool can hold an item with; gravity is ~196,
 -- so a weak grip barely lifts and is easily knocked loose by waves.
 -- GripBreak is how far (studs) an item can be pulled from the hold point before it slips.
@@ -17,11 +24,10 @@ Gear.Tools = {
 		Name = "Bare Hands",
 		Price = 0,
 		Reach = 10,
-		Lift = Gear.WeightClass.Light,
-		Depth = Gear.Depth.Shallow,
+		Tier = 1,
 		Grip = 235,
 		GripBreak = 5,
-		Note = "Weak grip",
+		Note = "Works up to zone 1 (Shopside Shore)",
 		Available = true,
 	},
 	{
@@ -30,11 +36,10 @@ Gear.Tools = {
 		Name = "Beach Rake",
 		Price = 150,
 		Reach = 14,
-		Lift = Gear.WeightClass.Light,
-		Depth = Gear.Depth.Shallow,
+		Tier = 2,
 		Grip = 260,
 		GripBreak = 6,
-		Note = "Pulls items out of the shallows",
+		Note = "Works up to zone 2 (Sunny Stretch)",
 		Available = true,
 	},
 	{
@@ -43,11 +48,10 @@ Gear.Tools = {
 		Name = "Fishing Net",
 		Price = 600,
 		Reach = 14,
-		Lift = Gear.WeightClass.Medium,
-		Depth = Gear.Depth.Shallow,
+		Tier = 3,
 		Grip = 330,
 		GripBreak = 7,
-		Note = "Better grip",
+		Note = "Works up to zone 3 (Middle Banks)",
 		Available = true,
 	},
 	{
@@ -56,25 +60,22 @@ Gear.Tools = {
 		Name = "Grabber Claw",
 		Price = 2500,
 		Reach = 18,
-		Lift = Gear.WeightClass.Medium,
-		Depth = Gear.Depth.KneeDeep,
+		Tier = 4,
 		Grip = 360,
 		GripBreak = 7,
-		Note = "Grabs from knee-deep water",
+		Note = "Works up to zone 4 (Outer Shore)",
 		Available = true,
 	},
 	{
-		-- Not in the doc's Milestone 1 list, but enabled so Heavy placeholder items can be tested.
 		Id = "BoatHook",
 		Rarity = "Rare",
 		Name = "Boat Hook",
 		Price = 9000,
 		Reach = 18,
-		Lift = Gear.WeightClass.Heavy,
-		Depth = Gear.Depth.Waist,
+		Tier = 5,
 		Grip = 420,
 		GripBreak = 8,
-		Note = "Reaches deeper water",
+		Note = "Works up to zone 5 (The Shoals)",
 		Available = true,
 	},
 	{
@@ -83,12 +84,11 @@ Gear.Tools = {
 		Name = "Hand Winch",
 		Price = 30000,
 		Reach = 24,
-		Lift = Gear.WeightClass.Heavy,
-		Depth = Gear.Depth.Waist,
+		Tier = 6,
 		Grip = 520,
 		GripBreak = 10,
-		Note = "Strong grip against waves",
-		Available = false,
+		Note = "Works up to zone 6 (The Drowned Reach)",
+		Available = true,
 	},
 	{
 		Id = "ElectricWinch",
@@ -96,12 +96,11 @@ Gear.Tools = {
 		Name = "Electric Winch",
 		Price = 90000,
 		Reach = 24,
-		Lift = Gear.WeightClass.VeryHeavy,
-		Depth = Gear.Depth.Waist,
+		Tier = 7,
 		Grip = 620,
 		GripBreak = 10,
-		Note = "Pulls chests out of rough water",
-		Available = false,
+		Note = "Works up to zone 7 (The Far Sandbar)",
+		Available = true,
 	},
 	{
 		-- Exotic (Sunken Hold lootbox): needs attunement to use. Never in the shop.
@@ -110,8 +109,7 @@ Gear.Tools = {
 		Rarity = "Exotic",
 		Price = 0,
 		Reach = 22,
-		Lift = Gear.WeightClass.Heavy,
-		Depth = Gear.Depth.Waist,
+		Tier = 5,
 		Grip = 480,
 		GripBreak = 10,
 		Note = "Exotic grabber: long reach, holds tight in the surf",
@@ -125,8 +123,7 @@ Gear.Tools = {
 		Rarity = "VeryRare",
 		Price = 0,
 		Reach = 26,
-		Lift = Gear.WeightClass.Heavy,
-		Depth = Gear.Depth.Waist,
+		Tier = 5,
 		Grip = 500,
 		GripBreak = 12,
 		Note = "Magical grabber: pulls items toward you through the water",
@@ -142,11 +139,10 @@ Gear.Tools = {
 		Rarity = "VeryRare",
 		Price = 0,
 		Reach = 30,
-		Lift = Gear.WeightClass.VeryHeavy,
-		Depth = Gear.Depth.Deep,
+		Tier = 7,
 		Grip = 600,
 		GripBreak = math.huge,
-		Note = "Magical grabber: floats any item to you in a bubble, slowly. Waves can't knock it loose",
+		Note = "Magical grabber: floats items to you in a bubble, slowly. Waves can't knock it loose",
 		Available = false,
 		Magical = true,
 		Bubble = true,
@@ -160,8 +156,7 @@ Gear.Tools = {
 		Rarity = "Exotic",
 		Price = 0,
 		Reach = 28,
-		Lift = Gear.WeightClass.Heavy,
-		Depth = Gear.Depth.Waist,
+		Tier = 6,
 		Grip = 520,
 		GripBreak = 12,
 		Note = "Exotic grabber: a gust reels items in fast, in or out of the water",
@@ -178,11 +173,10 @@ Gear.Tools = {
 		Rarity = "Exotic",
 		Price = 0,
 		Reach = 14,
-		Lift = Gear.WeightClass.VeryHeavy,
-		Depth = Gear.Depth.Waist,
+		Tier = 7,
 		Grip = 900,
 		GripBreak = 25,
-		Note = "Exotic grabber: short reach, lifts anything, almost impossible to knock loose",
+		Note = "Exotic grabber: short reach, almost impossible to knock loose",
 		Available = false,
 		Exotic = true,
 	},
@@ -193,11 +187,10 @@ Gear.Tools = {
 		Rarity = "Exotic",
 		Price = 0,
 		Reach = 30,
-		Lift = Gear.WeightClass.VeryHeavy,
-		Depth = Gear.Depth.Deep,
+		Tier = 7,
 		Grip = 700,
 		GripBreak = 14,
-		Note = "Exotic grabber: very long reach, lifts anything, reaches into deep water",
+		Note = "Exotic grabber: very long reach and a strong grip",
 		Available = false,
 		Exotic = true,
 	},
@@ -208,8 +201,7 @@ Gear.Tools = {
 		Rarity = "Exotic",
 		Price = 0,
 		Reach = 18,
-		Lift = Gear.WeightClass.Medium,
-		Depth = Gear.Depth.KneeDeep,
+		Tier = 4,
 		Grip = 400,
 		GripBreak = 8,
 		Note = "Exotic grabber: press F to freeze the waves around you for 5 seconds (25s cooldown)",
@@ -226,8 +218,7 @@ Gear.Tools = {
 		Name = "Lantern",
 		Price = 0,
 		Reach = 0,
-		Lift = Gear.WeightClass.Light,
-		Depth = Gear.Depth.Dry,
+		Tier = 1,
 		Grip = 0,
 		GripBreak = 0,
 		NoGrab = true,
@@ -618,12 +609,10 @@ function Gear.bestTool(owned: { [string]: boolean })
 	return best
 end
 
-function Gear.canLift(tool, weightClass: number): boolean
-	return weightClass <= tool.Lift
-end
-
-function Gear.canReachDepth(tool, depthBand: number): boolean
-	return depthBand <= tool.Depth
+-- Whether a lift tier (a tool's Tier, plus one with Strong Back: Stats.lift) lifts an item.
+-- `itemTier` is the item's Tier attribute; nil (unlock items) is always liftable.
+function Gear.canLift(lift: number, itemTier: number?): boolean
+	return itemTier == nil or itemTier <= lift
 end
 
 return Gear
