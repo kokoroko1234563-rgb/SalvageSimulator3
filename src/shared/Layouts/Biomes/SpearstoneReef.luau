@@ -74,9 +74,6 @@ return {
 			{ At = { 170, 302 }, Radius = 5, Weight = 3 },
 			{ At = { 0, 424 }, Radius = 4, Weight = 5 },
 		},
-		Entrances = {
-			{ -152, 130 },
-		},
 		Hazards = {
 			{ Type = "Spears", At = { -100, 156 }, Radius = 34, Pattern = "Wave", Damage = 35 },
 			{ Type = "Spears", At = { 0, 156 }, Radius = 34, Pattern = "Wave", Damage = 35 },
@@ -286,8 +283,25 @@ return {
 					},
 					{ Kind = "Flat", At = { -100, 88 }, Radius = 6 },
 					{ Kind = "Flat", At = { -100, 140 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -336, 174 },
+							{ -272, 174 },
+							{ -272, 162 },
+							{ -336, 162 },
+						},
+					},
+					{ Kind = "Flat", At = { -336, 168 }, Radius = 6 },
+					{ Kind = "Flat", At = { -272, 168 }, Radius = 6 },
+					{ Kind = "Flat", At = { -270, 170 }, Radius = 16 },
+				},
+				Entrances = {
+					{ -270, 170 },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { -270, 184 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Bones", At = { -258, 162 }, Scale = 0.9, Yaw = 120 },
 					{ Kind = "Rocks", At = { -288, 6 }, Scale = 1.4, Yaw = 30 },
 					{ Kind = "Rocks", At = { -312, 6 }, Scale = 1.1, Yaw = 100 },
 				},
@@ -543,8 +557,25 @@ return {
 						Rough = 0,
 						Over = true,
 					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 114 },
+							{ 272, 114 },
+							{ 272, 126 },
+							{ 336, 126 },
+						},
+					},
+					{ Kind = "Flat", At = { 336, 120 }, Radius = 6 },
+					{ Kind = "Flat", At = { 272, 120 }, Radius = 6 },
+					{ Kind = "Flat", At = { 270, 120 }, Radius = 16 },
+				},
+				Entrances = {
+					{ 270, 120 },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { 270, 134 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Bones", At = { 282, 112 }, Scale = 0.9, Yaw = 120 },
 					{ Kind = "WreckRibs", At = { 70, 8 }, Scale = 0.8, Yaw = 90 },
 				},
 			},
@@ -622,9 +653,6 @@ return {
 			{ At = { -170, 302 }, Radius = 5, Weight = 3 },
 			{ At = { 170, 302 }, Radius = 5, Weight = 3 },
 			{ At = { 0, 424 }, Radius = 4, Weight = 5 },
-		},
-		Entrances = {
-			{ 222, 262 },
 		},
 		Hazards = {
 			{ Type = "Spears", At = { -100, 156 }, Radius = 34, Pattern = "Wave", Damage = 60 },
@@ -844,6 +872,21 @@ return {
 					},
 					{ Kind = "Flat", At = { -100, 88 }, Radius = 6 },
 					{ Kind = "Flat", At = { -100, 140 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -336, 174 },
+							{ -272, 174 },
+							{ -272, 162 },
+							{ -336, 162 },
+						},
+					},
+					{ Kind = "Flat", At = { -336, 168 }, Radius = 6 },
+					{ Kind = "Flat", At = { -272, 168 }, Radius = 6 },
+					{ Kind = "Flat", At = { -270, 170 }, Radius = 16 },
+				},
+				Entrances = {
+					{ -270, 170 },
 				},
 				Hazards = {
 					{ Type = "Spears", At = { 60, 512 }, Radius = 12, Pattern = "Wave", Damage = 60 },
@@ -852,6 +895,8 @@ return {
 					{ Type = "Spears", At = { 210, 512 }, Radius = 12, Pattern = "Checker", Damage = 60 },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { -270, 184 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Bones", At = { -258, 162 }, Scale = 0.9, Yaw = 120 },
 					{ Kind = "Rocks", At = { -288, 6 }, Scale = 1.4, Yaw = 30 },
 					{ Kind = "Rocks", At = { -312, 6 }, Scale = 1.1, Yaw = 100 },
 				},
@@ -1108,8 +1153,25 @@ return {
 						Rough = 0,
 						Over = true,
 					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 114 },
+							{ 272, 114 },
+							{ 272, 126 },
+							{ 336, 126 },
+						},
+					},
+					{ Kind = "Flat", At = { 336, 120 }, Radius = 6 },
+					{ Kind = "Flat", At = { 272, 120 }, Radius = 6 },
+					{ Kind = "Flat", At = { 270, 120 }, Radius = 16 },
+				},
+				Entrances = {
+					{ 270, 120 },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { 270, 134 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Bones", At = { 282, 112 }, Scale = 0.9, Yaw = 120 },
 					{ Kind = "WreckRibs", At = { 70, 8 }, Scale = 0.8, Yaw = 90 },
 				},
 			},
@@ -1265,6 +1327,21 @@ return {
 					{ Kind = "Flat", At = { 264, 472 }, Radius = 6 },
 					{ Kind = "Flat", At = { 336, 472 }, Radius = 6 },
 					{ Kind = "Flat", At = { 336, 596 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 162 },
+							{ 272, 162 },
+							{ 272, 174 },
+							{ 336, 174 },
+						},
+					},
+					{ Kind = "Flat", At = { 336, 168 }, Radius = 6 },
+					{ Kind = "Flat", At = { 272, 168 }, Radius = 6 },
+					{ Kind = "Flat", At = { 270, 170 }, Radius = 16 },
+				},
+				Entrances = {
+					{ 270, 170 },
 				},
 				Hazards = {
 					{ Type = "Spears", At = { 0, 214 }, Radius = 12, Pattern = "Wave", Damage = 60 },
@@ -1273,6 +1350,8 @@ return {
 					{ Type = "Spears", At = { 0, 334 }, Radius = 12, Pattern = "Ring", Damage = 60 },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { 270, 184 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Bones", At = { 282, 162 }, Scale = 0.9, Yaw = 120 },
 					{
 						Kind = "Chain",
 						Path = {
@@ -1358,9 +1437,6 @@ return {
 			{ At = { -170, 302 }, Radius = 5, Weight = 3 },
 			{ At = { 170, 302 }, Radius = 5, Weight = 3 },
 			{ At = { 0, 424 }, Radius = 4, Weight = 5 },
-		},
-		Entrances = {
-			{ -64, 380 },
 		},
 		Hazards = {
 			{ Type = "Spears", At = { -100, 156 }, Radius = 34, Pattern = "Wave", Damage = 100 },
@@ -1580,6 +1656,21 @@ return {
 					},
 					{ Kind = "Flat", At = { -100, 88 }, Radius = 6 },
 					{ Kind = "Flat", At = { -100, 140 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ -336, 174 },
+							{ -272, 174 },
+							{ -272, 162 },
+							{ -336, 162 },
+						},
+					},
+					{ Kind = "Flat", At = { -336, 168 }, Radius = 6 },
+					{ Kind = "Flat", At = { -272, 168 }, Radius = 6 },
+					{ Kind = "Flat", At = { -270, 170 }, Radius = 16 },
+				},
+				Entrances = {
+					{ -270, 170 },
 				},
 				Hazards = {
 					{ Type = "Spears", At = { 60, 512 }, Radius = 12, Pattern = "Wave", Damage = 100 },
@@ -1588,6 +1679,8 @@ return {
 					{ Type = "Spears", At = { 210, 512 }, Radius = 12, Pattern = "Checker", Damage = 100 },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { -270, 184 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Bones", At = { -258, 162 }, Scale = 0.9, Yaw = 120 },
 					{ Kind = "Rocks", At = { -288, 6 }, Scale = 1.4, Yaw = 30 },
 					{ Kind = "Rocks", At = { -312, 6 }, Scale = 1.1, Yaw = 100 },
 				},
@@ -1845,8 +1938,25 @@ return {
 						Rough = 0,
 						Over = true,
 					},
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 114 },
+							{ 272, 114 },
+							{ 272, 126 },
+							{ 336, 126 },
+						},
+					},
+					{ Kind = "Flat", At = { 336, 120 }, Radius = 6 },
+					{ Kind = "Flat", At = { 272, 120 }, Radius = 6 },
+					{ Kind = "Flat", At = { 270, 120 }, Radius = 16 },
+				},
+				Entrances = {
+					{ 270, 120 },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { 270, 134 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Bones", At = { 282, 112 }, Scale = 0.9, Yaw = 120 },
 					{ Kind = "WreckRibs", At = { 70, 8 }, Scale = 0.8, Yaw = 90 },
 				},
 			},
@@ -2002,6 +2112,21 @@ return {
 					{ Kind = "Flat", At = { 264, 472 }, Radius = 6 },
 					{ Kind = "Flat", At = { 336, 472 }, Radius = 6 },
 					{ Kind = "Flat", At = { 336, 596 }, Radius = 6 },
+					{
+						Kind = "Flat",
+						Area = {
+							{ 336, 162 },
+							{ 272, 162 },
+							{ 272, 174 },
+							{ 336, 174 },
+						},
+					},
+					{ Kind = "Flat", At = { 336, 168 }, Radius = 6 },
+					{ Kind = "Flat", At = { 272, 168 }, Radius = 6 },
+					{ Kind = "Flat", At = { 270, 170 }, Radius = 16 },
+				},
+				Entrances = {
+					{ 270, 170 },
 				},
 				Hazards = {
 					{ Type = "Spears", At = { 0, 214 }, Radius = 12, Pattern = "Wave", Damage = 100 },
@@ -2010,6 +2135,8 @@ return {
 					{ Type = "Spears", At = { 0, 334 }, Radius = 12, Pattern = "Ring", Damage = 100 },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { 270, 184 }, Scale = 1.2, Yaw = 40 },
+					{ Kind = "Bones", At = { 282, 162 }, Scale = 0.9, Yaw = 120 },
 					{
 						Kind = "Chain",
 						Path = {
