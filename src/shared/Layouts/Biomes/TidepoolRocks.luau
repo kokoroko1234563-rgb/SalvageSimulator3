@@ -232,9 +232,6 @@ return {
 			{ At = { 270, 400 }, Radius = 8, Weight = 2 },
 			{ At = { -70, 398 }, Radius = 8, Weight = 4 },
 		},
-		Entrances = {
-			{ -250, 290 },
-		},
 		Decor = {
 			{
 				Kind = "Rocks",
@@ -401,19 +398,6 @@ return {
 			{ Kind = "Barnacles", At = { -26, 177 } },
 			{ Kind = "Rocks", At = { 206, 397 }, Scale = 0.8, Yaw = 20 },
 			{ Kind = "Barnacles", At = { 194, 407 } },
-			{ Kind = "Rocks", At = { -236, 282 }, Scale = 1.8, Yaw = 30 },
-			{ Kind = "Rocks", At = { -264, 298 }, Scale = 1.5, Yaw = 110 },
-			{ Kind = "Barnacles", At = { -250, 306 } },
-			{
-				Kind = "Shells",
-				Area = {
-					{ -270, 270 },
-					{ -230, 270 },
-					{ -230, 310 },
-					{ -270, 310 },
-				},
-				Count = 3,
-			},
 			{
 				Kind = "Pebbles",
 				Area = {
@@ -451,6 +435,7 @@ return {
 				Name = "Starfish gully",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 290 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -464,6 +449,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ -318, 290 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -250, 172 }, Radius = 9 },
 					{ Type = "Slow", At = { -110, 170 }, Radius = 8 },
@@ -480,6 +468,8 @@ return {
 					{ Type = "Pulse", At = { 200, 402 } },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { -302, 302 }, Scale = 1.5, Yaw = 30 },
+					{ Kind = "Barnacles", At = { -332, 302 } },
 					{ Kind = "Starfish", At = { -124, 22 }, Scale = 1.2, Yaw = 40 },
 					{ Kind = "Rocks", At = { -174, 30 }, Scale = 1.3, Yaw = 100 },
 				},
@@ -488,6 +478,7 @@ return {
 				Name = "Urchin gully",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 318, 300 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -501,6 +492,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ 318, 300 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -250, 172 }, Radius = 9 },
 					{ Type = "Slow", At = { -110, 170 }, Radius = 8 },
@@ -517,6 +511,8 @@ return {
 					{ Type = "Pulse", At = { 200, 402 } },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { 334, 312 }, Scale = 1.5, Yaw = 30 },
+					{ Kind = "Barnacles", At = { 304, 312 } },
 					{ Kind = "Urchins", At = { 176, 22 }, Scale = 1.2, Yaw = 80 },
 					{ Kind = "Rocks", At = { 126, 30 }, Scale = 1.3, Yaw = 200 },
 				},
@@ -525,6 +521,7 @@ return {
 				Name = "Shell gully",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 470 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -537,6 +534,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ -318, 470 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -250, 172 }, Radius = 9 },
@@ -553,6 +553,8 @@ return {
 					{ Type = "Pulse", At = { -20, 172 } },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { -302, 482 }, Scale = 1.5, Yaw = 30 },
+					{ Kind = "Barnacles", At = { -332, 482 } },
 					{ Kind = "Shells", At = { 26, 22 }, Scale = 1.2, Yaw = 120 },
 					{ Kind = "Rocks", At = { -24, 30 }, Scale = 1.3, Yaw = 300 },
 				},
@@ -868,9 +870,6 @@ return {
 			{ At = { -60, 348 }, Radius = 8, Weight = 2 },
 			{ At = { 270, 488 }, Radius = 8, Weight = 4 },
 		},
-		Entrances = {
-			{ -60, 280 },
-		},
 		Decor = {
 			{
 				Kind = "Rocks",
@@ -1082,19 +1081,6 @@ return {
 			{ Kind = "Barnacles", At = { 14, 497 } },
 			{ Kind = "Rocks", At = { 206, 483 }, Scale = 0.8, Yaw = 20 },
 			{ Kind = "Barnacles", At = { 194, 493 } },
-			{ Kind = "Rocks", At = { -46, 272 }, Scale = 1.8, Yaw = 30 },
-			{ Kind = "Rocks", At = { -74, 288 }, Scale = 1.5, Yaw = 110 },
-			{ Kind = "Barnacles", At = { -60, 296 } },
-			{
-				Kind = "Shells",
-				Area = {
-					{ -80, 260 },
-					{ -40, 260 },
-					{ -40, 300 },
-					{ -80, 300 },
-				},
-				Count = 3,
-			},
 			{
 				Kind = "Pebbles",
 				Area = {
@@ -1132,6 +1118,7 @@ return {
 				Name = "Starfish gully",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 280 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -1147,6 +1134,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ -318, 280 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -270, 212 }, Radius = 10 },
 					{ Type = "Slow", At = { -90, 210 }, Radius = 9 },
@@ -1170,6 +1160,8 @@ return {
 					{ Type = "Pulse", At = { 200, 488 } },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { -302, 292 }, Scale = 1.5, Yaw = 30 },
+					{ Kind = "Barnacles", At = { -332, 292 } },
 					{ Kind = "Starfish", At = { -114, 22 }, Scale = 1.2, Yaw = 40 },
 					{ Kind = "Rocks", At = { -164, 30 }, Scale = 1.3, Yaw = 100 },
 				},
@@ -1178,6 +1170,7 @@ return {
 				Name = "Urchin gully",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 318, 420 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -1193,6 +1186,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ 318, 420 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -270, 212 }, Radius = 10 },
 					{ Type = "Slow", At = { -90, 210 }, Radius = 9 },
@@ -1215,6 +1211,8 @@ return {
 					{ Type = "Pulse", At = { 200, 488 } },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { 334, 432 }, Scale = 1.5, Yaw = 30 },
+					{ Kind = "Barnacles", At = { 304, 432 } },
 					{ Kind = "Urchins", At = { 206, 22 }, Scale = 1.2, Yaw = 80 },
 					{ Kind = "Rocks", At = { 156, 30 }, Scale = 1.3, Yaw = 200 },
 				},
@@ -1223,6 +1221,7 @@ return {
 				Name = "Shell gully",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 420 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -1237,6 +1236,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ -318, 420 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -270, 212 }, Radius = 10 },
@@ -1261,6 +1263,8 @@ return {
 					{ Type = "Pulse", At = { 200, 488 } },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { -302, 432 }, Scale = 1.5, Yaw = 30 },
+					{ Kind = "Barnacles", At = { -332, 432 } },
 					{ Kind = "Shells", At = { -4, 22 }, Scale = 1.2, Yaw = 120 },
 					{ Kind = "Rocks", At = { -54, 30 }, Scale = 1.3, Yaw = 300 },
 				},
@@ -1576,9 +1580,6 @@ return {
 			{ At = { -70, 338 }, Radius = 8, Weight = 2 },
 			{ At = { 280, 478 }, Radius = 8, Weight = 4 },
 		},
-		Entrances = {
-			{ 40, 410 },
-		},
 		Decor = {
 			{
 				Kind = "Rocks",
@@ -1790,19 +1791,6 @@ return {
 			{ Kind = "Barnacles", At = { 14, 487 } },
 			{ Kind = "Rocks", At = { 196, 473 }, Scale = 0.8, Yaw = 10 },
 			{ Kind = "Barnacles", At = { 184, 483 } },
-			{ Kind = "Rocks", At = { 54, 402 }, Scale = 1.8, Yaw = 30 },
-			{ Kind = "Rocks", At = { 26, 418 }, Scale = 1.5, Yaw = 110 },
-			{ Kind = "Barnacles", At = { 40, 426 } },
-			{
-				Kind = "Shells",
-				Area = {
-					{ 20, 390 },
-					{ 60, 390 },
-					{ 60, 430 },
-					{ 20, 430 },
-				},
-				Count = 3,
-			},
 			{
 				Kind = "Pebbles",
 				Area = {
@@ -1840,6 +1828,7 @@ return {
 				Name = "Starfish gully",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 270 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -1855,6 +1844,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ -318, 270 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -280, 202 }, Radius = 11 },
 					{ Type = "Slow", At = { -100, 200 }, Radius = 10 },
@@ -1879,6 +1871,8 @@ return {
 					{ Type = "Pulse", At = { 190, 478 } },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { -302, 282 }, Scale = 1.5, Yaw = 30 },
+					{ Kind = "Barnacles", At = { -332, 282 } },
 					{ Kind = "Starfish", At = { -124, 22 }, Scale = 1.2, Yaw = 40 },
 					{ Kind = "Rocks", At = { -174, 30 }, Scale = 1.3, Yaw = 100 },
 				},
@@ -1887,6 +1881,7 @@ return {
 				Name = "Urchin gully",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 318, 410 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -1902,6 +1897,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ 318, 410 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -280, 202 }, Radius = 11 },
 					{ Type = "Slow", At = { -100, 200 }, Radius = 10 },
@@ -1925,6 +1923,8 @@ return {
 					{ Type = "Pulse", At = { 190, 478 } },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { 334, 422 }, Scale = 1.5, Yaw = 30 },
+					{ Kind = "Barnacles", At = { 304, 422 } },
 					{ Kind = "Urchins", At = { 196, 22 }, Scale = 1.2, Yaw = 80 },
 					{ Kind = "Rocks", At = { 146, 30 }, Scale = 1.3, Yaw = 200 },
 				},
@@ -1933,6 +1933,7 @@ return {
 				Name = "Shell gully",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 318, 270 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -1947,6 +1948,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ 318, 270 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -280, 202 }, Radius = 11 },
@@ -1970,6 +1974,8 @@ return {
 					{ Type = "Pulse", At = { 190, 478 } },
 				},
 				Decor = {
+					{ Kind = "Rocks", At = { 334, 282 }, Scale = 1.5, Yaw = 30 },
+					{ Kind = "Barnacles", At = { 304, 282 } },
 					{ Kind = "Shells", At = { 6, 22 }, Scale = 1.2, Yaw = 120 },
 					{ Kind = "Rocks", At = { -44, 30 }, Scale = 1.3, Yaw = 300 },
 				},
@@ -2058,9 +2064,6 @@ return {
 			},
 			{ Kind = "Flat", At = { 0, 568 }, Radius = 6 },
 			{ Kind = "Flat", At = { 0, 592 }, Radius = 6 },
-		},
-		Entrances = {
-			{ 0, 48 },
 		},
 		Decor = {
 			{
@@ -2625,6 +2628,9 @@ return {
 						Loot = {
 							{ At = { 40, 30 }, Radius = 6, Weight = 2 },
 						},
+						Entrances = {
+							{ 20, 30 },
+						},
 						Decor = {
 							{ Kind = "Weed", At = { 40, 30 } },
 							{ Kind = "Starfish", At = { 52, 24 } },
@@ -2656,6 +2662,9 @@ return {
 						},
 						Loot = {
 							{ At = { 40, 36 }, Radius = 6, Weight = 1 },
+						},
+						Entrances = {
+							{ 20, 30 },
 						},
 						Decor = {
 							{
@@ -2713,6 +2722,9 @@ return {
 						},
 						Loot = {
 							{ At = { 40, 30 }, Radius = 6, Weight = 2 },
+						},
+						Entrances = {
+							{ 20, 30 },
 						},
 						Decor = {
 							{ Kind = "Weed", At = { 40, 30 } },
@@ -2842,6 +2854,9 @@ return {
 						Loot = {
 							{ At = { 40, 26 }, Radius = 6, Weight = 5 },
 						},
+						Entrances = {
+							{ 20, 26 },
+						},
 						Decor = {
 							{ Kind = "Weed", At = { 40, 26 } },
 							{ Kind = "Starfish", At = { 52, 20 } },
@@ -2882,6 +2897,9 @@ return {
 						},
 						Loot = {
 							{ At = { 54, 26 }, Radius = 6, Weight = 4 },
+						},
+						Entrances = {
+							{ 44, 26 },
 						},
 						Decor = {
 							{ Kind = "Weed", At = { 26, 26 } },

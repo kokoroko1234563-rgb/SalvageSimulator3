@@ -132,14 +132,15 @@ def shore(n, hmax, width, loot_at, pairs=PAIRS):
     for i, zc in enumerate(pairs):
         spine_pair(f, zc, hmax, width, 1 if i % 2 == 0 else -1)
 
-    # The entrance: an arch in the reef, at the east end of the middle cove (cleared through both
-    # spines, a flat place for the secret door).
-    f.add(Kind="Flat", At=[322, mid], Radius=9)
-    f.entrance((322, mid))
-    for side in (-1, 1):
-        f.decor("DeadCoral", at=(306, mid + side * SEP), scale=1.5)
-        f.decor("DeadCoral", at=(338, mid + side * SEP), scale=1.5)
-    f.decor("Starfish", at=(322, mid + 14))
+    # The doors: an arch in the reef at either far end of the middle cove (cleared through both
+    # spines, a flat place for the secret door). One of the two stands each tide.
+    for door_x in (322, -322):
+        f.add(Kind="Flat", At=[door_x, mid], Radius=18)
+        f.entrance((door_x, mid))
+        for side in (-1, 1):
+            f.decor("DeadCoral", at=(door_x - 20, mid + side * SEP), scale=1.5)
+            f.decor("DeadCoral", at=(door_x + 20, mid + side * SEP), scale=1.5)
+        f.decor("Starfish", at=(door_x, mid + 22))
 
     # Coral growing on the open sand between the pairs, and the finds in the coves.
     for cx, cz in ((-250, 50), (220, 60), (-60, 200), (260, 210), (-230, 390), (30, 400),
@@ -298,6 +299,7 @@ def cove_room(slot, name, weight, kind):
         r.loot((36, 64), radius=5, weight=weight)
         r.decor("DeadCoral", area=box(36, 48, 48, 72), count=6)
         r.decor("Starfish", at=(36, 40))
+        r.entrance((36, 28))
     elif kind == "grotto":
         r.hall([(8, 8), (64, 8), (64, 88), (8, 88)], roof=True, pillars=[(36, 40), (36, 64)])
         r.loot((20, 76), radius=5, weight=weight)
@@ -307,12 +309,14 @@ def cove_room(slot, name, weight, kind):
         r.loot((20, 76), radius=5, weight=weight)
         r.decor("Crate", area=box(36, 48, 40, 70), count=3)
         r.decor("Shells", at=(24, 24))
+        r.entrance((36, 24))
     else:  # hollow: a snorkel left in a dried pool
         r.hall([(8, 8), (64, 8), (64, 88), (8, 88)])
         r.hollow((24, 70), radius=9, depth=3)
         r.loot((24, 70), radius=5, weight=weight)
         r.decor("Driftwood", at=(44, 30), yaw=30)
         r.decor("Urchins", at=(46, 60))
+        r.entrance((44, 40))
     return r
 
 
@@ -325,12 +329,11 @@ def zone4():
     f.decor("DeadCoral", area=box(0, 6, 480, 24), count=8)
     f.decor("Starfish", area=box(0, 600, 480, 24), count=5)
 
-    # The arch court: the reef's own arch in the middle, with the entrance in it. Each crossing
-    # reaches it by a roofed arch from its middle row.
+    # The arch court: the reef's own arch in the middle (the secret's door is in the coves). Each
+    # crossing reaches it by a roofed arch from its middle row.
     f.hall(box(0, 312, 96, 80), pillars=[(-24, 312), (24, 312)])
     f.decor("DeadCoral", at=(0, 296), scale=1.8)
     f.decor("Starfish", at=(0, 336))
-    f.entrance((0, 328))
     f.loot((0, 328), radius=6, weight=2)
 
     west = z.slot("Coves west", at=(-360, 102), size=(72, 96), door=(72, 48))

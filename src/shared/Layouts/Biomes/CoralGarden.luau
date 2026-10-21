@@ -87,7 +87,8 @@ return {
 				Rough = 1,
 				Material = "Concrete",
 			},
-			{ Kind = "Flat", At = { 322, 300 }, Radius = 9 },
+			{ Kind = "Flat", At = { 322, 300 }, Radius = 18 },
+			{ Kind = "Flat", At = { -322, 300 }, Radius = 18 },
 		},
 		Loot = {
 			{ At = { -300, 120 }, Radius = 5, Weight = 1 },
@@ -97,6 +98,7 @@ return {
 		},
 		Entrances = {
 			{ 322, 300 },
+			{ -322, 300 },
 		},
 		Decor = {
 			{
@@ -195,11 +197,16 @@ return {
 				},
 				Count = 4,
 			},
-			{ Kind = "DeadCoral", At = { 306, 280 }, Scale = 1.5 },
-			{ Kind = "DeadCoral", At = { 338, 280 }, Scale = 1.5 },
-			{ Kind = "DeadCoral", At = { 306, 320 }, Scale = 1.5 },
-			{ Kind = "DeadCoral", At = { 338, 320 }, Scale = 1.5 },
-			{ Kind = "Starfish", At = { 322, 314 } },
+			{ Kind = "DeadCoral", At = { 302, 280 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { 342, 280 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { 302, 320 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { 342, 320 }, Scale = 1.5 },
+			{ Kind = "Starfish", At = { 322, 322 } },
+			{ Kind = "DeadCoral", At = { -342, 280 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { -302, 280 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { -342, 320 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { -302, 320 }, Scale = 1.5 },
+			{ Kind = "Starfish", At = { -322, 322 } },
 			{
 				Kind = "DeadCoral",
 				Area = {
@@ -2843,7 +2850,8 @@ return {
 				Rough = 1,
 				Material = "Concrete",
 			},
-			{ Kind = "Flat", At = { 322, 350 }, Radius = 9 },
+			{ Kind = "Flat", At = { 322, 350 }, Radius = 18 },
+			{ Kind = "Flat", At = { -322, 350 }, Radius = 18 },
 		},
 		Loot = {
 			{ At = { 300, 190 }, Radius = 5, Weight = 1 },
@@ -2854,6 +2862,7 @@ return {
 		},
 		Entrances = {
 			{ 322, 350 },
+			{ -322, 350 },
 		},
 		Decor = {
 			{
@@ -2952,11 +2961,16 @@ return {
 				},
 				Count = 4,
 			},
-			{ Kind = "DeadCoral", At = { 306, 330 }, Scale = 1.5 },
-			{ Kind = "DeadCoral", At = { 338, 330 }, Scale = 1.5 },
-			{ Kind = "DeadCoral", At = { 306, 370 }, Scale = 1.5 },
-			{ Kind = "DeadCoral", At = { 338, 370 }, Scale = 1.5 },
-			{ Kind = "Starfish", At = { 322, 364 } },
+			{ Kind = "DeadCoral", At = { 302, 330 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { 342, 330 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { 302, 370 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { 342, 370 }, Scale = 1.5 },
+			{ Kind = "Starfish", At = { 322, 372 } },
+			{ Kind = "DeadCoral", At = { -342, 330 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { -302, 330 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { -342, 370 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { -302, 370 }, Scale = 1.5 },
+			{ Kind = "Starfish", At = { -322, 372 } },
 			{
 				Kind = "DeadCoral",
 				Area = {
@@ -5567,7 +5581,8 @@ return {
 				Rough = 1,
 				Material = "Concrete",
 			},
-			{ Kind = "Flat", At = { 322, 350 }, Radius = 9 },
+			{ Kind = "Flat", At = { 322, 350 }, Radius = 18 },
+			{ Kind = "Flat", At = { -322, 350 }, Radius = 18 },
 		},
 		Loot = {
 			{ At = { 300, 190 }, Radius = 5, Weight = 1 },
@@ -5578,6 +5593,7 @@ return {
 		},
 		Entrances = {
 			{ 322, 350 },
+			{ -322, 350 },
 		},
 		Decor = {
 			{
@@ -5676,11 +5692,16 @@ return {
 				},
 				Count = 4,
 			},
-			{ Kind = "DeadCoral", At = { 306, 330 }, Scale = 1.5 },
-			{ Kind = "DeadCoral", At = { 338, 330 }, Scale = 1.5 },
-			{ Kind = "DeadCoral", At = { 306, 370 }, Scale = 1.5 },
-			{ Kind = "DeadCoral", At = { 338, 370 }, Scale = 1.5 },
-			{ Kind = "Starfish", At = { 322, 364 } },
+			{ Kind = "DeadCoral", At = { 302, 330 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { 342, 330 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { 302, 370 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { 342, 370 }, Scale = 1.5 },
+			{ Kind = "Starfish", At = { 322, 372 } },
+			{ Kind = "DeadCoral", At = { -342, 330 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { -302, 330 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { -342, 370 }, Scale = 1.5 },
+			{ Kind = "DeadCoral", At = { -302, 370 }, Scale = 1.5 },
+			{ Kind = "Starfish", At = { -322, 372 } },
 			{
 				Kind = "DeadCoral",
 				Area = {
@@ -8351,9 +8372,6 @@ return {
 		Loot = {
 			{ At = { 0, 328 }, Radius = 6, Weight = 2 },
 		},
-		Entrances = {
-			{ 0, 328 },
-		},
 		Decor = {
 			{
 				Kind = "DeadCoral",
@@ -9392,6 +9410,9 @@ return {
 						Loot = {
 							{ At = { 36, 64 }, Radius = 5, Weight = 3 },
 						},
+						Entrances = {
+							{ 36, 28 },
+						},
 						Decor = {
 							{
 								Kind = "DeadCoral",
@@ -9605,6 +9626,9 @@ return {
 						Loot = {
 							{ At = { 20, 76 }, Radius = 5, Weight = 3 },
 						},
+						Entrances = {
+							{ 36, 24 },
+						},
 						Decor = {
 							{
 								Kind = "Crate",
@@ -9653,6 +9677,9 @@ return {
 						},
 						Loot = {
 							{ At = { 24, 70 }, Radius = 5, Weight = 4 },
+						},
+						Entrances = {
+							{ 44, 40 },
 						},
 						Decor = {
 							{ Kind = "Driftwood", At = { 44, 30 }, Yaw = 30 },

@@ -91,7 +91,7 @@ def cart_gap(part, gaps, jams, width=16):
 
 # ---- zones 1 to 3: open sand --------------------------------------------------------------------
 # Per zone: its height limit (the jams just under it), the jams' z, stubs, the dips behind the
-# jams (centre, radius), loot (the deepest is the best), the entrance, and each crossing: its
+# jams (centre, radius), loot (the deepest is the best), the doors, and each crossing: its
 # name, its gap in each jam, and the landmark that is its tell at the way in.
 OPEN = {
     # Zone 1 may not hide the beach from the top (a low bank would), so its "jams" are dark trenches
@@ -101,7 +101,7 @@ OPEN = {
         stubs=[((-330, 90), (-230, 96)), ((200, 300), (320, 292)), ((-300, 500), (-190, 506))],
         dips=[((-250, 172), 12), ((60, 170), 12), ((240, 402), 12), ((-90, 400), 12)],
         loot=[((-300, 210), 1), ((260, 440), 2), ((-60, 548), 4)],
-        entrance=(-270, 290),
+        doors=[(-318, 290), (318, 290), (-318, 470)],
         crossings=[("Anchor gap", (-150, 150), "Anchor"),
                    ("Crate gap", (150, -130), "Crate"),
                    ("Chain gap", (0, 210), "Chain")],
@@ -113,7 +113,7 @@ OPEN = {
         dips=[((-270, 248), 16), ((90, 246), 14), ((250, 388), 16), ((-110, 386), 14),
               ((200, 528), 14), ((-250, 530), 16)],
         loot=[((-300, 248), 1), ((270, 388), 2), ((-260, 530), 3), ((230, 552), 4)],
-        entrance=(-60, 280),
+        doors=[(-318, 280), (318, 420), (-318, 420)],
         crossings=[("Anchor gap", (-140, 100, -90), "Anchor"),
                    ("Crate gap", (180, -80, 110), "Crate"),
                    ("Ribs gap", (-30, 200, 20), "Bones")],
@@ -125,7 +125,7 @@ OPEN = {
         dips=[((-280, 238), 16), ((80, 236), 14), ((260, 378), 16), ((-90, 376), 14),
               ((210, 518), 14), ((-260, 520), 16)],
         loot=[((-310, 238), 1), ((290, 378), 2), ((-270, 520), 3), ((240, 556), 4)],
-        entrance=(40, 410),
+        doors=[(-318, 270), (318, 410), (318, 270)],
         pits=[(-300, 300), (-40, 300), (300, 300), (-230, 440), (40, 440), (290, 440),
               (-20, 570), (220, 570)],
         sinks=[(-190, 285), (190, 280), (-300, 425), (150, 425), (-120, 560), (-300, 570)],
@@ -162,12 +162,6 @@ def open_zone(n):
         dip(f, at, radius=r)
     for at, weight in s["loot"]:
         f.loot(at, radius=8, weight=weight)
-    # The entrance: a hollow beached tree trunk on flat sand, boughs round it.
-    ex, ez = s["entrance"]
-    f.entrance((ex, ez))
-    f.decor("Driftwood", at=(ex, ez), scale=3.2, yaw=70)
-    f.decor("Timber", at=(ex + 18, ez - 12), scale=1.6, yaw=20)
-    f.decor("Driftwood", at=(ex - 16, ez + 14), scale=2, yaw=140)
     # Scatter between the jams, so no stretch is bare.
     f.decor("DuneGrass", area=[(-340, 20), (340, 20), (340, 80), (-340, 80)], count=10)
     f.decor("Pebbles", area=[(-330, 230), (330, 230), (330, 330), (-330, 330)], count=10)
@@ -175,6 +169,12 @@ def open_zone(n):
     crosses = s["jams"] or s["trench"]
     for k, (name, gaps, tell) in enumerate(s["crossings"], 1):
         c = z.crossing(name, paths=1)
+        # The door: a hollow beached tree trunk on a flat of sand in a far corner of the beach,
+        # well off the cart gaps (each way puts it somewhere else).
+        door_at = s["doors"][k - 1]
+        c.add(Kind="Flat", At=list(door_at), Radius=18)
+        c.entrance(door_at)
+        c.decor("Timber", at=(door_at[0] + 16, door_at[1] + 12), scale=1.4, yaw=20)
         ramp = cart_gap(c, gaps, crosses)
         clear_of_pools(n, ramp)
         slow_dips(c, s["dips"], ramp)
@@ -234,9 +234,8 @@ def zone4():
     f.hall([(-360, 592), (360, 592), (360, 620), (-360, 620)])
     f.decor("DuneGrass", area=[(-340, 4), (340, 4), (340, 16), (-340, 16)], count=8)
     f.decor("Pebbles", area=[(-340, 598), (340, 598), (340, 614), (-340, 614)], count=6)
-    # The trunk court: the beached tree whose hollow is the secret's door, off the top band.
+    # The trunk court: a beached tree off the top band (the secret's door is in the hollows).
     f.hall([(-32, 20), (32, 20), (32, 68), (-32, 68)])
-    f.entrance((0, 48))
     f.decor("Driftwood", at=(0, 48), scale=3.4, yaw=80)
     f.decor("Timber", at=(-20, 36), scale=1.5, yaw=30)
     f.decor("Timber", at=(22, 60), scale=1.5, yaw=120)
@@ -255,17 +254,20 @@ def zone4():
     r.hall([(8, 8), (72, 8), (72, 52), (8, 52)])
     r.decor("Timber", area=[(14, 14), (66, 14), (66, 46), (14, 46)], count=4)
     r.loot((40, 36), radius=6, weight=2)
+    r.entrance((20, 30))
     r = s.room("Flooded hollow")
     r.hall([(8, 8), (72, 8), (72, 52), (8, 52)])
     r.hollow((40, 32), radius=14, depth=2, material="Ground")
     r.decor("Weed", at=(40, 32))
     r.loot((40, 32), radius=6, weight=1)
+    r.entrance((20, 30))
     s = z.slot("East hollow", at=(276, 36), size=(80, 60), door=(40, 0))
     r = s.room("Boot-heap")
     r.hall([(8, 8), (72, 8), (72, 52), (8, 52)])
     r.decor("Crate", at=(30, 34))
     r.decor("Driftwood", at=(52, 24), scale=1.2)
     r.loot((40, 36), radius=6, weight=2)
+    r.entrance((20, 30))
     r = s.room("Log cave")
     r.hall([(8, 8), (72, 8), (72, 52), (8, 52)], roof=True, pillars=[(40, 30)])
     r.loot((22, 38), radius=6, weight=1)
@@ -275,10 +277,12 @@ def zone4():
     r.hollow((40, 26), radius=14, depth=2, material="Ground")
     r.decor("Shells", at=(40, 26))
     r.loot((40, 26), radius=6, weight=5)
+    r.entrance((20, 26))
     r = s.room("Wedged hull")
     r.hall([(8, 8), (72, 8), (72, 44), (8, 44)])
     r.decor("Timber", area=[(14, 14), (66, 14), (66, 38), (14, 38)], count=4)
     r.loot((40, 26), radius=6, weight=4)
+    r.entrance((20, 26))
 
     # Crossing 1: the cart way in the west, the foot way in the east.
     c = z.crossing("West cart way", paths=2)

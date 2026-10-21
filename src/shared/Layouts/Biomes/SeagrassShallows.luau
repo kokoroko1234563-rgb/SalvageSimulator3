@@ -73,7 +73,6 @@ return {
 				Rough = 1,
 				Material = "Mud",
 			},
-			{ Kind = "Flat", At = { -70, 264 }, Radius = 9 },
 			{
 				Kind = "Paint",
 				Area = {
@@ -186,9 +185,6 @@ return {
 			{ At = { -230, 480 }, Radius = 5, Weight = 3 },
 			{ At = { 300, 556 }, Radius = 5, Weight = 4 },
 		},
-		Entrances = {
-			{ -70, 264 },
-		},
 		Decor = {
 			{
 				Kind = "Kelp",
@@ -270,7 +266,6 @@ return {
 			},
 			{ Kind = "Chain", At = { -56, 230 }, Yaw = 40 },
 			{ Kind = "Crate", At = { -86, 154 }, Yaw = 20 },
-			{ Kind = "Starfish", At = { -60, 274 } },
 			{
 				Kind = "Weed",
 				Area = {
@@ -548,6 +543,7 @@ return {
 				Name = "Seagrass trail",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -320, 355 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -563,6 +559,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ -320, 355 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -300, 47 }, Radius = 32 },
@@ -654,6 +653,7 @@ return {
 					{ Type = "Slow", At = { 322.8, 543.8 }, Radius = 22.4 },
 				},
 				Decor = {
+					{ Kind = "Starfish", At = { -306, 367 } },
 					{
 						Kind = "Weed",
 						Area = {
@@ -1541,6 +1541,7 @@ return {
 				Name = "Reed track",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 320, 255 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -1556,6 +1557,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ 320, 255 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -265, 47 }, Radius = 32 },
@@ -1647,6 +1651,7 @@ return {
 					{ Type = "Slow", At = { -342.2, 543.8 }, Radius = 22.4 },
 				},
 				Decor = {
+					{ Kind = "Starfish", At = { 334, 267 } },
 					{
 						Kind = "Weed",
 						Area = {
@@ -2525,6 +2530,7 @@ return {
 				Name = "Mud-flat way",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -320, 460 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -2540,6 +2546,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ -320, 460 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -230, 47 }, Radius = 32 },
@@ -2634,6 +2643,7 @@ return {
 					{ Type = "Slow", At = { -307.2, 543.8 }, Radius = 22.4 },
 				},
 				Decor = {
+					{ Kind = "Starfish", At = { -306, 472 } },
 					{
 						Kind = "Weed",
 						Area = {
@@ -3618,7 +3628,6 @@ return {
 				Rough = 1,
 				Material = "Mud",
 			},
-			{ Kind = "Flat", At = { 90, 364 }, Radius = 9 },
 			{
 				Kind = "Paint",
 				Area = {
@@ -3740,9 +3749,6 @@ return {
 			{ At = { 250, 470 }, Radius = 5, Weight = 3 },
 			{ At = { -290, 560 }, Radius = 5, Weight = 4 },
 		},
-		Entrances = {
-			{ 90, 364 },
-		},
 		Decor = {
 			{
 				Kind = "Kelp",
@@ -3808,7 +3814,6 @@ return {
 			},
 			{ Kind = "Chain", At = { 104, 330 }, Yaw = 40 },
 			{ Kind = "Crate", At = { 74, 254 }, Yaw = 20 },
-			{ Kind = "Starfish", At = { 100, 374 } },
 			{
 				Kind = "Weed",
 				Area = {
@@ -4086,6 +4091,7 @@ return {
 				Name = "Seagrass trail",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -320, 360 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -4101,6 +4107,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ -320, 360 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -300, 117 }, Radius = 32 },
@@ -4177,6 +4186,7 @@ return {
 					{ Type = "Slow", At = { 252.8, 532.8 }, Radius = 22.4 },
 				},
 				Decor = {
+					{ Kind = "Starfish", At = { -306, 372 } },
 					{
 						Kind = "Weed",
 						Area = {
@@ -4914,6 +4924,7 @@ return {
 				Name = "Reed track",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 320, 360 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -4929,6 +4940,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ 320, 360 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -265, 117 }, Radius = 32 },
@@ -5008,6 +5022,7 @@ return {
 					{ Type = "Slow", At = { 287.8, 532.8 }, Radius = 22.4 },
 				},
 				Decor = {
+					{ Kind = "Starfish", At = { 334, 372 } },
 					{
 						Kind = "Weed",
 						Area = {
@@ -5766,6 +5781,7 @@ return {
 				Name = "Mud-flat way",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 320, 125 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -5781,6 +5797,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ 320, 125 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -230, 117 }, Radius = 32 },
@@ -5860,6 +5879,7 @@ return {
 					{ Type = "Slow", At = { 322.8, 532.8 }, Radius = 22.4 },
 				},
 				Decor = {
+					{ Kind = "Starfish", At = { 334, 137 } },
 					{
 						Kind = "Weed",
 						Area = {
@@ -6694,7 +6714,6 @@ return {
 				Rough = 1,
 				Material = "Mud",
 			},
-			{ Kind = "Flat", At = { -110, 364 }, Radius = 9 },
 			{
 				Kind = "Paint",
 				Area = {
@@ -6807,9 +6826,6 @@ return {
 			{ At = { -260, 470 }, Radius = 5, Weight = 3 },
 			{ At = { 280, 560 }, Radius = 5, Weight = 4 },
 		},
-		Entrances = {
-			{ -110, 364 },
-		},
 		Decor = {
 			{
 				Kind = "Kelp",
@@ -6875,7 +6891,6 @@ return {
 			},
 			{ Kind = "Chain", At = { -96, 330 }, Yaw = 40 },
 			{ Kind = "Crate", At = { -126, 254 }, Yaw = 20 },
-			{ Kind = "Starfish", At = { -100, 374 } },
 			{
 				Kind = "Weed",
 				Area = {
@@ -7153,6 +7168,7 @@ return {
 				Name = "Seagrass trail",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -320, 350 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -7168,6 +7184,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ -320, 350 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -300, 117 }, Radius = 32 },
@@ -7247,6 +7266,7 @@ return {
 					{ Type = "Slow", At = { 252.8, 532.8 }, Radius = 22.4 },
 				},
 				Decor = {
+					{ Kind = "Starfish", At = { -306, 362 } },
 					{
 						Kind = "Weed",
 						Area = {
@@ -8014,6 +8034,7 @@ return {
 				Name = "Reed track",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 320, 360 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -8029,6 +8050,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ 320, 360 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -265, 117 }, Radius = 32 },
@@ -8105,6 +8129,7 @@ return {
 					{ Type = "Slow", At = { 287.8, 532.8 }, Radius = 22.4 },
 				},
 				Decor = {
+					{ Kind = "Starfish", At = { 334, 372 } },
 					{
 						Kind = "Weed",
 						Area = {
@@ -8833,6 +8858,7 @@ return {
 				Name = "Mud-flat way",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -320, 130 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -8848,6 +8874,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ -320, 130 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -230, 117 }, Radius = 32 },
@@ -8924,6 +8953,7 @@ return {
 					{ Type = "Slow", At = { 322.8, 532.8 }, Radius = 22.4 },
 				},
 				Decor = {
+					{ Kind = "Starfish", At = { -306, 142 } },
 					{
 						Kind = "Weed",
 						Area = {
@@ -9784,9 +9814,6 @@ return {
 		Loot = {
 			{ At = { 0, 322 }, Radius = 6, Weight = 2 },
 		},
-		Entrances = {
-			{ 0, 322 },
-		},
 		Decor = {
 			{
 				Kind = "Weed",
@@ -10564,6 +10591,9 @@ return {
 						Loot = {
 							{ At = { 36, 64 }, Radius = 5, Weight = 3 },
 						},
+						Entrances = {
+							{ 36, 28 },
+						},
 						Decor = {
 							{
 								Kind = "Weed",
@@ -10612,6 +10642,9 @@ return {
 						},
 						Loot = {
 							{ At = { 22, 24 }, Radius = 5, Weight = 4 },
+						},
+						Entrances = {
+							{ 40, 66 },
 						},
 						Decor = {
 							{
@@ -10698,6 +10731,9 @@ return {
 						Loot = {
 							{ At = { 20, 76 }, Radius = 5, Weight = 3 },
 						},
+						Entrances = {
+							{ 36, 24 },
+						},
 						Decor = {
 							{
 								Kind = "Crate",
@@ -10738,6 +10774,9 @@ return {
 						},
 						Loot = {
 							{ At = { 36, 80 }, Radius = 5, Weight = 4 },
+						},
+						Entrances = {
+							{ 36, 28 },
 						},
 						Decor = {
 							{

@@ -102,9 +102,6 @@ return {
 			{ At = { 260, 440 }, Radius = 8, Weight = 2 },
 			{ At = { -60, 548 }, Radius = 8, Weight = 4 },
 		},
-		Entrances = {
-			{ -270, 290 },
-		},
 		Decor = {
 			{
 				Kind = "Driftwood",
@@ -234,9 +231,6 @@ return {
 				Count = 4,
 			},
 			{ Kind = "Shells", At = { -86, 396 } },
-			{ Kind = "Driftwood", At = { -270, 290 }, Scale = 3.2, Yaw = 70 },
-			{ Kind = "Timber", At = { -252, 278 }, Scale = 1.6, Yaw = 20 },
-			{ Kind = "Driftwood", At = { -286, 304 }, Scale = 2, Yaw = 140 },
 			{
 				Kind = "DuneGrass",
 				Area = {
@@ -274,6 +268,7 @@ return {
 				Name = "Anchor gap",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 290 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -287,6 +282,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ -318, 290 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -250, 172 }, Radius = 12 },
 					{ Type = "Slow", At = { 60, 170 }, Radius = 12 },
@@ -294,6 +292,7 @@ return {
 					{ Type = "Slow", At = { -90, 400 }, Radius = 12 },
 				},
 				Decor = {
+					{ Kind = "Timber", At = { -302, 302 }, Scale = 1.4, Yaw = 20 },
 					{ Kind = "Anchor", At = { -124, 22 }, Scale = 1.2, Yaw = 40 },
 					{ Kind = "Driftwood", At = { -174, 30 }, Scale = 1.4, Yaw = 100 },
 				},
@@ -302,6 +301,7 @@ return {
 				Name = "Crate gap",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 318, 290 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -315,6 +315,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ 318, 290 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -250, 172 }, Radius = 12 },
 					{ Type = "Slow", At = { 60, 170 }, Radius = 12 },
@@ -322,6 +325,7 @@ return {
 					{ Type = "Slow", At = { -90, 400 }, Radius = 12 },
 				},
 				Decor = {
+					{ Kind = "Timber", At = { 334, 302 }, Scale = 1.4, Yaw = 20 },
 					{ Kind = "Crate", At = { 176, 22 }, Scale = 1.2, Yaw = 80 },
 					{ Kind = "Driftwood", At = { 126, 30 }, Scale = 1.4, Yaw = 200 },
 				},
@@ -330,6 +334,7 @@ return {
 				Name = "Chain gap",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 470 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -343,6 +348,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ -318, 470 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -250, 172 }, Radius = 12 },
 					{ Type = "Slow", At = { 60, 170 }, Radius = 12 },
@@ -350,6 +358,7 @@ return {
 					{ Type = "Slow", At = { -90, 400 }, Radius = 12 },
 				},
 				Decor = {
+					{ Kind = "Timber", At = { -302, 482 }, Scale = 1.4, Yaw = 20 },
 					{ Kind = "Chain", At = { 26, 22 }, Scale = 1.2, Yaw = 120 },
 					{ Kind = "Driftwood", At = { -24, 30 }, Scale = 1.4, Yaw = 300 },
 				},
@@ -548,9 +557,6 @@ return {
 			{ At = { -260, 530 }, Radius = 8, Weight = 3 },
 			{ At = { 230, 552 }, Radius = 8, Weight = 4 },
 		},
-		Entrances = {
-			{ -60, 280 },
-		},
 		Decor = {
 			{
 				Kind = "Driftwood",
@@ -740,9 +746,6 @@ return {
 				Count = 4,
 			},
 			{ Kind = "Shells", At = { -244, 524 } },
-			{ Kind = "Driftwood", At = { -60, 280 }, Scale = 3.2, Yaw = 70 },
-			{ Kind = "Timber", At = { -42, 268 }, Scale = 1.6, Yaw = 20 },
-			{ Kind = "Driftwood", At = { -76, 294 }, Scale = 2, Yaw = 140 },
 			{
 				Kind = "DuneGrass",
 				Area = {
@@ -780,6 +783,7 @@ return {
 				Name = "Anchor gap",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 280 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -795,6 +799,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ -318, 280 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -270, 248 }, Radius = 12 },
 					{ Type = "Slow", At = { 90, 246 }, Radius = 12 },
@@ -804,6 +811,7 @@ return {
 					{ Type = "Slow", At = { -250, 530 }, Radius = 12 },
 				},
 				Decor = {
+					{ Kind = "Timber", At = { -302, 292 }, Scale = 1.4, Yaw = 20 },
 					{ Kind = "Anchor", At = { -114, 22 }, Scale = 1.2, Yaw = 40 },
 					{ Kind = "Driftwood", At = { -164, 30 }, Scale = 1.4, Yaw = 100 },
 				},
@@ -812,6 +820,7 @@ return {
 				Name = "Crate gap",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 318, 420 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -827,6 +836,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ 318, 420 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -270, 248 }, Radius = 12 },
 					{ Type = "Slow", At = { 250, 388 }, Radius = 12 },
@@ -835,6 +847,7 @@ return {
 					{ Type = "Slow", At = { -250, 530 }, Radius = 12 },
 				},
 				Decor = {
+					{ Kind = "Timber", At = { 334, 432 }, Scale = 1.4, Yaw = 20 },
 					{ Kind = "Crate", At = { 206, 22 }, Scale = 1.2, Yaw = 80 },
 					{ Kind = "Driftwood", At = { 156, 30 }, Scale = 1.4, Yaw = 200 },
 				},
@@ -843,6 +856,7 @@ return {
 				Name = "Ribs gap",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 420 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -858,6 +872,9 @@ return {
 						Width = 16,
 					},
 				},
+				Entrances = {
+					{ -318, 420 },
+				},
 				Hazards = {
 					{ Type = "Slow", At = { -270, 248 }, Radius = 12 },
 					{ Type = "Slow", At = { 90, 246 }, Radius = 12 },
@@ -867,6 +884,7 @@ return {
 					{ Type = "Slow", At = { -250, 530 }, Radius = 12 },
 				},
 				Decor = {
+					{ Kind = "Timber", At = { -302, 432 }, Scale = 1.4, Yaw = 20 },
 					{ Kind = "Bones", At = { -4, 22 }, Scale = 1.2, Yaw = 120 },
 					{ Kind = "Driftwood", At = { -54, 30 }, Scale = 1.4, Yaw = 300 },
 				},
@@ -1065,9 +1083,6 @@ return {
 			{ At = { -270, 520 }, Radius = 8, Weight = 3 },
 			{ At = { 240, 556 }, Radius = 8, Weight = 4 },
 		},
-		Entrances = {
-			{ 40, 410 },
-		},
 		Decor = {
 			{
 				Kind = "Driftwood",
@@ -1257,9 +1272,6 @@ return {
 				Count = 4,
 			},
 			{ Kind = "Shells", At = { -254, 514 } },
-			{ Kind = "Driftwood", At = { 40, 410 }, Scale = 3.2, Yaw = 70 },
-			{ Kind = "Timber", At = { 58, 398 }, Scale = 1.6, Yaw = 20 },
-			{ Kind = "Driftwood", At = { 24, 424 }, Scale = 2, Yaw = 140 },
 			{
 				Kind = "DuneGrass",
 				Area = {
@@ -1297,6 +1309,7 @@ return {
 				Name = "Anchor gap",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 270 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -1311,6 +1324,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ -318, 270 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -280, 238 }, Radius = 12 },
@@ -1334,6 +1350,7 @@ return {
 					{ Type = "Sink", At = { -300, 570 }, Radius = 10 },
 				},
 				Decor = {
+					{ Kind = "Timber", At = { -302, 282 }, Scale = 1.4, Yaw = 20 },
 					{ Kind = "Anchor", At = { -124, 22 }, Scale = 1.2, Yaw = 40 },
 					{ Kind = "Driftwood", At = { -174, 30 }, Scale = 1.4, Yaw = 100 },
 				},
@@ -1342,6 +1359,7 @@ return {
 				Name = "Crate gap",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 318, 410 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -1356,6 +1374,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ 318, 410 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -280, 238 }, Radius = 12 },
@@ -1376,6 +1397,7 @@ return {
 					{ Type = "Sink", At = { -300, 570 }, Radius = 10 },
 				},
 				Decor = {
+					{ Kind = "Timber", At = { 334, 422 }, Scale = 1.4, Yaw = 20 },
 					{ Kind = "Crate", At = { 196, 22 }, Scale = 1.2, Yaw = 80 },
 					{ Kind = "Driftwood", At = { 146, 30 }, Scale = 1.4, Yaw = 200 },
 				},
@@ -1384,6 +1406,7 @@ return {
 				Name = "Ribs gap",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 318, 270 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -1398,6 +1421,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ 318, 270 },
 				},
 				Hazards = {
 					{ Type = "Slow", At = { -280, 238 }, Radius = 12 },
@@ -1420,6 +1446,7 @@ return {
 					{ Type = "Sink", At = { -300, 570 }, Radius = 10 },
 				},
 				Decor = {
+					{ Kind = "Timber", At = { 334, 282 }, Scale = 1.4, Yaw = 20 },
 					{ Kind = "Bones", At = { 6, 22 }, Scale = 1.2, Yaw = 120 },
 					{ Kind = "Driftwood", At = { -44, 30 }, Scale = 1.4, Yaw = 300 },
 				},
@@ -1499,9 +1526,6 @@ return {
 			},
 			{ Kind = "Flat", At = { 0, 568 }, Radius = 6 },
 			{ Kind = "Flat", At = { 0, 592 }, Radius = 6 },
-		},
-		Entrances = {
-			{ 0, 48 },
 		},
 		Hazards = {
 			{ Type = "Pit", At = { -180, 4 }, Radius = 4, Covered = false },
@@ -2006,6 +2030,9 @@ return {
 						Loot = {
 							{ At = { 40, 36 }, Radius = 6, Weight = 2 },
 						},
+						Entrances = {
+							{ 20, 30 },
+						},
 						Decor = {
 							{
 								Kind = "Timber",
@@ -2055,6 +2082,9 @@ return {
 						Loot = {
 							{ At = { 40, 32 }, Radius = 6, Weight = 1 },
 						},
+						Entrances = {
+							{ 20, 30 },
+						},
 						Decor = {
 							{ Kind = "Weed", At = { 40, 32 } },
 						},
@@ -2092,6 +2122,9 @@ return {
 						},
 						Loot = {
 							{ At = { 40, 36 }, Radius = 6, Weight = 2 },
+						},
+						Entrances = {
+							{ 20, 30 },
 						},
 						Decor = {
 							{ Kind = "Crate", At = { 30, 34 } },
@@ -2218,6 +2251,9 @@ return {
 						Loot = {
 							{ At = { 40, 26 }, Radius = 6, Weight = 5 },
 						},
+						Entrances = {
+							{ 20, 26 },
+						},
 						Decor = {
 							{ Kind = "Shells", At = { 40, 26 } },
 						},
@@ -2248,6 +2284,9 @@ return {
 						},
 						Loot = {
 							{ At = { 40, 26 }, Radius = 6, Weight = 4 },
+						},
+						Entrances = {
+							{ 20, 26 },
 						},
 						Decor = {
 							{

@@ -131,12 +131,10 @@ def shore(n, name, hmax, bank_w, depth, jx, loot_at, tide_z=(110, 300, 510), ban
                    (364, zc - 4 * k)], depth=depth, width=chan_w, rough=1, material=MUD)
         f.decor("Kelp", path=[(-330, zc + 12), (330, zc - 4)], count=5)
 
-    # The jetty, fallen along the middle channel; its entrance is under the end of it.
+    # A jetty, fallen along the middle channel (the secret's door is under another, in a far corner:
+    # each crossing puts it somewhere else, see DOORS).
     z0, z1 = tide_z[1] - 60, tide_z[1] + 40
     jetty(f, jx, z0, z1)
-    f.add(Kind="Flat", At=[jx, z1 + 24], Radius=9)
-    f.entrance((jx, z1 + 24))
-    f.decor("Starfish", at=(jx + 10, z1 + 34))
 
     # Seagrass meadows in the flats between, the zone's green.
     for cx, cz in ((-240, 60), (190, 55), (-80, 150), (260, 250), (-250, 350), (60, 360),
@@ -158,6 +156,11 @@ def crossing(z, name, start, g1, mid, g2, end, tell, rows, jx, k, paths=1):
     bank, `mid`, the gap `g2` in the second bank, out at `end`. Straight down over the banks is
     quicker on foot."""
     c = z.crossing(name, paths=paths)
+    # The door: a collapsed jetty on a flat of sand in a far corner, well off the cart ramp.
+    door_at = DOORS[z.number][k]
+    c.add(Kind="Flat", At=list(door_at), Radius=18)
+    c.entrance(door_at)
+    c.decor("Starfish", at=(door_at[0] + 14, door_at[1] + 12))
     bank1, bank2 = 190, 410
     c.ramp([(start, 0), (start, 70), (g1, bank1 - 20), (g1, bank1 + 25), (mid, 300),
             (g2, bank2 - 30), (g2, bank2 + 25), ((g2 + end) / 2, 520), (end, 608)], width=16)
@@ -187,6 +190,11 @@ def tell_kelp(x):
         c.decor("Starfish", at=(x, 28))
     return tell
 
+
+# Where each way (k) of each open zone puts the door.
+DOORS = {1: [(-320, 355), (320, 255), (-320, 460)],
+         2: [(-320, 360), (320, 360), (320, 125)],
+         3: [(-320, 350), (320, 360), (-320, 130)]}
 
 ROWS1 = [55, 155, 250, 355, 460, 555]
 ROWS2 = [125, 245, 355, 460, 560]
@@ -283,20 +291,24 @@ def pocket_room(slot, name, weight, kind):
         r.hollow((36, 64), radius=10, depth=2, material=MUD)
         r.loot((36, 64), radius=5, weight=weight)
         r.decor("Weed", area=box(36, 48, 48, 72), count=8)
+        r.entrance((36, 28))
     elif kind == "nets":
         r.hall([(8, 8), (64, 8), (64, 88), (8, 88)], pillars=[(36, 48)])
         r.loot((20, 76), radius=5, weight=weight)
         r.decor("Crate", area=box(36, 48, 40, 70), count=3)
         r.decor("Chain", at=(24, 20), yaw=70)
+        r.entrance((36, 24))
     elif kind == "pier":
         r.hall([(8, 8), (64, 8), (64, 88), (8, 88)])
         r.decor("Timber", path=[(36, 12), (36, 84)], count=6)
         r.loot((36, 80), radius=5, weight=weight)
+        r.entrance((36, 28))
     else:  # cove: a silted corner with a find in the mud
         r.hall([(8, 8), (64, 8), (64, 88), (8, 88)])
         r.hollow((22, 24), radius=9, depth=3, material=MUD)
         r.loot((22, 24), radius=5, weight=weight)
         r.decor("Kelp", area=box(40, 50, 40, 60), count=4)
+        r.entrance((40, 66))
     return r
 
 
@@ -310,12 +322,11 @@ def zone4():
     f.decor("Weed", area=box(0, 6, 480, 24), count=10)
     f.decor("Shells", area=box(0, 600, 480, 24), count=6)
 
-    # The jetty court: the collapsed jetty lies across a flooded court in the middle; the entrance
-    # is under it. Both crossings can reach it by a spur from the middle row.
+    # The jetty court: a collapsed jetty lies across a flooded court in the middle. Both crossings
+    # can reach it by a spur from the middle row. (The door is in the pockets and cellars.)
     f.hall(box(0, 312, 96, 80), floor="LeafyGrass")
     jetty(f, 0, 280, 340)
     f.hollow((0, 330), radius=8, depth=2, material=MUD)
-    f.entrance((0, 322))
     f.decor("Starfish", at=(-24, 340))
     f.loot((0, 322), radius=6, weight=2)
 

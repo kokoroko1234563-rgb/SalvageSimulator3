@@ -91,7 +91,7 @@ OPEN = {
         pools=[((-250, 172), 10), ((-110, 170), 9), ((70, 168), 10), ((240, 172), 9),
                ((-260, 402), 10), ((-70, 398), 9), ((120, 404), 10), ((270, 400), 9)],
         loot=[((-250, 172), 1), ((240, 172), 1), ((270, 400), 2), ((-70, 398), 4)],
-        entrance=(-250, 290),
+        doors=[(-318, 290), (318, 300), (-318, 470)],
         holes=[(-280, 112), (262, 250), (-240, 470), (-20, 172), (200, 402)],
         crossings=[("Starfish gully", (-150, 150), "Starfish"),
                    ("Urchin gully", (150, -130), "Urchins"),
@@ -104,7 +104,7 @@ OPEN = {
                ((-260, 352), 11), ((-60, 348), 10), ((140, 352), 11), ((290, 348), 10),
                ((-250, 492), 11), ((-70, 488), 10), ((110, 492), 11), ((270, 488), 10)],
         loot=[((-270, 212), 1), ((290, 348), 2), ((-60, 348), 2), ((270, 488), 4)],
-        entrance=(-60, 280),
+        doors=[(-318, 280), (318, 420), (-318, 420)],
         holes=[(-190, 210), (30, 212), (230, 208), (-120, 350), (60, 352), (230, 350),
                (-200, 490), (20, 492), (200, 488)],
         crossings=[("Starfish gully", (-140, 100, -90), "Starfish"),
@@ -118,7 +118,7 @@ OPEN = {
                ((-270, 342), 12), ((-70, 338), 11), ((150, 342), 12), ((300, 338), 11),
                ((-260, 482), 12), ((-60, 478), 11), ((120, 482), 12), ((280, 478), 11)],
         loot=[((-280, 202), 1), ((300, 338), 2), ((-70, 338), 2), ((280, 478), 4)],
-        entrance=(40, 410),
+        doors=[(-318, 270), (318, 410), (318, 270)],
         holes=[(-200, 200), (30, 202), (230, 198), (-170, 340), (10, 342), (210, 340),
                (-210, 480), (20, 482), (190, 478)],
         crossings=[("Starfish gully", (-150, 110, -100), "Starfish"),
@@ -156,14 +156,6 @@ def open_zone(n):
         f.decor("Barnacles", at=(hx - 6, hz + 5))
     for at, weight in s["loot"]:
         f.loot(at, radius=8, weight=weight)
-    # The entrance: a blowhole in the rocks, on flat sand at a bench's foot, rimmed with rock.
-    ex, ez = s["entrance"]
-    f.entrance((ex, ez))
-    f.decor("Rocks", at=(ex + 14, ez - 8), scale=1.8, yaw=30)
-    f.decor("Rocks", at=(ex - 14, ez + 8), scale=1.5, yaw=110)
-    f.decor("Barnacles", at=(ex, ez + 16))
-    f.decor("Shells", area=[(ex - 20, ez - 20), (ex + 20, ez - 20), (ex + 20, ez + 20), (ex - 20, ez + 20)],
-            count=3)
     # Scatter in the gullies between, so no stretch is bare.
     f.decor("Pebbles", area=[(-330, 20), (330, 20), (330, 70), (-330, 70)], count=10)
     f.decor("Shells", area=[(-330, 240), (330, 240), (330, 330), (-330, 330)], count=10)
@@ -171,6 +163,13 @@ def open_zone(n):
     crosses = s["benches"] or [(zt, 14) for zt in s["channels"]]
     for k, (name, gaps, tell) in enumerate(s["crossings"], 1):
         c = z.crossing(name, paths=1)
+        # The door: a blowhole in the rocks on a flat of sand in a far corner of the beach, well
+        # off the gullies (each way puts it somewhere else).
+        door_at = s["doors"][k - 1]
+        c.add(Kind="Flat", At=list(door_at), Radius=18)
+        c.entrance(door_at)
+        c.decor("Rocks", at=(door_at[0] + 16, door_at[1] + 12), scale=1.5, yaw=30)
+        c.decor("Barnacles", at=(door_at[0] - 14, door_at[1] + 12))
         ramp = gully(c, gaps, crosses)
         clear_of_pools(n, ramp)
         slow_pools(c, s["pools"], ramp)
@@ -231,6 +230,7 @@ def side_pool(slot, name, loot_weight, big=False):
     r.decor("Weed", at=(w / 2, d / 2))
     r.decor("Starfish", at=(w / 2 + 12, d / 2 - 6))
     r.loot((w / 2, d / 2), radius=6, weight=loot_weight)
+    r.entrance((20, d / 2))  # the door: a blowhole in the far pool room
     return r
 
 
@@ -242,9 +242,8 @@ def zone4():
     f.hall([(-360, 592), (360, 592), (360, 620), (-360, 620)])
     f.decor("Pebbles", area=[(-340, 4), (340, 4), (340, 16), (-340, 16)], count=8)
     f.decor("Shells", area=[(-340, 598), (340, 598), (340, 614), (-340, 614)], count=6)
-    # The blowhole court: a hole in the rocks off the top band, rimmed with barnacles.
+    # A rimmed hole off the top band (the secret's blowhole is in the pools).
     f.hall([(-32, 20), (32, 20), (32, 68), (-32, 68)])
-    f.entrance((0, 48))
     f.hollow((0, 48), radius=6, depth=1, material="Basalt")
     f.decor("Rocks", at=(-18, 40), scale=1.4, yaw=20)
     f.decor("Rocks", at=(20, 58), scale=1.2, yaw=110)
@@ -259,6 +258,7 @@ def zone4():
     r.decor("Rocks", area=[(14, 14), (66, 14), (66, 46), (14, 46)], count=3)
     r.decor("Barnacles", at=(40, 20))
     r.loot((40, 36), radius=6, weight=1)
+    r.entrance((20, 30))
     s = z.slot("East shelter", at=(276, 36), size=(80, 60), door=(40, 0))
     side_pool(s, "Twin pool", 2)
     r = s.room("Overhang")
@@ -272,6 +272,7 @@ def zone4():
     r.hollow((26, 26), radius=9, depth=2, material="Limestone")
     r.decor("Weed", at=(26, 26))
     r.loot((54, 26), radius=6, weight=4)
+    r.entrance((44, 26))
 
     # Crossing 1: the cart gully in the east, the foot way in the west.
     c = z.crossing("East gully", paths=2)
