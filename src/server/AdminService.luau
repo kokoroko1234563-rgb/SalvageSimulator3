@@ -23,6 +23,7 @@ local Waves = require(Shared.Waves)
 
 local AuctionService = require(script.Parent.AuctionService)
 local BiomeService = require(script.Parent.BiomeService)
+local BotService = require(script.Parent.BotService)
 local DataService = require(script.Parent.DataService)
 local LexiconService = require(script.Parent.LexiconService)
 local Showroom = require(script.Parent.Showroom)
@@ -1190,6 +1191,44 @@ command(
 			return { "Usage: private <players|off>" }
 		end
 		return { string.format("Rare spawns at x%.2f", MonetizationService.rareScale()) }
+	end
+)
+
+command(
+	"bots",
+	"bots <n|stop|report|speed <factor>>",
+	"Bots that play the game: bots 5 starts up to 20, bots stop removes them, bots report prints what they did",
+	function(_, args)
+		local word = (args[1] or ""):lower()
+		if word == "stop" then
+			BotService.stop()
+			return { "Bots stopped." }
+		elseif word == "report" then
+			if BotService.count() == 0 then
+				return { "No bots are running." }
+			end
+			local lines = BotService.report()
+			for _, line in lines do
+				print("[Bots] " .. line)
+			end
+			return lines
+		elseif word == "speed" then
+			local factor = tonumber(args[2])
+			if not factor or factor <= 0 then
+				return { "Usage: bots speed <factor>  (now x" .. BotService.speed() .. "; 1 = the real game)" }
+			end
+			BotService.setSpeed(factor)
+			return {
+				string.format("The game runs x%g as fast for the bots: tide, item spawns, walking.", factor),
+			}
+		end
+		local n = tonumber(word)
+		if not n then
+			return { "Usage: bots <n|stop|report|speed <factor>>" }
+		end
+		n = math.clamp(math.floor(n), 0, BotService.MaxBots)
+		BotService.setCount(n)
+		return { string.format("%d bot%s playing.", n, if n == 1 then "" else "s") }
 	end
 )
 
