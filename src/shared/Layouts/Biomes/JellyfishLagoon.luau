@@ -98,9 +98,6 @@ return {
 			{ At = { -200, 545 }, Radius = 5, Weight = 3 },
 			{ At = { 110, 555 }, Radius = 5, Weight = 4 },
 		},
-		Entrances = {
-			{ 300, 290 },
-		},
 		Decor = {
 			{
 				Kind = "Weed",
@@ -194,7 +191,6 @@ return {
 			},
 			{ Kind = "GlowWeed", At = { 105, 559 } },
 			{ Kind = "Starfish", At = { 115, 552 } },
-			{ Kind = "Driftwood", At = { 306, 278 }, Yaw = 40 },
 			{
 				Kind = "Shells",
 				Area = {
@@ -222,6 +218,7 @@ return {
 				Name = "West ring",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 318, 250 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -236,6 +233,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ 318, 250 },
 				},
 				Hazards = {
 					{ Type = "Jelly", At = { -71, 190 }, Radius = 4 },
@@ -267,6 +267,7 @@ return {
 					},
 				},
 				Decor = {
+					{ Kind = "GlowShells", At = { 332, 262 } },
 					{ Kind = "GlowShells", At = { -68, 192 } },
 					{ Kind = "GlowShells", At = { 100, 252 } },
 					{ Kind = "GlowShells", At = { -68, 432 } },
@@ -292,6 +293,7 @@ return {
 				Name = "East ring",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 250 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -306,6 +308,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ -318, 250 },
 				},
 				Hazards = {
 					{ Type = "Jelly", At = { -71, 190 }, Radius = 4 },
@@ -337,6 +342,7 @@ return {
 					},
 				},
 				Decor = {
+					{ Kind = "GlowShells", At = { -304, 262 } },
 					{ Kind = "GlowShells", At = { -68, 192 } },
 					{ Kind = "GlowShells", At = { 100, 252 } },
 					{ Kind = "GlowShells", At = { -68, 432 } },
@@ -457,9 +463,6 @@ return {
 			{ At = { -200, 545 }, Radius = 5, Weight = 3 },
 			{ At = { 110, 555 }, Radius = 5, Weight = 4 },
 		},
-		Entrances = {
-			{ 300, 290 },
-		},
 		Decor = {
 			{
 				Kind = "Weed",
@@ -553,7 +556,6 @@ return {
 			},
 			{ Kind = "GlowWeed", At = { 105, 559 } },
 			{ Kind = "Starfish", At = { 115, 552 } },
-			{ Kind = "Driftwood", At = { 306, 278 }, Yaw = 40 },
 			{
 				Kind = "Shells",
 				Area = {
@@ -581,6 +583,7 @@ return {
 				Name = "West ring",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { 318, 250 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -595,6 +598,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ 318, 250 },
 				},
 				Hazards = {
 					{ Type = "Jelly", At = { -71, 190 }, Radius = 4 },
@@ -626,6 +632,7 @@ return {
 					},
 				},
 				Decor = {
+					{ Kind = "GlowShells", At = { 332, 262 } },
 					{ Kind = "GlowShells", At = { -68, 192 } },
 					{ Kind = "GlowShells", At = { 100, 252 } },
 					{ Kind = "GlowShells", At = { -68, 432 } },
@@ -651,6 +658,7 @@ return {
 				Name = "East ring",
 				Paths = 1,
 				Primitives = {
+					{ Kind = "Flat", At = { -318, 250 }, Radius = 18 },
 					{
 						Kind = "Ramp",
 						Path = {
@@ -665,6 +673,9 @@ return {
 						},
 						Width = 16,
 					},
+				},
+				Entrances = {
+					{ -318, 250 },
 				},
 				Hazards = {
 					{ Type = "Jelly", At = { -71, 190 }, Radius = 4 },
@@ -696,6 +707,7 @@ return {
 					},
 				},
 				Decor = {
+					{ Kind = "GlowShells", At = { -304, 262 } },
 					{ Kind = "GlowShells", At = { -68, 192 } },
 					{ Kind = "GlowShells", At = { 100, 252 } },
 					{ Kind = "GlowShells", At = { -68, 432 } },
@@ -871,10 +883,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ -304, 260 },
-					{ -260, 260 },
-					{ -260, 300 },
-					{ -304, 300 },
+					{ -308, 256 },
+					{ -256, 256 },
+					{ -256, 304 },
+					{ -308, 304 },
 				},
 			},
 			{
@@ -891,10 +903,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ 260, 260 },
-					{ 304, 260 },
-					{ 304, 300 },
-					{ 260, 300 },
+					{ 256, 256 },
+					{ 308, 256 },
+					{ 308, 304 },
+					{ 256, 304 },
 				},
 			},
 			{
@@ -911,10 +923,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ -304, 360 },
-					{ -260, 360 },
-					{ -260, 400 },
-					{ -304, 400 },
+					{ -308, 356 },
+					{ -256, 356 },
+					{ -256, 404 },
+					{ -308, 404 },
 				},
 			},
 			{
@@ -931,10 +943,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ 260, 360 },
-					{ 304, 360 },
-					{ 304, 400 },
-					{ 260, 400 },
+					{ 256, 356 },
+					{ 308, 356 },
+					{ 308, 404 },
+					{ 256, 404 },
 				},
 			},
 			{
@@ -956,7 +968,10 @@ return {
 			{ At = { 283, 381 }, Radius = 5, Weight = 3 },
 		},
 		Entrances = {
-			{ 283, 291 },
+			{ -283, 279 },
+			{ 283, 279 },
+			{ -283, 381 },
+			{ 283, 381 },
 		},
 		Decor = {
 			{
@@ -1047,7 +1062,6 @@ return {
 			},
 			{ Kind = "GlowWeed", At = { 278, 385 } },
 			{ Kind = "Starfish", At = { 288, 378 } },
-			{ Kind = "Driftwood", At = { 272, 269 }, Yaw = 30 },
 			{ Kind = "Starfish", At = { -110, 8 } },
 			{ Kind = "Starfish", At = { 110, 8 } },
 		},
@@ -2210,10 +2224,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ -304, 272 },
-					{ -260, 272 },
-					{ -260, 312 },
-					{ -304, 312 },
+					{ -308, 268 },
+					{ -256, 268 },
+					{ -256, 316 },
+					{ -308, 316 },
 				},
 			},
 			{
@@ -2230,10 +2244,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ 260, 272 },
-					{ 304, 272 },
-					{ 304, 312 },
-					{ 260, 312 },
+					{ 256, 268 },
+					{ 308, 268 },
+					{ 308, 316 },
+					{ 256, 316 },
 				},
 			},
 			{
@@ -2250,10 +2264,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ -304, 368 },
-					{ -260, 368 },
-					{ -260, 408 },
-					{ -304, 408 },
+					{ -308, 364 },
+					{ -256, 364 },
+					{ -256, 412 },
+					{ -308, 412 },
 				},
 			},
 			{
@@ -2270,10 +2284,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ 260, 368 },
-					{ 304, 368 },
-					{ 304, 408 },
-					{ 260, 408 },
+					{ 256, 364 },
+					{ 308, 364 },
+					{ 308, 412 },
+					{ 256, 412 },
 				},
 			},
 			{
@@ -2295,7 +2309,10 @@ return {
 			{ At = { 283, 388 }, Radius = 5, Weight = 3 },
 		},
 		Entrances = {
-			{ 283, 304 },
+			{ -283, 292 },
+			{ 283, 292 },
+			{ -283, 388 },
+			{ 283, 388 },
 		},
 		Decor = {
 			{
@@ -2386,7 +2403,6 @@ return {
 			},
 			{ Kind = "GlowWeed", At = { 278, 392 } },
 			{ Kind = "Starfish", At = { 288, 385 } },
-			{ Kind = "Driftwood", At = { 272, 282 }, Yaw = 30 },
 			{ Kind = "Starfish", At = { -110, 8 } },
 			{ Kind = "Starfish", At = { 110, 8 } },
 		},
@@ -3657,10 +3673,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ -304, 262 },
-					{ -260, 262 },
-					{ -260, 302 },
-					{ -304, 302 },
+					{ -308, 258 },
+					{ -256, 258 },
+					{ -256, 306 },
+					{ -308, 306 },
 				},
 			},
 			{
@@ -3677,10 +3693,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ 260, 262 },
-					{ 304, 262 },
-					{ 304, 302 },
-					{ 260, 302 },
+					{ 256, 258 },
+					{ 308, 258 },
+					{ 308, 306 },
+					{ 256, 306 },
 				},
 			},
 			{
@@ -3697,10 +3713,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ -304, 358 },
-					{ -260, 358 },
-					{ -260, 398 },
-					{ -304, 398 },
+					{ -308, 354 },
+					{ -256, 354 },
+					{ -256, 402 },
+					{ -308, 402 },
 				},
 			},
 			{
@@ -3717,10 +3733,10 @@ return {
 			{
 				Kind = "Flat",
 				Area = {
-					{ 260, 358 },
-					{ 304, 358 },
-					{ 304, 398 },
-					{ 260, 398 },
+					{ 256, 354 },
+					{ 308, 354 },
+					{ 308, 402 },
+					{ 256, 402 },
 				},
 			},
 			{
@@ -3742,7 +3758,10 @@ return {
 			{ At = { 283, 378 }, Radius = 5, Weight = 3 },
 		},
 		Entrances = {
-			{ 283, 294 },
+			{ -283, 282 },
+			{ 283, 282 },
+			{ -283, 378 },
+			{ 283, 378 },
 		},
 		Decor = {
 			{
@@ -3833,7 +3852,6 @@ return {
 			},
 			{ Kind = "GlowWeed", At = { 278, 382 } },
 			{ Kind = "Starfish", At = { 288, 375 } },
-			{ Kind = "Driftwood", At = { 272, 272 }, Yaw = 30 },
 			{ Kind = "Starfish", At = { -110, 8 } },
 			{ Kind = "Starfish", At = { 110, 8 } },
 		},

@@ -99,8 +99,6 @@ def shore(n, bank, hollow_depth):
     for at, w in (((-300, 120), 1), ((300, 150), 1), ((-300, 320), 2), ((300, 400), 3),
                   ((-200, 545), 3), ((110, 555), 4)):
         cove(f, at, w)
-    f.entrance((300, 290))
-    f.decor("Driftwood", at=(306, 278), yaw=40)
     f.decor("Shells", area=box(0, 580, 600, 40), count=6)
     f.decor("Starfish", area=box(0, 50, 600, 60), count=4)
     return z
@@ -111,6 +109,11 @@ def shore_crossing(z, name, side, tell):
     Stranded jellies on the ring and the causeways, drifting ones in the water."""
     c = z.crossing(name, paths=1)
     s = side
+    # The door: a glowing grotto on a flat of sand at the far side of the lagoon from the cart's
+    # ramp, off every path (the other crossing puts it on the other side).
+    c.add(Kind="Flat", At=[-s * 318, 250], Radius=18)
+    c.entrance((-s * 318, 250))
+    c.decor("GlowShells", at=(-s * 318 + 14, 262))
     c.ramp([(0, 0), (0, 40), (s * 150, 60), (s * 285, 150), (s * 290, 460), (s * 150, 560), (0, 570),
             (0, 608)], width=16)
     for at in ((-71, 190), (97, 250), (-71, 430), (96, 450), (-200, 160), (190, 460), (0, 118),
@@ -187,10 +190,11 @@ def coves(z, cz, rz, sites):
     for x, dz, weight in sites:
         side = 1 if x > 0 else -1
         zz = cz + dz
-        f.hall(box(x, zz, 44, 40))
+        f.hall(box(x, zz, 52, 48))
         hw = RX * math.sqrt(max(0.0, 1 - (dz / rz) ** 2))
         f.lane([(side * (hw - 16), zz), (x, zz)], width=12)
         cove(f, (x, zz), weight)
+        f.entrance((x, zz))  # the secret's grotto: any of the four coves may hold it
 
 
 def hall_z(cz, rz, x, side):
@@ -209,8 +213,6 @@ def walled(n, rock, roof, cz, rz, plan, jellies, tells, arc_end, p1_step=44):
     q = max(48, int(rz * 0.32))
     sites = ((-283, -q, 1), (283, -q, 2), (-283, q, 4), (283, q, 3))
     coves(z, cz, rz, sites)
-    f.entrance((283, cz - q + 12))
-    f.decor("Driftwood", at=(272, cz - q - 10), yaw=30)
     for x in (-110, 110):
         f.decor("Starfish", at=(x, 8))
 
