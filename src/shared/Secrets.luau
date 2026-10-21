@@ -1,6 +1,12 @@
--- Secret courses. The layout lives here so the client can build it (courses are opened
--- locally, only the player who used the unlock item sees theirs) and the server can verify
--- the run against the same checkpoints and chest position.
+-- Secrets. The layout lives here so the client can build it (they are opened locally, only
+-- the player who used the unlock item sees theirs) and the server can verify the run against
+-- the same chest position (and checkpoints, for a course).
+-- Two kinds, told apart by `Course.Kind`:
+--   course (no Kind)  a flooding climb: platforms, checkpoints, a rising flood (the three
+--                     vaults below).
+--   "Room"            a small themed chamber with a chest in it, one per biome in the build:
+--                     no checkpoints, no flood. The run ends when the chest is claimed, the
+--                     player leaves or dies, or `Seconds` run out.
 -- All positions are relative to the course origin.
 
 local Config = require(script.Parent.Config)
@@ -108,6 +114,129 @@ local function towerCourse()
 	}
 end
 
+-- A room: a square chamber with the chest at one end and the player arriving at the other.
+-- Props dress it: { Position, Size, Color = "Accent" | "Wall" | "Light", Material, Shape, Glow }
+-- (relative to the room's origin); the client colours them from the secret's own colour.
+export type Prop = {
+	Position: Vector3,
+	Size: Vector3,
+	Color: string,
+	Material: string?,
+	Shape: string?,
+	Glow: boolean?,
+}
+
+local function prop(
+	kind: string,
+	x: number,
+	y: number,
+	z: number,
+	size: Vector3,
+	extra: { [string]: any }?
+): Prop
+	local made: any = { Position = Vector3.new(x, y, z), Size = size, Color = kind }
+	for key, value in extra or {} do
+		made[key] = value
+	end
+	return made
+end
+
+local function roomCourse(props: { Prop }, size: number?)
+	local half = size or 15
+	return {
+		Kind = "Room",
+		Floor = { Position = Vector3.new(0, 0, 0), Size = Vector3.new(half * 2, 1, half * 2) },
+		WallHeight = 14,
+		Platforms = {},
+		Props = props,
+		Checkpoints = {},
+		CheckpointRadius = 0,
+		Spawn = Vector3.new(0, 3, half - 4),
+		Chest = Vector3.new(0, 1.5, 4 - half),
+		ChestRadius = 7,
+		HalfSize = half,
+		Seconds = 60, -- a generous limit, so a run always ends
+		MinRunTime = 3, -- the chest is across the room: claiming sooner is implausible
+		StartDelay = 0,
+	}
+end
+
+-- Posts either side of the room.
+local function pillars(kind: string, material: string?, height: number, width: number): { Prop }
+	local list = {}
+	for _, x in { -11, 11 } do
+		for _, z in { -8, 4 } do
+			table.insert(
+				list,
+				prop(kind, x, height / 2 + 0.5, z, Vector3.new(width, height, width), { Material = material })
+			)
+		end
+	end
+	return list
+end
+
+local function extend(list: { Prop }, more: { Prop }): { Prop }
+	for _, item in more do
+		table.insert(list, item)
+	end
+	return list
+end
+
+local function ball(kind: string, x: number, y: number, z: number, d: number, glow: boolean?): Prop
+	return prop(kind, x, y, z, Vector3.new(d, d, d), { Shape = "Ball", Glow = glow })
+end
+
+local roomCourses = {
+	DriftwoodCove = roomCourse(extend(pillars("Accent", "Wood", 7, 2.5), {
+		prop("Wall", 0, 1.2, 0, Vector3.new(14, 1.4, 1.6), { Material = "Wood" }),
+		prop("Accent", -6, 2.2, 8, Vector3.new(1.4, 3.2, 1.4), { Material = "Wood" }),
+	})),
+	TidepoolRocks = roomCourse(extend(pillars("Wall", "Rock", 5, 4), {
+		ball("Light", 0, 0.6, 0, 8),
+		ball("Accent", -6, 1.5, 6, 2.5),
+		ball("Accent", 7, 1.5, 3, 3),
+	})),
+	SeagrassShallows = roomCourse(extend(pillars("Accent", "Grass", 4, 1.2), {
+		prop("Wall", 0, 5, 0, Vector3.new(26, 0.8, 1.4), { Material = "WoodPlanks" }),
+		prop("Wall", -10, 3, 0, Vector3.new(1, 5, 1), { Material = "Wood" }),
+		prop("Wall", 10, 3, 0, Vector3.new(1, 5, 1), { Material = "Wood" }),
+	})),
+	CoralGarden = roomCourse(extend(pillars("Accent", "Sand", 6, 3), {
+		ball("Accent", -6, 2, 5, 4),
+		ball("Accent", 6, 2, 0, 5),
+		ball("Light", 0, 1.5, 8, 2.5),
+	})),
+	FogBank = roomCourse(extend(pillars("Wall", "Rock", 9, 2), {
+		prop("Light", 0, 6, -4, Vector3.new(1.6, 4, 1.6), { Material = "Metal" }),
+		ball("Light", 0, 9, -4, 3, true),
+	})),
+	WhirlwindDunes = roomCourse({
+		ball("Accent", -8, -1, 3, 9),
+		ball("Accent", 9, -1, -2, 8),
+		ball("Accent", 0, -1.5, 9, 7),
+		prop("Light", 0, 3, -2, Vector3.new(0.5, 5, 0.5), { Material = "Metal" }),
+	}),
+	HermitHollows = roomCourse(extend(pillars("Wall", "Rock", 6, 3), {
+		ball("Accent", -7, 1.8, 2, 4),
+		ball("Accent", 7, 2.5, 5, 5),
+		ball("Light", 0, 1.2, 4, 2),
+	})),
+	SpearstoneReef = roomCourse(extend(pillars("Accent", "Rock", 8, 1.6), {
+		prop("Wall", -4, 3, 2, Vector3.new(1.2, 6, 1.2), { Material = "Rock" }),
+		prop("Wall", 4, 3, 2, Vector3.new(1.2, 6, 1.2), { Material = "Rock" }),
+	})),
+	JellyfishLagoon = roomCourse({
+		ball("Light", -8, 6, 0, 4, true),
+		ball("Light", 8, 8, 3, 3, true),
+		ball("Accent", 0, 9, 7, 5, true),
+		ball("Accent", 0, -2, 0, 12),
+	}),
+	StrandedIceberg = roomCourse(extend(pillars("Light", "Glass", 8, 2.4), {
+		prop("Accent", -6, 1.5, 5, Vector3.new(2, 3, 2), { Material = "Glass" }),
+		prop("Accent", 6, 2, 1, Vector3.new(2.4, 4, 2.4), { Material = "Glass" }),
+	})),
+}
+
 Secrets.List = {
 	SandcastleFlats = {
 		Id = "SandcastleFlats",
@@ -153,6 +282,117 @@ Secrets.List = {
 		-- sandbar is already about to flood whenever you can reach the door.
 		FloodSeconds = 150,
 	},
+	-- The rooms: one small chamber per biome in the initial build. A common biome's chest holds
+	-- its coin, as the Sandcastle Vault's does; a rare biome's holds one of its exotic rewards.
+	DriftwoodCove = {
+		Id = "DriftwoodCove",
+		Name = "Hollow Trunk",
+		Biome = "DriftwoodCove",
+		Unlock = "CarvedIdol",
+		Coin = "Orange",
+		Course = roomCourses.DriftwoodCove,
+		Color = Color3.fromRGB(150, 118, 84),
+	},
+	TidepoolRocks = {
+		Id = "TidepoolRocks",
+		Name = "Blowhole Grotto",
+		Biome = "TidepoolRocks",
+		Unlock = "PearlEyedShell",
+		Coin = "Blue",
+		Course = roomCourses.TidepoolRocks,
+		Color = Color3.fromRGB(92, 112, 124),
+	},
+	SeagrassShallows = {
+		Id = "SeagrassShallows",
+		Name = "Jetty Hideaway",
+		Biome = "SeagrassShallows",
+		Unlock = "BarnacledLantern",
+		Coin = "Green",
+		Course = roomCourses.SeagrassShallows,
+		Color = Color3.fromRGB(84, 120, 78),
+	},
+	CoralGarden = {
+		Id = "CoralGarden",
+		Name = "Reef Grotto",
+		Biome = "CoralGarden",
+		Unlock = "CoralComb",
+		Coin = "Pink",
+		Course = roomCourses.CoralGarden,
+		Color = Color3.fromRGB(226, 140, 156),
+	},
+	FogBank = {
+		Id = "FogBank",
+		Name = "Lighthouse Lamp Room",
+		Biome = "FogBank",
+		Unlock = "LighthouseKey",
+		Loot = {
+			{ Id = "LanternOfClearSight", Weight = 50 },
+			{ Id = "Foghorn", Weight = 50 },
+		},
+		Course = roomCourses.FogBank,
+		Color = Color3.fromRGB(170, 176, 182),
+	},
+	WhirlwindDunes = {
+		Id = "WhirlwindDunes",
+		Name = "Wind-Carved Hollow",
+		Biome = "WhirlwindDunes",
+		Unlock = "WindChime",
+		Loot = {
+			{ Id = "MagicCarpet", Weight = 50 },
+			{ Id = "GustGloves", Weight = 50 },
+		},
+		Course = roomCourses.WhirlwindDunes,
+		Color = Color3.fromRGB(214, 180, 122),
+	},
+	HermitHollows = {
+		Id = "HermitHollows",
+		Name = "Shell Burrow",
+		Biome = "HermitHollows",
+		Unlock = "SpiralConch",
+		Loot = {
+			{ Id = "CrabClaw", Weight = 50 },
+			{ Id = "ShellWagon", Weight = 50 },
+		},
+		Course = roomCourses.HermitHollows,
+		Color = Color3.fromRGB(205, 175, 150),
+	},
+	SpearstoneReef = {
+		Id = "SpearstoneReef",
+		Name = "Spearstone Cleft",
+		Biome = "SpearstoneReef",
+		Unlock = "SpearstoneShard",
+		Loot = {
+			{ Id = "TidewalkerBoots", Weight = 100 },
+		},
+		Course = roomCourses.SpearstoneReef,
+		Color = Color3.fromRGB(70, 80, 92),
+	},
+	JellyfishLagoon = {
+		Id = "JellyfishLagoon",
+		Name = "Glowing Grotto",
+		Biome = "JellyfishLagoon",
+		Unlock = "JellyJar",
+		Loot = {
+			{ Id = "JellyRaft", Weight = 50 },
+			{ Id = "GlowPearl", Weight = 50 },
+		},
+		Course = roomCourses.JellyfishLagoon,
+		Color = Color3.fromRGB(160, 120, 215),
+	},
+	StrandedIceberg = {
+		Id = "StrandedIceberg",
+		Name = "Ice Cave",
+		Biome = "StrandedIceberg",
+		Unlock = "FrozenCompass",
+		Loot = {
+			{ Id = "FrostSled", Weight = 50 },
+			{ Id = "FreezeWand", Weight = 50 },
+		},
+		Variant = "Frosted",
+		VariantChance = 0.015,
+		Course = roomCourses.StrandedIceberg,
+		Color = Color3.fromRGB(176, 214, 236),
+	},
 }
 
 Secrets.CoinColors = Palette.Coin
@@ -182,13 +422,21 @@ function Secrets.rollLoot(secret, rng: Random): (string?, string?)
 	return picked, variant
 end
 
+function Secrets.isRoom(secret): boolean
+	return secret.Course.Kind == "Room"
+end
+
 -- Each player slot gets its own spot far off the map, so courses never overlap.
 function Secrets.originFor(slot: number): Vector3
 	return Config.Secrets.Origin + Vector3.new(slot * Config.Secrets.Spacing, 0, 0)
 end
 
 -- Water level in the course `elapsed` seconds into a run lasting `duration` seconds.
+-- (A room doesn't flood: its level stays far below the floor.)
 function Secrets.floodLevel(course, elapsed: number, duration: number): number
+	if not course.FloodFrom then
+		return -math.huge
+	end
 	local t = math.clamp(elapsed / duration, 0, 1)
 	return course.FloodFrom + (course.FloodTo - course.FloodFrom) * t
 end

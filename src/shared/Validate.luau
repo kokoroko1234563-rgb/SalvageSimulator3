@@ -445,19 +445,17 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 			)
 		end
 		local course = secret.Course
-		for _, field in
-			{
-				"Floor",
-				"Platforms",
-				"Checkpoints",
-				"Spawn",
-				"Chest",
-				"HalfSize",
-				"WallHeight",
-				"FloodFrom",
-				"FloodTo",
-			}
-		do
+		local fields = { "Floor", "Platforms", "Checkpoints", "Spawn", "Chest", "HalfSize", "WallHeight" }
+		if course and course.Kind == "Room" then
+			-- A room has no flood, and a time limit instead.
+			check(type(course.Seconds) == "number" and course.Seconds > 0, where .. ": a room needs Seconds")
+			check(#course.Checkpoints == 0, where .. ": a room has no checkpoints")
+			table.insert(fields, "MinRunTime")
+		else
+			table.insert(fields, "FloodFrom")
+			table.insert(fields, "FloodTo")
+		end
+		for _, field in fields do
 			check(course and course[field] ~= nil, where .. ": course is missing " .. field)
 		end
 		if course and course.Spawn and course.HalfSize then

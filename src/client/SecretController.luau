@@ -1,6 +1,8 @@
--- Builds the secret course locally when the server starts a run (only this player sees
--- their copy), raises the flood, and lets the player claim the chest at the top. The
--- server checks everything; this side is only what the player sees and touches.
+-- Builds the secret course (or room) locally when the server starts a run (only this player
+-- sees their copy), raises the flood in a course, and lets the player claim the chest. A room
+-- (Course.Kind = "Room") is a small themed chamber with a ceiling and props instead of
+-- platforms and a flood. The server checks everything; this side is only what the player sees
+-- and touches.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -74,6 +76,48 @@ local function build(secret, origin: Vector3)
 		block(root, "Wall", CFrame.new(origin + wall[1]), wall[2], dark, { Transparency = 0.15 })
 	end
 
+	local isRoom = Secrets.isRoom(secret)
+	if isRoom then
+		-- A ceiling, and the props in the secret's colours.
+		block(
+			root,
+			"Ceiling",
+			CFrame.new(origin + Vector3.new(0, height + 1, 0)),
+			Vector3.new(half * 2 + 4, 2, half * 2 + 4),
+			dark
+		)
+		local colors = {
+			Accent = secret.Color,
+			Wall = secret.Color:Lerp(Color3.new(0, 0, 0), 0.2),
+			Light = secret.Color:Lerp(Color3.new(1, 1, 1), 0.55),
+		}
+		for index, item in course.Props or {} do
+			block(
+				root,
+				"Prop" .. index,
+				CFrame.new(origin + item.Position),
+				item.Size,
+				colors[item.Color] or secret.Color,
+				{
+					Material = if item.Material
+						then Palette.Material[item.Material]
+						else Palette.Material.Sand,
+					Shape = if item.Shape == "Ball" then Enum.PartType.Ball else Enum.PartType.Block,
+				}
+			)
+			if item.Glow then
+				local light = Instance.new("PointLight")
+				light.Color = colors.Light
+				light.Range = 14
+				light.Parent = root:FindFirstChild("Prop" .. index)
+			end
+		end
+		local lamp = Instance.new("PointLight")
+		lamp.Brightness = 1.5
+		lamp.Range = 40
+		lamp.Color = colors.Light
+		lamp.Parent = root:FindFirstChild("Floor")
+	end
 	for index, platform in course.Platforms do
 		block(root, "Platform" .. index, CFrame.new(origin + platform.Position), platform.Size, secret.Color)
 	end
@@ -120,6 +164,11 @@ local function build(secret, origin: Vector3)
 		Remotes.get("ClaimChest"):FireServer()
 	end)
 
+	if isRoom then
+		root.Parent = Workspace
+		folder = root
+		return
+	end
 	water = block(
 		root,
 		"Flood",
@@ -173,7 +222,9 @@ function SecretController.init()
 			readyRemote:FireServer(true)
 		elseif kind == "go" and run then
 			run.startedAt = info.StartedAt
-			HUD.banner("The vault is flooding. Climb!")
+			HUD.banner(
+				if run.course.Kind == "Room" then "Find the chest!" else "The vault is flooding. Climb!"
+			)
 		elseif kind == "end" then
 			cleanup()
 		end

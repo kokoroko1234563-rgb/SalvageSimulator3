@@ -1,8 +1,10 @@
 -- Secret runs. Using a banked unlock item at a secret's door (always uses it up) sends the
--- player to their own copy of the course. The client builds the course locally; the server
+-- player to their own copy of the course or room. The client builds it locally; the server
 -- never sees those parts, so it verifies the run from the character's replicated position:
--- checkpoints in order, staying above the rising flood, a plausible time, and standing at
--- the chest when claiming it. Failing (flooded, fell out, died, out of time) loses the item.
+-- a plausible time and standing at the chest when claiming it, and for a flooding course
+-- also the checkpoints in order and staying above the rising flood. A room (Course.Kind =
+-- "Room", one per biome) has no checkpoints or flood, only a time limit (Course.Seconds).
+-- Failing (flooded, fell out, died, out of time) loses the item.
 
 local Players = game:GetService("Players")
 
@@ -66,6 +68,10 @@ local function floodDuration(door: Vector3): number
 	return math.clamp(t, cfg.MinFlood, cfg.MaxFlood)
 end
 
+local function place(run: Run): string
+	return if Secrets.isRoom(run.secret) then "room" else "vault"
+end
+
 local function endRun(player: Player, message: string?, sendBack: boolean)
 	local run = runs[player]
 	if not run then
@@ -125,7 +131,7 @@ function SecretService.tryEnter(player: Player, secretId: string, returnTo: CFra
 	local run: Run = {
 		secret = secret,
 		origin = Secrets.originFor(slot),
-		duration = secret.FloodSeconds or floodDuration(returnTo.Position),
+		duration = secret.Course.Seconds or secret.FloodSeconds or floodDuration(returnTo.Position),
 		returnTo = returnTo,
 		startedAt = nil,
 		nextCheckpoint = 1,
@@ -176,7 +182,7 @@ local function onClaim(player: Player)
 	local elapsed = Tide.now() - run.startedAt
 	local ok = run.nextCheckpoint > #course.Checkpoints
 		and (rel - course.Chest).Magnitude <= course.ChestRadius
-		and elapsed >= cfg.MinRunTime
+		and elapsed >= (course.MinRunTime or cfg.MinRunTime)
 		and elapsed <= run.duration + 2
 	if not ok then
 		warn(
@@ -222,9 +228,14 @@ end
 local function waitForArrival(player: Player, run: Run)
 	local root = rootOf(player)
 	if root and run.ready and insideCourse(run, root.Position) then
-		run.startedAt = Tide.now() + cfg.FloodDelay -- the water waits a moment before rising
+		local course = run.secret.Course
+		run.startedAt = Tide.now() + (course.StartDelay or cfg.FloodDelay) -- the water waits a moment before rising
 		eventRemote:FireClient(player, "go", { StartedAt = run.startedAt })
-		notify(player, "Climb to the chest before the sea floods in!")
+		if Secrets.isRoom(run.secret) then
+			notify(player, "Find the chest!")
+		else
+			notify(player, "Climb to the chest before the sea floods in!")
+		end
 		return
 	end
 	local waited = os.clock() - run.openedAt
@@ -258,7 +269,7 @@ local function tick()
 		end
 		local root, humanoid = rootOf(player)
 		if not root or not humanoid or humanoid.Health <= 0 then
-			endRun(player, "You didn't make it out of the vault.", false)
+			endRun(player, "You didn't make it out of the " .. place(run) .. ".", false)
 			continue
 		end
 		local course = run.secret.Course
@@ -271,7 +282,7 @@ local function tick()
 		end
 
 		local water = Secrets.floodLevel(course, elapsed, run.duration)
-		if rel.Y < water then
+		if course.FloodFrom and rel.Y < water then
 			endRun(
 				player,
 				"The flood caught you. The " .. Items.get(run.secret.Unlock).Name .. " is gone.",
@@ -284,11 +295,11 @@ local function tick()
 		then
 			endRun(
 				player,
-				"You left the vault. The " .. Items.get(run.secret.Unlock).Name .. " is gone.",
+				"You left the " .. place(run) .. ". The " .. Items.get(run.secret.Unlock).Name .. " is gone.",
 				true
 			)
 		elseif elapsed > run.duration + 2 then
-			endRun(player, "The vault flooded.", true)
+			endRun(player, if course.FloodFrom then "The vault flooded." else "Time's up.", true)
 		end
 	end
 end
