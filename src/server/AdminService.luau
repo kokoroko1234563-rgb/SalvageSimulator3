@@ -607,6 +607,20 @@ command("god", "god [player]", "Toggle no-drowning", function(caller, args)
 	end) or lines
 end)
 
+command(
+	"fly",
+	"fly [player]",
+	"Toggle noclip flight (Space/E up, Ctrl/Q down, Shift faster)",
+	function(caller, args)
+		local lines = {}
+		return eachTarget(caller, args[1], function(target)
+			local on = not target:GetAttribute("AdminFly")
+			target:SetAttribute("AdminFly", on)
+			table.insert(lines, target.Name .. ": flight " .. (if on then "ON" else "OFF"))
+		end) or lines
+	end
+)
+
 command("speed", "speed <walkspeed> [player]", "Set walk speed (default 16)", function(caller, args)
 	local speed = tonumber(args[1])
 	if not speed then

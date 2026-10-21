@@ -30,7 +30,7 @@ local function tick()
 		-- rock, a prop or a ridge above the water you can breathe.
 		local feet = root.Position.Y - root.Size.Y / 2 - humanoid.HipHeight
 		local deep = Beach.waterYAt(sea, root.Position.X) - feet >= Config.Beach.WaistDepth
-		if deep and not player:GetAttribute("AdminGod") then
+		if deep and not player:GetAttribute("AdminGod") and not player:GetAttribute("AdminFly") then
 			local lungs = Stats.breath(player)
 			breath = math.max(0, breath - TICK / (cfg.BreathTime * lungs))
 			if breath <= 0 then
