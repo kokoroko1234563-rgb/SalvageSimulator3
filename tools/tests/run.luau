@@ -60,6 +60,7 @@ for _, name in
 		"Remotes",
 		"Validate",
 		"Fish",
+		"Routes",
 	}
 do
 	test("load Shared/" .. name, function()
@@ -111,6 +112,8 @@ test("load server services", function()
 			"SurfService",
 			"Showroom",
 			"ShowroomExhibits",
+			"BotEconomy",
+			"BotService",
 		}
 	do
 		h.require("Server/" .. name)
@@ -3438,6 +3441,187 @@ test("secret: a room run claims its chest, and a claim from away from it is reje
 		SecretService.claimOk(vault, vault.Chest, #vault.Checkpoints + 1, 30, 100),
 		"the vault's chest opens at the top"
 	)
+end)
+
+-- Bots (src/server/BotService, BotEconomy, src/shared/Routes) -----------------------------------
+
+test("bot routes avoid rock and walls, and go through the gap", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local Routes = h.require("Shared/Routes")
+	local tile = 4
+	local z0 = Beach.tileRange(tile)
+	-- A wall across the whole beach with one 24-wide gap at x = 200.
+	local function wall(x0, x1)
+		return {
+			Kind = "Wall",
+			Area = { { x0, 100 }, { x1, 100 }, { x1, 130 }, { x0, 130 } },
+			Height = 14,
+		}
+	end
+	Layouts.setActive(tile, { Name = "gapped", Primitives = { wall(-400, 188), wall(212, 400) } })
+	local grid = Routes.new()
+	local from, to = { x = 0, z = z0 + 20 }, { x = 0, z = z0 + 220 }
+	local path, length = grid:find(from, to, { radius = 4 })
+	assert(path, "a way round exists")
+	assert(length > 300, "it goes round by the gap, not straight over the wall")
+	local through = false
+	for _, point in path do
+		local _, rock = Beach.shapeAt(point.x, point.z)
+		assert(not rock, "never on rock")
+		if point.z > z0 + 105 and point.z < z0 + 125 then
+			through = true
+			assert(point.x > 186 and point.x < 214, "crosses the wall only at the gap")
+		end
+	end
+	assert(through, "it crosses the wall")
+	for i = 2, #path do
+		local a, b = path[i - 1], path[i]
+		local rise = math.abs(Beach.groundAt(b.x, b.z) - Beach.groundAt(a.x, a.z))
+		local run = math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2)
+		assert(rise <= Config.Beach.Terrain.FootSlope * run + 1e-6, "no step steeper than a player can climb")
+	end
+	-- Close the gap: no way at all.
+	Layouts.setActive(tile, { Name = "closed", Primitives = { wall(-400, 400) } })
+	grid:refresh()
+	assert(grid:find(from, to, { radius = 4 }) == nil, "a closed wall has no way through")
+	-- Water too deep to stand in blocks the route like rock does.
+	Layouts.setActive(tile, nil)
+	grid:refresh()
+	assert(grid:find(from, to, { radius = 4 }), "open ground again")
+	local blocked = function(_x, z)
+		return z > z0 + 100 and z < z0 + 130
+	end
+	assert(grid:find(from, to, { radius = 4, blocked = blocked }) == nil, "deep water blocks a route")
+	Layouts.setActive(tile, nil)
+end)
+
+test("bot buying rule picks the best income per price, and rebirths first", function()
+	local Economy = h.require("Server/BotEconomy")
+	local Rebirth = h.require("Shared/Rebirth")
+	local state = Economy.newState()
+	assert(Economy.nextPurchase(state) == nil, "nothing to buy with no coins")
+	for _, coins in { 300, 1700, 6500, 30000, 200000 } do
+		state = Economy.newState()
+		state.Coins = coins
+		local base = Economy.income(state)
+		local best, bestRatio
+		for _, option in Economy.options(state, false) do
+			if option.Price <= coins then
+				local ratio = option.Gain / option.Price
+				if not bestRatio or ratio > bestRatio then
+					best, bestRatio = option, ratio
+				end
+				-- (the gain is what the purchase really adds)
+				local trial = Economy.newState()
+				trial.Coins = coins
+				if option.Category == "Tool" then
+					trial.Tools[option.Id] = true
+				else
+					trial.Vessels[option.Id] = true
+				end
+				assert(math.abs(Economy.income(trial) - base - option.Gain) < 1e-6, "gain is income added")
+			end
+		end
+		local pick = Economy.nextPurchase(state)
+		assert(
+			pick and best and pick.Id == best.Id,
+			coins .. " coins: the best income per price is " .. tostring(best and best.Id)
+		)
+		assert(pick.Price <= coins, "affordable")
+	end
+	-- 250 coins can only buy a wheelbarrow, which is the best buy then.
+	state = Economy.newState()
+	state.Coins = 250
+	assert(Economy.nextPurchase(state).Id == "Wheelbarrow", "the wheelbarrow first")
+	assert(Economy.buy(state, Economy.nextPurchase(state)) and state.Coins == 0, "buying spends the price")
+	-- Rebirth: as soon as it's affordable, resets coins and shop gear, adds a pick.
+	state = Economy.newState()
+	state.Coins = Rebirth.cost(0)
+	state.Tools.BoatHook = true
+	state.Vessels.Wheelbarrow = true
+	assert(Economy.canRebirth(state), "can rebirth at the cost")
+	local pick = Economy.rebirth(state)
+	assert(pick and state.Rewards[pick], "takes a reward")
+	assert(state.Rebirths == 1 and state.Coins == 0, "coins reset")
+	assert(not state.Tools.BoatHook and not state.Vessels.Wheelbarrow, "shop gear goes")
+	-- It takes the pick that gives most income.
+	local options = Rebirth.remaining({})
+	local bestIncome, bestId = -1, nil
+	for _, id in options do
+		local trial = Economy.newState()
+		trial.Rebirths = 1
+		Economy.grant(trial, id)
+		if Economy.income(trial) > bestIncome then
+			bestIncome, bestId = Economy.income(trial), id
+		end
+	end
+	assert(pick == bestId, "the most useful reward is " .. tostring(bestId) .. ", took " .. tostring(pick))
+end)
+
+test("bot can't claim an item another already claimed", function()
+	local Items = h.require("Shared/Items")
+	local Gear = h.require("Shared/Gear")
+	local ItemService = h.require("Server/ItemService")
+	local GrabService = h.require("Server/GrabService")
+	local item = ItemService.spawnAt(Items.get("Seashell"), 1, roblox.Vector3.new(0, 0, 100))
+	local tool = Gear.getTool("BareHands")
+	local near = item.CFrame.Position
+	assert(GrabService.canClaim(item, -1, tool, 1, near), "free and in reach")
+	assert(not GrabService.canClaim(item, -1, tool, 1, near + roblox.Vector3.new(0, 0, 40)), "out of reach")
+	assert(ItemService.claimForBot(item, -1), "the first bot claims it")
+	assert(not ItemService.claimForBot(item, -2), "the second can't")
+	assert(not GrabService.canClaim(item, -2, tool, 1, near), "and the rules say so too")
+	assert(ItemService.getOwnerId(item) == -1, "it stays the first bot's")
+	assert(ItemService.stats.ClaimedByBots >= 1, "counted")
+	ItemService.destroy(item)
+	assert(not ItemService.claimForBot(item, -3), "a destroyed item can't be claimed")
+	-- Heavy items need a tool that lifts them.
+	local anchor = ItemService.spawnAt(Items.get("TreasureChest"), 1, roblox.Vector3.new(0, 0, 100))
+	assert(not GrabService.canClaim(anchor, -1, tool, 1, anchor.CFrame.Position), "too heavy for bare hands")
+	ItemService.destroy(anchor)
+end)
+
+test("bot state never touches DataService", function()
+	local fs = require("@lune/fs")
+	local DataService = h.require("Server/DataService")
+	local Economy = h.require("Server/BotEconomy")
+	local BotService = h.require("Server/BotService")
+	local calls = 0
+	local originals = {}
+	for name, value in DataService do
+		if type(value) == "function" then
+			originals[name] = value
+			DataService[name] = function(...)
+				calls += 1
+				return value(...)
+			end
+		end
+	end
+	local state = Economy.newState()
+	Economy.sell(state, 500)
+	Economy.buy(state, Economy.nextPurchase(state))
+	state.Coins = 1e6
+	Economy.rebirth(state)
+	BotService.report()
+	BotService.snapshot()
+	for name, value in originals do
+		DataService[name] = value
+	end
+	assert(calls == 0, "DataService was called " .. calls .. " times")
+	-- And the source doesn't use it or DataStores at all (comments aside).
+	for _, file in { "src/server/BotService.luau", "src/server/BotEconomy.luau", "src/shared/Routes.luau" } do
+		local code = {}
+		for line in string.gmatch(fs.readFile(file), "[^\n]+") do
+			if not string.match(line, "^%s*%-%-") then
+				table.insert(code, line)
+			end
+		end
+		local text = table.concat(code, "\n")
+		assert(not string.find(text, "DataService", 1, true), file .. " mentions DataService")
+		assert(not string.find(text, "DataStore", 1, true), file .. " mentions a DataStore")
+	end
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failures))
