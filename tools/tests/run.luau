@@ -3518,6 +3518,48 @@ test("bot routes avoid rock and walls, and go through the gap", function()
 	Layouts.setActive(tile, nil)
 end)
 
+test(
+	"item crowds: shallow, light surf spawns scale with the players on the server, heavy ones don't",
+	function()
+		local Config = h.require("Shared/Config")
+		local Tide = h.require("Shared/Tide")
+		local ItemService = h.require("Server/ItemService")
+		local saved = Config.Items.CrowdSpawn
+		Config.Items.CrowdSpawn = { Players = 20, Scale = 3 }
+		assert(ItemService.crowdScale(1) == 1, "a solo server is the base rate")
+		assert(math.abs(ItemService.crowdScale(20) - 3) < 1e-9, "full crowd: three times")
+		assert(math.abs(ItemService.crowdScale(10.5) - 2) < 1e-9, "linear in between")
+		assert(ItemService.crowdScale(40) == 3, "no more than Scale")
+		local max = Config.Items.MaxSurfItems
+		assert(ItemService.surfCap(1) == max, "the cap is MaxSurfItems at the base rate")
+		assert(
+			math.abs(ItemService.surfCap(3) - max * (0.3 + 0.7 * 3)) < 1e-9,
+			"the shallow share of the cap triples, the heavy share doesn't"
+		)
+		ItemService.setBotCount(19)
+		assert(
+			math.abs(ItemService.crowdScale() - 1 - 2 * 18 / 19) < 1e-9,
+			"bots count as players (one other player: none here)"
+		)
+		ItemService.setBotCount(0)
+		Config.Items.CrowdSpawn = { Players = 20, Scale = 1 }
+		assert(ItemService.crowdScale(20) == 1, "Scale 1 turns it off")
+		Config.Items.CrowdSpawn = saved
+		-- The extra spawns are never heavy.
+		local sea = Tide.sea(1000)
+		local made = 0
+		for _ = 1, 80 do
+			local item = ItemService.spawnInSurf(sea, true)
+			if item then
+				made += 1
+				assert((item:GetAttribute("Class") or 1) < 3, "a light spawn is never heavy")
+				ItemService.destroy(item)
+			end
+		end
+		assert(made > 20, "light spawns happen (" .. made .. ")")
+	end
+)
+
 test("bot route searches are time-sliced: a hopeless one yields and stays within its bound", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")

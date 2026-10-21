@@ -365,10 +365,10 @@ local HEAVY_SHARE = 0.3 -- the share of surf spawns that are heavy, where a zone
 
 -- Washes one item up somewhere in the surf around the current waterline. The zone (and so
 -- the value and rarity) comes from where it lands, so low tide brings richer loot.
-function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
+function ItemService.spawnInSurf(sea: Tide.Sea, notHeavy: boolean?): BasePart?
 	local beach = Config.Beach
 	-- Heavy things sit out in deeper water; lighter ones anywhere from the wet sand out.
-	local heavy = rng:NextNumber() < HEAVY_SHARE
+	local heavy = not notHeavy and rng:NextNumber() < HEAVY_SHARE
 	local x, z
 	for _ = 1, 6 do
 		local depth = if heavy
@@ -455,8 +455,34 @@ function ItemService.settleSpots(sea: Tide.Sea, cycle: number): number
 	return spawned
 end
 
+-- Crowds (Config.Items.CrowdSpawn): the more players on the server (bots count), the more of the
+-- shallow, light finds wash up, up to Scale times a solo server's at Players players, linear in
+-- between. Heavy and deep spawns don't change.
+local botCount = 0
+
+function ItemService.setBotCount(n: number)
+	botCount = n
+end
+
+function ItemService.crowdScale(players: number?): number
+	local crowd = cfg.CrowdSpawn
+	if not crowd or crowd.Scale <= 1 or crowd.Players <= 1 then
+		return 1
+	end
+	local count = players or (#Players:GetPlayers() + botCount)
+	return 1 + (crowd.Scale - 1) * math.clamp((count - 1) / (crowd.Players - 1), 0, 1)
+end
+
+-- The most items kept in the surf at a crowd scale: the shallow, light share (all but the heavy
+-- spawns' share) grows with it, the heavy share doesn't.
+function ItemService.surfCap(scale: number): number
+	return cfg.MaxSurfItems * (HEAVY_SHARE + (1 - HEAVY_SHARE) * scale)
+end
+
 local function spawnTick()
 	local sea = Tide.sea()
+	local scale = ItemService.crowdScale()
+	local cap = ItemService.surfCap(scale)
 	local total, inSurf = 0, 0
 	for item in all do
 		total += 1
@@ -468,12 +494,23 @@ local function spawnTick()
 		end
 	end
 	ItemService.stats.SpawnTicks += 1
-	if inSurf >= cfg.MaxSurfItems then
+	if inSurf >= cap then
 		ItemService.stats.SurfFullTicks += 1
 	end
-	if total < cfg.MaxTotal and inSurf < cfg.MaxSurfItems then
+	if total < cfg.MaxTotal and inSurf < cap then
 		if ItemService.spawnInSurf(sea) then
 			ItemService.stats.SurfSpawned += 1
+			inSurf += 1
+		end
+		-- The extra shallow, light finds a crowd brings (the light share of a normal tick's spawns
+		-- is about 1 - HEAVY_SHARE, so that many extra tries per unit of scale above 1).
+		local extra = (scale - 1) * (1 - HEAVY_SHARE)
+		while extra > 0 and total < cfg.MaxTotal and inSurf < cap do
+			if rng:NextNumber() < extra and ItemService.spawnInSurf(sea, true) then
+				ItemService.stats.SurfSpawned += 1
+				inSurf += 1
+			end
+			extra -= 1
 		end
 	end
 	if total < cfg.MaxTotal then

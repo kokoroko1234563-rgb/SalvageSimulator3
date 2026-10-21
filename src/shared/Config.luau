@@ -735,6 +735,10 @@ Config.Pockets = {
 Config.Items = {
 	SpawnInterval = 1.25, -- seconds between spawn attempts
 	MaxSurfItems = 45, -- unclaimed items kept washing around the current waterline
+	-- Crowds: at Players players on the server (bots count) the shallow, light surf spawns, and the
+	-- share of MaxSurfItems they fill, are Scale times a solo server's, linear in between. Heavy and
+	-- deep spawns don't change. Scale 1 turns it off.
+	CrowdSpawn = { Players = 20, Scale = 3 },
 	MaxTotal = 450,
 	LooseTimeout = 25, -- a claimed item left alone this long freezes and becomes unclaimed
 	TimedOutLifetime = 90, -- a timed-out item despawns if nobody grabs it within this
