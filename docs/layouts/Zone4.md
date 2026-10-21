@@ -49,8 +49,9 @@ Feet beat carts at the test starts in every crossing (the foot ways and scramble
 
 ## Test Range (every way it comes out)
 
-Clean in crossings 1 and 5 and in every other room choice. The Bend's wall (x -228, z 2081 to 2087
-in the Range) is no longer flagged: its short return is drawn as an area, so the Range does not
-measure the corner (35.5) as a wall. A few scenery boulders, coral balls and rubble specks still
-sit 1 to 2.3 studs above the ground in crossings 2 to 4. They are placed by the game's scenery
-code (ZoneProps, moved by GroundShift between layouts), not by this plan.
+Clean in every crossing and room choice. The Bend's wall (x -228, z 2081 to 2087 in the Range)
+is no longer flagged: its short return is drawn as an area, so the Range does not measure the
+corner (35.5) as a wall. The scenery that floated 1 to 2.3 studs in crossings 2 to 4 is fixed in
+the game's scenery code: a boulder and its slab, and a coral clump's balls, are one model each,
+so GroundShift moves them together; and GroundShift puts away props within 6 studs of a rock
+face, or on ground more than half a stud off level, where the terrain sags.

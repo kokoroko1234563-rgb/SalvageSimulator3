@@ -235,14 +235,20 @@ local function boulder(
 	local tilt =
 		CFrame.Angles(rng:NextNumber(-0.35, 0.35), rng:NextNumber() * math.pi, rng:NextNumber(-0.35, 0.35))
 	local at = CFrame.new(x, (y or Beach.groundAt(x, z)) + dims.Y * 0.25, z) * tilt
-	local rock = add(parent, {
+	-- The boulder and its slab are one model, so GroundShift moves them together (moved apart,
+	-- by the ground under each, the slab floats off a slope's boulder).
+	local model = Instance.new("Model")
+	model.Name = "Boulder"
+	model.Parent = parent
+	local rock = add(model, {
 		Name = "Boulder",
 		Size = dims,
 		CFrame = at,
 		Color = color,
 		Material = Palette.Material.Rock,
 	})
-	add(parent, {
+	model.PrimaryPart = rock
+	add(model, {
 		Name = "BoulderSlab",
 		Size = dims * Vector3.new(0.7, 0.8, 0.55),
 		CFrame = at * CFrame.new(dims.X * 0.25, dims.Y * 0.15, dims.Z * 0.2) * CFrame.Angles(0.5, 0.7, 0.3),
@@ -296,6 +302,11 @@ end
 -- A clump of coral: bright balls on the sand.
 local function coralPatch(parent: Instance, center: Vector3, rng: Random)
 	local colors = { Z.Coral1, Z.Coral2, Z.Coral3 }
+	-- One model, so the clump moves with the ground as one (see boulder).
+	local clump = Instance.new("Model")
+	clump.Name = "Coral"
+	clump.Parent = parent
+	parent = clump
 	for _ = 1, 4 do
 		local diameter = rng:NextNumber(1.2, 2.6)
 		local offset = Vector3.new(rng:NextNumber(-1.4, 1.4), diameter / 2, rng:NextNumber(-1.4, 1.4))
