@@ -180,9 +180,10 @@ def inset(slot, by=8):
     return [(by, by), (w - by, by), (w - by, d - by), (by, d - by)]
 
 
-def crab_nest(slot, name, weight=4, branches=0):
+def crab_nest(slot, name, weight=4, branches=0, burrow=False):
     """A dead-end nest: a roofed tunnel straight in and a chamber at its end heaped with big
-    shells (the best find there), a smaller heap beside it."""
+    shells (the best find there), a smaller heap beside it. With `burrow`, the secret's burrow
+    stands on the chamber's floor."""
     r = slot.room(name, lead=False)
     door, deep, (ix, iz) = inward(slot)
     w, d = slot.size
@@ -196,10 +197,12 @@ def crab_nest(slot, name, weight=4, branches=0):
     r.decor("Bones", at=(round(mid[0] + iz * 10), round(mid[1] + ix * 10)), scale=0.8)
     r.decor("Shells", at=(round(mid[0] - iz * 10), round(mid[1] - ix * 10)), scale=1.2)
     r.decor("Barnacles", area=box(mid[0], mid[1], 36, 20), count=4)
+    if burrow:
+        r.entrance(mid)
     return r
 
 
-def shell_midden(slot, name, weight=3, pits=1):
+def shell_midden(slot, name, weight=3, pits=1, burrow=None):
     """A heap of old shells in an open chamber: shell mounds to wind between, covered pits in the
     heaps (the cracks are the tell), the find deepest."""
     r = slot.room(name)
@@ -214,10 +217,12 @@ def shell_midden(slot, name, weight=3, pits=1):
     r.hazard("Pit", at=deep, radius=4, covered=True)
     if pits > 1:
         r.hazard("Pit", at=(round(w / 2), round(d / 2)), radius=4, covered=True)
+    if burrow:
+        r.entrance(burrow)  # the secret's burrow, on the heap's clear floor
     return r
 
 
-def collapsed_chamber(slot, name, weight=2):
+def collapsed_chamber(slot, name, weight=2, burrow=None):
     """A chamber whose roof came down: boulders to clamber round, the find behind the biggest."""
     r = slot.room(name)
     r.hall(inset(slot))
@@ -228,6 +233,8 @@ def collapsed_chamber(slot, name, weight=2):
     r.loot(deep, radius=4, weight=weight)
     r.decor("Rocks", area=inset(slot, 12), count=5)
     r.decor("Barnacles", area=inset(slot), count=4)
+    if burrow:
+        r.entrance(burrow)  # the secret's burrow, in the clear corner behind the boulders
     return r
 
 
@@ -276,8 +283,7 @@ def frame(z, lair, entrance):
     else:
         f.hazard("Patrol", path=[(190, 376), (270, 376)], count=2)
 
-    f.entrance(entrance)
-    f.decor("GlowShells", at=(entrance[0] + 10, entrance[1] + 6))
+    # (The secret's door is in a nest chamber or midden of the deep slots: see slots().)
 
 
 def slots(z, lair, pool=False):
@@ -296,12 +302,12 @@ def slots(z, lair, pool=False):
     crab_nest(s3, "Hermit nest", weight=3)
 
     s4 = z.slot("Deep nest", at=(-48, 360), size=(96, 72), door=(48, 0))
-    crab_nest(s4, "Brood nest", weight=5, branches=1)
-    shell_midden(s4, "Moult midden", weight=3)
+    crab_nest(s4, "Brood nest", weight=5, branches=1, burrow=True)
+    shell_midden(s4, "Moult midden", weight=3, burrow=(48, 30))
 
     s5 = z.slot("Hoard", at=(120, 504), size=(112, 72), door=(56, 72))
-    crab_nest(s5, "Hoard nest", weight=5, branches=2)
-    collapsed_chamber(s5, "Fallen hoard", weight=3)
+    crab_nest(s5, "Hoard nest", weight=5, branches=2, burrow=True)
+    collapsed_chamber(s5, "Fallen hoard", weight=3, burrow=(90, 54))
 
     s7 = z.slot("Sea nests", at=(-232, 504), size=(112, 72), door=(56, 72))
     crab_nest(s7, "Sea nest", weight=6, branches=2)

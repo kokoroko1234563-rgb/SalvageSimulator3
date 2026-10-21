@@ -308,9 +308,6 @@ return {
 			{ At = { 0, 296 }, Radius = 6, Weight = 3 },
 			{ At = { 228, 376 }, Radius = 6, Weight = 2 },
 		},
-		Entrances = {
-			{ -224, 232 },
-		},
 		Hazards = {
 			{
 				Type = "Patrol",
@@ -378,7 +375,6 @@ return {
 			},
 			{ Kind = "Bones", At = { 228, 376 }, Scale = 1.2, Yaw = 30 },
 			{ Kind = "GlowShells", At = { 200, 352 } },
-			{ Kind = "GlowShells", At = { -214, 238 } },
 		},
 		Name = "Outer Shore",
 		Crossings = {
@@ -3630,6 +3626,9 @@ return {
 						Loot = {
 							{ At = { 48, 60 }, Radius = 5, Weight = 5 },
 						},
+						Entrances = {
+							{ 48, 52 },
+						},
 						Decor = {
 							{ Kind = "Shells", At = { 48, 60 }, Scale = 2 },
 							{ Kind = "Bones", At = { 58, 52 }, Scale = 0.8 },
@@ -3688,6 +3687,9 @@ return {
 						},
 						Loot = {
 							{ At = { 48, 60 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 48, 30 },
 						},
 						Hazards = {
 							{ Type = "Pit", At = { 48, 60 }, Radius = 4, Covered = true },
@@ -3751,6 +3753,9 @@ return {
 						},
 						Loot = {
 							{ At = { 56, 12 }, Radius = 5, Weight = 5 },
+						},
+						Entrances = {
+							{ 56, 20 },
 						},
 						Decor = {
 							{ Kind = "Shells", At = { 56, 12 }, Scale = 2 },
@@ -3826,6 +3831,9 @@ return {
 						},
 						Loot = {
 							{ At = { 56, 12 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 90, 54 },
 						},
 						Decor = {
 							{
@@ -4415,9 +4423,6 @@ return {
 			{ At = { 0, 296 }, Radius = 6, Weight = 3 },
 			{ At = { 256, 410 }, Radius = 6, Weight = 4 },
 		},
-		Entrances = {
-			{ 54, 328 },
-		},
 		Hazards = {
 			{
 				Type = "Patrol",
@@ -4495,7 +4500,6 @@ return {
 				},
 				Count = 6,
 			},
-			{ Kind = "GlowShells", At = { 64, 334 } },
 		},
 		Name = "The Shoals",
 		Crossings = {
@@ -9832,6 +9836,9 @@ return {
 						Loot = {
 							{ At = { 48, 60 }, Radius = 5, Weight = 5 },
 						},
+						Entrances = {
+							{ 48, 52 },
+						},
 						Decor = {
 							{ Kind = "Shells", At = { 48, 60 }, Scale = 2 },
 							{ Kind = "Bones", At = { 58, 52 }, Scale = 0.8 },
@@ -9890,6 +9897,9 @@ return {
 						},
 						Loot = {
 							{ At = { 48, 60 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 48, 30 },
 						},
 						Hazards = {
 							{ Type = "Pit", At = { 48, 60 }, Radius = 4, Covered = true },
@@ -9953,6 +9963,9 @@ return {
 						},
 						Loot = {
 							{ At = { 56, 12 }, Radius = 5, Weight = 5 },
+						},
+						Entrances = {
+							{ 56, 20 },
 						},
 						Decor = {
 							{ Kind = "Shells", At = { 56, 12 }, Scale = 2 },
@@ -10028,6 +10041,9 @@ return {
 						},
 						Loot = {
 							{ At = { 56, 12 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 90, 54 },
 						},
 						Decor = {
 							{
@@ -10474,9 +10490,6 @@ return {
 			{ At = { 0, 296 }, Radius = 6, Weight = 3 },
 			{ At = { 256, 410 }, Radius = 6, Weight = 4 },
 		},
-		Entrances = {
-			{ 176, 424 },
-		},
 		Hazards = {
 			{
 				Type = "Patrol",
@@ -10554,7 +10567,6 @@ return {
 				},
 				Count = 6,
 			},
-			{ Kind = "GlowShells", At = { 186, 430 } },
 		},
 		Name = "The Drowned Reach",
 		Crossings = {
@@ -16198,6 +16210,9 @@ return {
 						Loot = {
 							{ At = { 48, 60 }, Radius = 5, Weight = 5 },
 						},
+						Entrances = {
+							{ 48, 52 },
+						},
 						Decor = {
 							{ Kind = "Shells", At = { 48, 60 }, Scale = 2 },
 							{ Kind = "Bones", At = { 58, 52 }, Scale = 0.8 },
@@ -16256,6 +16271,9 @@ return {
 						},
 						Loot = {
 							{ At = { 48, 60 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 48, 30 },
 						},
 						Hazards = {
 							{ Type = "Pit", At = { 48, 60 }, Radius = 4, Covered = true },
@@ -16319,6 +16337,9 @@ return {
 						},
 						Loot = {
 							{ At = { 56, 12 }, Radius = 5, Weight = 5 },
+						},
+						Entrances = {
+							{ 56, 20 },
 						},
 						Decor = {
 							{ Kind = "Shells", At = { 56, 12 }, Scale = 2 },
@@ -16394,6 +16415,9 @@ return {
 						},
 						Loot = {
 							{ At = { 56, 12 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 90, 54 },
 						},
 						Decor = {
 							{
