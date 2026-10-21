@@ -21,8 +21,8 @@ The map (zone coordinates, x -360 west to 360 east, z 0 top to 608 the sea), all
       584  ===================== the bottom band ============================================
 
 Every crossing reaches every chamber, so every slot's door can be walked to. In zones 5 and 6
-the east chamber is the Lair, where the giant's route begins; each crossing has the giant in its
-own long straight tunnel (a different one each tide), which the cart's way keeps clear of.
+the east chamber is the Lair, where the giant's tunnels begin; each crossing has the giant in its own
+maze of 2 or 3 tunnels (20 wide, roofed) that meet at junctions and cross the paths, with 4 to 6 burrows.
 """
 
 import math
@@ -89,14 +89,41 @@ def crabs(part, points, count=3):
     part.hazard("Patrol", path=points, count=count)
 
 
-def giant(part, route, burrows, roofs=True):
-    """The giant's tunnel: one straight lane it fills (12 wide), roofed, with its burrow holes
-    (churned mounds) on the route. No glowing shells: this is the way not to take."""
-    part.lane(route, width=12)
-    if roofs:
+LAIR_BOX = (152, 320, 296, 440)  # the Lair (open sky) and the Moult Hall (already roofed, with pillars)
+HALL_BOX = (-72, 248, 72, 344)
+
+
+def _outside(a, b, boxes=(LAIR_BOX, HALL_BOX), step=2):
+    """The pieces of the run a to b that lie outside the chambers `boxes` (a run is carved and
+    roofed only there: the chambers have their own floors and roofs)."""
+    length = math.hypot(b[0] - a[0], b[1] - a[1])
+    n = max(1, int(length / step))
+    pieces, start = [], None
+    for i in range(n + 1):
+        t = i / n
+        x, z = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+        inside = any(x0 + 2 <= x <= x1 - 2 and z0 + 2 <= z <= z1 - 2 for x0, z0, x1, z1 in boxes)
+        if not inside and start is None:
+            start = t
+        if (inside or i == n) and start is not None:
+            end = t if not inside else (i - 1) / n
+            if end > start:
+                pieces.append(((a[0] + (b[0] - a[0]) * start, a[1] + (b[1] - a[1]) * start),
+                               (a[0] + (b[0] - a[0]) * end, a[1] + (b[1] - a[1]) * end)))
+            start = None
+    return pieces
+
+
+def giant_net(part, routes, burrows):
+    """The giant's tunnels: a network of runs it fills (16 wide, carved 20), roofed outside the
+    chambers, that meet at junctions (shared points, or one run's corner on another's), with its
+    burrow holes (churned mounds) on them. No glowing shells: this is the way not to take."""
+    for route in routes:
         for a, b in zip(route, route[1:]):
-            part.roof_lane([a, b], 12)
-    part.hazard("Hunter", path=route, burrows=burrows)
+            for p, q in _outside(a, b):
+                part.lane([p, q], width=16)
+                part.roof_lane([p, q], 20)
+    part.hazard("Hunter", routes=[[list(pt) for pt in route] for route in routes], burrows=burrows)
     for bx, bz in burrows:
         part.decor("Rocks", at=(bx, bz), scale=0.8)
         part.decor("Pebbles", at=(bx + 4, bz + 3))
@@ -439,9 +466,8 @@ c.decor("GlowShells", at=(28, 12))
 c.decor("GlowShells", at=(52, 24))
 
 # =================================================================================================
-# Zone 5: The Shoals. The Lair, and the giant: one tunnel each crossing, from the Lair out.
+# Zone 5: The Shoals. The Lair, and the giant: a maze of tunnels each crossing, from the Lair out.
 # =================================================================================================
-LAIR = (224, 380)  # where every giant's route begins
 z5 = Zone(5, "The Shoals", rock=ROCK)
 frame(z5, lair=True, entrance=(54, 328))
 slots(z5, lair=True)
@@ -456,9 +482,10 @@ def lair_links(c, court=True, west=True):
         tunnel(c, [(-72, 300), (-136, 300)], roofs=(), shells=False)
 
 
-def giant_tunnel(c, route, burrows):
-    giant(c, route, burrows)
-    c.decor("Bones", at=(route[0][0] - 14, route[0][1] - 20), scale=1.2, yaw=70)  # at its mouth
+LAIR0 = (224, 380)
+# The Hall route: out of the Lair's west side, up and west along z 266 (above the pillars, past
+# the cart's way and the Hall, away from the entrance flat) to the west cart/foot corner.
+HALL_UP = [LAIR0, (156, 350), (156, 266), (-136, 266), (-136, 300)]
 
 
 # ---- crossing 1: Lair watch (2 paths) -----------------------------------------------------------
@@ -471,7 +498,9 @@ B = [(170, 0), (170, 50), (222, 50), (222, 100), (170, 100), (170, 200), (336, 2
      (336, 500), (256, 500), (256, 548), (336, 548), (336, 608)]
 cart_way(c, A)
 tunnel(c, B)
-giant_tunnel(c, [(224, 380), (224, 140)], [(224, 340), (224, 250), (224, 170)])
+giant_net(c, [[LAIR0, (224, 150), (100, 150), (100, 128)],  # north across B's row and column, west to the cart's corner
+              HALL_UP],  # through the Hall, west to the cart's way
+          [(224, 310), (224, 246), (224, 150), (150, 150), (156, 300), (-104, 266)])
 rubble(c, (336, 400))
 rubble(c, (336, 570), "z")
 lair_links(c)
@@ -494,7 +523,9 @@ tunnel(c, TW_L)
 tunnel(c, WR_S)
 tunnel(c, EAST_SNAKE)
 tunnel(c, [(232, 424), (232, 452), (336, 452), (336, 500), (256, 500), (256, 548), (336, 548), (336, 608)])
-giant_tunnel(c, [(268, 400), (268, 592)], [(268, 450), (268, 520), (268, 570)])
+giant_net(c, [[LAIR0, (296, 408), (296, 592)],  # south across the bottom east rows
+              [LAIR0, (164, 404), (164, 470), (104, 470)]],  # south-west to the cart's corner
+          [(296, 412), (296, 476), (296, 576), (130, 470), (194, 392)])
 rubble(c, (-136, 430))
 rubble(c, (336, 160), "z")
 lair_links(c, court=False, west=False)
@@ -514,7 +545,10 @@ B = [(40, 0), (40, 48), (-88, 48), (-88, 104), (100, 104), (100, 190), (336, 190
      (336, 500), (256, 500), (256, 548), (336, 548), (336, 608)]
 cart_way(c, A)
 tunnel(c, B)
-giant_tunnel(c, [(188, 380), (188, 120)], [(188, 340), (188, 262), (188, 190), (188, 140)])
+giant_net(c, [[LAIR0, (210, 340), (210, 150), (100, 150)],  # north across B's row, west to B's column
+              HALL_UP,  # through the Hall, west to the cart's corner
+              [LAIR0, (336, 380)]],  # east onto B's long run
+          [(210, 306), (210, 236), (150, 150), (290, 380), (-104, 266)])
 rubble(c, (336, 350))
 rubble(c, (-88, 80), "z")
 lair_links(c)
@@ -539,7 +573,10 @@ tunnel(c, EAST_LONG)
 tunnel(c, [(232, 424), (232, 452), (336, 452), (336, 500), (256, 500), (256, 548), (336, 548), (336, 608)])
 tunnel(c, CR_S)
 tunnel(c, BC)
-giant_tunnel(c, [(268, 380), (268, 188)], [(268, 340), (268, 264), (268, 214), (268, 196)])
+giant_net(c, [[LAIR0, (250, 340), (250, 188)],  # north across the east snake's rows
+              [LAIR0, (156, 350), (156, 282), (96, 282), (60, 266), (-136, 266), (-136, 300)],  # through the Hall (the centre path), west to the cart's way
+              [LAIR0, (164, 404), (164, 452), (80, 452)]],  # south-west to the centre path's corner
+          [(250, 312), (250, 214), (156, 300), (-104, 266), (120, 452), (190, 394)])
 rubble(c, (336, 520), "z")
 rubble(c, (-100, 400))
 lair_links(c, court=False, west=False)
@@ -562,7 +599,10 @@ B = TW_L + [(-224, 264)] + [(-224, 300), (-136, 300), (-136, 340), (-288, 340), 
                            (-136, 500), (-280, 500), (-280, 608)]
 cart_way(c, A)
 tunnel(c, B)
-giant_tunnel(c, [(164, 380), (164, 126)], [(164, 340), (164, 270), (164, 210), (164, 150)])
+giant_net(c, [[LAIR0, (156, 350), (156, 216)],  # north beside the cart's rows
+              [(156, 266), (-136, 266), (-136, 300)],  # west across the cart's column and the Hall to the west rows
+              [LAIR0, (164, 404), (164, 470), (104, 470)]],  # south-west to the cart's corner
+          [(156, 310), (156, 222), (-104, 266), (164, 420), (120, 470)])
 rubble(c, (-136, 480), "z")
 rubble(c, (-224, 100), "z")
 lair_links(c, court=False, west=False)
@@ -575,7 +615,7 @@ c.decor("GlowShells", at=(28, 12))
 c.decor("GlowShells", at=(52, 24))
 
 # =================================================================================================
-# Zone 6: The Drowned Reach. The deepest, longest ways: the same Lair, longer tunnels.
+# Zone 6: The Drowned Reach. The deepest, longest ways: the same Lair, another maze each crossing.
 # =================================================================================================
 z6 = Zone(6, "The Drowned Reach", rock=ROCK)
 frame(z6, lair=True, entrance=(176, 424))
@@ -599,7 +639,9 @@ B = [(-40, 0), (-40, 60), (100, 60), (100, 100), (-40, 100), (-40, 150), (100, 1
      (336, 452), (336, 500), (256, 500), (256, 548), (336, 548), (336, 608)]
 cart_way(c, WEST_CART)
 tunnel(c, B)
-giant_tunnel(c, [(224, 380), (224, 200)], [(224, 344), (224, 266), (224, 222), (224, 206)])
+giant_net(c, [[LAIR0, (224, 150), (100, 150)],  # north across B's row, west to B's corner
+              HALL_UP],  # through the Hall, west to the cart's way
+          [(224, 310), (224, 236), (224, 150), (160, 150), (156, 300), (-104, 266)])
 rubble(c, (336, 400))
 rubble(c, (336, 570), "z")
 lair_links(c, court=False, west=False)
@@ -624,7 +666,9 @@ EAST_LONG = [(222, 0), (222, 60), (150, 60), (150, 100), (222, 100), (222, 140),
              (336, 188)] + EAST_SNAKE[4:]
 tunnel(c, EAST_LONG)
 tunnel(c, EAST_BOTTOM)
-giant_tunnel(c, [(268, 400), (268, 592)], [(268, 450), (268, 500), (268, 540), (268, 576)])
+giant_net(c, [[LAIR0, (296, 408), (296, 592)],  # south across the bottom east rows
+              [LAIR0, (190, 336), (104, 336)]],  # west across the Hall link to the cart's column
+          [(296, 412), (296, 476), (296, 576), (140, 336), (205, 356)])
 rubble(c, (-136, 480), "z")
 rubble(c, (336, 520), "z")
 lair_links(c, court=False, west=False)
@@ -643,7 +687,9 @@ B = [(40, 0), (40, 48), (-88, 48), (-88, 104), (100, 104), (100, 190), (336, 190
      (336, 548), (336, 608)]
 cart_way(c, WEST_CART)
 tunnel(c, B)
-giant_tunnel(c, [(188, 380), (188, 120)], [(188, 340), (188, 262), (188, 210), (188, 140)])
+giant_net(c, [[LAIR0, (210, 340), (210, 150), (100, 150)],  # north across B's row, west to B's column
+              HALL_UP],  # through the Hall, west to the cart's way
+          [(210, 310), (210, 236), (150, 150), (60, 266), (-104, 266)])
 rubble(c, (336, 380))
 rubble(c, (-88, 80), "z")
 lair_links(c, court=False)
@@ -671,7 +717,9 @@ tunnel(c, EB6)
 CR6 = [(100, 0), (100, 48)] + CR_L[2:]
 tunnel(c, CR6)
 tunnel(c, BC)
-giant_tunnel(c, [(268, 380), (268, 240)], [(268, 344), (268, 300), (268, 264), (268, 248)])
+giant_net(c, [[LAIR0, (268, 380), (268, 240)],  # north across the east snake's rows
+              [LAIR0, (190, 336), (-60, 336)]],  # west along the Hall, across the centre path
+          [(268, 310), (207, 358), (140, 336), (-30, 336)])
 rubble(c, (336, 468), "z")
 rubble(c, (-100, 400))
 lair_links(c, court=False, west=False)
@@ -690,7 +738,9 @@ cart_way(c, WEST_CART)
 B = CR_L + [(40, 296), (54, 336)] + [(-72, 336)] + BC[1:]
 tunnel(c, CR_L)
 tunnel(c, BC)
-giant_tunnel(c, [(164, 380), (164, 126)], [(164, 340), (164, 270), (164, 210), (164, 150)])
+giant_net(c, [[LAIR0, (156, 350), (156, 132), (40, 132)],  # north to the centre rows
+              [LAIR0, (190, 336), (-72, 336)]],  # west along the Hall, across the centre path
+          [(156, 306), (156, 206), (100, 132), (207, 358), (-30, 336)])
 rubble(c, (-100, 400))
 rubble(c, (40, 180), "z")
 lair_links(c, court=False, west=False)
