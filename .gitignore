@@ -10,3 +10,4 @@ tools/preview/out/
 
 # Subagent working copies (git worktrees)
 .claude/worktrees/
+tools/bots/out/
