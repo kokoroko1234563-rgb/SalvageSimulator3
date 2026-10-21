@@ -9,7 +9,7 @@ applies and the whole lagoon sits under a rock ceiling.
 ## What was built
 
 - **Zones 2 and 3 (open shore, no walls or rock).** A lagoon of six overlapping hollows (the
-  seaward row deeper, so it floods from the sea side first) in a ring of sand (a ridge, drawn 250 by 176 so it clears the zone 2 pier, 4.2 high in
+  seaward row deeper, so it floods from the sea side first) in a ring of sand (a ridge, drawn 250 by 176 and 20 wide so it clears the zone 2 pier, 4.2 high in
   zone 2, 6 in zone 3), two causeways across it north to south (one has a foot-only ford cut in
   it), mud and glowing weed in the water, six loot coves round the ring (best on the sea side)
   and the entrance on the east. Two crossings (West ring, East ring): the cart's ramp swings round

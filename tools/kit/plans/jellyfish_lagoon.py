@@ -88,10 +88,10 @@ def shore(n, bank, hollow_depth):
         f.hollow((x * 0.85, 395), radius=84, depth=hollow_depth, rough=3, material=MUD)
     # Its ring of sand: wide enough that carts must go round it.
     ring = ellipse(cx, cz, 250, 176, 28)  # clear of the pier (x 40, z 0 to 150)
-    f.ridge(closed(ring), height=bank, width=16, rock=False, rough=1)
+    f.ridge(closed(ring), height=bank, width=20, rock=False, rough=1)
     # Two causeways across, north to south: one with a ford cut in it (foot only).
-    f.ridge([(-70, 165), (-72, 340), (-70, 515)], height=bank - 0.6, width=16, rough=0)
-    f.ridge([(96, 165), (98, 340), (96, 510)], height=bank - 0.6, width=16, rough=0)
+    f.ridge([(-70, 178), (-72, 340), (-70, 515)], height=bank - 0.6, width=16, rough=0)
+    f.ridge([(96, 178), (98, 340), (96, 510)], height=bank - 0.6, width=16, rough=0)
     f.add(Kind="Channel", Path=[(98, 360), (98, 396)], Depth=2.4, Width=8, Rough=0, Material=MUD)
     f.decor("Weed", area=box(0, 340, 400, 300), count=10)
     f.decor(GLOW, area=box(0, 340, 400, 300), count=8)
