@@ -1255,6 +1255,9 @@ end
 HazardService._tunnels = tunnels
 
 function builders.Hunter(tile, settings, folder)
+	if Beach.zoneOfTile(tile) < settings.FromZone then
+		return
+	end
 	local z0 = Beach.tileRange(tile)
 	local function world(path)
 		local out = {}

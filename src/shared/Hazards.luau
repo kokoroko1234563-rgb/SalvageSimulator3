@@ -242,6 +242,7 @@ Hazards.Types = {
 		FeelRange = 8, -- this close, it notices you from any side
 		LoseTime = 2.5,
 		Leash = 90,
+		FromZone = 1, -- the shallowest zone it lives in (a biome's giant can keep to the deep)
 		DashRange = 30, -- someone this close ahead, it dashes
 		DashWarn = 0.8, -- seconds it rears up first
 		DashSpeed = 42,

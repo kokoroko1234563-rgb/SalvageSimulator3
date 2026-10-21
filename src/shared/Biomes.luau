@@ -101,7 +101,7 @@ Biomes.List = {
 				HitText = "A hermit crab knocked you flat!",
 			},
 			-- And the giant one: it hunts down its tunnel, sees a light a long way off, and kills.
-			{ Type = "Hunter", HitText = "The giant hermit crab got you!" },
+			{ Type = "Hunter", FromZone = 5, HitText = "The giant hermit crab got you!" },
 		},
 		Decor = Color3.fromRGB(225, 205, 180),
 		-- Crushed-shell grit and shell-crusted rock in a warm, dim, coral-pink gloom.
