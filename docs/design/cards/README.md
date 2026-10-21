@@ -56,3 +56,37 @@ Where each biome rolls, by tier (decided):
 | Uncommon | 2 to 6 | 12 to 15 |
 | Rare | 4 to 6 | 8 to 15 |
 | VeryRare | 5 and 6 only | 4 to 6 |
+
+## The secrets: an opening, an item and a chest in each biome
+
+Every biome of the initial build has its own secret. Its **unlock item** washes up on the beach
+(whether or not that tide's door stands), there is an **opening** in the biome, and using the
+item at the opening (it is always used up) takes you into a small themed **room** with a chest
+(`Secrets.luau`, kind `Room`: no checkpoints, no flood, a 60 second limit). Sandcastle Flats and
+Shipwreck Shallows keep their flooding courses. Sea-Glass Shore and Black Sand Vents wait.
+
+**When the door stands.** Each time a biome rolls, its door stands with a chance by the biome's
+tier (`Config.Secrets.DoorChance`): Common 50%, Uncommon 65%, Rare 80%, VeryRare 90%.
+
+**Where.** The door is in a far-off place, off the cart route and away from the main paths: a far
+corner of the beach in the open zones, a side room or a chamber off a lane in the walled ones.
+Each layout's `Entrances` (from its kit plan) says where; every way a zone can come out has at
+least one. `lune run tools/entrances.luau` lists them, with what is wrong with any that is not
+in clear ground.
+
+| Biome | Opening | Unlock item | Chest |
+|---|---|---|---|
+| Driftwood Cove | Hollow beached tree trunk | Carved Idol | Orange coin |
+| Tidepool Rocks | Blowhole in the rocks | Pearl-Eyed Shell | Blue coin |
+| Seagrass Shallows | Under a collapsed jetty | Barnacled Lantern | Green coin |
+| Coral Garden | Arch in the reef | Coral Comb | Pink coin |
+| Fog Bank | Lighthouse door | Lighthouse Key | Lantern of Clear Sight or Foghorn |
+| Whirlwind Dunes | Hollow in a dune, a wind-carved arch | Wind Chime | Magic Carpet or Gust Gloves |
+| Hermit Hollows | Shell burrow, on the floor of a chamber | Spiral Conch | Crab Claw or Shell Wagon |
+| Spearstone Reef | Cleft between leaning spearstones | Spearstone Shard | Tidewalker Boots |
+| Jellyfish Lagoon | Glowing lagoon grotto | Jelly Jar | Jelly Raft or Glow Pearl |
+| Stranded Iceberg | Ice cave mouth | Frozen Compass | Frost Sled or Freeze Wand (rare Frosted variant) |
+
+The common biomes' chests pay as the Sandcastle Vault's does (the biome's coloured coin). The
+rare biomes' chests are a lootbox of the exotic rewards already defined in `Gear.luau`; these
+will be reworked later, so the tables are placeholders.
