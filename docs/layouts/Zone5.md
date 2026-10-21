@@ -67,6 +67,13 @@ Weed mats in the fords and bands, starfish and urchins in the pools and the Grot
 along the cart's ramp and on the courts, fence posts and chain nets across each ford, barnacles
 in the caves.
 
-## Test Range
+## Test Range (every way it comes out)
 
-(see the end of this file's history: filled in after the run)
+Clean but for small tolerances: the terrain 2.6 studs off the layout at one wall foot
+(crossing 2), and the beach's shared cosmetic textures (glitter sand and salt crust specks a
+fraction of a stud under or over the ground, one amphora on the Far Sandbar), which belong to
+no layout. Roblox's own pathfinder gives up on the one-path Grotto way from the far east starts
+(a long route, as in zone 6); the terrain walk finds the way down from every start (36 to 58 s
+from x 280 to -280). Its "fastest way" (32 s) runs along the beach's outer edge strip beyond the
+walls, which the walk doesn't bar (the same happens in zone 6); the quick check's path times
+above are the measure of the lanes.
