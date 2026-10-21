@@ -34,6 +34,7 @@ import fcntl
 import glob
 import json
 import os
+import re
 import ssl
 import subprocess
 import sys
@@ -225,13 +226,32 @@ def write_report():
         for path in sorted(glob.glob(os.path.join(OUT, "x*_*.json"))):
             extra[os.path.basename(path)[1:-5]] = json.load(open(path))
         if extra:
-            lines.append("Repeat runs (the same X again, to see the noise):")
-            lines.append("")
-            lines.append("| run | mean coins/h per bot | lost to bot per bot | bots that bought gear | claimed |")
-            lines.append("|---|---|---|---|---|")
+            groups = {}
             for name, res in extra.items():
-                for r in summarise({0: res}):
-                    lines.append(f"| {name} | {r['mean']:,.0f} | {r['lost_per_bot']:.1f} | {r['bought']}/{r['n']} | {r['claimed']} |")
+                x, tag = name.split("_", 1)
+                groups.setdefault((re.sub(r"\d+$", "", tag), int(x)), []).append(res)
+            lines.append("Repeated runs, by tag (mean and range over the repeats):")
+            lines.append("")
+            lines.append("| tag | X | runs | coins/h per bot | server total coins/h | tide deaths per run | claimed per run | gear at the end (bots per run) |")
+            lines.append("|---|---|---|---|---|---|---|---|")
+            for (tag, x), runs in sorted(groups.items()):
+                per_bot, total, deaths, claimed, gear = [], [], [], [], {}
+                for res in runs:
+                    bots = res["snapshot"]["Bots"]
+                    hours = sum(b["GameSeconds"] for b in bots) / len(bots) / 3600
+                    coins = sum(b["Coins"] for b in bots)
+                    per_bot.append(coins / len(bots) / hours)
+                    total.append(coins / hours)
+                    deaths.append(sum(b["Deaths"] for b in bots))
+                    claimed.append(res["snapshot"]["Server"]["Claimed"])
+                    for b in bots:
+                        key = f"{b['Gear']['Tool']}+{b['Gear'].get('Vessel') or 'hands'}"
+                        gear[key] = gear.get(key, 0) + 1
+
+                def span(v):
+                    return f"{sum(v) / len(v):,.0f} ({min(v):,.0f} to {max(v):,.0f})"
+                mix = ", ".join(f"{k} {n / len(runs):.1f}" for k, n in sorted(gear.items(), key=lambda kv: -kv[1])[:5])
+                lines.append(f"| {tag} | {x} | {len(runs)} | {span(per_bot)} | {span(total)} | {span(deaths)} | {span(claimed)} | {mix} |")
             lines.append("")
         first = {}
         for path in glob.glob(os.path.join(OUT, "first_sweep", "x*.json")):
@@ -288,6 +308,7 @@ def main():
     parser.add_argument("--seconds", type=int, default=250)
     parser.add_argument("--final-trip", action="store_true")
     parser.add_argument("--no-publish", action="store_true")
+    parser.add_argument("--scale", type=float, help="Config.Items.CrowdSpawn.Scale for the run (1 = off)")
     parser.add_argument("--tag", help="name a repeat run (x8_<tag>.json), kept out of the main table")
     parser.add_argument("--report-only", action="store_true")
     args = parser.parse_args()
@@ -302,7 +323,10 @@ def main():
                                     "zone": 6, "tool": "BoatHook", "vessel": "Wheelbarrow"}))
     else:
         for x in [int(v) for v in args.xs.split(",")]:
-            jobs.append((f"x{x}" + (f"_{args.tag}" if args.tag else ""), {"bots": x, "speed": args.speed, "seconds": args.seconds}))
+            job = {"bots": x, "speed": args.speed, "seconds": args.seconds}
+            if args.scale is not None:
+                job["scale"] = args.scale
+            jobs.append((f"x{x}" + (f"_{args.tag}" if args.tag else ""), job))
 
     # One Test Range run at a time: every run publishes its own build to the one place.
     with open("/tmp/salvage-test-range.lock", "w") as lock:

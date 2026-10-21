@@ -37,6 +37,10 @@ ItemService.init(map)
 local BotService = require(Server.BotService)
 local setup = os.clock() - started
 
+-- Config.Items.CrowdSpawn.Scale: 1 turns the crowd spawn scaler off.
+if JOB.scale then
+	Config.Items.CrowdSpawn = { Players = Config.Items.CrowdSpawn.Players, Scale = JOB.scale }
+end
 BotService.clearLog()
 BotService.setSpeed(JOB.speed or 1)
 if JOB.finalTrip then
