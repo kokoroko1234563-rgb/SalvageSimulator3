@@ -38,6 +38,17 @@ rule), `src/shared/Routes.luau` (walkable routes), `tools/bots/` (the sweep).
   nothing else will do. One the sea catches (water at waist depth) is swept away: it loses its cart load
   and returns home four seconds later.
 
+- **Spreading.** The beach's width is split between the bots present (by number, re-split when bots
+  join or leave); each bot works its own stretch first and only leaves it when the stretch has nothing
+  it can take. A bot with no cart (one thing in its hands) keeps to trips of at most 200 game seconds
+  outside its stretch. A bot reserves its target (a soft claim in BotService; other bots skip it) and
+  gives up at once if anyone claims it first. Items are scored by value per second of the walk there and
+  on home.
+- **Never blocks a frame.** Each bot thinks (picks a target, plans routes) in its own thread, one at a
+  time, while movement carries on. Route searches call a yield every 200 node expansions, and all bots
+  together may use about 3 ms of a frame; searches are bounded by the distance. The sweep reports the
+  worst Heartbeat and bot work time.
+
 ## One buying rule, for every bot
 
 1. Rebirth as soon as it can be afforded, taking the reward after which its estimated income is highest.

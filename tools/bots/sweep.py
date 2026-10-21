@@ -153,6 +153,9 @@ def summarise(results):
         idle = sum(b["IdleGameSeconds"] for b in bots) / max(sum(b["GameSeconds"] for b in bots), 1)
         rows.append(dict(x=x, mean=sum(rates) / len(rates), lo=min(rates), hi=max(rates),
                          items=sum(items) / len(items), lost=sum(b["LostToBot"] for b in bots),
+                         lost_per_bot=sum(b["LostToBot"] for b in bots) / len(bots),
+                         bought=sum(1 for b in bots if b.get("Purchases", 0) > 0 or b["Rebirths"] > 0),
+                         n=len(bots),
                          idle=idle, spawned=server["SurfSpawned"], claimed=server["Claimed"],
                          despawned=server["Despawned"], full=server["SurfFullTicks"] / max(server["SpawnTicks"], 1)))
     return rows
@@ -212,12 +215,37 @@ def write_report():
                      "Rates are per hour of game time. Zones are the base layouts (no biomes).")
         lines.append("")
         rows = summarise(results)
-        lines.append("| X | mean coins/h per bot | slowest | fastest | items/h per bot | lost to another bot | idle % | surf spawned | claimed | despawned unclaimed | surf full % |")
-        lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
+        lines.append("| X | mean coins/h per bot | slowest | fastest | items/h per bot | lost to bot per bot | bots that bought gear | idle % | surf spawned | claimed | despawned unclaimed | surf full % |")
+        lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
         for r in rows:
-            lines.append(f"| {r['x']} | {r['mean']:,.0f} | {r['lo']:,.0f} | {r['hi']:,.0f} | {r['items']:,.0f} | {r['lost']} | "
-                         f"{100 * r['idle']:.0f} | {r['spawned']} | {r['claimed']} | {r['despawned']} | {100 * r['full']:.0f} |")
+            lines.append(f"| {r['x']} | {r['mean']:,.0f} | {r['lo']:,.0f} | {r['hi']:,.0f} | {r['items']:,.0f} | {r['lost_per_bot']:.1f} | "
+                         f"{r['bought']}/{r['n']} | {100 * r['idle']:.0f} | {r['spawned']} | {r['claimed']} | {r['despawned']} | {100 * r['full']:.0f} |")
         lines.append("")
+        extra = {}
+        for path in sorted(glob.glob(os.path.join(OUT, "x*_*.json"))):
+            extra[os.path.basename(path)[1:-5]] = json.load(open(path))
+        if extra:
+            lines.append("Repeat runs (the same X again, to see the noise):")
+            lines.append("")
+            lines.append("| run | mean coins/h per bot | lost to bot per bot | bots that bought gear | claimed |")
+            lines.append("|---|---|---|---|---|")
+            for name, res in extra.items():
+                for r in summarise({0: res}):
+                    lines.append(f"| {name} | {r['mean']:,.0f} | {r['lost_per_bot']:.1f} | {r['bought']}/{r['n']} | {r['claimed']} |")
+            lines.append("")
+        first = {}
+        for path in glob.glob(os.path.join(OUT, "first_sweep", "x*.json")):
+            name = os.path.basename(path)[1:-5]
+            if name.isdigit():
+                first[int(name)] = json.load(open(path))
+        if first:
+            lines.append("The first sweep (before bots spread along the beach), for comparison:")
+            lines.append("")
+            lines.append("| X | mean coins/h per bot | lost to bot per bot | bots that bought gear | claimed |")
+            lines.append("|---|---|---|---|---|")
+            for r in summarise(first):
+                lines.append(f"| {r['x']} | {r['mean']:,.0f} | {r['lost_per_bot']:.1f} | {r['bought']}/{r['n']} | {r['claimed']} |")
+            lines.append("")
         if rows:
             chart(rows, os.path.join(OUT, "income_chart.png"))
             lines.append("![income per bot against X](income_chart.png)")
@@ -260,6 +288,7 @@ def main():
     parser.add_argument("--seconds", type=int, default=250)
     parser.add_argument("--final-trip", action="store_true")
     parser.add_argument("--no-publish", action="store_true")
+    parser.add_argument("--tag", help="name a repeat run (x8_<tag>.json), kept out of the main table")
     parser.add_argument("--report-only", action="store_true")
     args = parser.parse_args()
     os.makedirs(OUT, exist_ok=True)
@@ -273,7 +302,7 @@ def main():
                                     "zone": 6, "tool": "BoatHook", "vessel": "Wheelbarrow"}))
     else:
         for x in [int(v) for v in args.xs.split(",")]:
-            jobs.append((f"x{x}", {"bots": x, "speed": args.speed, "seconds": args.seconds}))
+            jobs.append((f"x{x}" + (f"_{args.tag}" if args.tag else ""), {"bots": x, "speed": args.speed, "seconds": args.seconds}))
 
     # One Test Range run at a time: every run publishes its own build to the one place.
     with open("/tmp/salvage-test-range.lock", "w") as lock:
@@ -293,6 +322,10 @@ def main():
             print("\n".join(result.get("logs", [])[-8:]))
             if result.get("trip"):
                 print(json.dumps(result["trip"]))
+            frames = result["snapshot"].get("Frames")
+            if frames:
+                print(f"frames: {frames['Frames']}, worst Heartbeat {1000 * frames['MaxDt']:.0f} ms, "
+                      f"worst bot work {1000 * frames['MaxWork']:.1f} ms, over 50 ms: {frames['Slow']}")
             print(f"(setup {result['setupSeconds']:.1f}s, played {result['ranSeconds']:.0f}s)")
     write_report()
 
