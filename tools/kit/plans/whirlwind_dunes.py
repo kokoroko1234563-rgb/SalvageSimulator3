@@ -257,7 +257,6 @@ def build(n, name, spec):
         # Spike pits on the bowl's rim, where a fling can throw you: two open, two under sand.
         for k, (px, pz) in enumerate([(-36, -36), (36, -36), (-36, 36), (36, 36)]):
             f.hazard("Pit", at=(CENTRE[0] + px, CENTRE[1] + pz), radius=4, covered=k % 2 == 1)
-    f.entrance((-316, 4))
     f.decor("Pebbles", area=[(-340, -6), (340, -6), (340, 14), (-340, 14)], count=8)
     f.decor("Driftwood", area=[(-340, 596), (340, 596), (340, 616), (-340, 616)], count=4)
 
@@ -285,10 +284,16 @@ def build(n, name, spec):
 
     for (sname, at, size, door), (ka, kb, wa, wb) in zip(SITES, spec["rooms"]):
         s = z.slot(sname, at=at, size=size, door=door)
-        KINDS[ka](s, f"{sname[:-8]} {ka}", weight=wa, pit=spec.get("pits", False) and wa >= 3)
-        KINDS[kb](s, f"{sname[:-8]} {kb}", weight=wb, pit=spec.get("pits", False) and wb >= 3)
+        for kind, w in ((ka, wa), (kb, wb)):
+            r = KINDS[kind](s, f"{sname[:-8]} {kind}", weight=w, pit=spec.get("pits", False) and w >= 3)
+            if sname == DOOR_SITE and kind in DOOR_AT:
+                r.entrance(DOOR_AT[kind])  # the secret's door: a dune hollow, far down the west
     return z
 
+
+# The secret's door stands in the hollow far down the west (both of its rooms hold it).
+DOOR_SITE = "Low west hollows"
+DOOR_AT = {"scoop": (44, 46), "ring": (44, 36)}
 
 ROOMS = [("scoop", "drift", 3, 2), ("comb", "ring", 2, 3), ("ring", "scoop", 4, 3),
          ("drift", "comb", 3, 4)]

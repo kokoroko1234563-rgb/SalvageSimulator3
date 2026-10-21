@@ -111,9 +111,6 @@ return {
 		Loot = {
 			{ At = { 0, 304 }, Radius = 6, Weight = 3 },
 		},
-		Entrances = {
-			{ -316, 4 },
-		},
 		Hazards = {
 			{
 				Type = "Whirlwind",
@@ -945,6 +942,9 @@ return {
 						Loot = {
 							{ At = { 44, 14 }, Radius = 4, Weight = 4 },
 						},
+						Entrances = {
+							{ 44, 36 },
+						},
 						Decor = {
 							{ Kind = "Timber", At = { 66, 36 }, Scale = 0.6, Yaw = 102 },
 							{ Kind = "Timber", At = { 55, 55 }, Scale = 0.6, Yaw = 25 },
@@ -990,6 +990,9 @@ return {
 						},
 						Loot = {
 							{ At = { 44, 14 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 44, 46 },
 						},
 						Decor = {
 							{ Kind = "Bones", At = { 50, 20 }, Scale = 0.8, Yaw = 30 },
@@ -1242,9 +1245,6 @@ return {
 		},
 		Loot = {
 			{ At = { 0, 304 }, Radius = 6, Weight = 3 },
-		},
-		Entrances = {
-			{ -316, 4 },
 		},
 		Hazards = {
 			{
@@ -2197,6 +2197,9 @@ return {
 						Loot = {
 							{ At = { 44, 14 }, Radius = 4, Weight = 4 },
 						},
+						Entrances = {
+							{ 44, 36 },
+						},
 						Decor = {
 							{ Kind = "Timber", At = { 66, 36 }, Scale = 0.6, Yaw = 102 },
 							{ Kind = "Timber", At = { 55, 55 }, Scale = 0.6, Yaw = 25 },
@@ -2242,6 +2245,9 @@ return {
 						},
 						Loot = {
 							{ At = { 44, 14 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 44, 46 },
 						},
 						Decor = {
 							{ Kind = "Bones", At = { 50, 20 }, Scale = 0.8, Yaw = 30 },
@@ -2494,9 +2500,6 @@ return {
 		},
 		Loot = {
 			{ At = { 0, 304 }, Radius = 6, Weight = 3 },
-		},
-		Entrances = {
-			{ -316, 4 },
 		},
 		Hazards = {
 			{
@@ -3633,6 +3636,9 @@ return {
 						Loot = {
 							{ At = { 44, 14 }, Radius = 4, Weight = 4 },
 						},
+						Entrances = {
+							{ 44, 36 },
+						},
 						Hazards = {
 							{ Type = "Pit", At = { 44, 14 }, Radius = 4, Covered = true },
 						},
@@ -3681,6 +3687,9 @@ return {
 						},
 						Loot = {
 							{ At = { 44, 14 }, Radius = 4, Weight = 3 },
+						},
+						Entrances = {
+							{ 44, 46 },
 						},
 						Hazards = {
 							{ Type = "Pit", At = { 44, 14 }, Radius = 4, Covered = true },
