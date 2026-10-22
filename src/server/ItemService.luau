@@ -57,8 +57,10 @@ function ItemService.resetStats()
 	end
 end
 
+local clock: (() -> number)? -- tools/tests: a stand-in clock (a simulated tide)
+
 local function now(): number
-	return Tide.now()
+	return if clock then clock() else Tide.now()
 end
 
 local function trySetNetworkOwner(part: BasePart, player: Player?)
@@ -487,14 +489,14 @@ function ItemService.surfCap(scale: number): number
 end
 
 local function spawnTick()
-	local sea = Tide.sea()
+	local sea = Tide.sea(now())
 	local scale = ItemService.crowdScale()
 	local cap = ItemService.surfCap(scale)
 	local total, inSurf = 0, 0
 	for item in all do
 		total += 1
 		if ItemService.getState(item) == "Unclaimed" and item:GetAttribute("Fresh") then
-			local depth = Beach.depthAt(item.Position, sea)
+			local depth = Beach.depthAt(item.CFrame.Position, sea)
 			if depth > -1 and depth < Config.Beach.WaistDepth then
 				inSurf += 1
 			end
@@ -521,7 +523,7 @@ local function spawnTick()
 		end
 	end
 	if total < cfg.MaxTotal then
-		ItemService.settleSpots(sea, Tide.getState().Cycle)
+		ItemService.settleSpots(sea, Tide.getState(now()).Cycle)
 	end
 end
 
@@ -529,7 +531,7 @@ local function maintenanceTick()
 	local t = now()
 	local sea = Tide.sea(t)
 	for item in all do
-		local position = item.Position
+		local position = item.CFrame.Position
 		local state = ItemService.getState(item)
 		local since = item:GetAttribute("Since") or t
 
@@ -560,6 +562,13 @@ local function maintenanceTick()
 			end
 		end
 	end
+end
+
+-- For tools/tests (tools/spawn_sim.luau): run the ticks by hand against a simulated clock.
+ItemService._spawnTick = spawnTick
+ItemService._maintenanceTick = maintenanceTick
+function ItemService._setClock(fn: (() -> number)?)
+	clock = fn
 end
 
 function ItemService.init(map: Instance)
