@@ -132,6 +132,18 @@ The sweep builds no terrain and rolls no biomes: every tile has its zone's base 
 bots walk and where items spawn. Each task starts a fresh server, so every bot starts with bare hands and
 no coins and is still early in its game when the run ends (250 s at x10 is about 1.7 tides).
 
+### Chained runs: one long game in several tasks
+
+`--chain N` runs N tasks per X as one continuous game. Each task returns `BotService.exportState()` (the
+tide's phase and progress and the sea's seed, every bot with its purse, gear, rewards, stats, place and
+cargo, every free item on the beach with its zone, place and age, the loot spots settled this tide, and
+the counts) and the next task starts from it (`importWorld` puts the tide and beach back before the
+way-home fields are built, `importBots` the bots). A bot whose spot is underwater when it comes back is
+moved landward to safe ground with its cargo, and the move is logged. Per-bot stats and the server counts
+carry, so the last task's report covers the whole chain; the sweep joins the progress curve and the income
+log. `chain_<name>.json` has it; `sweep.md` gets a "Chained runs" table and income per game quarter-hour.
+The speed must be the same for the whole chain.
+
 ### The final-zone trip
 
 `--final-trip` runs one bot alone, with a Hand Winch (the zone 6 tool) and a Wheelbarrow (the cheapest
