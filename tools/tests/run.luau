@@ -3557,6 +3557,264 @@ test("item crowds: the zones' ordinary surf spawns scale with the players on the
 	assert(made > 20, "surf spawns happen (" .. made .. ")")
 end)
 
+-- Spawning by zone (ItemService): `spawnWorld` clears the items, puts the item clock at `time`
+-- (seconds into the tide: 0 is high water, about 1000 low) and gives the zones a high spawn rate
+-- and the targets in `targets` (zone -> target; others 0), runs `fn`, then restores it all.
+local function spawnWorld(time: number, targets: { [number]: number }, fn: (any) -> ())
+	local Config = h.require("Shared/Config")
+	local ItemService = h.require("Server/ItemService")
+	local saved = {}
+	local spotChance = Config.Items.SpotChance
+	Config.Items.SpotChance = 0 -- (the loot spots are tested on their own)
+	for zone, entry in Config.Zones do
+		saved[zone] = { Target = entry.Target, MaxRate = entry.MaxRate }
+		entry.Target = targets[zone] or 0
+		entry.MaxRate = 50
+	end
+	ItemService._setClock(function()
+		return time
+	end)
+	for item in ItemService.all() do
+		ItemService.destroy(item)
+	end
+	local ok, err = pcall(fn, ItemService)
+	for item in ItemService.all() do
+		ItemService.destroy(item)
+	end
+	ItemService._setClock(nil)
+	Config.Items.SpotChance = spotChance
+	for zone, entry in Config.Zones do
+		entry.Target, entry.MaxRate = saved[zone].Target, saved[zone].MaxRate
+	end
+	assert(ok, err)
+end
+
+local function freeIn(ItemService, zone: number, time: number): number
+	local Tide = h.require("Shared/Tide")
+	return ItemService.countFree(Tide.sea(time))[zone]
+end
+
+test("spawn: an empty zone spawns and a full one doesn't", function()
+	local Config = h.require("Shared/Config")
+	local time = 1000
+	spawnWorld(time, { [1] = 6, [2] = 6 }, function(ItemService)
+		-- The rate rises as the zone empties and is nothing at (or above) the target.
+		local dt = Config.Items.SpawnInterval
+		local half = ItemService.zoneSpawnRate(1, 3, 1, dt)
+		local empty = ItemService.zoneSpawnRate(1, 0, 1, dt)
+		assert(empty > half and half > 0, "emptier zones spawn faster")
+		assert(math.abs(empty - 2 * half) < 1e-9, "in proportion to what's missing")
+		assert(ItemService.zoneSpawnRate(1, 6, 1, dt) == 0, "a zone at target spawns nothing")
+		assert(ItemService.zoneSpawnRate(1, 9, 1, dt) == 0, "nor one above it")
+		-- Ticks fill an empty zone up to its target, and then stop.
+		for _ = 1, 30 do
+			ItemService._spawnTick()
+		end
+		assert(freeIn(ItemService, 1, time) >= 6, "an empty zone 1 fills")
+		assert(freeIn(ItemService, 2, time) >= 6, "an empty zone 2 fills")
+		local before = freeIn(ItemService, 1, time)
+		local spawned = ItemService.stats.ZoneSpawned[1]
+		for _ = 1, 30 do
+			ItemService._spawnTick()
+		end
+		assert(freeIn(ItemService, 1, time) == before, "a full zone gets nothing more")
+		assert(ItemService.stats.ZoneSpawned[1] == spawned, "and the counts say so")
+	end)
+end)
+
+test("spawn: only free items count, each in the zone it lies in", function()
+	local Items = h.require("Shared/Items")
+	local time = 1000
+	spawnWorld(time, { [1] = 3 }, function(ItemService)
+		local shell = Items.get("Seashell")
+		local mine = ItemService.spawnAt(shell, 1, roblox.Vector3.new(0, 5, 200))
+		assert(freeIn(ItemService, 1, time) == 1, "an unclaimed item counts")
+		ItemService.setLoose(mine)
+		assert(freeIn(ItemService, 1, time) == 1, "a loose one counts")
+		ItemService.setUnclaimed(mine, true)
+		assert(ItemService.claimForBot(mine, -1))
+		assert(freeIn(ItemService, 1, time) == 0, "a held one doesn't")
+		ItemService.setInCart(mine, "cart", -1)
+		assert(freeIn(ItemService, 1, time) == 0, "nor one in a vessel")
+		ItemService.spawnAt(shell, 2, roblox.Vector3.new(0, 5, 700))
+		assert(
+			freeIn(ItemService, 1, time) == 0 and freeIn(ItemService, 2, time) == 1,
+			"counted where it lies"
+		)
+	end)
+end)
+
+test("spawn: items dropped in one zone never change another zone's rate", function()
+	local Config = h.require("Shared/Config")
+	local Items = h.require("Shared/Items")
+	local Tide = h.require("Shared/Tide")
+	local time = 1000
+	spawnWorld(time, { [1] = 10, [2] = 10, [3] = 10 }, function(ItemService)
+		local dt = Config.Items.SpawnInterval
+		local function rate(zone: number): number
+			local counts = ItemService.countFree(Tide.sea(time))
+			return ItemService.zoneSpawnRate(zone, counts[zone], 1, dt)
+		end
+		local before = { rate(1), rate(2), rate(3) }
+		assert(before[1] > 0 and before[2] > 0, "empty zones spawn")
+		for i = 1, 25 do
+			ItemService.spawnAt(Items.get("Seashell"), 2, roblox.Vector3.new(i * 5 - 60, 5, 700))
+		end
+		assert(rate(2) == 0, "the zone that got them stops")
+		assert(rate(1) == before[1] and rate(3) == before[3], "the others don't change at all")
+	end)
+end)
+
+test("spawn: open sand never rolls an unlock item or the Beacon Pearl", function()
+	local Beach = h.require("Shared/Beach")
+	local Biomes = h.require("Shared/Biomes")
+	local Config = h.require("Shared/Config")
+	local Tide = h.require("Shared/Tide")
+	local workspace = h.game.Workspace
+	local chance, exotic = Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance
+	local maxOnMap, beam = Config.Unlocks.MaxOnMap, Config.SkyBeam.SpawnChance
+	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = 1, 1
+	Config.Unlocks.MaxOnMap = math.huge
+	Config.SkyBeam.SpawnChance = 1
+	local tile = 2
+	spawnWorld(1000, {}, function(ItemService)
+		local sea = Tide.sea(1000)
+		workspace:SetAttribute(Biomes.attributeFor(tile), "SandcastleFlats")
+		-- The control: with those chances set, the surf's roll gives the unlock item and the pearl.
+		local z = Beach.tileRange(tile) + 100
+		local def = ItemService._chooseDef(Beach.zoneAt(z) :: number, z, 1)
+		assert(def and def.Unlock, "the surf rolls the unlock item")
+		local farZ = Beach.zoneRange(Beach.FarSandbarZone) + 10
+		local sky = ItemService._chooseDef(Beach.FarSandbarZone, farZ, 1)
+		assert(sky and sky.Id == "BeaconPearl", "and the Beacon Pearl on the Far Sandbar")
+		-- Open sand (the ordinary option): never, over many rolls in every zone.
+		for roll = 1, 300 do
+			local zoneIndex = (roll % Config.Beach.ActiveZones) + 1
+			local ordinary = ItemService._chooseDef(zoneIndex, Beach.zoneRange(zoneIndex) + 10, 1, true)
+			assert(ordinary and not ordinary.Unlock and ordinary.Id ~= "BeaconPearl", "an ordinary roll")
+			local far = ItemService._chooseDef(Beach.FarSandbarZone, farZ, 1, true)
+			assert(far and far.Id ~= "BeaconPearl", "no pearl on the Far Sandbar either")
+		end
+		local made = 0
+		for roll = 1, 90 do
+			local item = ItemService.spawnOnSand(sea, (roll % 3) + 1)
+			if item then
+				made += 1
+				assert(not item:GetAttribute("Unlock"), "no unlock item on open sand")
+				assert(item:GetAttribute("ItemId") ~= "BeaconPearl", "no Beacon Pearl on open sand")
+				ItemService.destroy(item)
+			end
+		end
+		assert(made > 60, "sand spawns happen (" .. made .. ")")
+	end)
+	workspace:SetAttribute(Biomes.attributeFor(tile), nil)
+	Config.Unlocks.MaxOnMap = maxOnMap
+	Config.SkyBeam.SpawnChance = beam
+	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = chance, exotic
+end)
+
+test("spawn: sand spawns are on open ground, dry, in their own zone", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Tide = h.require("Shared/Tide")
+	for _, time in { 0, 700, 1000 } do
+		spawnWorld(time, {}, function(ItemService)
+			local sea = Tide.sea(time)
+			for roll = 1, 90 do
+				local zone = (roll % 3) + 1
+				assert(Config.Zones[zone].SpawnOnSand, "zones 1 to 3 use open sand")
+				local item = ItemService.spawnOnSand(sea, zone)
+				if item then
+					local p = item.CFrame.Position
+					assert(Beach.zoneAt(p.Z) == zone, "in its zone")
+					local _, rock = Beach.shapeAt(p.X, p.Z)
+					assert(not rock and not Beach.roofAt(p.X, p.Z), "not on rock or under a roof")
+					assert(Beach.seaDepthAt(p, sea) <= 0.5, "not under the sea")
+					ItemService.destroy(item)
+				end
+			end
+		end)
+	end
+	assert(
+		not Config.Zones[4].SpawnOnSand and not Config.Zones[7].SpawnOnSand,
+		"the outer zones use the surf"
+	)
+end)
+
+test("spawn: zones 4 and up only spawn around the waterline", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Tide = h.require("Shared/Tide")
+	local seen = 0
+	for time = 0, 1500, 150 do
+		spawnWorld(time, { [4] = 50, [5] = 50, [6] = 50, [7] = 50 }, function(ItemService)
+			for _ = 1, 20 do
+				ItemService._spawnTick()
+			end
+			local sea = Tide.sea(time)
+			for item in ItemService.all() do
+				local zone = item:GetAttribute("Zone")
+				if zone >= 4 then
+					seen += 1
+					-- (Depth on the even slope: the layouts' shapes move the real ground.)
+					local p = item.CFrame.Position
+					local depth = (p.Z - Tide.waterlineAt(sea, p.X)) * Config.Beach.Slope
+					assert(
+						depth > -1 and depth < Config.Beach.WaistDepth,
+						"zone " .. zone .. " item " .. depth .. " studs into the sea at t=" .. time
+					)
+				end
+			end
+		end)
+	end
+	assert(seen > 40, "the outer zones refill when the water is there (" .. seen .. ")")
+	-- At high water the sea is in zone 1: nothing at all in the outer zones.
+	spawnWorld(0, { [4] = 50, [5] = 50, [6] = 50, [7] = 50 }, function(ItemService)
+		for _ = 1, 20 do
+			ItemService._spawnTick()
+		end
+		for item in ItemService.all() do
+			assert(item:GetAttribute("Zone") < 4, "nothing in the outer zones at high tide")
+		end
+	end)
+end)
+
+test("spawn: the crowd raises every zone's target and rate", function()
+	local Config = h.require("Shared/Config")
+	local ItemService = h.require("Server/ItemService")
+	local saved = Config.Items.CrowdSpawn
+	Config.Items.CrowdSpawn = { Players = 20, Scale = 3 }
+	local dt = Config.Items.SpawnInterval
+	local scale = ItemService.crowdScale(20)
+	for zone, entry in Config.Zones do
+		assert(
+			math.abs(ItemService.zoneTarget(zone, scale) - 3 * entry.Target) < 1e-9,
+			"three times the target"
+		)
+		assert(math.abs(ItemService.zoneMaxRate(zone, scale) - 3 * entry.MaxRate) < 1e-9, "and the max rate")
+		-- A zone full for a solo server still wants items in a crowd.
+		assert(ItemService.zoneSpawnRate(zone, entry.Target, 1, dt) == 0)
+		assert(ItemService.zoneSpawnRate(zone, entry.Target, scale, dt) > 0)
+	end
+	local solo, crowded
+	spawnWorld(1000, { [1] = 6 }, function(service)
+		for _ = 1, 40 do
+			service._spawnTick()
+		end
+		solo = freeIn(service, 1, 1000)
+	end)
+	ItemService.setBotCount(19)
+	spawnWorld(1000, { [1] = 6 }, function(service)
+		for _ = 1, 40 do
+			service._spawnTick()
+		end
+		crowded = freeIn(service, 1, 1000)
+	end)
+	ItemService.setBotCount(0)
+	Config.Items.CrowdSpawn = saved
+	assert(crowded > solo, "a crowd fills a zone further (" .. solo .. " solo, " .. crowded .. " crowded)")
+end)
+
 test("bot route searches are time-sliced: a hopeless one yields and stays within its bound", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
