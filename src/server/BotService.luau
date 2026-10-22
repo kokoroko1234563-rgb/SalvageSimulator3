@@ -110,7 +110,10 @@ local searchStats = {
 	Chosen = 0,
 	WaterTaken = 0,
 	WaterSkipped = 0,
-} -- what became of the item searches
+	HomeFull = 0, -- bots that set off home with a full cart
+	HomeTide = 0, -- ... with free slots, because the tide forced it
+	HomeNothing = 0, -- ... with free slots, because nothing more was worth waiting for
+} -- what became of the item searches, and why bots set off home
 local tripResult: any = nil
 local cycleBase = 0 -- tide cycles before this server clock's (a chained sweep carries the game over)
 local moved: { any } = {} -- bots put somewhere safe when a carried-over game was imported
@@ -692,7 +695,7 @@ local function loadFraction(bot: Bot): string
 	return string.format("%d/%d", #bot.Cargo, BotEconomy.capacity(bot.State))
 end
 
-local function goHome(bot: Bot)
+local function goHome(bot: Bot): boolean
 	local entry = ensureField(bot)
 	local path = entry.Field:path(bot.X, math.max(bot.Z, 0))
 	if path then
@@ -716,10 +719,24 @@ local function goHome(bot: Bot)
 	end
 	if not path then
 		bot.StuckUntil = now() + 1
-		return
+		return false
 	end
 	setStatus(bot, if #bot.Cargo > 0 then "hauling back" else "waiting for the tide")
 	beginPath(bot, path, "Home")
+	return true
+end
+
+-- Sets off home with a load, and counts why: the mean load (items over capacity) when setting off,
+-- and, server-wide, whether the cart was full, the tide forced it, or nothing more was worth
+-- waiting for.
+local function setOffHome(bot: Bot, reason: string)
+	local count = #bot.Cargo
+	if goHome(bot) and count > 0 then
+		bot.Stats.HomeTrips += 1
+		bot.Stats.HomeLoad += count / BotEconomy.capacity(bot.State)
+		local key = "Home" .. reason
+		searchStats[key] = (searchStats[key] or 0) + 1
+	end
 end
 
 -- A bot's own stretch of the beach along X: the width is split between the bots present, in
@@ -763,6 +780,95 @@ local function tideSlack(bot: Bot): number
 	return game / speedFactor
 end
 
+-- The Far Sandbar ------------------------------------------------------------------------------
+
+-- Zone 7 lies across a channel that is only shallow enough to cross for a while around low tide. A
+-- tier 7 bot plans for that window: it waits at the zone 6 edge until the channel opens, crosses,
+-- works, and leaves with margin so it is back across before the channel deepens again.
+local SAND_MIN_STAY = 60 -- game seconds on the sandbar that make a trip worth the crossing
+local SAND_LEAD = 45 -- game seconds before the channel opens that a bot should be at its bank
+local SAND_BANK = 12 -- studs short of the channel where a bot waits for it to open
+local SAND_SAMPLE = 5 -- game seconds between samples of the channel's depth
+local channelCache: { [number]: { At: number, Opens: number? } } = {}
+
+-- When the channel at X is next shallow enough to cross (water no deeper than the bots' route limit
+-- at its deepest point): an absolute time, now if it is already, nil if not within a cycle.
+local function channelOpens(x: number): number?
+	local bucket = math.floor(x / 40)
+	local t = now()
+	local hit = channelCache[bucket]
+	if hit and t - hit.At < 20 / speedFactor then
+		return hit.Opens
+	end
+	local sandbar = Config.Beach.FarSandbar
+	local lowest = math.huge
+	for z = sandbar.ChannelStart, sandbar.ChannelEnd, 4 do
+		lowest = math.min(lowest, Beach.groundAt(x, z))
+	end
+	local limit = Config.Beach.WaistDepth - DEPTH_MARGIN
+	local opens = nil
+	local dt = SAND_SAMPLE / speedFactor
+	for i = 0, math.floor(1.1 * BotEconomy.CycleSeconds / SAND_SAMPLE) do
+		local at = t + i * dt
+		if Beach.waterYAt(Tide.sea(at), x) - lowest <= limit then
+			opens = at
+			break
+		end
+	end
+	channelCache[bucket] = { At = t, Opens = opens }
+	return opens
+end
+
+export type SandbarPlan = {
+	Opens: number, -- real seconds from now until the channel is shallow enough (0: it is)
+	Arrive: number, -- ... until the bot could be across
+	LeaveBy: number, -- ... until the latest moment it may start back (the way home's deadline less margin)
+	Stay: number, -- real seconds it could work over there
+	ToBank: number, -- ... for it to walk to the channel's shore side
+	BankZ: number,
+	X: number,
+	Feasible: boolean, -- a stay of SAND_MIN_STAY game seconds fits
+}
+
+-- The plan for a sandbar trip from (fromX, fromZ), or nil if the bot's tool doesn't work zone 7 or
+-- there is no window. `entry` is the way-home field's entry: its slack at the sandbar's near edge
+-- is the latest moment the bot may be there and still get home across the channel.
+local function sandbarPlan(state: any, entry: any, fromX: number, fromZ: number): SandbarPlan?
+	local zone = Beach.FarSandbarZone
+	if BotEconomy.lift(state, BotEconomy.tool(state)) < zone then
+		return nil
+	end
+	local sandbar = Config.Beach.FarSandbar
+	local t = now()
+	local x = math.clamp(fromX, -(Beach.HalfWidth - 30), Beach.HalfWidth - 30)
+	local opensAt = channelOpens(x)
+	if not opensAt then
+		return nil
+	end
+	local slack = entry.Field:slack(x, sandbar.ChannelEnd + 8)
+	if not slack then
+		return nil
+	end
+	local speed = BotEconomy.walkSpeed(state) * speedFactor * SAFE_SPEED
+	local bankZ = sandbar.ChannelStart - SAND_BANK
+	local toBank = math.max(bankZ - fromZ, 0) * BotEconomy.MazeFactor / speed
+	local crossing = (sandbar.ChannelEnd - sandbar.ChannelStart + 16) / speed
+	local arrive = math.max(t + toBank, opensAt) + crossing
+	local leaveBy = entry.T0 + slack - TIDE_SLACK * 1.5 / speedFactor
+	local stay = leaveBy - arrive
+	return {
+		Opens = math.max(opensAt - t, 0),
+		Arrive = arrive - t,
+		LeaveBy = leaveBy - t,
+		Stay = stay,
+		ToBank = toBank,
+		BankZ = bankZ,
+		X = x,
+		Feasible = stay >= SAND_MIN_STAY / speedFactor,
+	}
+end
+BotService.sandbarPlan = sandbarPlan -- for tools/tests
+
 -- Items worth a look: free, not reserved by another bot, of a zone tier the tool lifts, not ones we
 -- gave up on, and for a trip bot only in its zone. Scored by value per second
 -- of the walk there and on home. Those in the bot's own stretch come first; the rest only when
@@ -771,8 +877,9 @@ end
 -- The least share of the best finds' average value (for the cart's free slots) worth taking up a
 -- slot for (BotService.candidates).
 local SLOT_FLOOR = 0.3
+local SAMPLE_ITEMS = 8 -- free items per zone looked at for the share with a safe approach
 
-local function candidates(bot: Bot, entry: any): ({ any }, { any })
+local function candidates(bot: Bot, entry: any, relaxed: boolean?): ({ any }, { any })
 	local lift = BotEconomy.lift(bot.State, BotEconomy.tool(bot.State))
 	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor
 	local sea = Tide.sea()
@@ -781,7 +888,28 @@ local function candidates(bot: Bot, entry: any): ({ any }, { any })
 	local hands = BotEconomy.cartSize(bot.State) == nil and BotEconomy.capacity(bot.State) == 1
 	local mine, others = {}, {}
 	local reserved = reservedItems(bot)
+	-- Zone 7 only while a sandbar trip is on (the channel shallow, a useful stay fits).
+	local plan = sandbarPlan(bot.State, entry, bot.X, bot.Z)
+	bot.Plan = plan
+	local sandbarOpen = plan ~= nil and plan.Feasible and plan.Opens <= 0
+	local sandbarZone = Beach.FarSandbarZone
+	local samples: { [number]: { any } } = {}
 	for item in ItemService.all() do
+		local zone = item:GetAttribute("Zone")
+		if
+			zone == sandbarZone
+			and not sandbarOpen
+			and ItemService.getState(item) == "Unclaimed"
+			and Gear.canLift(lift, item:GetAttribute("Tier"))
+		then
+			-- (Not a candidate now, but a sample of what a trip would find.)
+			local list = samples[zone] or {}
+			samples[zone] = list
+			if #list < SAMPLE_ITEMS then
+				table.insert(list, item)
+			end
+			continue
+		end
 		if
 			ItemService.getState(item) == "Unclaimed"
 			and not item:GetAttribute("Unlock")
@@ -803,6 +931,11 @@ local function candidates(bot: Bot, entry: any): ({ any }, { any })
 				-- What lies beyond the first zone (or in deeper water) is worth going anywhere
 				-- along the beach for; the stretch is for the cheap finds of the first zone's shallows.
 				local premium = (item:GetAttribute("Tier") or 1) >= 2 or band >= Gear.Depth.KneeDeep
+				local list = samples[zone or 0] or {}
+				samples[zone or 0] = list
+				if #list < SAMPLE_ITEMS then
+					table.insert(list, item)
+				end
 				local inStretch = premium or (position.X >= lo and position.X <= hi)
 				-- Hands-only bots stay on short trips (200 game seconds there and back at most).
 				if back < math.huge and (inStretch or not hands or (there + back) * speedFactor <= 200) then
@@ -834,17 +967,14 @@ local function candidates(bot: Bot, entry: any): ({ any }, { any })
 		sum += values[i]
 	end
 	-- And what's still to come this tide: while the sea is going out (or low) every zone the
-	-- tool works will be uncovered, so a slot is worth a find from the best of them even before
-	-- anything lies there; once it comes in, only the zones still uncovered count.
-	local coming = 0
-	local tide = Tide.getState()
-	for z = 1, #Config.Zones do
-		local z0 = Beach.zoneRange(z)
-		if tide.Phase ~= "In" or z0 < tide.Waterline then
-			coming = math.max(coming, BotEconomy.findValue(bot.State, z))
-		end
-	end
-	local floor = SLOT_FLOOR * math.max(if n > 0 then sum / n else 0, coming)
+	-- tool works that the bot can work this tide will be uncovered, so a slot is worth a find from
+	-- the best of them even before anything lies there; once it comes in, only the zones still
+	-- uncovered count. A zone counts only if the bot can work it from where it is (zone 7: a
+	-- crossing, a useful stay and the way back fit in the channel's window), and its find is
+	-- weighted by the share of its free items that have a safe approach.
+	local coming = BotService.comingValue(bot, entry, plan, samples)
+	bot.Coming = coming
+	local floor = if relaxed then 0 else SLOT_FLOOR * math.max(if n > 0 then sum / n else 0, coming)
 	local function worthASlot(list)
 		local kept = {}
 		for _, entry in list do
@@ -901,9 +1031,78 @@ local function approachFor(
 end
 BotService.approachFor = approachFor -- for tools/tests
 
-local function chooseTarget(bot: Bot): boolean
+-- The value of a slot's worth of find still to come this tide, for a bot as it stands: the best, over
+-- the zones it can work this tide, of the zone's average find (BotEconomy.findValue) times the
+-- share of the zone's free items (`samples`, a few of them) that have a safe approach. While the sea
+-- is going out or low every zone its tool works counts, once it comes in only the ones still
+-- uncovered. Zone 7 counts only if `plan` (sandbarPlan) shows a crossing, a useful stay and the way
+-- back fit in the channel's window.
+function BotService.comingValue(
+	bot: Bot,
+	entry: any,
+	plan: SandbarPlan?,
+	samples: { [number]: { any } }
+): number
+	local tide = Tide.getState()
+	local sandbarZone = Beach.FarSandbarZone
+	local order = {}
+	for z = 1, #Config.Zones do
+		local raw = BotEconomy.findValue(bot.State, z)
+		local z0 = Beach.zoneRange(z)
+		if
+			raw > 0
+			and (tide.Phase ~= "In" or z0 < tide.Waterline)
+			and (z ~= sandbarZone or (plan and plan.Feasible))
+		then
+			table.insert(order, { Zone = z, Raw = raw })
+		end
+	end
+	table.sort(order, function(a, b)
+		return a.Raw > b.Raw
+	end)
+	local tool = BotEconomy.tool(bot.State)
+	local reach = tool.Reach + Config.Items.ReachSlack - 3
+	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor
+	local best = 0
+	for _, e in order do
+		if e.Raw <= best then
+			break -- (the rest are worth less even with every item reachable)
+		end
+		local list = samples[e.Zone] or {}
+		local safe = 0
+		for _, item in list do
+			local position = item.Position
+			local there = math.sqrt((position.X - bot.X) ^ 2 + (position.Z - bot.Z) ^ 2)
+				* BotEconomy.MazeFactor
+				/ speed
+			if e.Zone == sandbarZone and plan then
+				there = math.max(there, plan.Arrive)
+			end
+			if
+				approachFor(
+					entry,
+					position.X,
+					position.Z,
+					reach,
+					bot.X,
+					bot.Z,
+					there + 1.2 / speedFactor + tideSlack(bot)
+				)
+			then
+				safe += 1
+			end
+		end
+		-- (A zone with nothing to look at yet is taken on trust, the sandbar half: its surf is
+		-- mostly out of reach.)
+		local prior = if e.Zone == sandbarZone then 0.5 else 1
+		best = math.max(best, e.Raw * (safe + 2 * prior) / (#list + 2))
+	end
+	return best
+end
+
+local function chooseTarget(bot: Bot, relaxed: boolean?): boolean
 	local entry = ensureField(bot)
-	local mine, others = candidates(bot, entry)
+	local mine, others = candidates(bot, entry, relaxed)
 	searchStats.Decisions += 1
 	if #mine + #others == 0 then
 		searchStats.NoCandidates += 1
@@ -963,6 +1162,10 @@ local function chooseTarget(bot: Bot): boolean
 				)
 			then
 				searchStats.Chosen += 1
+				if item:GetAttribute("Zone") == Beach.FarSandbarZone and not bot.OnSandbar then
+					bot.OnSandbar = true
+					bot.Stats.SandbarTrips += 1
+				end
 				if inWater then
 					searchStats.WaterTaken += 1
 				end
@@ -993,7 +1196,9 @@ local function stagingFor(
 	hi: number,
 	fromX: number,
 	fromZ: number,
-	tripZone: number?
+	tripZone: number?,
+	holdBack: boolean?,
+	atBank: boolean?
 ): (number, number)
 	grid = grid or Routes.new()
 	local x = (lo + hi) / 2
@@ -1011,9 +1216,17 @@ local function stagingFor(
 	if reach < #Config.Zones then
 		bottom = select(2, Beach.zoneRange(reach)) - 20
 	end
+	if holdBack or atBank then
+		-- A tier 7 bot waits on the channel's shore side, not across it: it crosses (a sandbar trip)
+		-- only while the channel is open (decide).
+		bottom = math.min(bottom, Config.Beach.FarSandbar.ChannelStart - SAND_BANK)
+	end
 	if tripZone then
 		local z0, z1 = Beach.zoneRange(tripZone)
 		top, bottom = z0 + 10, math.min(bottom, z1 - 20)
+	end
+	if atBank then
+		z = bottom
 	end
 	z = math.clamp(z, top, bottom)
 	-- Not inside a wall: the nearest open ground.
@@ -1041,7 +1254,69 @@ BotService.stagingFor = stagingFor -- for tools/tests
 
 local function stagingPoint(bot: Bot): (number, number)
 	local lo, hi = stretchOf(bot)
-	return stagingFor(bot.State, lo, hi, bot.X, bot.Z, if bot.Trip then bot.Trip.Zone else nil)
+	local plan = bot.Plan
+	local holdBack, atBank = false, false
+	if plan and not bot.Trip then
+		if plan.Feasible and plan.Opens <= 0 then
+			-- (The channel is open and a stay fits: no holding back.)
+		elseif plan.Feasible and plan.Opens - plan.ToBank <= SAND_LEAD / speedFactor then
+			-- Time to be at the channel's shore side, as it opens.
+			holdBack, atBank = true, true
+			lo, hi = plan.X, plan.X
+		else
+			holdBack = true
+		end
+	elseif
+		not bot.Trip and BotEconomy.lift(bot.State, BotEconomy.tool(bot.State)) >= Beach.FarSandbarZone
+	then
+		holdBack = true
+	end
+	return stagingFor(
+		bot.State,
+		lo,
+		hi,
+		bot.X,
+		bot.Z,
+		if bot.Trip then bot.Trip.Zone else nil,
+		holdBack,
+		atBank
+	)
+end
+
+-- Real seconds until the way home from where the bot stands closes (its deadline).
+local function timeLeft(bot: Bot, entry: any): number
+	local slack = entry.Field:slack(bot.X, math.max(bot.Z, 0))
+	if not slack then
+		return 0
+	end
+	return slack - (now() - entry.T0)
+end
+
+-- Why a bot with a load should set off home now, or nil to keep working: "Full" (the cart is),
+-- "Tide" (the way home's deadline, less the margin the bot keeps, is near) or "Nothing" (the sea is
+-- coming in and no zone still uncovered that the bot can work offers more than the bar for a slot,
+-- against what it carries).
+local function homeReason(bot: Bot, entry: any): string?
+	if #bot.Cargo >= BotEconomy.capacity(bot.State) then
+		return "Full"
+	end
+	if bot.Trip or bot.Finished then
+		return "Nothing"
+	end
+	if timeLeft(bot, entry) < tideSlack(bot) + 20 / speedFactor then
+		return "Tide"
+	end
+	if Tide.getState().Phase == "In" then
+		local sum = 0
+		for _, item in bot.Cargo do
+			sum += item:GetAttribute("Value") or 0
+		end
+		local coming = bot.Coming or 0
+		if coming <= 0 or coming < SLOT_FLOOR * sum / #bot.Cargo then
+			return "Nothing"
+		end
+	end
+	return nil
 end
 
 function decide(bot: Bot)
@@ -1079,8 +1354,16 @@ function decide(bot: Bot)
 		end
 	end
 	if #bot.Cargo > 0 then
-		goHome(bot)
-		return
+		-- Free slots and nothing worth taking: keep working (wait at the best zone the tide is
+		-- uncovering) unless the cart is full, the tide forces the bot home, or nothing is left.
+		local reason = homeReason(bot, ensureField(bot))
+		if reason then
+			if reason ~= "Full" and not bot.Trip and not bot.Finished and chooseTarget(bot, true) then
+				return -- (one of the last items, worth little but safe to take on the way)
+			end
+			setOffHome(bot, reason)
+			return
+		end
 	end
 	local t = now()
 	-- Nothing to take: wait at the waterline in the bot's own stretch, following the sea out and
@@ -1159,6 +1442,11 @@ function decide(bot: Bot)
 				return
 			end
 		end
+	end
+	if #bot.Cargo > 0 then
+		-- (Couldn't wait out here: the way back needs leaving, or there's nowhere to stand.)
+		setOffHome(bot, if atHome(bot) then "Nothing" else "Tide")
+		return
 	end
 	if not atHome(bot) then
 		goHome(bot)
@@ -1261,6 +1549,7 @@ local function die(bot: Bot)
 		bot.Stats.LostLoads += 1
 	end
 	loseLoad(bot)
+	bot.OnSandbar = false
 	bot.Path = nil
 	bot.Target = nil
 	setStatus(bot, "swept away by the tide")
@@ -1293,6 +1582,7 @@ local function sell(bot: Bot)
 		end
 	end
 	bot.Cargo = {}
+	bot.OnSandbar = false
 	local paid = if count > 0 then BotEconomy.sell(bot.State, total) else 0
 	if count > 0 then
 		bot.Stats.Coins += paid
@@ -1581,6 +1871,9 @@ local function spawnBot(id: number, state: any, trip: any, at: { x: number, z: n
 			LostItems = 0,
 			Purchases = 0,
 			Rebirths = 0,
+			HomeTrips = 0, -- times set off home with a load
+			HomeLoad = 0, -- the sum of their loads (items over capacity)
+			SandbarTrips = 0,
 		},
 		Trip = trip,
 		DirX = 0,
@@ -1991,6 +2284,9 @@ function BotService.snapshot()
 				LostLoads = s.LostLoads,
 				LostItems = s.LostItems,
 				Purchases = s.Purchases,
+				HomeTrips = s.HomeTrips,
+				MeanHomeLoad = if s.HomeTrips > 0 then s.HomeLoad / s.HomeTrips else 0, -- items over capacity
+				SandbarTrips = s.SandbarTrips,
 				Rebirths = bot.State.Rebirths,
 				Purse = bot.State.Coins,
 				Gear = gearSnapshot(bot),
@@ -2037,7 +2333,7 @@ function BotService.report(): { string }
 	local snap = BotService.snapshot()
 	local lines = {
 		string.format("Bots: %d, speed x%.0f. Rates are per hour of game time.", snap.BotCount, snap.Speed),
-		"bot  colour    coins/h   items/h  trips  lost-to-bot  lost-other  idle%  deaths  lost-loads  gear, thinking%",
+		"bot  colour    coins/h   items/h  trips  lost-to-bot  lost-other  idle%  deaths  lost-loads  home-load%  sandbar  gear, thinking%",
 	}
 	local total = {
 		Coins = 0,
@@ -2050,6 +2346,9 @@ function BotService.report(): { string }
 		Deaths = 0,
 		LostLoads = 0,
 		Hours = 0,
+		HomeTrips = 0,
+		HomeLoad = 0,
+		Sandbar = 0,
 	}
 	for _, b in snap.Bots do
 		local hours = math.max(b.GameSeconds, 1) / 3600
@@ -2063,10 +2362,13 @@ function BotService.report(): { string }
 		total.Deaths += b.Deaths
 		total.LostLoads += b.LostLoads
 		total.Hours += hours
+		total.HomeTrips += b.HomeTrips
+		total.HomeLoad += b.MeanHomeLoad * b.HomeTrips
+		total.Sandbar += b.SandbarTrips
 		table.insert(
 			lines,
 			string.format(
-				"%-4d %-9s %-9s %-8.0f %-6d %-12d %-11d %-6.0f %-7d %-11d %s + %s, %d rebirth(s), thinking %.1f%%",
+				"%-4d %-9s %-9s %-8.0f %-6d %-12d %-11d %-6.0f %-7d %-11d %-11.0f %-8d %s + %s, %d rebirth(s), thinking %.1f%%",
 				b.Bot,
 				b.Color,
 				commas(b.Coins / hours),
@@ -2077,6 +2379,8 @@ function BotService.report(): { string }
 				b.IdleGameSeconds / math.max(b.GameSeconds, 1) * 100,
 				b.Deaths,
 				b.LostLoads,
+				b.MeanHomeLoad * 100,
+				b.SandbarTrips,
 				b.Gear.Tool,
 				b.Gear.Vessel or "hands",
 				b.Gear.Rebirths,
@@ -2089,7 +2393,7 @@ function BotService.report(): { string }
 		table.insert(
 			lines,
 			string.format(
-				"all  total     %-9s %-8.0f %-6d %-12d %-11d %-6.0f %-7d %-11d (per bot: %s coins/h), thinking %.1f%%",
+				"all  total     %-9s %-8.0f %-6d %-12d %-11d %-6.0f %-7d %-11d %-11.0f %-8d (per bot: %s coins/h), thinking %.1f%%",
 				commas(total.Coins / (total.Hours / n)),
 				total.Items / (total.Hours / n),
 				total.Trips,
@@ -2098,6 +2402,8 @@ function BotService.report(): { string }
 				total.Idle / math.max(total.Hours * 3600, 1) * 100,
 				total.Deaths,
 				total.LostLoads,
+				total.HomeLoad / math.max(total.HomeTrips, 1) * 100,
+				total.Sandbar,
 				commas(total.Coins / math.max(total.Hours, 1e-9)),
 				total.Think / math.max(total.Hours * 3600, 1) * 100
 			)
@@ -2122,6 +2428,16 @@ function BotService.report(): { string }
 			snap.Searches.DrySkipped,
 			snap.Searches.NoCandidates,
 			snap.Searches.Decisions
+		)
+	)
+	local sr = snap.Searches
+	table.insert(
+		lines,
+		string.format(
+			"Set off home: %d with a full cart, %d with free slots because the tide forced it, %d with free slots because nothing more was worth waiting for",
+			sr.HomeFull,
+			sr.HomeTide,
+			sr.HomeNothing
 		)
 	)
 	local s = snap.Server
