@@ -20,6 +20,9 @@ Usage (from the repo root):
   --final-trip     measure one bot on one trip to the final zone with the cheapest vessel and a tool
                    able to work it, against Config.Rebirth.BaseCost (prices are not changed)
   --no-publish     reuse the last published build
+  --gear IDS       tool/vessel ids that some bots own from the start (tier 7 gear, e.g.
+                   ElectricWinch,QuadBike, so sandbar trips can happen); --gear-bots N says how many
+                   of the first bots (default: half of X)
 
 Writes tools/bots/out/: x<N>.json (each task's raw result), sweep.md (a table per X and the chart),
 income_chart.png, and income_log.json (the income-per-tide log the Monte Carlo samples: one entry
@@ -109,12 +112,13 @@ def table_for(result):
     bots = snap["Bots"]
     server = snap["Server"]
     lines = []
-    lines.append("| bot | colour | coins/h | items/h | trips | lost to bot | lost other | idle % | deaths | lost loads | rebirths | gear |")
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    lines.append("| bot | colour | coins/h | items/h | trips | lost to bot | lost other | idle % | deaths | lost loads | home load % | sandbar trips | rebirths | gear |")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     totals = dict(coins=0, items=0, trips=0, lost_bot=0, lost_other=0, idle=0, seconds=0, deaths=0, loads=0)
     for b in bots:
         s = b["GameSeconds"]
-        lines.append("| {Bot} | {Color} | {c:,.0f} | {i:,.0f} | {Trips} | {LostToBot} | {LostOther} | {idle:.0f} | {Deaths} | {LostLoads} | {Rebirths} | {tool} + {vessel} |".format(
+        lines.append("| {Bot} | {Color} | {c:,.0f} | {i:,.0f} | {Trips} | {LostToBot} | {LostOther} | {idle:.0f} | {Deaths} | {LostLoads} | {home:.0f} | {SandbarTrips} | {Rebirths} | {tool} + {vessel} |".format(
+            home=100 * b.get("MeanHomeLoad", 0), SandbarTrips=b.get("SandbarTrips", 0),
             c=per_hour(b["Coins"], s), i=per_hour(b["Items"], s), idle=100 * b["IdleGameSeconds"] / max(s, 1),
             tool=b["Gear"]["Tool"], vessel=b["Gear"].get("Vessel") or "hands", **b))
         totals["coins"] += b["Coins"]
@@ -126,13 +130,21 @@ def table_for(result):
         totals["seconds"] += s
         totals["deaths"] += b["Deaths"]
         totals["loads"] += b["LostLoads"]
+        totals["home_trips"] = totals.get("home_trips", 0) + b.get("HomeTrips", 0)
+        totals["home_load"] = totals.get("home_load", 0) + b.get("MeanHomeLoad", 0) * b.get("HomeTrips", 0)
+        totals["sandbar"] = totals.get("sandbar", 0) + b.get("SandbarTrips", 0)
     n = max(len(bots), 1)
     mean_s = totals["seconds"] / n
-    lines.append("| **all** | | **{c:,.0f}** | **{i:,.0f}** | {trips} | {lb} | {lo} | {idle:.0f} | {d} | {l} | | per bot: {pc:,.0f} coins/h |".format(
+    lines.append("| **all** | | **{c:,.0f}** | **{i:,.0f}** | {trips} | {lb} | {lo} | {idle:.0f} | {d} | {l} | {hl:.0f} | {sb} | | per bot: {pc:,.0f} coins/h |".format(
+        hl=100 * totals.get("home_load", 0) / max(totals.get("home_trips", 0), 1), sb=totals.get("sandbar", 0),
         c=per_hour(totals["coins"], mean_s), i=per_hour(totals["items"], mean_s), trips=totals["trips"],
         lb=totals["lost_bot"], lo=totals["lost_other"], idle=100 * totals["idle"] / max(totals["seconds"], 1),
         d=totals["deaths"], l=totals["loads"], pc=per_hour(totals["coins"], mean_s) / n))
     surf_full = 100 * server["SurfFullTicks"] / max(server["SpawnTicks"], 1)
+    lines.append("")
+    searches = snap.get("Searches") or {}
+    lines.append(f"Set off home: {searches.get('HomeFull', 0)} with a full cart, {searches.get('HomeTide', 0)} with free slots "
+                 f"because the tide forced it, {searches.get('HomeNothing', 0)} with free slots because nothing more was worth waiting for.")
     lines.append("")
     lines.append(f"Server: {server['SurfSpawned']} surf items spawned (+{server.get('SandSpawned', 0)} on open sand, +{server['SpotSpawned']} at loot spots; "
                  f"by zone {'/'.join(str(n) for n in server.get('ZoneSpawned', []))}), "
@@ -299,8 +311,8 @@ def write_report():
     if chains:
         lines.append("## Chained runs (one continuous game per row)")
         lines.append("")
-        lines.append("| run | X | speed | game minutes | coins/h per bot: mean / median / min / max | server total coins/h | thinking % | tide deaths | despawned unclaimed | bots that bought gear | rebirths (total) | worst frame ms: Heartbeat / bot work |")
-        lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+        lines.append("| run | X | speed | game minutes | coins/h per bot: mean / median / min / max | server total coins/h | thinking % | tide deaths | despawned unclaimed | bots that bought gear | rebirths (total) | worst frame ms: Heartbeat / bot work | idle % | mean load when heading home % | sandbar trips | set off home: full / tide / nothing left |")
+        lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
         detail = []
         for path in chains:
             chain = json.load(open(path))
@@ -315,9 +327,15 @@ def write_report():
             total = sum(b["Coins"] for b in bots) / hours
             think = 100 * sum(b["ThinkingGameSeconds"] for b in bots) / sum(b["GameSeconds"] for b in bots)
             bought = sum(1 for b in bots if b.get("Purchases", 0) > 0 or b["Rebirths"] > 0)
+            trips = sum(b.get("HomeTrips", 0) for b in bots)
+            home = 100 * sum(b.get("MeanHomeLoad", 0) * b.get("HomeTrips", 0) for b in bots) / max(trips, 1)
+            idle = 100 * sum(b["IdleGameSeconds"] for b in bots) / sum(b["GameSeconds"] for b in bots)
+            sr = snap.get("Searches") or {}
             lines.append(f"| {name} | {len(bots)} | x{chain['job']['speed']:g} | {minutes:.0f} | {sum(rates) / len(rates):,.0f} / {median:,.0f} / {rates[0]:,.0f} / {rates[-1]:,.0f} | "
                          f"{total:,.0f} | {think:.1f} | {sum(b['Deaths'] for b in bots)} | {snap['Server']['Despawned']} | {bought}/{len(bots)} | "
-                         f"{sum(b['Rebirths'] for b in bots)} | {1000 * chain['frames']['MaxDt']:.0f} / {1000 * chain['frames']['MaxWork']:.0f} |")
+                         f"{sum(b['Rebirths'] for b in bots)} | {1000 * chain['frames']['MaxDt']:.0f} / {1000 * chain['frames']['MaxWork']:.0f} | "
+                         f"{idle:.0f} | {home:.0f} | {sum(b.get('SandbarTrips', 0) for b in bots)} | "
+                         f"{sr.get('HomeFull', 0)} / {sr.get('HomeTide', 0)} / {sr.get('HomeNothing', 0)} |")
             gear = {}
             for b in bots:
                 key = f"{b['Gear']['Tool']}+{b['Gear'].get('Vessel') or 'hands'}"
@@ -427,6 +445,9 @@ def main():
     parser.add_argument("--chain", type=int, default=0,
                         help="N consecutive tasks per X, each starting from the previous one's final state (one long game)")
     parser.add_argument("--scale", type=float, help="Config.Items.CrowdSpawn.Scale for the run (1 = off)")
+    parser.add_argument("--gear", help="tool/vessel ids some bots own from the start, e.g. ElectricWinch,QuadBike "
+                        "(tier 7 gear, so sandbar trips can happen)")
+    parser.add_argument("--gear-bots", type=int, help="how many bots (the first ones) start with --gear (default: half of X, rounded up)")
     parser.add_argument("--tag", help="name a repeat run (x8_<tag>.json), kept out of the main table")
     parser.add_argument("--report-only", action="store_true")
     args = parser.parse_args()
@@ -444,6 +465,9 @@ def main():
             job = {"bots": x, "speed": args.speed, "seconds": args.seconds}
             if args.scale is not None:
                 job["scale"] = args.scale
+            if args.gear:
+                job["gear"] = args.gear.split(",")
+                job["gearBots"] = args.gear_bots if args.gear_bots is not None else (x + 1) // 2
             jobs.append((f"x{x}" + (f"_{args.tag}" if args.tag else ""), job))
 
     # One Test Range run at a time: every run publishes its own build to the one place.

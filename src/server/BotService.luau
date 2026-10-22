@@ -2002,15 +2002,30 @@ function BotService.speed(): number
 	return speedFactor
 end
 
--- Makes `n` bots play (adding or removing the highest numbers), 0 to 20.
-function BotService.setCount(n: number)
+-- Makes `n` bots play (adding or removing the highest numbers), 0 to 20. `gear` (tool and vessel
+-- ids, e.g. { "ElectricWinch", "QuadBike" }) is owned from the start by the first `gearBots` of the
+-- bots that join (all of them if not given): the sweep's way to put tier 7 gear in play.
+function BotService.setCount(n: number, gear: { string }?, gearBots: number?)
 	n = math.clamp(math.floor(n), 0, BotService.MaxBots)
 	if n > 0 then
 		ensureRunning()
 	end
 	for id = 1, n do
 		if not bots[id] then
-			spawnBot(id, nil, nil)
+			local state = nil
+			if gear and id <= (gearBots or n) then
+				state = BotEconomy.newState()
+				for _, gearId in gear do
+					if Gear.findTool(gearId) then
+						state.Tools[gearId] = true
+					elseif Gear.getVessel(gearId) then
+						state.Vessels[gearId] = true
+					else
+						warn("[BotService] unknown starting gear " .. tostring(gearId))
+					end
+				end
+			end
+			spawnBot(id, state, nil)
 		end
 	end
 	for id = BotService.MaxBots, n + 1, -1 do

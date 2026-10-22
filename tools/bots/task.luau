@@ -60,7 +60,7 @@ if JOB.finalTrip then
 elseif JOB.state then
 	BotService.importBots(JOB.state)
 else
-	BotService.setCount(JOB.bots)
+	BotService.setCount(JOB.bots, JOB.gear, JOB.gearBots)
 end
 local series = { BotService.progress() }
 
