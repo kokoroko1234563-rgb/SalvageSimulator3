@@ -115,10 +115,13 @@ Config.Beach = {
 Config.Zones = {
 	-- Zone N washes up only the items of Tier N (Items.Catalog), at the rarities in Rarity, and
 	-- the tool of that tier (Gear.Tools) lifts all of them.
+	-- SpawnOnSand: the zone's spawns also land on its open sand at any point of the tide (zones
+	-- 1 to 3); without it they only wash up in the surf around the waterline.
 	-- Target: how many free items the zone keeps lying in it on a solo server; MaxRate: the most
 	-- it spawns per second, when empty (it slows as the zone fills; ItemService has the rule).
 	{
 		Name = "Shopside Shore",
+		SpawnOnSand = true,
 		Multiplier = 2,
 		CrossTime = 35,
 		Rarity = { Common = 90, Uncommon = 10 },
@@ -127,6 +130,7 @@ Config.Zones = {
 	},
 	{
 		Name = "Sunny Stretch",
+		SpawnOnSand = true,
 		Multiplier = 3,
 		CrossTime = 36,
 		Rarity = { Common = 70, Uncommon = 25, Rare = 5 },
@@ -135,6 +139,7 @@ Config.Zones = {
 	},
 	{
 		Name = "Middle Banks",
+		SpawnOnSand = true,
 		Multiplier = 5,
 		CrossTime = 38,
 		Rarity = { Common = 50, Uncommon = 32, Rare = 15, VeryRare = 3 },
@@ -752,6 +757,9 @@ Config.Items = {
 	-- (bots count) every zone's Target and MaxRate are Scale times a solo server's, linear in
 	-- between. Scale 1 turns it off.
 	CrowdSpawn = { Players = 20, Scale = 3 },
+	-- A spawn in a SpawnOnSand zone is a surf spawn with this chance when the waterline is in the
+	-- zone (that's where unlock items and the Beacon Pearl come from), else it lands on open sand.
+	SurfShare = 0.5,
 	MaxTotal = 450, -- no spawns at all while the map holds this many items (a safety cap)
 	LooseTimeout = 25, -- a claimed item left alone this long freezes and becomes unclaimed
 	TimedOutLifetime = 90, -- a timed-out item despawns if nobody grabs it within this

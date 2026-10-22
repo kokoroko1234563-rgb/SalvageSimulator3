@@ -345,7 +345,9 @@ end
 -- sky-beam item on the Far Sandbar, else an item of the zone's own tier (Items.Catalog Tier) at
 -- a rarity from the zone's table (the rarest of `rarityRolls` rolls). Biome loot takes the
 -- tier of the zone it washes up in, whatever its own Tier (createItem).
-local function chooseDef(zoneIndex: number, z: number, rarityRolls: number)
+-- With `ordinary` set (spawns on open sand) there is no unlock item and no sky-beam item: those
+-- only come from the surf; the biome's own loot is still allowed.
+local function chooseDef(zoneIndex: number, z: number, rarityRolls: number, ordinary: boolean?)
 	local biome = Biomes.activeIn(Beach.tileAt(z))
 	local def
 	-- Private servers scale rare spawns down with the player count (MonetizationService).
@@ -357,7 +359,7 @@ local function chooseDef(zoneIndex: number, z: number, rarityRolls: number)
 				else Config.Unlocks.ExoticSpawnChance
 		)
 	-- (Only once its secret is built: before that the item would open nothing.)
-	if biome and biome.UnlockItem and biome.Secret and rng:NextNumber() < unlockChance then
+	if not ordinary and biome and biome.UnlockItem and biome.Secret and rng:NextNumber() < unlockChance then
 		if ItemService.countOf(biome.UnlockItem) < Config.Unlocks.MaxOnMap then
 			def = Items.get(biome.UnlockItem)
 		end
@@ -365,6 +367,7 @@ local function chooseDef(zoneIndex: number, z: number, rarityRolls: number)
 	-- The sky-beam item only ever washes up on the Far Sandbar, and only one at a time.
 	if
 		not def
+		and not ordinary
 		and zoneIndex == Beach.FarSandbarZone
 		and rng:NextNumber() < Config.SkyBeam.SpawnChance * rareScale
 		and ItemService.countOf("BeaconPearl") == 0
@@ -411,6 +414,53 @@ local function surfPoint(sea: Tide.Sea, lo: number, hi: number, zoneIndex: numbe
 		end
 	end
 	return nil, nil
+end
+
+-- Whether (x, z) is open, walkable sand: not rock, not under a roof, not under the sea (or a
+-- rock pool), and not on a slope steeper than a player can walk.
+local function openSand(x: number, z: number, sea: Tide.Sea): boolean
+	if not restsAt(x, z) or Beach.roofAt(x, z) then
+		return false
+	end
+	local ground = Beach.groundAt(x, z)
+	if Beach.depthAt(Vector3.new(x, ground, z), sea) > 0 then
+		return false
+	end
+	local step = 2
+	local limit = Config.Beach.Terrain.FootSlope * step
+	for _, offset in { { step, 0 }, { -step, 0 }, { 0, step }, { 0, -step } } do
+		if math.abs(Beach.groundAt(x + offset[1], z + offset[2]) - ground) > limit then
+			return false
+		end
+	end
+	return true
+end
+
+-- Somewhere on a zone's open sand, at the current tide.
+local function sandPoint(sea: Tide.Sea, zoneIndex: number): (number?, number?)
+	local z0, z1 = Beach.zoneRange(zoneIndex)
+	for _ = 1, 8 do
+		local x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
+		local z = rng:NextNumber(z0, z1)
+		if openSand(x, z, sea) then
+			return x, z
+		end
+	end
+	return nil, nil
+end
+
+-- Leaves one ordinary item (no unlock item, no Beacon Pearl) somewhere on a zone's open sand.
+function ItemService.spawnOnSand(sea: Tide.Sea, zoneIndex: number): BasePart?
+	local x, z = sandPoint(sea, zoneIndex)
+	if not x or not z then
+		return nil
+	end
+	local def = chooseDef(zoneIndex, z, 1, true)
+	if not def then
+		return nil
+	end
+	local y = Beach.groundAt(x, z) + def.Size.Y / 2
+	return createItem(def, zoneIndex, Vector3.new(x, y, z), zoneIndex)
 end
 
 -- Washes one item up somewhere in the surf around the current waterline, in `zoneIndex` when
@@ -553,11 +603,31 @@ function ItemService.countFree(sea: Tide.Sea): ({ number }, number)
 	return counts, total
 end
 
--- Makes one spawn in a zone (nil when no point was found).
+-- Makes one spawn in a zone (nil when no point was found). A SpawnOnSand zone puts it on its
+-- open sand, or, with chance SurfShare when the waterline is in the zone, in the surf; the other
+-- zones only have the surf (no point there when the water is elsewhere).
 local function spawnInZone(sea: Tide.Sea, zoneIndex: number): BasePart?
-	local item = ItemService.spawnInSurf(sea, zoneIndex)
+	local item
+	if Config.Zones[zoneIndex].SpawnOnSand then
+		if rng:NextNumber() < cfg.SurfShare then
+			item = ItemService.spawnInSurf(sea, zoneIndex)
+			if item then
+				ItemService.stats.SurfSpawned += 1
+			end
+		end
+		if not item then
+			item = ItemService.spawnOnSand(sea, zoneIndex)
+			if item then
+				ItemService.stats.SandSpawned += 1
+			end
+		end
+	else
+		item = ItemService.spawnInSurf(sea, zoneIndex)
+		if item then
+			ItemService.stats.SurfSpawned += 1
+		end
+	end
 	if item then
-		ItemService.stats.SurfSpawned += 1
 		countSpawn(zoneIndex)
 	end
 	return item
