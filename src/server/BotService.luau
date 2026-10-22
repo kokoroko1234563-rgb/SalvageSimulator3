@@ -652,22 +652,36 @@ end
 
 -- Where a bot waits for what the tide washes up: just landward of the waterline as it will be when
 -- the bot gets there, along the bot's own lane of the beach (a trip bot: inside its zone).
-local function stagingPoint(bot: Bot): (number, number)
-	local lo, hi = stretchOf(bot)
+-- It never goes further out than the furthest zone the bot's tool works (its tier, Strong Back
+-- included: Bare Hands zone 1, Rake zone 2, ...): when the waterline is beyond that, it waits at the
+-- seaward edge of that zone. Zone 7 (past the channel) only for a tier 7 tool.
+local function stagingFor(
+	state: any,
+	lo: number,
+	hi: number,
+	fromX: number,
+	fromZ: number,
+	tripZone: number?
+): (number, number)
+	grid = grid or Routes.new()
 	local x = (lo + hi) / 2
-	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor
+	local speed = BotEconomy.walkSpeed(state) * speedFactor
 	local t = now()
-	local z = bot.Z
+	local z = fromZ
 	for _ = 1, 3 do
-		local eta = math.sqrt((x - bot.X) ^ 2 + (z - bot.Z) ^ 2) * BotEconomy.MazeFactor / speed
+		local eta = math.sqrt((x - fromX) ^ 2 + (z - fromZ) ^ 2) * BotEconomy.MazeFactor / speed
 		-- (Further up the beach while the sea comes in: it gains on a bot standing at its edge.)
 		local margin = if Tide.getState(t).Phase == "In" then 30 else 8
 		z = Tide.waterlineAt({ Now = t + eta }, x) - margin
 	end
 	local top, bottom = 0, Beach.Depth - 20
-	if bot.Trip then
-		local z0, z1 = Beach.zoneRange(bot.Trip.Zone)
-		top, bottom = z0 + 10, z1 - 20
+	local reach = math.clamp(BotEconomy.lift(state, BotEconomy.tool(state)), 1, #Config.Zones)
+	if reach < #Config.Zones then
+		bottom = select(2, Beach.zoneRange(reach)) - 20
+	end
+	if tripZone then
+		local z0, z1 = Beach.zoneRange(tripZone)
+		top, bottom = z0 + 10, math.min(bottom, z1 - 20)
 	end
 	z = math.clamp(z, top, bottom)
 	-- Not inside a wall: the nearest open ground.
@@ -690,6 +704,12 @@ local function stagingPoint(bot: Bot): (number, number)
 		end
 	end
 	return x, z
+end
+BotService.stagingFor = stagingFor -- for tools/tests
+
+local function stagingPoint(bot: Bot): (number, number)
+	local lo, hi = stretchOf(bot)
+	return stagingFor(bot.State, lo, hi, bot.X, bot.Z, if bot.Trip then bot.Trip.Zone else nil)
 end
 
 function decide(bot: Bot)

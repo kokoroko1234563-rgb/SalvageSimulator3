@@ -3815,6 +3815,40 @@ test("spawn: the crowd raises every zone's target and rate", function()
 	assert(crowded > solo, "a crowd fills a zone further (" .. solo .. " solo, " .. crowded .. " crowded)")
 end)
 
+test("bot staging stays inside the furthest zone the tool works, even at low tide", function()
+	local Beach = h.require("Shared/Beach")
+	local Tide = h.require("Shared/Tide")
+	local Economy = h.require("Server/BotEconomy")
+	local BotService = h.require("Server/BotService")
+	local workspace = h.game.Workspace
+	local saved = workspace:GetAttribute(Tide.StartAttribute)
+	-- Low tide: the waterline is out at the Far Sandbar's channel.
+	workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("Hold", 0.5))
+	assert(Tide.getState().Waterline > 3700, "the tide is low")
+	for tier, tool in { "BareHands", "BeachRake", "FishingNet" } do
+		local state = Economy.newState()
+		state.Tools[tool] = true
+		local reach = Economy.lift(state, Economy.tool(state))
+		assert(reach == tier, tool .. " is tier " .. tier)
+		local _, z = BotService.stagingFor(state, -300, -260, 90, -30, nil)
+		assert(
+			Beach.zoneAt(z) == tier,
+			"a tier " .. tier .. " bot stages in zone " .. tier .. " (z " .. z .. ")"
+		)
+	end
+	-- Strong Back adds a tier; a tier 7 tool may stage past the channel.
+	local state = Economy.newState()
+	state.Rewards.StrongBack = true
+	local _, z = BotService.stagingFor(state, -300, -260, 90, -30, nil)
+	assert(Beach.zoneAt(z) == 2, "Bare Hands with Strong Back reach zone 2")
+	local winch = Economy.newState()
+	winch.Tools.ElectricWinch = true
+	assert(Economy.lift(winch, Economy.tool(winch)) == 7, "a tier 7 tool")
+	local _, far = BotService.stagingFor(winch, -300, -260, -280, 3300, nil)
+	assert(Beach.zoneAt(far) == 7, "only a tier 7 tool stages in zone 7 (z " .. far .. ")")
+	workspace:SetAttribute(Tide.StartAttribute, saved)
+end)
+
 test("bot route searches are time-sliced: a hopeless one yields and stays within its bound", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
