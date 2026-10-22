@@ -115,29 +115,39 @@ Config.Beach = {
 Config.Zones = {
 	-- Zone N washes up only the items of Tier N (Items.Catalog), at the rarities in Rarity, and
 	-- the tool of that tier (Gear.Tools) lifts all of them.
+	-- Target: how many free items the zone keeps lying in it on a solo server; MaxRate: the most
+	-- it spawns per second, when empty (it slows as the zone fills; ItemService has the rule).
 	{
 		Name = "Shopside Shore",
 		Multiplier = 2,
 		CrossTime = 35,
 		Rarity = { Common = 90, Uncommon = 10 },
+		Target = 20,
+		MaxRate = 0.5,
 	},
 	{
 		Name = "Sunny Stretch",
 		Multiplier = 3,
 		CrossTime = 36,
 		Rarity = { Common = 70, Uncommon = 25, Rare = 5 },
+		Target = 16,
+		MaxRate = 0.4,
 	},
 	{
 		Name = "Middle Banks",
 		Multiplier = 5,
 		CrossTime = 38,
 		Rarity = { Common = 50, Uncommon = 32, Rare = 15, VeryRare = 3 },
+		Target = 14,
+		MaxRate = 0.4,
 	},
 	{
 		Name = "Outer Shore",
 		Multiplier = 8,
 		CrossTime = 55,
 		Rarity = { Common = 30, Uncommon = 35, Rare = 25, VeryRare = 10 },
+		Target = 12,
+		MaxRate = 0.5,
 		-- Its own dangers: rockfall in the breaks between the ribs, the odd spike pit (always
 		-- clearly shown), and the undertow in its lowest lane.
 		Hazards = {
@@ -151,6 +161,8 @@ Config.Zones = {
 		Multiplier = 12,
 		CrossTime = 65,
 		Rarity = { Common = 20, Uncommon = 35, Rare = 30, VeryRare = 15 },
+		Target = 8,
+		MaxRate = 0.4,
 		-- Its sand holds you rather than swallowing you: the sea coming in does the killing.
 		Hazards = {
 			{ Type = "Sink", Scatter = false, Lethal = false },
@@ -163,6 +175,8 @@ Config.Zones = {
 		Multiplier = 18,
 		CrossTime = 85,
 		Rarity = { Common = 10, Uncommon = 30, Rare = 38, VeryRare = 22 },
+		Target = 8,
+		MaxRate = 0.4,
 		-- Its own dangers where no biome rolled (Hazards.luau), where its layout places them.
 		Hazards = {
 			{ Type = "Sink", Scatter = false },
@@ -172,7 +186,13 @@ Config.Zones = {
 			{ Type = "Pit", Scatter = false },
 		},
 	},
-	{ Name = "The Far Sandbar", Multiplier = 25, Rarity = { Rare = 60, VeryRare = 40 } },
+	{
+		Name = "The Far Sandbar",
+		Multiplier = 25,
+		Rarity = { Rare = 60, VeryRare = 40 },
+		Target = 6,
+		MaxRate = 0.4,
+	},
 }
 
 -- Tide: the sea level falls (uncovering the outer zones), holds at low tide, then rises
@@ -727,12 +747,12 @@ Config.Pockets = {
 
 Config.Items = {
 	SpawnInterval = 1.25, -- seconds between spawn attempts
-	MaxSurfItems = 45, -- unclaimed items kept washing around the current waterline
-	-- Crowds: at Players players on the server (bots count) the zones' ordinary surf spawns, and
-	-- the MaxSurfItems they fill, are Scale times a solo server's, linear in between. Scale 1
-	-- turns it off.
+	-- Each zone keeps its own target of free items lying in it (Config.Zones Target) and refills
+	-- at up to MaxRate per second (see ItemService). Crowds: at Players players on the server
+	-- (bots count) every zone's Target and MaxRate are Scale times a solo server's, linear in
+	-- between. Scale 1 turns it off.
 	CrowdSpawn = { Players = 20, Scale = 3 },
-	MaxTotal = 450,
+	MaxTotal = 450, -- no spawns at all while the map holds this many items (a safety cap)
 	LooseTimeout = 25, -- a claimed item left alone this long freezes and becomes unclaimed
 	TimedOutLifetime = 90, -- a timed-out item despawns if nobody grabs it within this
 	FreshLifetime = 360, -- surf spawns are recycled after this long untouched

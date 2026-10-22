@@ -3531,9 +3531,9 @@ test("item crowds: the zones' ordinary surf spawns scale with the players on the
 	assert(math.abs(ItemService.crowdScale(20) - 3) < 1e-9, "full crowd: three times")
 	assert(math.abs(ItemService.crowdScale(10.5) - 2) < 1e-9, "linear in between")
 	assert(ItemService.crowdScale(40) == 3, "no more than Scale")
-	local max = Config.Items.MaxSurfItems
-	assert(ItemService.surfCap(1) == max, "the cap is MaxSurfItems at the base rate")
-	assert(math.abs(ItemService.surfCap(3) - max * 3) < 1e-9, "and it triples with the spawns")
+	local target = Config.Zones[1].Target
+	assert(ItemService.zoneTarget(1, 1) == target, "a zone's target is its own at the base rate")
+	assert(math.abs(ItemService.zoneTarget(1, 3) - target * 3) < 1e-9, "and it triples with the crowd")
 	ItemService.setBotCount(19)
 	assert(
 		math.abs(ItemService.crowdScale() - 1 - 2 * 18 / 19) < 1e-9,

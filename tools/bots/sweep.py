@@ -134,9 +134,10 @@ def table_for(result):
         d=totals["deaths"], l=totals["loads"], pc=per_hour(totals["coins"], mean_s) / n))
     surf_full = 100 * server["SurfFullTicks"] / max(server["SpawnTicks"], 1)
     lines.append("")
-    lines.append(f"Server: {server['SurfSpawned']} surf items spawned (+{server['SpotSpawned']} at loot spots), "
+    lines.append(f"Server: {server['SurfSpawned']} surf items spawned (+{server.get('SandSpawned', 0)} on open sand, +{server['SpotSpawned']} at loot spots; "
+                 f"by zone {'/'.join(str(n) for n in server.get('ZoneSpawned', []))}), "
                  f"{server['Claimed']} claimed ({server['ClaimedByBots']} by bots), "
-                 f"{server['Despawned']} despawned unclaimed, surf full on {server['SurfFullTicks']} of "
+                 f"{server['Despawned']} despawned unclaimed, every zone at target on {server['SurfFullTicks']} of "
                  f"{server['SpawnTicks']} spawn ticks ({surf_full:.0f}%).")
     return lines, totals, n, mean_s
 
@@ -157,7 +158,7 @@ def summarise(results):
                          lost_per_bot=sum(b["LostToBot"] for b in bots) / len(bots),
                          bought=sum(1 for b in bots if b.get("Purchases", 0) > 0 or b["Rebirths"] > 0),
                          n=len(bots),
-                         idle=idle, spawned=server["SurfSpawned"], claimed=server["Claimed"],
+                         idle=idle, spawned=server["SurfSpawned"] + server.get("SandSpawned", 0), claimed=server["Claimed"],
                          despawned=server["Despawned"], full=server["SurfFullTicks"] / max(server["SpawnTicks"], 1)))
     return rows
 

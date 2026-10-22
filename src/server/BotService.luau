@@ -1385,9 +1385,11 @@ function BotService.snapshot()
 			})
 		end
 	end
+	local server = table.clone(ItemService.stats)
+	server.ZoneSpawned = table.clone(server.ZoneSpawned)
 	return {
 		Bots = list,
-		Server = table.clone(ItemService.stats),
+		Server = server,
 		Speed = speedFactor,
 		BotCount = #list,
 		Frames = table.clone(frameStats),
@@ -1483,9 +1485,11 @@ function BotService.report(): { string }
 	table.insert(
 		lines,
 		string.format(
-			"Server: %d surf items spawned (+%d at loot spots), %d claimed (%d by bots), %d despawned unclaimed, surf full on %d of %d spawn ticks",
+			"Server: %d surf items spawned (+%d on open sand, +%d at loot spots; by zone %s), %d claimed (%d by bots), %d despawned unclaimed, every zone at target on %d of %d spawn ticks",
 			s.SurfSpawned,
+			s.SandSpawned,
 			s.SpotSpawned,
+			table.concat(s.ZoneSpawned, "/"),
 			s.Claimed,
 			s.ClaimedByBots,
 			s.Despawned,

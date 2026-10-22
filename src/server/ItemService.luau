@@ -1,4 +1,4 @@
--- Beach items: spawning in the surf, ownership state, timeouts, despawning and the tide.
+-- Beach items: spawning, ownership state, timeouts, despawning and the tide.
 --
 -- Item states (attribute "State"):
 --   Unclaimed  anchored, no physics, anyone can grab it
@@ -6,6 +6,28 @@
 --   Loose      claimed but put down outside a vessel; server simulates it, waves push it,
 --              and after Config.Items.LooseTimeout it freezes and becomes Unclaimed again
 --   InVessel   claimed, sitting in its owner's vessel, network-owned by the owner
+--
+-- Spawning (docs/design/spawning.md). Every zone, 1 to 7 (the Far Sandbar included), keeps its
+-- own supply of free items, whatever the tide is doing:
+--   * Target. Each zone has a target number of free items lying in it (Config.Zones Target):
+--     items Unclaimed or Loose whose position is in the zone, on sand or in the surf (not in
+--     deep water). Held and InVessel items don't count.
+--   * Rate. Each spawn tick a zone spawns with an expected number of
+--     MaxRate * SpawnInterval * (target - count) / target items: the emptier the zone, the
+--     faster it refills, up to MaxRate per second when empty; at or above target it spawns
+--     nothing. A zone only ever looks at its own count, so items dropped in one zone can't
+--     speed up another.
+--   * Rarity. What a spawn is (chooseDef) is rolled exactly as before; emptiness changes only
+--     how often a zone spawns, never what.
+--   * Where. Zones with SpawnOnSand (1 to 3) put a spawn on their open, walkable sand (not
+--     under the sea, not rock, not under a roof, not on a cliff) at any point of the tide, or,
+--     when the waterline is in the zone, with chance Config.Items.SurfShare in the surf. The
+--     other zones (4 to 6, the Far Sandbar) only spawn in the wet sand and surf around the
+--     waterline, so they refill only while the water is in or near them. Open-sand spawns roll
+--     ordinary items only: no unlock item and no Beacon Pearl, which come from surf spawns.
+--   * Crowds. The crowd scale (players plus bots, Config.Items.CrowdSpawn) multiplies every
+--     zone's target and its MaxRate. Config.Items.MaxTotal is a global safety cap.
+--   * Loot spots (settleSpots) are separate: once each tide, unchanged, and not counted.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -40,21 +62,32 @@ local rng = Random.new()
 local destroyedCallbacks = {}
 local createdCallbacks = {}
 
+local function zoneCounts(): { number }
+	return table.create(#Config.Zones, 0)
+end
+
 -- Server-wide counts for the bots' measurements (BotService reports them, `bots report`).
 ItemService.stats = {
 	SurfSpawned = 0, -- items washed up in the surf
+	SandSpawned = 0, -- items left on open sand (zones with SpawnOnSand)
 	SpotSpawned = 0, -- finds left at loot spots
+	ZoneSpawned = zoneCounts(), -- surf, sand and spot items by zone (index 1 to 7)
 	Claimed = 0, -- free items taken by anyone (a player or a bot)
 	ClaimedByBots = 0,
 	Despawned = 0, -- items that went unclaimed: timed out, drowned, or lost to the sea
-	SpawnTicks = 0, -- spawn attempts...
-	SurfFullTicks = 0, -- ...and how many found the surf full (MaxSurfItems)
+	SpawnTicks = 0, -- spawn ticks...
+	SurfFullTicks = 0, -- ...and how many found every zone at its target
 }
 
 function ItemService.resetStats()
-	for key in ItemService.stats do
-		ItemService.stats[key] = 0
+	for key, value in ItemService.stats do
+		ItemService.stats[key] = if type(value) == "table" then zoneCounts() else 0
 	end
+end
+
+local function countSpawn(zoneIndex: number)
+	local zones = ItemService.stats.ZoneSpawned
+	zones[zoneIndex] += 1
 end
 
 local clock: (() -> number)? -- tools/tests: a stand-in clock (a simulated tide)
@@ -368,48 +401,44 @@ end
 ItemService._chooseDef = chooseDef -- for tools/tests
 
 -- Somewhere to wash an item up: a point at a random depth between `lo` and `hi` of the sea, off
--- the rocks.
-local function surfPoint(sea: Tide.Sea, lo: number, hi: number): (number?, number?)
+-- the rocks, and in `zoneIndex` when one is asked for.
+local function surfPoint(sea: Tide.Sea, lo: number, hi: number, zoneIndex: number?): (number?, number?)
 	for _ = 1, 6 do
 		local x = rng:NextNumber(-Beach.HalfWidth + 12, Beach.HalfWidth - 12)
 		local z = Beach.zForDepth(rng:NextNumber(lo, hi), sea, x)
-		if restsAt(x, z) then
+		if restsAt(x, z) and (not zoneIndex or Beach.zoneAt(z) == zoneIndex) then
 			return x, z
 		end
 	end
 	return nil, nil
 end
 
--- Washes one item up somewhere in the surf around the current waterline. The zone (and so
--- the value, rarity and tier) comes from where it lands, so low tide brings richer loot. Heavy
--- things (by Class) are moved out into deeper water, within the same stretch of beach.
-function ItemService.spawnInSurf(sea: Tide.Sea): BasePart?
+-- Washes one item up somewhere in the surf around the current waterline, in `zoneIndex` when
+-- one is asked for (else wherever the surf point lands). The zone (and so the value, rarity and
+-- tier) comes from where it lands. Heavy things (by Class) are moved out into deeper water,
+-- within the same stretch of beach.
+function ItemService.spawnInSurf(sea: Tide.Sea, zoneIndex: number?): BasePart?
 	local beach = Config.Beach
-	local x, z = surfPoint(sea, -0.3, beach.WaistDepth - 0.3)
+	local x, z = surfPoint(sea, -0.3, beach.WaistDepth - 0.3, zoneIndex)
 	if not x or not z then
 		return nil
 	end
-	local zoneIndex = Beach.zoneAt(z)
-	if not zoneIndex or zoneIndex < 1 then
+	local zoneHere = Beach.zoneAt(z)
+	if not zoneHere or zoneHere < 1 then
 		return nil
 	end
-	local def = chooseDef(zoneIndex, z, 1)
+	local def = chooseDef(zoneHere, z, 1)
 	if not def then
 		return nil
 	end
 	if def.Class >= Gear.WeightClass.Heavy and not def.Unlock then
-		local deepX, deepZ = surfPoint(sea, beach.ShallowDepth, beach.WaistDepth - 0.3)
-		if
-			deepX
-			and deepZ
-			and Beach.zoneAt(deepZ) == zoneIndex
-			and Beach.tileAt(deepZ) == Beach.tileAt(z)
-		then
+		local deepX, deepZ = surfPoint(sea, beach.ShallowDepth, beach.WaistDepth - 0.3, zoneHere)
+		if deepX and deepZ and Beach.tileAt(deepZ) == Beach.tileAt(z) then
 			x, z = deepX, deepZ
 		end
 	end
 	local y = Beach.groundAt(x, z) + def.Size.Y / 2
-	return createItem(def, zoneIndex, Vector3.new(x, y, z), zoneIndex)
+	return createItem(def, zoneHere, Vector3.new(x, y, z), zoneHere)
 end
 
 -- The layouts' loot spots: once each tide, as the sea goes out and leaves a spot dry, it
@@ -458,6 +487,7 @@ function ItemService.settleSpots(sea: Tide.Sea, cycle: number): number
 					zoneIndex
 				)
 				ItemService.stats.SpotSpawned += 1
+				countSpawn(zoneIndex)
 				spawned += 1
 			end
 		end
@@ -465,8 +495,8 @@ function ItemService.settleSpots(sea: Tide.Sea, cycle: number): number
 	return spawned
 end
 
--- Crowds (Config.Items.CrowdSpawn): the more players on the server (bots count), the more of the
--- zones' ordinary surf spawns wash up, up to Scale times a solo server's at Players players,
+-- Crowds (Config.Items.CrowdSpawn): the more players on the server (bots count), the more every
+-- zone's target and its spawn rate scale up, to Scale times a solo server's at Players players,
 -- linear in between.
 local botCount = 0
 
@@ -483,47 +513,89 @@ function ItemService.crowdScale(players: number?): number
 	return 1 + (crowd.Scale - 1) * math.clamp((count - 1) / (crowd.Players - 1), 0, 1)
 end
 
--- The most items kept in the surf at a crowd scale: MaxSurfItems times the scale.
-function ItemService.surfCap(scale: number): number
-	return cfg.MaxSurfItems * scale
+-- How many free items a zone keeps lying in it at a crowd scale.
+function ItemService.zoneTarget(zoneIndex: number, scale: number): number
+	return Config.Zones[zoneIndex].Target * scale
+end
+
+-- The most a zone spawns per second (when it's empty) at a crowd scale.
+function ItemService.zoneMaxRate(zoneIndex: number, scale: number): number
+	return Config.Zones[zoneIndex].MaxRate * scale
+end
+
+-- The chance-weighted number of items a zone spawns in `dt` seconds with `count` free items
+-- lying in it: MaxRate * dt * (target - count) / target, nothing at or above the target.
+function ItemService.zoneSpawnRate(zoneIndex: number, count: number, scale: number, dt: number): number
+	local target = ItemService.zoneTarget(zoneIndex, scale)
+	if target <= 0 or count >= target then
+		return 0
+	end
+	return ItemService.zoneMaxRate(zoneIndex, scale) * dt * (target - count) / target
+end
+
+-- The free items lying in each zone: Unclaimed or Loose, on sand or in the surf (not in deep
+-- water, where they're about to be lost). Held and InVessel items don't count. Also the total
+-- number of items of all kinds.
+function ItemService.countFree(sea: Tide.Sea): ({ number }, number)
+	local counts = zoneCounts()
+	local total = 0
+	for item in all do
+		total += 1
+		local state = ItemService.getState(item)
+		if state == "Unclaimed" or state == "Loose" then
+			local position = item.CFrame.Position
+			local zoneIndex = Beach.zoneAt(position.Z)
+			if zoneIndex and zoneIndex >= 1 and Beach.depthAt(position, sea) < Config.Beach.WaistDepth then
+				counts[zoneIndex] += 1
+			end
+		end
+	end
+	return counts, total
+end
+
+-- Makes one spawn in a zone (nil when no point was found).
+local function spawnInZone(sea: Tide.Sea, zoneIndex: number): BasePart?
+	local item = ItemService.spawnInSurf(sea, zoneIndex)
+	if item then
+		ItemService.stats.SurfSpawned += 1
+		countSpawn(zoneIndex)
+	end
+	return item
 end
 
 local function spawnTick()
-	local sea = Tide.sea(now())
+	local t = now()
+	local sea = Tide.sea(t)
 	local scale = ItemService.crowdScale()
-	local cap = ItemService.surfCap(scale)
-	local total, inSurf = 0, 0
-	for item in all do
-		total += 1
-		if ItemService.getState(item) == "Unclaimed" and item:GetAttribute("Fresh") then
-			local depth = Beach.depthAt(item.CFrame.Position, sea)
-			if depth > -1 and depth < Config.Beach.WaistDepth then
-				inSurf += 1
+	local counts, total = ItemService.countFree(sea)
+	ItemService.stats.SpawnTicks += 1
+	local anyWanted = false
+	for zoneIndex = 1, #Config.Zones do
+		local expected = ItemService.zoneSpawnRate(zoneIndex, counts[zoneIndex], scale, cfg.SpawnInterval)
+		if expected <= 0 then
+			continue
+		end
+		anyWanted = true
+		-- (More than one a tick only when the rate is high; the fraction is a chance.)
+		local made = math.floor(expected)
+		if rng:NextNumber() < expected - made then
+			made += 1
+		end
+		for _ = 1, made do
+			if total >= cfg.MaxTotal then
+				break
+			end
+			if spawnInZone(sea, zoneIndex) then
+				total += 1
+				counts[zoneIndex] += 1
 			end
 		end
 	end
-	ItemService.stats.SpawnTicks += 1
-	if inSurf >= cap then
+	if not anyWanted then
 		ItemService.stats.SurfFullTicks += 1
 	end
-	if total < cfg.MaxTotal and inSurf < cap then
-		if ItemService.spawnInSurf(sea) then
-			ItemService.stats.SurfSpawned += 1
-			inSurf += 1
-		end
-		-- The extra spawns a crowd brings: one more try per unit of scale above 1 (the last one
-		-- only with the chance left over).
-		local extra = scale - 1
-		while extra > 0 and total < cfg.MaxTotal and inSurf < cap do
-			if rng:NextNumber() < extra and ItemService.spawnInSurf(sea) then
-				ItemService.stats.SurfSpawned += 1
-				inSurf += 1
-			end
-			extra -= 1
-		end
-	end
 	if total < cfg.MaxTotal then
-		ItemService.settleSpots(sea, Tide.getState(now()).Cycle)
+		ItemService.settleSpots(sea, Tide.getState(t).Cycle)
 	end
 end
 
