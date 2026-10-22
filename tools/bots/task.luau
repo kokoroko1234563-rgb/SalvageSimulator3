@@ -35,7 +35,6 @@ map.Parent = Workspace
 local ItemService = require(Server.ItemService)
 ItemService.init(map)
 local BotService = require(Server.BotService)
-local setup = os.clock() - started
 
 -- Config.Items.CrowdSpawn.Scale: 1 turns the crowd spawn scaler off.
 if JOB.scale then
@@ -43,6 +42,13 @@ if JOB.scale then
 end
 BotService.clearLog()
 BotService.setSpeed(JOB.speed or 1)
+-- The way-home fields are built before anyone plays, in big slices (a bot would wait for them).
+if JOB.finalTrip then
+	BotService.warmUp({ { Cart = "Small", Loose = true } })
+else
+	BotService.warmUp({ {}, { Cart = "Small" }, { Cart = "Medium" } })
+end
+local setup = os.clock() - started
 if JOB.finalTrip then
 	BotService.startTrip(JOB.zone or 6, JOB.tool or "HandWinch", JOB.vessel or "Wheelbarrow")
 else

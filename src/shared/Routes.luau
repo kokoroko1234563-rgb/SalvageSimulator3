@@ -108,6 +108,35 @@ export type Grid = {
 	isRock: (self: Grid, col: number, row: number) -> boolean,
 	canStep: (self: Grid, col: number, row: number, dc: number, dr: number, options: Options?) -> boolean,
 	find: (self: Grid, from: Point, to: Point, options: Options?) -> ({ Point }?, number?),
+	buildField: (self: Grid, options: FieldOptions) -> Field,
+	version: number,
+	nodes: number, -- node expansions made by `find`, ever
+	fieldNodes: number, -- and by `buildField`
+}
+
+export type FieldOptions = {
+	goals: { Point }, -- the cells walked toward
+	goalRadius: number?, -- studs around each goal that are goal cells too (default one cell)
+	speed: number, -- studs a second the walker is assumed to make
+	slope: number?,
+	cart: string?,
+	-- When the walker can no longer stand at a point: seconds from the start of the field (x, z, ground).
+	-- Nil, or very large, for never.
+	closing: ((number, number, number) -> number)?,
+	rowLo: number?, -- only rows (cells along Z) from here...
+	rowHi: number?, -- ...to here
+	yield: (() -> ())?,
+	yieldEvery: number?,
+}
+
+-- A walk-home field: for every cell the walker can get home from, the latest moment (seconds from
+-- the field's start) it may be at the cell and still get home before the sea closes the way
+-- (`slack`), and the length of the way, which `path` follows. See Grid.buildField.
+export type Field = {
+	slack: (self: Field, x: number, z: number) -> number?,
+	distance: (self: Field, x: number, z: number) -> number?,
+	path: (self: Field, x: number, z: number) -> { Point }?,
+	reaches: (self: Field, x: number, z: number) -> boolean,
 }
 
 function Routes.new(): Grid
@@ -133,6 +162,9 @@ function Routes.new(): Grid
 	local self = {} :: any
 	self.cols = cols
 	self.rows = rows
+	self.version = 0
+	self.nodes = 0
+	self.fieldNodes = 0
 
 	-- Forgets the tiles whose layout has changed (a new biome, a new tide's choice).
 	function self:refresh()
@@ -141,6 +173,7 @@ function Routes.new(): Grid
 			if tiles[tile] == nil or layouts[tile] ~= layout then
 				tiles[tile] = fresh()
 				layouts[tile] = layout
+				self.version += 1
 			end
 		end
 		tiles[0] = tiles[0] or fresh()
@@ -301,6 +334,7 @@ function Routes.new(): Grid
 			end
 			closed[cell] = true
 			nodes += 1
+			self.nodes += 1
 			if nodes > maxNodes then
 				break
 			end
@@ -347,6 +381,125 @@ function Routes.new(): Grid
 			cell = came[cell]
 		end
 		return path, cost[goal]
+	end
+
+	-- A field of the way home (or to any goal): one flood outward from the goals, so "how far is the
+	-- way home from here" and "is it still open" are lookups, and the way itself is the chain of
+	-- `next` cells. The sea is taken into account as the flood goes: a walker at a cell must still
+	-- get home before any cell on its way is closed (`closing`), so a cell's slack is the smaller of
+	-- its own closing time and the slack of the next cell on its way less the time to walk there.
+	-- The flood goes by largest slack first, so ties (dry ground, which never closes) fall to the
+	-- shortest way.
+	local NEVER = 1e6
+	function self:buildField(opts: FieldOptions): Field
+		local slope = opts.slope or terrain.FootSlope
+		local cart = opts.cart
+		local speed = opts.speed
+		local closing = opts.closing
+		local yieldFn = opts.yield
+		local yieldEvery = opts.yieldEvery or 500
+		local rowLo, rowHi = opts.rowLo or 0, opts.rowHi or rows - 1
+		local count = cols * rows
+		local slack = table.create(count, -math.huge)
+		local length = table.create(count, 0)
+		local nextCell = table.create(count, -1)
+		local closes: { [number]: number } = {}
+		local stepOptions = { slope = slope }
+		local queue = heap()
+		local goalCells = math.max(0, math.floor((opts.goalRadius or 0) / STEP))
+		for _, goal in opts.goals do
+			local gc, gr = self:cellOf(goal.x, goal.z)
+			for dc = -goalCells, goalCells do
+				for dr = -goalCells, goalCells do
+					local c, r = gc + dc, gr + dr
+					if c >= 0 and c < cols and r >= rowLo and r <= rowHi then
+						local cell = r * cols + c
+						slack[cell + 1] = NEVER
+						queue.push(-NEVER, cell)
+					end
+				end
+			end
+		end
+		local nodes = 0
+		while true do
+			local negSlack, cell = queue.pop()
+			if not cell then
+				break
+			end
+			local here = -negSlack
+			if here < slack[cell + 1] then
+				continue
+			end
+			nodes += 1
+			self.fieldNodes += 1
+			if yieldFn and nodes % yieldEvery == 0 then
+				yieldFn()
+			end
+			local col, row = cell % cols, cell // cols
+			for _, s in STEPS do
+				local nc, nr = col + s[1], row + s[2]
+				if nc < 0 or nc >= cols or nr < rowLo or nr > rowHi then
+					continue
+				end
+				local other = nr * cols + nc
+				-- (A step is as steep one way as the other, so the walker's step from `other` to
+				-- `cell` is the one checked here.)
+				if not self:canStep(col, row, s[1], s[2], stepOptions) then
+					continue
+				end
+				if cart and not cartFits(nc, nr, cart) then
+					continue
+				end
+				local close = closes[other]
+				if close == nil then
+					close = if closing
+						then closing((nc - half) * STEP, nr * STEP, self:groundAt(nc, nr))
+						else NEVER
+					closes[other] = close
+				end
+				local value = math.min(close, here - s[3] / speed)
+				if value > slack[other + 1] then
+					slack[other + 1] = value
+					length[other + 1] = length[cell + 1] + s[3]
+					nextCell[other + 1] = cell
+					queue.push(-value, other)
+				end
+			end
+		end
+
+		local field = {} :: any
+		local function indexOf(x: number, z: number): number
+			local col, row = self:cellOf(x, z)
+			return row * cols + col + 1
+		end
+		function field:slack(x: number, z: number): number?
+			local value = slack[indexOf(x, z)]
+			return if value == -math.huge then nil else value
+		end
+		function field:distance(x: number, z: number): number?
+			local index = indexOf(x, z)
+			return if slack[index] == -math.huge then nil else length[index]
+		end
+		function field:reaches(x: number, z: number): boolean
+			return slack[indexOf(x, z)] ~= -math.huge
+		end
+		-- The way from (x, z) to a goal: cell centres, ending in a goal cell.
+		function field:path(x: number, z: number): { Point }?
+			local index = indexOf(x, z)
+			if slack[index] == -math.huge then
+				return nil
+			end
+			local path: { Point } = {}
+			local cell = index - 1
+			local guard = 0
+			while cell >= 0 and guard < count do
+				table.insert(path, { x = ((cell % cols) - half) * STEP, z = (cell // cols) * STEP })
+				cell = nextCell[cell + 1]
+				guard += 1
+			end
+			return path
+		end
+		return field :: Field
 	end
 
 	return self :: Grid

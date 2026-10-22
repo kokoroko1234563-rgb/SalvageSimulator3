@@ -3849,6 +3849,140 @@ test("bot staging stays inside the furthest zone the tool works, even at low tid
 	workspace:SetAttribute(Tide.StartAttribute, saved)
 end)
 
+test("bot home field: distances, unreachable pockets, closing times, and the way down it", function()
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	local Layouts = h.require("Shared/Layouts")
+	local Routes = h.require("Shared/Routes")
+	local tile = 4
+	local z0, z1 = Beach.tileRange(tile)
+	local function wall(x0, za, x1, zb)
+		return { Kind = "Wall", Area = { { x0, za }, { x1, za }, { x1, zb }, { x0, zb } }, Height = 14 }
+	end
+	-- A wall across the tile with a gap at x = 200, and a walled pocket off to one side.
+	Layouts.setActive(tile, {
+		Name = "field",
+		Primitives = {
+			wall(-400, 100, 188, 130),
+			wall(212, 100, 400, 130),
+			wall(-300, 300, -200, 310),
+			wall(-300, 400, -200, 410),
+			wall(-300, 300, -290, 410),
+			wall(-210, 300, -200, 410),
+		},
+	})
+	local grid = Routes.new()
+	local goal = { x = 0, z = z0 + 20 }
+	local rows = { rowLo = math.floor(z0 / Routes.STEP), rowHi = math.floor(z1 / Routes.STEP) }
+	local function build(closing)
+		return grid:buildField({
+			goals = { goal },
+			goalRadius = 4,
+			speed = 10,
+			closing = closing,
+			rowLo = rows.rowLo,
+			rowHi = rows.rowHi,
+		})
+	end
+	local field = build(nil)
+	local from = { x = 0, z = z0 + 220 }
+	local _, length = grid:find(from, goal, { radius = 4 })
+	local distance = field:distance(from.x, from.z)
+	assert(distance and length, "a way exists")
+	assert(
+		math.abs(distance - length) / length < 0.2,
+		"the field's distance matches a search (" .. distance .. " vs " .. length .. ")"
+	)
+	assert(distance > 300, "round by the gap")
+	assert(not field:reaches(-250, z0 + 350), "the walled pocket isn't reachable")
+	assert(field:reaches(-250, z0 + 250), "open ground beside it is")
+	-- The way down the field reaches the goal, a legal step at a time.
+	local path = field:path(from.x, from.z)
+	assert(path and #path > 10, "a path")
+	local last = path[#path]
+	assert(math.abs(last.x - goal.x) <= 8 and math.abs(last.z - goal.z) <= 8, "it ends at the goal")
+	for i = 2, #path do
+		local a, b = path[i - 1], path[i]
+		local _, rock = Beach.shapeAt(b.x, b.z)
+		assert(not rock, "never on rock")
+		local run = math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2)
+		assert(run <= 6, "a step is a cell")
+		assert(
+			math.abs(Beach.groundAt(b.x, b.z) - Beach.groundAt(a.x, a.z))
+				<= Config.Beach.Terrain.FootSlope * run + 1e-6,
+			"no step steeper than a player climbs"
+		)
+	end
+	-- The sea closing the ground behind the wall (z > z0 + 135) after 60 seconds: a walker out there
+	-- must get through the gap in time, so the slack there is under 60 and falls with the walk.
+	local closed = build(function(_x, z)
+		return if z > z0 + 135 then 60 else 1e6
+	end)
+	local near = closed:slack(from.x, from.z)
+	assert(
+		near and near < 60,
+		"slack beyond a closing line is under its closing time (" .. tostring(near) .. ")"
+	)
+	assert(closed:slack(0, z0 + 60) > 1e5, "ground that never closes has no deadline")
+	Layouts.setActive(tile, nil)
+end)
+
+test(
+	"bot water items: claimed from a safe spot within reach, skipped when there is none, zone 7 needs tier 7",
+	function()
+		local Beach = h.require("Shared/Beach")
+		local Gear = h.require("Shared/Gear")
+		local Layouts = h.require("Shared/Layouts")
+		local Routes = h.require("Shared/Routes")
+		local Tide = h.require("Shared/Tide")
+		local Economy = h.require("Server/BotEconomy")
+		local BotService = h.require("Server/BotService")
+		local tile = 4
+		local z0, z1 = Beach.tileRange(tile)
+		Layouts.setActive(tile, false) -- flat ground
+		local grid = Routes.new()
+		local line = z0 + 200 -- the water is too deep for a bot beyond this
+		local field = grid:buildField({
+			goals = { { x = 0, z = z0 + 20 } },
+			goalRadius = 4,
+			speed = 10,
+			closing = function(_x, z)
+				return if z > line then 0 else 1e6
+			end,
+			rowLo = math.floor(z0 / Routes.STEP),
+			rowHi = math.floor(z1 / Routes.STEP),
+		})
+		local entry = { Field = field, T0 = Tide.now() }
+		local reach = Gear.getTool("BeachRake").Reach + 1 -- 14 + 1
+		-- An item 10 studs out in deep water: stand at safe depth, within reach of it.
+		local point = BotService.approachFor(entry, 0, line + 10, reach, 0, z0 + 50, 5)
+		assert(point, "a safe spot within reach")
+		assert(point.z <= line, "at safe depth (z " .. point.z .. " against the line at " .. line .. ")")
+		assert(
+			math.sqrt((point.x - 0) ^ 2 + (point.z - (line + 10)) ^ 2) <= reach,
+			"and within the tool's reach of the item"
+		)
+		-- One further out than the tool reaches from safe water: no candidate.
+		assert(
+			BotService.approachFor(entry, 0, line + 40, reach, 0, z0 + 50, 5) == nil,
+			"no safe spot within reach: skipped"
+		)
+		-- A dry item is reached from the item itself or next to it.
+		local dry = BotService.approachFor(entry, 0, line - 50, reach, 0, z0 + 50, 5)
+		assert(dry and dry.z <= line, "a dry item")
+		-- Zone 7 (past the channel) is only for a tier 7 tool: nothing lower lifts what lies there.
+		for _, id in { "BareHands", "BeachRake", "FishingNet", "GrabberClaw", "BoatHook", "HandWinch" } do
+			local state = Economy.newState()
+			state.Tools[id] = true
+			assert(
+				not Gear.canLift(Economy.lift(state, Economy.tool(state)), 7),
+				id .. " can't lift zone 7's finds"
+			)
+		end
+		Layouts.setActive(tile, nil)
+	end
+)
+
 test("bot route searches are time-sliced: a hopeless one yields and stays within its bound", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")

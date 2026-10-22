@@ -99,6 +99,17 @@ local incomeLog: { any } = {}
 local lastCycle = -1
 local lastRefresh = 0
 local startedAt = 0
+local nodesBase = { Search = 0, Field = 0 }
+local searchStats = {
+	DrySkipped = 0,
+	Decisions = 0,
+	NoCandidates = 0,
+	NoRoute = 0,
+	Closed = 0,
+	Chosen = 0,
+	WaterTaken = 0,
+	WaterSkipped = 0,
+} -- what became of the item searches
 local tripResult: any = nil
 local rng = Random.new()
 
@@ -404,9 +415,12 @@ local function yieldFor(bot: Bot): () -> ()
 end
 
 -- How many node expansions a search over this distance may take before it is given up as hopeless.
-local function nodeBound(ax: number, az: number, bx: number, bz: number): number
+local function nodeBound(ax: number, az: number, bx: number, bz: number, generous: boolean?): number
 	local cells = math.sqrt((ax - bx) ^ 2 + (az - bz) ^ 2) / Routes.STEP
-	return math.clamp(math.floor(2000 + 150 * cells), 2000, 150000)
+	if generous then
+		return math.clamp(math.floor(2000 + 150 * cells), 2000, 150000)
+	end
+	return math.clamp(math.floor(2000 + 40 * cells), 2000, 30000)
 end
 
 -- A route from the bot's spot to (x, z), through the shop's flat ground at either end. Nil if
@@ -433,7 +447,8 @@ local function routeTo(
 		cart = cart,
 		blocked = if ignoreTide then nil else waterBlocker(speed, limit, delay or 0),
 		radius = radius,
-		maxNodes = nodeBound(start.x, start.z, x, z),
+		maxNodes = nodeBound(start.x, start.z, x, z, bot.Trip ~= nil),
+		weight = if bot.Trip then nil else 1.5,
 		yield = yieldFor(bot),
 	}
 	local gridStart = { x = start.x, z = math.max(start.z, 0) }
@@ -455,6 +470,26 @@ local function routeTo(
 	return full, length
 end
 
+-- The way out from the sell pad to a point is the way home from it, walked the other way: no
+-- search needed (the field already knows it, for this kind of walker).
+local function reverseOf(bot: Bot, entry: any, x: number, z: number): ({ any }?, number?)
+	local path = entry.Field:path(x, math.max(z, 0))
+	if not path then
+		return nil, nil
+	end
+	local out = {}
+	if bot.Z < 0 then
+		table.insert(out, { x = bot.X, z = bot.Z })
+	end
+	for i = #path, 1, -1 do
+		table.insert(out, path[i])
+	end
+	if z < 0 then
+		table.insert(out, { x = x, z = z })
+	end
+	return out, entry.Field:distance(x, math.max(z, 0))
+end
+
 local function beginPath(bot: Bot, path: { any }, mode: string)
 	bot.Path = path
 	bot.Index = 2
@@ -462,6 +497,170 @@ local function beginPath(bot: Bot, path: { any }, mode: string)
 	if path[1] and (path[1].x ~= bot.X or path[1].z ~= bot.Z) then
 		bot.Index = 1
 	end
+end
+
+-- The way home, as fields ----------------------------------------------------------------
+
+-- One flood from the sell pad outward over the route grid gives, for every cell, how far the way
+-- home is, the way itself, and the latest moment a walker may be there and still get home before the
+-- sea closes the way (Routes.buildField). It is built once for each kind of walker (on foot, or with
+-- a cart of a size) and answers every "is the way back open" and "how far home" by lookup, so a
+-- bot's thinking is one search to its chosen item rather than a handful of searches.
+local FIELD_SAMPLE = 2 -- game seconds between samples of the sea
+local fields: { [string]: any } = {}
+local building: { [string]: boolean } = {}
+
+-- When the sea is at a cell's depth limit, in seconds from t0, from the tide's own curve: the
+-- waterline at a column is the shared waterline a lag earlier, and a cell is too deep once the
+-- waterline falls to (ground + limit) / -slope.
+local function makeClosing(t0: number, limit: number)
+	local dt = FIELD_SAMPLE / speedFactor
+	local n = math.floor(2 * BotEconomy.CycleSeconds / FIELD_SAMPLE)
+	local pad = 24
+	local base: { [number]: number } = {}
+	for i = -pad, n + pad do
+		base[i] = Tide.waterline(t0 + i * dt)
+	end
+	-- Per column: the waterline at each sample from now (raw), its running minimum (pmin), the end
+	-- of its rising stretch (peak) and of the falling stretch after that (trough).
+	local columns: { [number]: any } = {}
+	local slope = Config.Beach.Slope
+	local function column(x: number)
+		local lag = math.clamp(math.floor(Tide.lagAt(x, t0) / dt + 0.5), -pad, pad)
+		local raw, pmin = table.create(n + 1), table.create(n + 1)
+		local lowest = math.huge
+		for i = 0, n do
+			local value = base[i - lag]
+			raw[i + 1] = value
+			lowest = math.min(lowest, value)
+			pmin[i + 1] = lowest
+		end
+		local peak = 0
+		while peak < n and raw[peak + 2] >= raw[peak + 1] do
+			peak += 1
+		end
+		local trough = peak
+		while trough < n and raw[trough + 2] <= raw[trough + 1] do
+			trough += 1
+		end
+		return { Raw = raw, Min = pmin, Peak = peak, Trough = trough }
+	end
+	return function(x: number, _z: number, ground: number): number
+		local col = columns[x]
+		if not col then
+			col = column(x)
+			columns[x] = col
+		end
+		-- Too deep once the waterline has fallen to this.
+		local critical = -(ground + limit) / slope
+		local raw, pmin = col.Raw, col.Min
+		if pmin[1] > critical then
+			-- Dry enough now: closes when the waterline first falls that far.
+			if pmin[n + 1] > critical then
+				return 1e6
+			end
+			local lo, hi = 1, n + 1 -- pmin[lo] > critical >= pmin[hi]
+			while hi - lo > 1 do
+				local mid = (lo + hi) // 2
+				if pmin[mid] <= critical then
+					hi = mid
+				else
+					lo = mid
+				end
+			end
+			return (hi - 1) * dt
+		end
+		-- Too deep now. If the sea is on its way out it reopens (the bot can be there once it has),
+		-- and closes again as the tide turns; if it is coming in, it stays closed.
+		local peak, trough = col.Peak, col.Trough
+		if raw[peak + 1] <= critical then
+			return 0
+		end
+		if raw[trough + 1] > critical then
+			return 1e6
+		end
+		local lo, hi = peak + 1, trough + 1 -- raw[lo] > critical >= raw[hi], falling
+		while hi - lo > 1 do
+			local mid = (lo + hi) // 2
+			if raw[mid] <= critical then
+				hi = mid
+			else
+				lo = mid
+			end
+		end
+		return (hi - 1) * dt
+	end
+end
+
+local function fieldKey(cart: string?, loose: boolean): string
+	return (cart or "foot") .. (if loose then ":trip" else "")
+end
+
+local function buildFieldFor(cart: string?, loose: boolean, urgent: boolean?)
+	local key = fieldKey(cart, loose)
+	if building[key] then
+		return
+	end
+	building[key] = true
+	local worker = { Cargo = {}, Gone = false }
+	local function run()
+		local t0 = now()
+		local version = grid.version
+		local speed = BotEconomy.WalkSpeed * speedFactor * (if loose then LOOSE_SPEED else SAFE_SPEED)
+		local limit = Config.Beach.WaistDepth - (if loose then LOOSE_MARGIN else DEPTH_MARGIN)
+		local yieldNow = if urgent
+			then function()
+				-- (Warm-up, before bots play: take big slices.)
+				if os.clock() - lastMark > 0.02 then
+					task.wait()
+					lastMark = os.clock()
+				end
+			end
+			else yieldFor(worker)
+		local field = grid:buildField({
+			goals = { { x = HOME.x, z = 0 } },
+			goalRadius = 8,
+			speed = speed,
+			slope = if cart then Config.Beach.Terrain.CartSlope else Config.Beach.Terrain.FootSlope,
+			cart = cart,
+			closing = makeClosing(t0, limit),
+			yield = yieldNow,
+		})
+		fields[key] = { Field = field, T0 = t0, Version = version }
+	end
+	local ok, err = pcall(run)
+	building[key] = false
+	if not ok and not string.find(tostring(err), "bot gone", 1, true) then
+		warn("[BotService] building the way-home field failed: " .. tostring(err))
+	end
+end
+
+-- The field for a bot's kind of walker, built (and rebuilt when the layouts changed, or it is old
+-- enough that its picture of the sea runs short) in a thread of its own; the caller waits, in its
+-- own thread, until there is one.
+local function ensureField(bot: Bot)
+	local cart = BotEconomy.cartSize(bot.State)
+	local loose = bot.Trip ~= nil
+	local key = fieldKey(cart, loose)
+	local entry = fields[key]
+	local stale = entry
+		and (entry.Version ~= grid.version or now() - entry.T0 > 0.8 * BotEconomy.CycleSeconds / speedFactor)
+	if (not entry or stale) and not building[key] then
+		task.spawn(buildFieldFor, cart, loose)
+	end
+	while not fields[key] do
+		task.wait()
+		if bot.Gone or not running then
+			error("bot gone")
+		end
+	end
+	return fields[key]
+end
+
+-- Whether a walker at (x, z) can still get home if it sets out `delay` seconds from now.
+local function wayHomeOpen(entry: any, x: number, z: number, delay: number): boolean
+	local slack = entry.Field:slack(x, math.max(z, 0))
+	return slack ~= nil and slack >= now() - entry.T0 + delay
 end
 
 -- Decisions ------------------------------------------------------------------------------
@@ -482,13 +681,15 @@ local function loadFraction(bot: Bot): string
 end
 
 local function goHome(bot: Bot)
-	local path = routeTo(bot, HOME.x, HOME.z, 6)
-	if not path then
-		-- No way with the full margins: the tightest the sea allows.
-		path = routeTo(bot, HOME.x, HOME.z, 6, nil, nil, true)
-	end
-	if not path then
-		-- Nothing the tide won't cut: try anyway on the shortest way, rather than stand and drown.
+	local entry = ensureField(bot)
+	local path = entry.Field:path(bot.X, math.max(bot.Z, 0))
+	if path then
+		if bot.Z < 0 then
+			table.insert(path, 1, { x = bot.X, z = bot.Z })
+		end
+		table.insert(path, { x = HOME.x, z = HOME.z })
+	else
+		-- Walled in from the field's point of view: the plain shortest way, if any.
 		local cart = BotEconomy.cartSize(bot.State)
 		path = grid:find({ x = bot.X, z = math.max(bot.Z, 0) }, { x = HOME.x, z = 0 }, {
 			slope = if cart then Config.Beach.Terrain.CartSlope else Config.Beach.Terrain.FootSlope,
@@ -535,12 +736,27 @@ local function reservedItems(bot: Bot): { [BasePart]: boolean }
 	return set
 end
 
+-- Real seconds of slack to leave the way home: more while the sea is coming in, more with a load.
+local function tideSlack(bot: Bot): number
+	if bot.Trip then
+		return 0
+	end
+	local game = TIDE_SLACK
+	if Tide.getState(now()).Phase == "In" then
+		game *= 2
+	end
+	if #bot.Cargo > 0 then
+		game *= 1.5
+	end
+	return game / speedFactor
+end
+
 -- Items worth a look: free, not reserved by another bot, of a zone tier the tool lifts, not ones we
 -- gave up on, and for a trip bot only in its zone. Scored by value per second
 -- of the walk there and on home. Those in the bot's own stretch come first; the rest only when
 -- the stretch has nothing it can take (a bot with no cart, carrying one thing at a time, keeps to
 -- short trips then).
-local function candidates(bot: Bot): ({ any }, { any })
+local function candidates(bot: Bot, entry: any): ({ any }, { any })
 	local lift = BotEconomy.lift(bot.State, BotEconomy.tool(bot.State))
 	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor
 	local sea = Tide.sea()
@@ -564,15 +780,16 @@ local function candidates(bot: Bot): ({ any }, { any })
 				local there = math.sqrt((position.X - bot.X) ^ 2 + (position.Z - bot.Z) ^ 2)
 					* BotEconomy.MazeFactor
 					/ speed
-				local back = math.sqrt((position.X - HOME.x) ^ 2 + (position.Z - HOME.z) ^ 2)
-					* BotEconomy.MazeFactor
-					/ speed
+				-- The way home from there, from the field: its length, and whether it stays open
+				-- for the walk there, the lift, and a margin.
+				local homeLength = entry.Field:distance(position.X, math.max(position.Z, 0))
+				local back = if homeLength then homeLength / speed else math.huge
 				-- What lies beyond the first zone (or in deeper water) is worth going anywhere
 				-- along the beach for; the stretch is for the cheap finds of the first zone's shallows.
 				local premium = (item:GetAttribute("Tier") or 1) >= 2 or band >= Gear.Depth.KneeDeep
 				local inStretch = premium or (position.X >= lo and position.X <= hi)
 				-- Hands-only bots stay on short trips (200 game seconds there and back at most).
-				if inStretch or not hands or (there + back) * speedFactor <= 200 then
+				if back < math.huge and (inStretch or not hands or (there + back) * speedFactor <= 200) then
 					table.insert(if inStretch then mine else others, {
 						Item = item,
 						There = there,
@@ -590,62 +807,121 @@ local function candidates(bot: Bot): ({ any }, { any })
 	return mine, others
 end
 
--- Real seconds of slack to leave the way home: more while the sea is coming in, more with a load.
-local function tideSlack(bot: Bot): number
-	if bot.Trip then
-		return 0
+-- Where to stand to claim an item: the nearest spot to the bot, within the tool's reach of the item,
+-- that stays safe (the way home open, the water under the route limit) for `delay` seconds from
+-- now (the walk there, the grab and load, and a margin), or nil if there is none. An item in the
+-- water is claimed from the shore side of it, never by wading to it.
+local function approachFor(
+	entry: any,
+	itemX: number,
+	itemZ: number,
+	reach: number,
+	fromX: number,
+	fromZ: number,
+	delay: number
+): { x: number, z: number }?
+	grid = grid or Routes.new()
+	local best, bestDistance = nil, math.huge
+	for _, fraction in { 0, 0.4, 0.7, 1 } do
+		local radius = reach * fraction
+		local count = if radius == 0 then 1 else 12
+		for k = 0, count - 1 do
+			local angle = k / count * 2 * math.pi
+			local col, row = grid:cellOf(itemX + math.cos(angle) * radius, itemZ + math.sin(angle) * radius)
+			local x, z = grid:centerOf(col, row)
+			if
+				(x - itemX) ^ 2 + (z - itemZ) ^ 2 <= reach * reach
+				and not grid:isRock(col, row)
+				and wayHomeOpen(entry, x, z, delay)
+			then
+				local distance = (x - fromX) ^ 2 + (z - fromZ) ^ 2
+				if distance < bestDistance then
+					best, bestDistance = { x = x, z = z }, distance
+				end
+			end
+		end
 	end
-	local game = TIDE_SLACK
-	if Tide.getState(now()).Phase == "In" then
-		game *= 2
-	end
-	if #bot.Cargo > 0 then
-		game *= 1.5
-	end
-	return game / speedFactor
+	return best
 end
+BotService.approachFor = approachFor -- for tools/tests
 
 local function chooseTarget(bot: Bot): boolean
-	local mine, others = candidates(bot)
+	local entry = ensureField(bot)
+	local mine, others = candidates(bot, entry)
+	searchStats.Decisions += 1
+	if #mine + #others == 0 then
+		searchStats.NoCandidates += 1
+	end
 	local list = {}
 	for _, group in { mine, others } do
-		for i = 1, math.min(#group, 4) do
+		for i = 1, math.min(#group, 40) do
 			table.insert(list, group[i])
 		end
 	end
-	for i = 1, #list do
-		local item = list[i].Item
+	local tool = BotEconomy.tool(bot.State)
+	local reach = tool.Reach + Config.Items.ReachSlack - 3 -- (cells are 4 studs: a little in hand)
+	local walk = BotEconomy.walkSpeed(bot.State) * speedFactor * SAFE_SPEED
+	local sea = Tide.sea()
+	local searches = 0
+	for _, candidate in list do
+		local item = candidate.Item
 		local position = item.Position
-		local arrival = now() + list[i].There
-		local deepThen = Beach.waterYAt({ Now = arrival }, position.X)
-				- Beach.groundAt(position.X, position.Z)
-			>= Config.Beach.WaistDepth - DEPTH_MARGIN
-		if deepThen then
-			bot.Skip[item] = now() + 20 / speedFactor
+		local inWater = Beach.depthAt(position, sea) > 0
+		local point = approachFor(
+			entry,
+			position.X,
+			position.Z,
+			reach,
+			bot.X,
+			bot.Z,
+			candidate.There + 1.2 / speedFactor + tideSlack(bot)
+		)
+		if not point then
+			-- No safe place within reach of it, now or by the time the bot is there.
+			if inWater then
+				searchStats.WaterSkipped += 1
+			else
+				searchStats.DrySkipped += 1
+			end
+			bot.Skip[item] = now() + 10 / speedFactor
 			continue
 		end
-		local out, outLength =
-			routeTo(bot, position.X, position.Z, math.min(BotEconomy.tool(bot.State).Reach * 0.6, 8))
-		if out then
-			-- And the way back from there must stay open, setting out once it's loaded.
-			local walk = BotEconomy.walkSpeed(bot.State) * speedFactor * SAFE_SPEED
-			local back = routeTo(
-				bot,
-				HOME.x,
-				HOME.z,
-				6,
-				{ x = out[#out].x, z = out[#out].z },
-				(outLength or 0) / walk + 1.2 / speedFactor + tideSlack(bot)
-			)
-			if back then
+		local out, outLength
+		if atHome(bot) then
+			out, outLength = reverseOf(bot, entry, point.x, point.z)
+		else
+			searches += 1
+			out, outLength = routeTo(bot, point.x, point.z, 2)
+		end
+		if not out then
+			searchStats.NoRoute += 1
+		else
+			-- And the way back from where the route ends must stay open, setting out once loaded.
+			local last = out[#out]
+			if
+				wayHomeOpen(
+					entry,
+					last.x,
+					last.z,
+					(outLength or 0) / walk + 1.2 / speedFactor + tideSlack(bot)
+				)
+			then
+				searchStats.Chosen += 1
+				if inWater then
+					searchStats.WaterTaken += 1
+				end
 				bot.Target = item
 				bot.Reapproached = false
 				setStatus(bot, if atHome(bot) then "walking out" else "heading for an item")
 				beginPath(bot, out, "ToItem")
 				return true
 			end
+			searchStats.Closed += 1
 		end
-		bot.Skip[item] = now() + 20 / speedFactor
+		bot.Skip[item] = now() + 60 / speedFactor
+		if searches >= 2 then
+			break
+		end
 	end
 	return false
 end
@@ -719,7 +995,19 @@ function decide(bot: Bot)
 		-- Stopped short of an item: step right up to it.
 		bot.Pending = nil
 		if ItemService.isItem(pending) and ItemService.getState(pending) == "Unclaimed" then
-			local path = routeTo(bot, pending.Position.X, pending.Position.Z, 0)
+			-- (From a safe place close in: never into the water.)
+			local entry = ensureField(bot)
+			local tool = BotEconomy.tool(bot.State)
+			local point = approachFor(
+				entry,
+				pending.Position.X,
+				pending.Position.Z,
+				(tool.Reach + Config.Items.ReachSlack - 3) * 0.5,
+				bot.X,
+				bot.Z,
+				5 / speedFactor + tideSlack(bot)
+			)
+			local path = if point then routeTo(bot, point.x, point.z, 0) else nil
 			if path then
 				bot.Target = pending
 				beginPath(bot, path, "ToItem")
@@ -752,7 +1040,11 @@ function decide(bot: Bot)
 			local tripReady = state.Phase ~= "Out" or state.PhaseProgress >= 0.4
 			local out, outLength
 			if not bot.Trip or tripReady then
-				out, outLength = routeTo(bot, sx, sz, 8, nil, nil, nil, bot.Trip ~= nil)
+				if atHome(bot) then
+					out, outLength = reverseOf(bot, ensureField(bot), sx, sz)
+				else
+					out, outLength = routeTo(bot, sx, sz, 8, nil, nil, nil, bot.Trip ~= nil)
+				end
 			end
 			if bot.Trip then
 				bot.Trip.Diag = string.format(
@@ -766,20 +1058,22 @@ function decide(bot: Bot)
 				)
 			end
 			if out then
-				local walk = BotEconomy.walkSpeed(bot.State) * speedFactor * SAFE_SPEED
-				local back = routeTo(
-					bot,
-					HOME.x,
-					HOME.z,
-					6,
-					{ x = out[#out].x, z = out[#out].z },
+				local entry = ensureField(bot)
+				local walk = BotEconomy.walkSpeed(bot.State)
+					* speedFactor
+					* (if bot.Trip then LOOSE_SPEED else SAFE_SPEED)
+				local last = out[#out]
+				local back = wayHomeOpen(
+					entry,
+					last.x,
+					last.z,
 					(outLength or 0) / walk + (if bot.Trip then 0 else 60) / speedFactor
 				)
 				if bot.Trip then
 					bot.Trip.Diag = string.format(
 						"%s, back %s (tide %s %.0f%%)",
 						bot.Trip.Diag,
-						tostring(back ~= nil),
+						tostring(back),
 						Tide.getState(t).Phase,
 						Tide.getState(t).PhaseProgress * 100
 					)
@@ -799,7 +1093,7 @@ function decide(bot: Bot)
 			return
 		else
 			bot.BackCheckAt = t + 3 / speedFactor
-			if routeTo(bot, HOME.x, HOME.z, 6, nil, 60 / speedFactor) then
+			if wayHomeOpen(ensureField(bot), bot.X, bot.Z, 60 / speedFactor) then
 				setStatus(bot, "waiting for the tide")
 				bot.WaitUntil = t + 0.3
 				bot.After = function() end
@@ -1082,11 +1376,18 @@ local function think(bot: Bot)
 	if bot.Thinking or bot.Gone then
 		return
 	end
+	-- (A thread runs until its first yield: start no new thinking in a frame that's used its share.)
+	mark()
+	if frameUsed > FRAME_BUDGET then
+		return
+	end
 	bot.Thinking = true
 	task.spawn(function()
 		mark()
+		local startedThinking = now()
 		local ok, err = pcall(decide, bot)
 		bot.Thinking = false
+		bot.Stats.ThinkSeconds += now() - startedThinking
 		if not ok and not bot.Gone and not string.find(tostring(err), "bot gone", 1, true) then
 			warn("[BotService] bot " .. bot.Id .. " errored while thinking: " .. tostring(err))
 			bot.Path, bot.Target, bot.Mode, bot.After = nil, nil, nil, nil
@@ -1215,6 +1516,7 @@ local function spawnBot(id: number, state: any, trip: any): Bot
 			LostToBot = 0,
 			LostOther = 0,
 			IdleSeconds = 0,
+			ThinkSeconds = 0,
 			Deaths = 0,
 			LostLoads = 0,
 			LostItems = 0,
@@ -1278,10 +1580,21 @@ local function ensureRunning()
 	end
 	lastCycle = Tide.getState().Cycle
 	startedAt = now()
+	nodesBase = { Search = grid.nodes, Field = grid.fieldNodes }
 	connection = RunService.Heartbeat:Connect(onFrame)
 end
 
 -- Public ---------------------------------------------------------------------------------
+
+-- Builds the way-home fields before any bot plays (the sweep does this in its set-up), in big slices:
+-- each is { Cart = size or nil, Loose = true for a trip bot }. Without it a bot waits for its field.
+function BotService.warmUp(modes: { { Cart: string?, Loose: boolean? } })
+	grid = grid or Routes.new()
+	grid:refresh()
+	for _, mode in modes do
+		buildFieldFor(mode.Cart, mode.Loose == true, true)
+	end
+end
 
 function BotService.count(): number
 	local n = 0
@@ -1395,6 +1708,7 @@ function BotService.snapshot()
 				LostToBot = s.LostToBot,
 				LostOther = s.LostOther,
 				IdleGameSeconds = s.IdleSeconds * bot.StartSpeed,
+				ThinkingGameSeconds = s.ThinkSeconds * bot.StartSpeed,
 				Deaths = s.Deaths,
 				LostLoads = s.LostLoads,
 				LostItems = s.LostItems,
@@ -1413,6 +1727,12 @@ function BotService.snapshot()
 		Speed = speedFactor,
 		BotCount = #list,
 		Frames = table.clone(frameStats),
+		Searches = table.clone(searchStats),
+		Nodes = {
+			Search = grid and grid.nodes - nodesBase.Search or 0,
+			Field = grid and grid.fieldNodes - nodesBase.Field or 0,
+			GameMinutes = (now() - startedAt) * speedFactor / 60,
+		},
 	}
 end
 
@@ -1439,7 +1759,7 @@ function BotService.report(): { string }
 	local snap = BotService.snapshot()
 	local lines = {
 		string.format("Bots: %d, speed x%.0f. Rates are per hour of game time.", snap.BotCount, snap.Speed),
-		"bot  colour    coins/h   items/h  trips  lost-to-bot  lost-other  idle%  deaths  lost-loads  gear",
+		"bot  colour    coins/h   items/h  trips  lost-to-bot  lost-other  idle%  deaths  lost-loads  gear, thinking%",
 	}
 	local total = {
 		Coins = 0,
@@ -1448,6 +1768,7 @@ function BotService.report(): { string }
 		LostToBot = 0,
 		LostOther = 0,
 		Idle = 0,
+		Think = 0,
 		Deaths = 0,
 		LostLoads = 0,
 		Hours = 0,
@@ -1460,13 +1781,14 @@ function BotService.report(): { string }
 		total.LostToBot += b.LostToBot
 		total.LostOther += b.LostOther
 		total.Idle += b.IdleGameSeconds
+		total.Think += b.ThinkingGameSeconds
 		total.Deaths += b.Deaths
 		total.LostLoads += b.LostLoads
 		total.Hours += hours
 		table.insert(
 			lines,
 			string.format(
-				"%-4d %-9s %-9s %-8.0f %-6d %-12d %-11d %-6.0f %-7d %-11d %s + %s, %d rebirth(s)",
+				"%-4d %-9s %-9s %-8.0f %-6d %-12d %-11d %-6.0f %-7d %-11d %s + %s, %d rebirth(s), thinking %.1f%%",
 				b.Bot,
 				b.Color,
 				commas(b.Coins / hours),
@@ -1479,7 +1801,8 @@ function BotService.report(): { string }
 				b.LostLoads,
 				b.Gear.Tool,
 				b.Gear.Vessel or "hands",
-				b.Gear.Rebirths
+				b.Gear.Rebirths,
+				b.ThinkingGameSeconds / math.max(b.GameSeconds, 1) * 100
 			)
 		)
 	end
@@ -1488,7 +1811,7 @@ function BotService.report(): { string }
 		table.insert(
 			lines,
 			string.format(
-				"all  total     %-9s %-8.0f %-6d %-12d %-11d %-6.0f %-7d %-11d (per bot: %s coins/h)",
+				"all  total     %-9s %-8.0f %-6d %-12d %-11d %-6.0f %-7d %-11d (per bot: %s coins/h), thinking %.1f%%",
 				commas(total.Coins / (total.Hours / n)),
 				total.Items / (total.Hours / n),
 				total.Trips,
@@ -1497,10 +1820,32 @@ function BotService.report(): { string }
 				total.Idle / math.max(total.Hours * 3600, 1) * 100,
 				total.Deaths,
 				total.LostLoads,
-				commas(total.Coins / math.max(total.Hours, 1e-9))
+				commas(total.Coins / math.max(total.Hours, 1e-9)),
+				total.Think / math.max(total.Hours * 3600, 1) * 100
 			)
 		)
 	end
+	local nodes = snap.Nodes
+	table.insert(
+		lines,
+		string.format(
+			"Searches: %.0f nodes per game minute (route searches %d, way-home fields %d); frames: worst Heartbeat %.0f ms, bot work %.0f ms, %d over 50 ms; item searches: %d chosen, %d no route, %d way home closed; water items: %d taken, %d skipped (dry ones skipped: %d); %d of %d target choices found no candidate",
+			(nodes.Search + nodes.Field) / math.max(nodes.GameMinutes, 1e-9),
+			nodes.Search,
+			nodes.Field,
+			snap.Frames.MaxDt * 1000,
+			snap.Frames.MaxWork * 1000,
+			snap.Frames.Slow,
+			snap.Searches.Chosen,
+			snap.Searches.NoRoute,
+			snap.Searches.Closed,
+			snap.Searches.WaterTaken,
+			snap.Searches.WaterSkipped,
+			snap.Searches.DrySkipped,
+			snap.Searches.NoCandidates,
+			snap.Searches.Decisions
+		)
+	)
 	local s = snap.Server
 	table.insert(
 		lines,
