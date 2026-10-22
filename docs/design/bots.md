@@ -98,6 +98,15 @@ channel is open and a stay of 60 game seconds fits, and the general rules (safe 
 slack) still decide each item. `bots report` counts sandbar trips per bot (a trip: a bot that takes a zone 7
 item after its last sale).
 
+A wheeled cart cannot climb the channel's banks (`CartSlope`), so a bot with one **shuttles**: it parks the
+cart at the channel's shore side, crosses on foot, carries one find at a time back to the cart and loads it,
+and repeats while the channel is open (each pick-up still needs the foot field's way home across the channel
+to stay open), then takes the cart home. A bot with no cart, or a flying one, just crosses. Before the
+window, a tier 7 bot with room for the haul (`headForBank`) gives up other work once the walk to the bank
+(by the cart field) leaves less than `SAND_LEAD` spare before the channel opens, and follows the waterline
+out to the bank, never past it. When staging far out has no safe way, the bot tries nearer points on the way
+before it gives up and goes home.
+
 ## One buying rule, for every bot
 
 1. Rebirth as soon as it can be afforded, taking the reward after which its estimated income is highest.
