@@ -112,6 +112,10 @@ local searchStats = {
 	WaterSkipped = 0,
 	HomeFull = 0, -- bots that set off home with a full cart
 	HomeTide = 0, -- ... with free slots, because the tide forced it
+	SandNoPlan = 0, -- decisions of tier 7 bots with no sandbar plan (no window, or no way)
+	SandShort = 0, -- ... with a window too short for a useful stay
+	SandWaiting = 0, -- ... with a useful stay once the channel opens
+	SandOpen = 0, -- ... with the channel open and a useful stay
 	HomeNothing = 0, -- ... with free slots, because nothing more was worth waiting for
 } -- what became of the item searches, and why bots set off home
 local tripResult: any = nil
@@ -296,20 +300,32 @@ local function placeCart(bot: Bot)
 		end
 		return
 	end
-	local trail = bot.Trail
-	local back = trail[math.max(1, #trail - 4)]
-	local cx, cz = back.x, back.z
-	local dx, dz = bot.X - cx, bot.Z - cz
-	local length = math.sqrt(dx * dx + dz * dz)
-	if length < 0.5 then
-		dx, dz = bot.DirX, bot.DirZ
-		length = 1
+	local cframe
+	if bot.Parked then
+		-- (Left at the channel's shore side while the bot works the sandbar on foot.)
+		cframe = bot.Parked.CFrame
+		local hands = bot.Hands
+		if hands then
+			hands.CFrame = CFrame.new(bot.X + bot.DirX * 1.6, bot.GroundY + 3.8, bot.Z + bot.DirZ * 1.6)
+		end
+	else
+		local trail = bot.Trail
+		local back = trail[math.max(1, #trail - 4)]
+		local cx, cz = back.x, back.z
+		local dx, dz = bot.X - cx, bot.Z - cz
+		local length = math.sqrt(dx * dx + dz * dz)
+		if length < 0.5 then
+			dx, dz = bot.DirX, bot.DirZ
+			length = 1
+		end
+		local groundY = Beach.groundAt(cx, cz)
+		cframe = CFrame.lookAt(
+			Vector3.new(cx, groundY, cz),
+			Vector3.new(cx + dx / length, groundY, cz + dz / length)
+		)
+		-- (the cart's handle is at -Z: it faces the bot)
+		bot.Cart:PivotTo(cframe)
 	end
-	local groundY = Beach.groundAt(cx, cz)
-	local cframe =
-		CFrame.lookAt(Vector3.new(cx, groundY, cz), Vector3.new(cx + dx / length, groundY, cz + dz / length))
-	-- (the cart's handle is at -Z: it faces the bot)
-	bot.Cart:PivotTo(cframe)
 	local box = bot.CartBox
 	local columns = math.min(2, math.max(1, BotEconomy.capacity(bot.State)))
 	local rows = math.ceil(BotEconomy.capacity(bot.State) / columns)
@@ -371,6 +387,15 @@ local function advance(bot: Bot, dt: number, sea: Tide.Sea): boolean
 end
 
 -- Routes ---------------------------------------------------------------------------------
+
+-- The cart a bot's routes must fit: its vessel's size, or none (on foot) while it is on a sandbar
+-- shuttle, its cart parked at the channel's shore side (wheeled carts can't climb the channel's banks).
+local function cartOf(bot: Bot): string?
+	if bot.Foot then
+		return nil
+	end
+	return BotEconomy.cartSize(bot.State)
+end
 
 local function waterBlocker(speed: number, limit: number, delay: number)
 	-- Whether the sea would be too deep to stand in at a cell when the bot reaches it (`delay`
@@ -446,7 +471,7 @@ local function routeTo(
 	-- plans with the second try's margins, which the zone 6 round trip needs.)
 	loose = loose or bot.Trip ~= nil
 	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor * (if loose then LOOSE_SPEED else SAFE_SPEED)
-	local cart = BotEconomy.cartSize(bot.State)
+	local cart = cartOf(bot)
 	local limit = Config.Beach.WaistDepth - (if loose then LOOSE_MARGIN else DEPTH_MARGIN)
 	local options = {
 		slope = if cart then Config.Beach.Terrain.CartSlope else Config.Beach.Terrain.FootSlope,
@@ -653,8 +678,8 @@ end
 -- The field for a bot's kind of walker, built (and rebuilt when the layouts changed, or it is old
 -- enough that its picture of the sea runs short) in a thread of its own; the caller waits, in its
 -- own thread, until there is one.
-local function ensureField(bot: Bot)
-	local cart = BotEconomy.cartSize(bot.State)
+local function ensureField(bot: Bot, onFoot: boolean?)
+	local cart = if onFoot then nil else cartOf(bot)
 	local loose = bot.Trip ~= nil
 	local key = fieldKey(cart, loose)
 	local entry = fields[key]
@@ -705,7 +730,7 @@ local function goHome(bot: Bot): boolean
 		table.insert(path, { x = HOME.x, z = HOME.z })
 	else
 		-- Walled in from the field's point of view: the plain shortest way, if any.
-		local cart = BotEconomy.cartSize(bot.State)
+		local cart = cartOf(bot)
 		path = grid:find({ x = bot.X, z = math.max(bot.Z, 0) }, { x = HOME.x, z = 0 }, {
 			slope = if cart then Config.Beach.Terrain.CartSlope else Config.Beach.Terrain.FootSlope,
 			cart = cart,
@@ -774,7 +799,7 @@ local function tideSlack(bot: Bot): number
 	if Tide.getState(now()).Phase == "In" then
 		game *= 2
 	end
-	if #bot.Cargo > 0 then
+	if #bot.Cargo > 0 or bot.Hands then
 		game *= 1.5
 	end
 	return game / speedFactor
@@ -889,13 +914,28 @@ local function candidates(bot: Bot, entry: any, relaxed: boolean?): ({ any }, { 
 	local mine, others = {}, {}
 	local reserved = reservedItems(bot)
 	-- Zone 7 only while a sandbar trip is on (the channel shallow, a useful stay fits).
-	local plan = sandbarPlan(bot.State, entry, bot.X, bot.Z)
+	-- (A cart bot's plan is for its feet: it parks its cart at the channel and crosses alone.)
+	local cartBot = BotEconomy.cartSize(bot.State) ~= nil
+	local footEntry = if cartBot and not bot.Foot then ensureField(bot, true) else entry
+	local plan = sandbarPlan(bot.State, footEntry, bot.X, bot.Z)
 	bot.Plan = plan
-	local sandbarOpen = plan ~= nil and plan.Feasible and plan.Opens <= 0
+	if BotEconomy.lift(bot.State, BotEconomy.tool(bot.State)) >= Beach.FarSandbarZone then
+		local key = if not plan
+			then "SandNoPlan"
+			elseif not plan.Feasible then "SandShort"
+			elseif plan.Opens > 0 then "SandWaiting"
+			else "SandOpen"
+		searchStats[key] += 1
+	end
+	local sandbarOpen = bot.Foot == true
+		or (not cartBot and plan ~= nil and plan.Feasible and plan.Opens <= 0)
 	local sandbarZone = Beach.FarSandbarZone
 	local samples: { [number]: { any } } = {}
 	for item in ItemService.all() do
 		local zone = item:GetAttribute("Zone")
+		if bot.Foot and zone ~= sandbarZone then
+			continue -- (a shuttle is for the sandbar only)
+		end
 		if
 			zone == sandbarZone
 			and not sandbarOpen
@@ -972,7 +1012,7 @@ local function candidates(bot: Bot, entry: any, relaxed: boolean?): ({ any }, { 
 	-- uncovered count. A zone counts only if the bot can work it from where it is (zone 7: a
 	-- crossing, a useful stay and the way back fit in the channel's window), and its find is
 	-- weighted by the share of its free items that have a safe approach.
-	local coming = BotService.comingValue(bot, entry, plan, samples)
+	local coming = BotService.comingValue(bot, entry, plan, samples, footEntry)
 	bot.Coming = coming
 	local floor = if relaxed then 0 else SLOT_FLOOR * math.max(if n > 0 then sum / n else 0, coming)
 	local function worthASlot(list)
@@ -1041,7 +1081,8 @@ function BotService.comingValue(
 	bot: Bot,
 	entry: any,
 	plan: SandbarPlan?,
-	samples: { [number]: { any } }
+	samples: { [number]: { any } },
+	footEntry: any?
 ): number
 	local tide = Tide.getState()
 	local sandbarZone = Beach.FarSandbarZone
@@ -1080,7 +1121,7 @@ function BotService.comingValue(
 			end
 			if
 				approachFor(
-					entry,
+					if e.Zone == sandbarZone and footEntry then footEntry else entry,
 					position.X,
 					position.Z,
 					reach,
@@ -1257,7 +1298,7 @@ local function stagingPoint(bot: Bot): (number, number)
 	local plan = bot.Plan
 	local holdBack, atBank = false, false
 	if plan and not bot.Trip then
-		if plan.Feasible and plan.Opens <= 0 then
+		if plan.Feasible and plan.Opens <= 0 and BotEconomy.cartSize(bot.State) == nil then
 			-- (The channel is open and a stay fits: no holding back.)
 		elseif plan.Feasible and plan.Opens - plan.ToBank <= SAND_LEAD / speedFactor then
 			-- Time to be at the channel's shore side, as it opens.
@@ -1321,6 +1362,117 @@ end
 
 BotService.homeReason = homeReason -- for tools/tests
 
+-- The sandbar shuttle ---------------------------------------------------------------------------
+-- A wheeled cart can't climb the channel's banks (Config.Beach.Terrain.CartSlope), so a bot with one
+-- crosses alone: it parks the cart at the channel's shore side, walks over on foot, carries one item
+-- at a time back across to the cart and loads it, and comes back for the next while the channel is
+-- open (every pick-up needs the way home across the channel to stay open, as ever), then takes the
+-- cart on home. (A bot with no cart, or one that flies, just goes: no shuttle.)
+
+local function depositHands(bot: Bot)
+	local item = bot.Hands
+	bot.Hands = nil
+	if item and ItemService.isItem(item) then
+		table.insert(bot.Cargo, item)
+		ItemService.setInCart(item, bot.CartVessel, bot.OwnerId)
+	end
+	placeCart(bot)
+end
+
+local function endShuttle(bot: Bot)
+	if bot.Hands then
+		depositHands(bot)
+	end
+	bot.Foot = false
+	bot.Parked = nil
+	bot.ParkSpot = nil
+	bot.ShuttleAfter = now() + 20 / speedFactor
+	dropTrail(bot)
+	placeCart(bot)
+end
+
+-- At the channel's shore side as it opens, with free slots and sandbar finds about: park the cart.
+local function startShuttle(bot: Bot): boolean
+	if bot.Foot or bot.Trip or bot.Finished or not bot.Cart or (bot.ShuttleAfter or 0) > now() then
+		return false
+	end
+	if #bot.Cargo >= BotEconomy.capacity(bot.State) then
+		return false
+	end
+	local plan = sandbarPlan(bot.State, ensureField(bot, true), bot.X, bot.Z)
+	if not plan or not plan.Feasible or plan.Opens > 0 or bot.Z < plan.BankZ - 40 then
+		return false
+	end
+	local lift = BotEconomy.lift(bot.State, BotEconomy.tool(bot.State))
+	local t = now()
+	local found = false
+	for item in ItemService.all() do
+		if
+			item:GetAttribute("Zone") == Beach.FarSandbarZone
+			and ItemService.getState(item) == "Unclaimed"
+			and not item:GetAttribute("Unlock")
+			and Gear.canLift(lift, item:GetAttribute("Tier"))
+			and (not bot.Skip[item] or bot.Skip[item] < t)
+		then
+			found = true
+			break
+		end
+	end
+	if not found then
+		bot.ShuttleAfter = t + 10 / speedFactor
+		return false
+	end
+	bot.Parked = { CFrame = bot.Cart:GetPivot() }
+	bot.ParkSpot = { x = bot.X, z = bot.Z }
+	bot.Foot = true
+	if not bot.OnSandbar then
+		bot.OnSandbar = true
+		bot.Stats.SandbarTrips += 1
+	end
+	setStatus(bot, "crossing to the sandbar")
+	return true
+end
+
+local function decideShuttle(bot: Bot)
+	local spot = bot.ParkSpot
+	local near = (bot.X - spot.x) ^ 2 + (bot.Z - spot.z) ^ 2 < 64
+	local function toCart(mode: string): boolean
+		local path = routeTo(bot, spot.x, spot.z, 4)
+		if path then
+			setStatus(bot, if bot.Hands then "carrying it back to the cart" else "back to the cart")
+			beginPath(bot, path, mode)
+			return true
+		end
+		return false
+	end
+	if bot.Hands then
+		if near then
+			bot.Mode = "Claiming"
+			setStatus(bot, "loading")
+			later(bot, 0.5, function()
+				depositHands(bot)
+				bot.Mode = nil
+			end)
+			return
+		end
+		if not toCart("Deposit") then
+			goHome(bot) -- (no way back to the cart: home on foot, and the cart is fetched there)
+		end
+		return
+	end
+	if #bot.Cargo < BotEconomy.capacity(bot.State) and chooseTarget(bot) then
+		return
+	end
+	-- Nothing more to take over there (or the cart is full): back to the cart and on.
+	if near then
+		endShuttle(bot)
+		return
+	end
+	if not toCart("Unpark") then
+		goHome(bot)
+	end
+end
+
 function decide(bot: Bot)
 	bot.Target = nil
 	local pending = bot.Pending
@@ -1348,6 +1500,14 @@ function decide(bot: Bot)
 			end
 		end
 		bot.Skip[pending] = now() + 20 / speedFactor
+	end
+	if bot.Foot then
+		decideShuttle(bot)
+		return
+	end
+	if startShuttle(bot) then
+		decideShuttle(bot)
+		return
 	end
 	local capacity = BotEconomy.capacity(bot.State)
 	if #bot.Cargo < capacity and not bot.Finished then
@@ -1530,6 +1690,14 @@ local function loseLoad(bot: Bot)
 	end
 	bot.Stats.LostItems += #bot.Cargo
 	bot.Cargo = {}
+	if bot.Hands then
+		if ItemService.isItem(bot.Hands) then
+			ItemService.destroy(bot.Hands)
+		end
+		bot.Stats.LostItems += 1
+		bot.Hands = nil
+	end
+	bot.Foot, bot.Parked, bot.ParkSpot = false, nil, nil
 end
 
 local function die(bot: Bot)
@@ -1676,10 +1844,14 @@ local function arrive(bot: Bot)
 		end
 		bot.Mode = "Claiming"
 		later(bot, 0.5, function()
-			-- Into the cart (or the hands).
-			table.insert(bot.Cargo, item)
-			if bot.Cart then
-				ItemService.setInCart(item, bot.CartVessel, bot.OwnerId)
+			-- Into the cart (or the hands: one thing, or the one thing a shuttle carries back).
+			if bot.Foot then
+				bot.Hands = item
+			else
+				table.insert(bot.Cargo, item)
+				if bot.Cart then
+					ItemService.setInCart(item, bot.CartVessel, bot.OwnerId)
+				end
 			end
 			bot.GroundY = Beach.groundAt(bot.X, bot.Z)
 			placeCart(bot)
@@ -1687,7 +1859,29 @@ local function arrive(bot: Bot)
 				bot.Mode = nil
 			end)
 		end)
+	elseif mode == "Deposit" then
+		bot.Mode = "Claiming"
+		setStatus(bot, "loading")
+		later(bot, 0.5, function()
+			depositHands(bot)
+			bot.Mode = nil
+		end)
+	elseif mode == "Unpark" then
+		endShuttle(bot)
+		bot.Mode = nil
 	elseif mode == "Home" then
+		if bot.Foot then
+			-- (Came home on foot: the cart is fetched, and what's in the hands goes in with the rest.)
+			if bot.Hands then
+				table.insert(bot.Cargo, bot.Hands)
+				bot.Hands = nil
+			end
+			bot.Foot = false
+			bot.Parked = nil
+			bot.ParkSpot = nil
+			dropTrail(bot)
+			placeCart(bot)
+		end
 		bot.Mode = "Selling"
 		local count = #bot.Cargo
 		if count > 0 then
@@ -1906,6 +2100,11 @@ local function releaseCargo(bot: Bot)
 		end
 	end
 	bot.Cargo = {}
+	if bot.Hands and ItemService.isItem(bot.Hands) then
+		ItemService.setUnclaimed(bot.Hands, true)
+		ItemService.dropToGround(bot.Hands)
+	end
+	bot.Hands = nil
 	local target = bot.Target
 	bot.Target = nil
 	return target
@@ -2448,6 +2647,16 @@ function BotService.report(): { string }
 		)
 	)
 	local sr = snap.Searches
+	table.insert(
+		lines,
+		string.format(
+			"Tier 7 bots' decisions: %d without a sandbar plan, %d with too short a window, %d waiting for the channel, %d with it open",
+			sr.SandNoPlan,
+			sr.SandShort,
+			sr.SandWaiting,
+			sr.SandOpen
+		)
+	)
 	table.insert(
 		lines,
 		string.format(

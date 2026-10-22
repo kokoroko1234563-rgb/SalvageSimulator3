@@ -4005,6 +4005,29 @@ test("bot sandbar trip plan: waits for the channel to open and leaves before it 
 	workspace:SetAttribute(Tide.StartAttribute, saved)
 end)
 
+test(
+	"bot: a wheeled cart can't cross the channel to the Far Sandbar, a bot on foot can (the shuttle)",
+	function()
+		local Config = h.require("Shared/Config")
+		local Routes = h.require("Shared/Routes")
+		local grid = Routes.new()
+		local sandbar = Config.Beach.FarSandbar
+		local function field(cart)
+			return grid:buildField({
+				goals = { { x = 90, z = 0 } },
+				goalRadius = 8,
+				speed = 10,
+				slope = if cart then Config.Beach.Terrain.CartSlope else Config.Beach.Terrain.FootSlope,
+				cart = cart,
+			})
+		end
+		local foot, cart = field(nil), field("Small")
+		assert(foot:slack(0, sandbar.ChannelEnd + 8), "on foot the sandbar has a way home")
+		assert(cart:slack(0, sandbar.ChannelStart - 12), "a cart gets to the channel's shore side")
+		assert(cart:slack(0, sandbar.ChannelEnd + 8) == nil, "a wheeled cart has no way across the channel")
+	end
+)
+
 test("bot home field: distances, unreachable pockets, closing times, and the way down it", function()
 	local Beach = h.require("Shared/Beach")
 	local Config = h.require("Shared/Config")
