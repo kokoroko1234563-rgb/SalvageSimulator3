@@ -231,28 +231,38 @@ def write_report():
             for name, res in extra.items():
                 x, tag = name.split("_", 1)
                 groups.setdefault((re.sub(r"\d+$", "", tag), int(x)), []).append(res)
-            lines.append("Repeated runs, by tag (mean and range over the repeats):")
+            lines.append("Repeated runs, by tag (the bots of all the repeats pooled, or the repeats' mean and range):")
             lines.append("")
-            lines.append("| tag | X | runs | coins/h per bot | server total coins/h | tide deaths per run | claimed per run | gear at the end (bots per run) |")
-            lines.append("|---|---|---|---|---|---|---|---|")
+            lines.append("| tag | X | runs | coins/h per bot: mean / median / min / max | server total coins/h (mean, range) | thinking % of game time | tide deaths per run | worst frame ms: Heartbeat / bot work | water items taken / skipped | gear at the end (bots per run) |")
+            lines.append("|---|---|---|---|---|---|---|---|---|---|")
             for (tag, x), runs in sorted(groups.items()):
-                per_bot, total, deaths, claimed, gear = [], [], [], [], {}
+                rates, total, deaths, gear = [], [], [], {}
+                think, beat, work, taken, skipped = [], 0, 0, 0, 0
                 for res in runs:
                     bots = res["snapshot"]["Bots"]
                     hours = sum(b["GameSeconds"] for b in bots) / len(bots) / 3600
-                    coins = sum(b["Coins"] for b in bots)
-                    per_bot.append(coins / len(bots) / hours)
-                    total.append(coins / hours)
+                    total.append(sum(b["Coins"] for b in bots) / hours)
+                    rates.extend(b["Coins"] / (b["GameSeconds"] / 3600) for b in bots)
                     deaths.append(sum(b["Deaths"] for b in bots))
-                    claimed.append(res["snapshot"]["Server"]["Claimed"])
+                    think.append(100 * sum(b.get("ThinkingGameSeconds", 0) for b in bots) / sum(b["GameSeconds"] for b in bots))
+                    frames = res["snapshot"].get("Frames") or {}
+                    beat = max(beat, 1000 * frames.get("MaxDt", 0))
+                    work = max(work, 1000 * frames.get("MaxWork", 0))
+                    searches = res["snapshot"].get("Searches") or {}
+                    taken += searches.get("WaterTaken", 0)
+                    skipped += searches.get("WaterSkipped", 0)
                     for b in bots:
                         key = f"{b['Gear']['Tool']}+{b['Gear'].get('Vessel') or 'hands'}"
                         gear[key] = gear.get(key, 0) + 1
+                rates.sort()
+                median = rates[len(rates) // 2] if len(rates) % 2 else (rates[len(rates) // 2 - 1] + rates[len(rates) // 2]) / 2
 
                 def span(v):
                     return f"{sum(v) / len(v):,.0f} ({min(v):,.0f} to {max(v):,.0f})"
-                mix = ", ".join(f"{k} {n / len(runs):.1f}" for k, n in sorted(gear.items(), key=lambda kv: -kv[1])[:5])
-                lines.append(f"| {tag} | {x} | {len(runs)} | {span(per_bot)} | {span(total)} | {span(deaths)} | {span(claimed)} | {mix} |")
+                mix = ", ".join(f"{k} {n / len(runs):.1f}" for k, n in sorted(gear.items(), key=lambda kv: -kv[1])[:6])
+                lines.append(f"| {tag} | {x} | {len(runs)} | {sum(rates) / len(rates):,.0f} / {median:,.0f} / {rates[0]:,.0f} / {rates[-1]:,.0f} | "
+                             f"{span(total)} | {sum(think) / len(think):.1f} | {sum(deaths) / len(deaths):.1f} ({min(deaths)} to {max(deaths)}) | "
+                             f"{beat:.0f} / {work:.0f} | {taken} / {skipped} | {mix} |")
             lines.append("")
         first = {}
         for path in glob.glob(os.path.join(OUT, "first_sweep", "x*.json")):

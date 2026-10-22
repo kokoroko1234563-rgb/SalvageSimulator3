@@ -535,13 +535,20 @@ local function makeClosing(t0: number, limit: number)
 			lowest = math.min(lowest, value)
 			pmin[i + 1] = lowest
 		end
+		-- (The tide's curve can wobble a little on its way, so the peak is the highest the sea gets
+		-- in the next cycle, and the trough the lowest after it.)
+		local cycle = math.floor(BotEconomy.CycleSeconds / FIELD_SAMPLE)
 		local peak = 0
-		while peak < n and raw[peak + 2] >= raw[peak + 1] do
-			peak += 1
+		for i = 0, math.min(cycle, n) do
+			if raw[i + 1] >= raw[peak + 1] then
+				peak = i
+			end
 		end
 		local trough = peak
-		while trough < n and raw[trough + 2] <= raw[trough + 1] do
-			trough += 1
+		for i = peak, math.min(peak + cycle, n) do
+			if raw[i + 1] <= raw[trough + 1] then
+				trough = i
+			end
 		end
 		return { Raw = raw, Min = pmin, Peak = peak, Trough = trough }
 	end
@@ -591,6 +598,8 @@ local function makeClosing(t0: number, limit: number)
 		return (hi - 1) * dt
 	end
 end
+
+BotService._closing = makeClosing -- for tools/tests
 
 local function fieldKey(cart: string?, loose: boolean): string
 	return (cart or "foot") .. (if loose then ":trip" else "")
@@ -1071,12 +1080,15 @@ function decide(bot: Bot)
 				)
 				if bot.Trip then
 					bot.Trip.Diag = string.format(
-						"%s, back %s (tide %s %.0f%%)",
+						"%s, back %s (tide %s %.0f%%), slack %s, needed %.0f",
 						bot.Trip.Diag,
 						tostring(back),
 						Tide.getState(t).Phase,
-						Tide.getState(t).PhaseProgress * 100
+						Tide.getState(t).PhaseProgress * 100,
+						tostring(entry.Field:slack(last.x, math.max(last.z, 0))),
+						now() - entry.T0 + (outLength or 0) / walk
 					)
+					bot.Trip.First = bot.Trip.First or bot.Trip.Diag
 				end
 				if back then
 					setStatus(bot, "walking out")

@@ -88,6 +88,7 @@ local result = {
 			earned = trip.Earned or 0,
 			items = trip.Items or 0,
 			diag = trip.Diag,
+			first = trip.First,
 			gameSeconds = if trip.EndedAt then (trip.EndedAt - trip.StartedAt) * (JOB.speed or 1) else nil,
 			baseCost = Config.Rebirth.BaseCost,
 		}
