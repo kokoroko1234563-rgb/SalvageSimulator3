@@ -3996,7 +3996,9 @@ test("bot sandbar trip plan: waits for the channel to open and leaves before it 
 	-- Its staging point, held back to the shore side of the channel, is on the near side.
 	local _, z = BotService.stagingFor(state, -10, 10, 0, 500, nil, true)
 	assert(z < sandbar.ChannelStart, "a tier 7 bot holds back at the zone 6 edge (z " .. z .. ")")
-	local _, atBank = BotService.stagingFor(state, -10, 10, 0, 500, nil, true, true)
+	-- Low tide, window open: it follows the waterline to the bank, no further.
+	workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("Hold", 0.5))
+	local _, atBank = BotService.stagingFor(state, -10, 10, 0, 3300, nil, true, true)
 	assert(atBank >= plan.BankZ - 8 and atBank < sandbar.ChannelStart, "at the bank when the window nears")
 	-- A deadline that comes before the channel can be crossed and worked: no trip.
 	closesIn = plan.Opens

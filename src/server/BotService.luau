@@ -811,7 +811,7 @@ end
 -- tier 7 bot plans for that window: it waits at the zone 6 edge until the channel opens, crosses,
 -- works, and leaves with margin so it is back across before the channel deepens again.
 local SAND_MIN_STAY = 60 -- game seconds on the sandbar that make a trip worth the crossing
-local SAND_LEAD = 45 -- game seconds before the channel opens that a bot should be at its bank
+local SAND_LEAD = 90 -- game seconds spare, over the walk to its bank, that a bot gives up other work and follows the tide there
 local SAND_BANK = 12 -- studs short of the channel where a bot waits for it to open
 local SAND_SAMPLE = 5 -- game seconds between samples of the channel's depth
 local channelCache: { [number]: { At: number, Start: number, Opens: number? } } = {}
@@ -858,7 +858,13 @@ export type SandbarPlan = {
 -- The plan for a sandbar trip from (fromX, fromZ), or nil if the bot's tool doesn't work zone 7 or
 -- there is no window. `entry` is the way-home field's entry: its slack at the sandbar's near edge
 -- is the latest moment the bot may be there and still get home across the channel.
-local function sandbarPlan(state: any, entry: any, fromX: number, fromZ: number): SandbarPlan?
+local function sandbarPlan(
+	state: any,
+	entry: any,
+	fromX: number,
+	fromZ: number,
+	cartEntry: any?
+): SandbarPlan?
 	local zone = Beach.FarSandbarZone
 	if BotEconomy.lift(state, BotEconomy.tool(state)) < zone then
 		return nil
@@ -876,7 +882,18 @@ local function sandbarPlan(state: any, entry: any, fromX: number, fromZ: number)
 	end
 	local speed = BotEconomy.walkSpeed(state) * speedFactor * SAFE_SPEED
 	local bankZ = sandbar.ChannelStart - SAND_BANK
-	local toBank = math.max(bankZ - fromZ, 0) * BotEconomy.MazeFactor / speed
+	-- (The way out is dry ground ahead of the tide, not the slow wade the other plans assume.)
+	local bankSpeed = BotEconomy.walkSpeed(state) * speedFactor * 0.9
+	local toBank = math.max(bankZ - fromZ, 0) * BotEconomy.MazeFactor / bankSpeed
+	if cartEntry then
+		-- (A cart goes by the zones' paths, which are longer than the straight line: the cart field's
+		-- way home from the bank, less the bot's own, is the walk there.)
+		local dBank = cartEntry.Field:distance(x, bankZ)
+		local dBot = cartEntry.Field:distance(fromX, math.max(fromZ, 0))
+		if dBank and dBot then
+			toBank = math.max(dBank - dBot, 0) / bankSpeed
+		end
+	end
 	local crossing = (sandbar.ChannelEnd - sandbar.ChannelStart + 16) / speed
 	local arrive = math.max(t + toBank, opensAt) + crossing
 	local leaveBy = entry.T0 + slack - TIDE_SLACK * 1.5 / speedFactor
@@ -917,7 +934,8 @@ local function candidates(bot: Bot, entry: any, relaxed: boolean?): ({ any }, { 
 	-- (A cart bot's plan is for its feet: it parks its cart at the channel and crosses alone.)
 	local cartBot = BotEconomy.cartSize(bot.State) ~= nil
 	local footEntry = if cartBot and not bot.Foot then ensureField(bot, true) else entry
-	local plan = sandbarPlan(bot.State, footEntry, bot.X, bot.Z)
+	local plan =
+		sandbarPlan(bot.State, footEntry, bot.X, bot.Z, if cartBot and not bot.Foot then entry else nil)
 	bot.Plan = plan
 	if BotEconomy.lift(bot.State, BotEconomy.tool(bot.State)) >= Beach.FarSandbarZone then
 		local key = if not plan
@@ -1266,9 +1284,6 @@ local function stagingFor(
 		local z0, z1 = Beach.zoneRange(tripZone)
 		top, bottom = z0 + 10, math.min(bottom, z1 - 20)
 	end
-	if atBank then
-		z = bottom
-	end
 	z = math.clamp(z, top, bottom)
 	-- Not inside a wall: the nearest open ground.
 	local col, row = grid:cellOf(x, z)
@@ -1473,6 +1488,35 @@ local function decideShuttle(bot: Bot)
 	end
 end
 
+-- Whether a bot should drop what it is doing and be at the channel's shore side as it opens: its tool
+-- works zone 7, a useful stay fits from where it is, it has room for what it would bring back, and
+-- it is time to set off (the walk to the bank takes it there as the channel opens).
+local function headForBank(bot: Bot): boolean
+	if bot.Foot or bot.Trip or bot.Finished then
+		return false
+	end
+	if BotEconomy.lift(bot.State, BotEconomy.tool(bot.State)) < Beach.FarSandbarZone then
+		return false
+	end
+	local capacity = BotEconomy.capacity(bot.State)
+	if capacity - #bot.Cargo < math.max(2, capacity // 3) and capacity > 1 then
+		return false
+	end
+	local cartBot = BotEconomy.cartSize(bot.State) ~= nil
+	local plan = sandbarPlan(
+		bot.State,
+		ensureField(bot, cartBot),
+		bot.X,
+		bot.Z,
+		if cartBot then ensureField(bot) else nil
+	)
+	bot.Plan = plan
+	return plan ~= nil
+		and plan.Feasible
+		and plan.Opens - plan.ToBank <= SAND_LEAD / speedFactor
+		and bot.Z < plan.BankZ - 40
+end
+
 function decide(bot: Bot)
 	bot.Target = nil
 	local pending = bot.Pending
@@ -1510,7 +1554,10 @@ function decide(bot: Bot)
 		return
 	end
 	local capacity = BotEconomy.capacity(bot.State)
-	if #bot.Cargo < capacity and not bot.Finished then
+	-- A sandbar trip is planned: time to be at the channel's shore side as it opens, so no new
+	-- targets (the staging below walks there).
+	local bankBound = headForBank(bot)
+	if #bot.Cargo < capacity and not bot.Finished and not bankBound then
 		if chooseTarget(bot) then
 			return
 		end
@@ -1534,7 +1581,8 @@ function decide(bot: Bot)
 	-- otherwise wait where it's safe.
 	if not bot.Finished then
 		local sx, sz = stagingPoint(bot)
-		if math.sqrt((sx - bot.X) ^ 2 + (sz - bot.Z) ^ 2) > 40 then
+		-- Walks toward a staging point if there's a way there that stays open on the way back.
+		local function stageAt(sx: number, sz: number): boolean
 			-- (The trip bot sets out once the tide is well on its way out, so it trails the waterline
 			-- all the way: its outbound leg needn't look at the water.)
 			local state = Tide.getState(t)
@@ -1585,6 +1633,24 @@ function decide(bot: Bot)
 				if back then
 					setStatus(bot, "walking out")
 					beginPath(bot, out, "Stage")
+					return true
+				end
+			end
+			return false
+		end
+		if math.sqrt((sx - bot.X) ^ 2 + (sz - bot.Z) ^ 2) > 40 then
+			if stageAt(sx, sz) then
+				return
+			end
+			-- (No safe way to all the way there, a long walk after a tide that outruns the bot: a
+			-- nearer point on the way, rather than giving up and going home.)
+			for _, fraction in { 0.6, 0.3 } do
+				local tx, tz = bot.X + (sx - bot.X) * fraction, bot.Z + (sz - bot.Z) * fraction
+				if
+					not bot.Trip
+					and math.sqrt((tx - bot.X) ^ 2 + (tz - bot.Z) ^ 2) > 40
+					and stageAt(tx, tz)
+				then
 					return
 				end
 			end
