@@ -61,6 +61,20 @@ rule), `src/shared/Routes.luau` (walkable routes), `tools/bots/` (the sweep).
   target and max rate grow linearly with the players on the server, bots counted, to Scale times a solo
   server's (`spawning.md`). `--scale` on the sweep sets Scale.
 
+- **Cheap planning.** One flood outward from the sell pad over the route grid (`Routes.buildField`, one per
+  kind of walker: on foot, or each cart size in use) gives every cell its distance home, the way home
+  itself, and the latest moment a walker may be there and still get home before the sea closes the way
+  (from the tide's own curve, with the tight margins). "Is the way back open from here" and "how far home"
+  are lookups; going home follows the field; the way out from the pad is the way home reversed. A bot
+  scores candidates by straight-line distance and the field, and runs one real search, only when it
+  starts from somewhere other than the pad. Thinking is time-sliced (see below) and counted:
+  `ThinkingGameSeconds` per bot, search nodes per game minute server-wide.
+- **Water.** An item in the water is claimed from a safe spot within the tool's reach (plus the server's
+  slack, less a little), never by wading to it: the spot must stay safe for the walk there, the grab and
+  load, the way home and the tide margin. With no such spot the item is skipped. Staging never goes past
+  the furthest zone the tool works (its tier, Strong Back included), so nothing without a tier 7 tool
+  goes to the Far Sandbar or the channel.
+
 ## One buying rule, for every bot
 
 1. Rebirth as soon as it can be afforded, taking the reward after which its estimated income is highest.
