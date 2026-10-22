@@ -789,7 +789,7 @@ local SAND_MIN_STAY = 60 -- game seconds on the sandbar that make a trip worth t
 local SAND_LEAD = 45 -- game seconds before the channel opens that a bot should be at its bank
 local SAND_BANK = 12 -- studs short of the channel where a bot waits for it to open
 local SAND_SAMPLE = 5 -- game seconds between samples of the channel's depth
-local channelCache: { [number]: { At: number, Opens: number? } } = {}
+local channelCache: { [number]: { At: number, Start: number, Opens: number? } } = {}
 
 -- When the channel at X is next shallow enough to cross (water no deeper than the bots' route limit
 -- at its deepest point): an absolute time, now if it is already, nil if not within a cycle.
@@ -797,7 +797,7 @@ local function channelOpens(x: number): number?
 	local bucket = math.floor(x / 40)
 	local t = now()
 	local hit = channelCache[bucket]
-	if hit and t - hit.At < 20 / speedFactor then
+	if hit and hit.Start == Tide.cycleStart() and t - hit.At < 20 / speedFactor then
 		return hit.Opens
 	end
 	local sandbar = Config.Beach.FarSandbar
@@ -815,7 +815,7 @@ local function channelOpens(x: number): number?
 			break
 		end
 	end
-	channelCache[bucket] = { At = t, Opens = opens }
+	channelCache[bucket] = { At = t, Start = Tide.cycleStart(), Opens = opens }
 	return opens
 end
 
@@ -857,7 +857,7 @@ local function sandbarPlan(state: any, entry: any, fromX: number, fromZ: number)
 	local leaveBy = entry.T0 + slack - TIDE_SLACK * 1.5 / speedFactor
 	local stay = leaveBy - arrive
 	return {
-		Opens = math.max(opensAt - t, 0),
+		Opens = if opensAt - t < 1 / speedFactor then 0 else opensAt - t, -- (a second off is open)
 		Arrive = arrive - t,
 		LeaveBy = leaveBy - t,
 		Stay = stay,
@@ -1318,6 +1318,8 @@ local function homeReason(bot: Bot, entry: any): string?
 	end
 	return nil
 end
+
+BotService.homeReason = homeReason -- for tools/tests
 
 function decide(bot: Bot)
 	bot.Target = nil

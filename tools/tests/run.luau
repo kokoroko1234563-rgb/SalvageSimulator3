@@ -3849,6 +3849,162 @@ test("bot staging stays inside the furthest zone the tool works, even at low tid
 	workspace:SetAttribute(Tide.StartAttribute, saved)
 end)
 
+test(
+	"bot with free slots and no candidate keeps working: home only when full, forced, or nothing left",
+	function()
+		local Tide = h.require("Shared/Tide")
+		local Economy = h.require("Server/BotEconomy")
+		local BotService = h.require("Server/BotService")
+		local workspace = h.game.Workspace
+		local saved = workspace:GetAttribute(Tide.StartAttribute)
+		local state = Economy.newState()
+		state.Vessels.Wheelbarrow = true
+		local capacity = Economy.capacity(state)
+		assert(capacity >= 4, "a cart that holds more than two")
+		local function item(value)
+			return {
+				GetAttribute = function()
+					return value
+				end,
+			}
+		end
+		local function bot(count, coming)
+			local cargo = {}
+			for _ = 1, count do
+				table.insert(cargo, item(500))
+			end
+			return { State = state, Cargo = cargo, X = 0, Z = 800, Coming = coming }
+		end
+		local function entry(secondsLeft)
+			return {
+				T0 = Tide.now(),
+				Field = {
+					slack = function()
+						return secondsLeft
+					end,
+				},
+			}
+		end
+		-- The sea going out, two of the cart's slots taken, nothing worth taking: it stays out.
+		workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("Out", 0.3))
+		assert(
+			BotService.homeReason(bot(2, 3000), entry(1e6)) == nil,
+			"free slots, nothing to take, the tide going out: keep working"
+		)
+		assert(
+			BotService.homeReason(bot(2, 0), entry(1e6)) == nil,
+			"even with nothing in sight to come (the sea is still going out)"
+		)
+		assert(BotService.homeReason(bot(capacity, 3000), entry(1e6)) == "Full", "a full cart goes home")
+		assert(BotService.homeReason(bot(2, 3000), entry(20)) == "Tide", "the way home's deadline is near")
+		-- The tide coming in: nothing left to come that beats the bar for a slot sends it home; a zone
+		-- still uncovered that does keeps it out.
+		workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("In", 0.3))
+		assert(
+			BotService.homeReason(bot(2, 0), entry(1e6)) == "Nothing",
+			"the tide is in and nothing is left"
+		)
+		assert(
+			BotService.homeReason(bot(2, 100), entry(1e6)) == "Nothing",
+			"what is left is below the bar (30% of what it carries)"
+		)
+		assert(
+			BotService.homeReason(bot(2, 3000), entry(1e6)) == nil,
+			"something worth a slot is still uncovered"
+		)
+		workspace:SetAttribute(Tide.StartAttribute, saved)
+	end
+)
+
+test("bot: the sandbar counts as coming only when a crossing, a stay and the way back fit", function()
+	local Beach = h.require("Shared/Beach")
+	local Tide = h.require("Shared/Tide")
+	local Economy = h.require("Server/BotEconomy")
+	local BotService = h.require("Server/BotService")
+	local workspace = h.game.Workspace
+	local saved = workspace:GetAttribute(Tide.StartAttribute)
+	local state = Economy.newState()
+	state.Tools.ElectricWinch = true
+	state.Vessels.Wheelbarrow = true
+	assert(Economy.lift(state, Economy.tool(state)) == 7, "a tier 7 tool")
+	local function entry(secondsLeft)
+		return {
+			T0 = Tide.now(),
+			Field = {
+				slack = function()
+					return secondsLeft
+				end,
+			},
+		}
+	end
+	local bot = { State = state, Cargo = {}, X = 0, Z = 3000 }
+	-- Low tide: the channel is open now.
+	workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("Hold", 0.2))
+	local roomy = entry(1000)
+	local plan = BotService.sandbarPlan(state, roomy, bot.X, bot.Z)
+	assert(plan and plan.Opens <= 0 and plan.Feasible, "the channel is open and a stay fits")
+	local lying = {}
+	for k = 1, 8 do
+		table.insert(lying, { Position = roblox.Vector3.new(k * 6, 0, Beach.zoneRange(7) + 60) })
+	end
+	local withSandbar = BotService.comingValue(bot, roomy, plan, { [7] = lying })
+	assert(withSandbar > Economy.findValue(state, 6), "zone 7's find sets the bar when it can be worked")
+	-- The same moment, but the way home across the channel closes too soon for a crossing, a stay
+	-- of a minute and the margin: zone 7 is out.
+	local tight = entry(plan.Arrive + 20)
+	local short = BotService.sandbarPlan(state, tight, bot.X, bot.Z)
+	assert(short and not short.Feasible, "no useful stay fits")
+	local without = BotService.comingValue(bot, tight, short, {})
+	assert(without <= Economy.findValue(state, 6) + 1e-6, "zone 7 is excluded from what is coming")
+	assert(without > 0 and without < withSandbar, "the other zones still count")
+	assert(
+		BotService.comingValue(bot, tight, nil, {}) == without,
+		"no plan at all is the same as an infeasible one"
+	)
+	-- A tool short of tier 7 never has a plan.
+	local lower = Economy.newState()
+	lower.Tools.HandWinch = true
+	assert(BotService.sandbarPlan(lower, roomy, 0, 3000) == nil, "a tier 6 tool has no sandbar plan")
+	workspace:SetAttribute(Tide.StartAttribute, saved)
+	assert(Beach.FarSandbarZone == 7, "zone 7 is the sandbar")
+end)
+
+test("bot sandbar trip plan: waits for the channel to open and leaves before it closes", function()
+	local Config = h.require("Shared/Config")
+	local Tide = h.require("Shared/Tide")
+	local Economy = h.require("Server/BotEconomy")
+	local BotService = h.require("Server/BotService")
+	local workspace = h.game.Workspace
+	local saved = workspace:GetAttribute(Tide.StartAttribute)
+	local state = Economy.newState()
+	state.Tools.ElectricWinch = true
+	local sandbar = Config.Beach.FarSandbar
+	-- The sea is still going out: the channel is too deep to cross, so the plan has it open later.
+	workspace:SetAttribute(Tide.StartAttribute, Tide.startFor("Out", 0.5))
+	local closesIn = 700 -- the field's deadline for being across: seconds from now
+	local entry = { T0 = Tide.now(), Field = {
+		slack = function()
+			return closesIn
+		end,
+	} }
+	local plan = BotService.sandbarPlan(state, entry, 0, 500)
+	assert(plan and plan.Opens > 0, "the channel opens later")
+	assert(plan.Arrive >= plan.Opens, "it crosses only once the channel is open")
+	assert(plan.LeaveBy < closesIn, "it leaves with a margin, before the way home closes")
+	assert(plan.Arrive < plan.LeaveBy == plan.Feasible or plan.Stay < 60, "a stay is only planned if it fits")
+	assert(plan.BankZ < sandbar.ChannelStart, "it waits on the near side of the channel")
+	-- Its staging point, held back to the shore side of the channel, is on the near side.
+	local _, z = BotService.stagingFor(state, -10, 10, 0, 500, nil, true)
+	assert(z < sandbar.ChannelStart, "a tier 7 bot holds back at the zone 6 edge (z " .. z .. ")")
+	local _, atBank = BotService.stagingFor(state, -10, 10, 0, 500, nil, true, true)
+	assert(atBank >= plan.BankZ - 8 and atBank < sandbar.ChannelStart, "at the bank when the window nears")
+	-- A deadline that comes before the channel can be crossed and worked: no trip.
+	closesIn = plan.Opens
+	local late = BotService.sandbarPlan(state, entry, 0, 500)
+	assert(late and not late.Feasible and late.LeaveBy < late.Arrive, "it would not be back across in time")
+	workspace:SetAttribute(Tide.StartAttribute, saved)
+end)
+
 test("bot home field: distances, unreachable pockets, closing times, and the way down it", function()
 	local Beach = h.require("Shared/Beach")
 	local Config = h.require("Shared/Config")
