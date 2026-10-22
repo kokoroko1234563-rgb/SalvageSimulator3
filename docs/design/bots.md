@@ -15,6 +15,16 @@ rule), `src/shared/Routes.luau` (walkable routes), `tools/bots/` (the sweep).
   same colour, is anchored too and trails it along its own track; what it carries rides in the cart
   (in the hands, one thing, until it owns a vessel). Twenty distinct colours are in `BotService.Colors`.
 - **Cart slots are worth something.** A bot skips items worth under 30% (`SLOT_FLOOR` in BotService) of the more of: the average of the best finds its free slots could hold (anywhere it can reach), and the average find in the best zone its tool works that the tide will still uncover this tide (`BotEconomy.findValue`; while the sea goes out or is low that's every zone the tool works, once it comes in only those still uncovered). So cheap shore finds don't fill the cart on the way out, even before the better ones have washed up.
+  A zone counts only if the bot can work it this tide from where it stands: zone 7 (the Far Sandbar) only
+  while a crossing, a stay of at least 60 game seconds and the way back fit in the channel's window
+  (see "The Far Sandbar" below), and each zone's find is weighted by the share of a sample of its free
+  items that have a safe approach.
+- **Free slots keep a bot out.** With free slots and nothing worth taking, a bot waits at the best zone
+  it can work that the tide is uncovering (never past its tool's zones). It sets off home only when the
+  cart is full, the tide forces it (the way home's deadline, less its margin, is near), or the tide is in
+  and no zone still uncovered offers more than the bar for a slot, against what it carries. Before
+  heading home with free slots it takes any last item that is safe. `bots report` counts why bots set
+  off home and the mean load (items over capacity) when they did.
 - **Real motions.** Walks out with the tide (waits just landward of the waterline, following it out and back in again, so the incoming tide is still worked),
   walks to an item, claims it, loads it, walks back, sells at the buyer, walks to the shopkeeper to buy
   gear or rebirth.
@@ -76,6 +86,18 @@ rule), `src/shared/Routes.luau` (walkable routes), `tools/bots/` (the sweep).
   the furthest zone the tool works (its tier, Strong Back included), so nothing without a tier 7 tool
   goes to the Far Sandbar or the channel.
 
+## The Far Sandbar
+
+Zone 7 lies across a channel that is shallow enough to cross (water at most waist depth less 1 stud at its
+deepest) for only about 300 s of a 1,500 s tide, around low tide. A bot whose tool works zone 7 plans for that
+window (`sandbarPlan`): it waits at the zone 6 edge (12 studs short of the channel) rather than past it, goes to
+the channel's shore side so as to be there as it opens (`SAND_LEAD`), crosses once it is open, works, and
+leaves by the way-home field's deadline for the far side (the slack at the sandbar's near edge, less 1.5 times
+the usual margin), so it is back across before the channel deepens. Zone 7's items are candidates only while the
+channel is open and a stay of 60 game seconds fits, and the general rules (safe approach, way home open with
+slack) still decide each item. `bots report` counts sandbar trips per bot (a trip: a bot that takes a zone 7
+item after its last sale).
+
 ## One buying rule, for every bot
 
 1. Rebirth as soon as it can be afforded, taking the reward after which its estimated income is highest.
@@ -105,6 +127,8 @@ traders and Robux are out of scope.
 - **lost to bot**: it was heading for an item and another bot claimed it first. **lost other**: the
   item was taken by a player or despawned first.
 - **idle %**: share of time with status "waiting for the tide" (nothing to take and nowhere to walk).
+- **home load %**: mean of items over capacity when a bot sets off home with a load. **sandbar trips**: see
+  above. The server line counts set-offs home by reason (full cart, tide forced it, nothing left).
 - **deaths / lost loads**: times swept away by the sea, and how many of them lost a carried load.
 - Server-wide (`ItemService.stats`): items spawned (surf, open sand and loot spots, and the count per zone), items claimed, items that
   despawned unclaimed (timed out, drowned or lost), and how many spawn ticks found every zone
@@ -120,7 +144,11 @@ python3 tools/bots/sweep.py                         X = 1, 2, 4, 8, 12, 16, 20 a
 python3 tools/bots/sweep.py --xs 1,8 --speed 10
 python3 tools/bots/sweep.py --final-trip
 python3 tools/bots/sweep.py --report-only
+python3 tools/bots/sweep.py --xs 20 --speed 3 --scale 3 --chain 5 --gear ElectricWinch,QuadBike --gear-bots 10
 ```
+
+`--gear` (tool and vessel ids) gives the first `--gear-bots` bots (default half) that gear from the start, so
+tier 7 bots can make sandbar trips without first earning it.
 
 It publishes the build to the Test Range and runs `tools/bots/task.luau` once per X through Open Cloud's
 Luau Execution (300 s limit per task, so 250 s of play by default). `--speed` is the one factor that
