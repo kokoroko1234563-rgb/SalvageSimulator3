@@ -170,6 +170,13 @@ local function zoneYield(z: number, lift: number): (number, number)
 	return value, chance
 end
 
+-- The average worth of one find in zone `z` (as its Value attribute shows it: the zone's
+-- multiplier, not the rebirth's) for a bot with this gear; 0 if its tool doesn't work the zone.
+function BotEconomy.findValue(state: State, z: number): number
+	local value, chance = zoneYield(z, BotEconomy.lift(state, BotEconomy.tool(state)))
+	return if chance > 0 then value / chance else 0
+end
+
 -- Estimated coins a tide brings in with this gear (coins as paid, with the rebirth multiplier).
 -- The tide works through the zones one after another, and a tool works every zone up to its
 -- tier, so the estimate adds up what each of those zones brings in while the waterline is there.

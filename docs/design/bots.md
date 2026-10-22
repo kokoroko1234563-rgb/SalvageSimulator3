@@ -14,7 +14,7 @@ rule), `src/shared/Routes.luau` (walkable routes), `tools/bots/` (the sweep).
   (16 studs/s, slowed by water as `Beach.wading` says, times the sweep's speed factor). Its cart, in the
   same colour, is anchored too and trails it along its own track; what it carries rides in the cart
   (in the hands, one thing, until it owns a vessel). Twenty distinct colours are in `BotService.Colors`.
-- **Cart slots are worth something.** A bot skips items worth under 30% of the average of the best finds its free slots could hold (anywhere it can reach), so cheap shore finds don't fill the cart on the way out; with nothing better about, the bar drops by itself (`SLOT_FLOOR` in BotService).
+- **Cart slots are worth something.** A bot skips items worth under 30% (`SLOT_FLOOR` in BotService) of the more of: the average of the best finds its free slots could hold (anywhere it can reach), and the average find in the best zone its tool works that the tide will still uncover this tide (`BotEconomy.findValue`; while the sea goes out or is low that's every zone the tool works, once it comes in only those still uncovered). So cheap shore finds don't fill the cart on the way out, even before the better ones have washed up.
 - **Real motions.** Walks out with the tide (waits just landward of the waterline, following it out and back in again, so the incoming tide is still worked),
   walks to an item, claims it, loads it, walks back, sells at the buyer, walks to the shopkeeper to buy
   gear or rebirth.

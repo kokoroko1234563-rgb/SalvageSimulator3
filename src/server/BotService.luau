@@ -816,8 +816,9 @@ local function candidates(bot: Bot, entry: any): ({ any }, { any })
 		end
 	end
 	-- A cart slot is worth something: skip what's worth much less than the best finds the free
-	-- slots could hold, anywhere the bot can reach (so cheap things by the shore don't fill the
-	-- cart on the way out to better ones; with nothing better about, the bar drops by itself).
+	-- slots could hold, anywhere the bot can reach, or than a find in the best zone the tide will
+	-- still uncover for its tool (so cheap things by the shore don't fill the cart on the way out
+	-- to better ones, even before those have washed up).
 	local free = math.max(1, BotEconomy.capacity(bot.State) - #bot.Cargo)
 	local values = {}
 	for _, list in { mine, others } do
@@ -832,7 +833,18 @@ local function candidates(bot: Bot, entry: any): ({ any }, { any })
 	for i = 1, n do
 		sum += values[i]
 	end
-	local floor = if n > 0 then SLOT_FLOOR * sum / n else 0
+	-- And what's still to come this tide: while the sea is going out (or low) every zone the
+	-- tool works will be uncovered, so a slot is worth a find from the best of them even before
+	-- anything lies there; once it comes in, only the zones still uncovered count.
+	local coming = 0
+	local tide = Tide.getState()
+	for z = 1, #Config.Zones do
+		local z0 = Beach.zoneRange(z)
+		if tide.Phase ~= "In" or z0 < tide.Waterline then
+			coming = math.max(coming, BotEconomy.findValue(bot.State, z))
+		end
+	end
+	local floor = SLOT_FLOOR * math.max(if n > 0 then sum / n else 0, coming)
 	local function worthASlot(list)
 		local kept = {}
 		for _, entry in list do

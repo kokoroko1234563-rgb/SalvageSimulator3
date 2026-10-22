@@ -4208,6 +4208,14 @@ test("bot speed-up keeps each zone's supply per second of game time", function()
 	assert(math.abs(fast - normal) < normal * 1e-6, "the same per game second: " .. fast .. " vs " .. normal)
 end)
 
+test("bot: a find's worth rises with the zone, and a tool's zones only", function()
+	local Economy = h.require("Server/BotEconomy")
+	local state = Economy.newState()
+	state.Tools.BoatHook = true
+	assert(Economy.findValue(state, 5) > Economy.findValue(state, 1), "deeper zones are worth more")
+	assert(Economy.findValue(state, 6) == 0, "a zone beyond the tool is worth nothing to it")
+end)
+
 test("bot can't claim an item another already claimed", function()
 	local Items = h.require("Shared/Items")
 	local Gear = h.require("Shared/Gear")
