@@ -57,9 +57,9 @@ rule), `src/shared/Routes.luau` (walkable routes), `tools/bots/` (the sweep).
   an item beyond the first zone (or in knee-deep water or deeper); the stretch is for the cheap finds of
   the first zone's shallows.
   A trip bot sets out once the tide is 40% out and plans with the looser margins.
-- **Crowds.** `Config.Items.CrowdSpawn = { Players = 20, Scale = 3 }`: the zones' ordinary surf spawns
-  (and `MaxSurfItems`) grow linearly with the players on the server, bots counted, to Scale times a solo
-  server's. `--scale` on the sweep sets Scale.
+- **Crowds.** `Config.Items.CrowdSpawn = { Players = 20, Scale = 3 }`: every zone's spawn
+  target and max rate grow linearly with the players on the server, bots counted, to Scale times a solo
+  server's (`spawning.md`). `--scale` on the sweep sets Scale.
 
 ## One buying rule, for every bot
 
@@ -91,9 +91,9 @@ traders and Robux are out of scope.
   item was taken by a player or despawned first.
 - **idle %**: share of time with status "waiting for the tide" (nothing to take and nowhere to walk).
 - **deaths / lost loads**: times swept away by the sea, and how many of them lost a carried load.
-- Server-wide (`ItemService.stats`): surf items spawned (and loot-spot finds), items claimed, items that
-  despawned unclaimed (timed out, drowned or lost), and how many spawn ticks found the surf full
-  (`MaxSurfItems`).
+- Server-wide (`ItemService.stats`): items spawned (surf, open sand and loot spots, and the count per zone), items claimed, items that
+  despawned unclaimed (timed out, drowned or lost), and how many spawn ticks found every zone
+  at its target.
 - **income log**: one entry per bot per tide (cycle): income, items, trips, game seconds, gear at start
   and end, the zones worked (items and value per zone), the bot count at the time. `Partial` marks a
   tide cut short by the start or end of the run.

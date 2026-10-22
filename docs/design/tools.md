@@ -53,6 +53,6 @@ Values are unchanged; new items are priced like their neighbours of the same rar
 
 ## Crowds
 
-`Config.Items.CrowdSpawn` scales the zones' ordinary surf spawns (and `MaxSurfItems`) with the players
-on the server, bots counted. Now that everything in a zone is liftable by its tool, that is all the
-scaler needs to touch.
+`Config.Items.CrowdSpawn` scales every zone's spawn target and max rate with the players on the server,
+bots counted (see `spawning.md`). Now that everything in a zone is liftable by its tool, that is all
+the scaler needs to touch.
