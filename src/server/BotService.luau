@@ -94,7 +94,7 @@ local connection: RBXScriptConnection? = nil
 local grid: any = nil
 local botFolder: Folder? = nil
 local speedFactor = 1
-local originals: { [string]: number }? = nil
+local originals: any = nil
 local incomeLog: { any } = {}
 local lastCycle = -1
 local lastRefresh = 0
@@ -1630,10 +1630,24 @@ function BotService.setSpeed(factor: number)
 			FreshLifetime = Config.Items.FreshLifetime,
 			TimedOutLifetime = Config.Items.TimedOutLifetime,
 			LooseTimeout = Config.Items.LooseTimeout,
+			MaxRate = {},
 		}
+		for index, zone in Config.Zones do
+			originals.MaxRate[index] = zone.MaxRate
+		end
 	end
 	for key, value in originals do
-		Config.Items[key] = value / factor
+		if key ~= "MaxRate" then
+			Config.Items[key] = value / factor
+		end
+	end
+	-- Each zone's spawn rate is per second: it goes up by the factor too (the ticks come more
+	-- often, but each tick's share of the rate is smaller, so without this the supply per second
+	-- of game time would fall by the factor).
+	for index, zone in Config.Zones do
+		if zone.MaxRate then
+			zone.MaxRate = originals.MaxRate[index] * factor
+		end
 	end
 	-- The tide keeps its place while it changes speed (as the admin console's tidespeed does).
 	local state = Tide.getState()

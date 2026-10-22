@@ -4081,6 +4081,24 @@ test("bot buying rule picks the best income per price, and rebirths first", func
 	assert(pick == bestId, "the most useful reward is " .. tostring(bestId) .. ", took " .. tostring(pick))
 end)
 
+test("bot speed-up keeps each zone's supply per second of game time", function()
+	local Config = h.require("Shared/Config")
+	local ItemService = h.require("Server/ItemService")
+	local BotService = h.require("Server/BotService")
+	-- Items per second of game time when a zone is empty: per tick, over the tick's game length.
+	local function perGameSecond(zone: number, factor: number): number
+		local interval = Config.Items.SpawnInterval
+		return ItemService.zoneSpawnRate(zone, 0, 1, interval) / (interval * factor)
+	end
+	BotService.setSpeed(1)
+	local normal = perGameSecond(1, 1)
+	BotService.setSpeed(10)
+	local fast = perGameSecond(1, 10)
+	BotService.setSpeed(1)
+	assert(normal > 0, "an empty zone spawns")
+	assert(math.abs(fast - normal) < normal * 1e-6, "the same per game second: " .. fast .. " vs " .. normal)
+end)
+
 test("bot can't claim an item another already claimed", function()
 	local Items = h.require("Shared/Items")
 	local Gear = h.require("Shared/Gear")
