@@ -768,6 +768,10 @@ end
 -- of the walk there and on home. Those in the bot's own stretch come first; the rest only when
 -- the stretch has nothing it can take (a bot with no cart, carrying one thing at a time, keeps to
 -- short trips then).
+-- The least share of the best finds' average value (for the cart's free slots) worth taking up a
+-- slot for (BotService.candidates).
+local SLOT_FLOOR = 0.3
+
 local function candidates(bot: Bot, entry: any): ({ any }, { any })
 	local lift = BotEconomy.lift(bot.State, BotEconomy.tool(bot.State))
 	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor
@@ -811,6 +815,34 @@ local function candidates(bot: Bot, entry: any): ({ any }, { any })
 			end
 		end
 	end
+	-- A cart slot is worth something: skip what's worth much less than the best finds the free
+	-- slots could hold, anywhere the bot can reach (so cheap things by the shore don't fill the
+	-- cart on the way out to better ones; with nothing better about, the bar drops by itself).
+	local free = math.max(1, BotEconomy.capacity(bot.State) - #bot.Cargo)
+	local values = {}
+	for _, list in { mine, others } do
+		for _, entry in list do
+			table.insert(values, entry.Item:GetAttribute("Value") or 0)
+		end
+	end
+	table.sort(values, function(a, b)
+		return a > b
+	end)
+	local sum, n = 0, math.min(free, #values)
+	for i = 1, n do
+		sum += values[i]
+	end
+	local floor = if n > 0 then SLOT_FLOOR * sum / n else 0
+	local function worthASlot(list)
+		local kept = {}
+		for _, entry in list do
+			if (entry.Item:GetAttribute("Value") or 0) >= floor then
+				table.insert(kept, entry)
+			end
+		end
+		return kept
+	end
+	mine, others = worthASlot(mine), worthASlot(others)
 	local function byScore(a, b)
 		return a.Score > b.Score
 	end
