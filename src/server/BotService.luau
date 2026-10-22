@@ -38,6 +38,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
+local Items = require(Shared.Items)
 local Routes = require(Shared.Routes)
 local Tide = require(Shared.Tide)
 
@@ -111,6 +112,8 @@ local searchStats = {
 	WaterSkipped = 0,
 } -- what became of the item searches
 local tripResult: any = nil
+local cycleBase = 0 -- tide cycles before this server clock's (a chained sweep carries the game over)
+local moved: { any } = {} -- bots put somewhere safe when a carried-over game was imported
 local rng = Random.new()
 
 local function now(): number
@@ -1148,7 +1151,7 @@ local function flushCycle(bot: Bot, partial: boolean)
 	local seconds = (now() - entry.StartedAt) * speedFactor
 	table.insert(incomeLog, {
 		Bot = bot.Id,
-		Cycle = entry.Cycle,
+		Cycle = cycleBase + entry.Cycle,
 		Income = entry.Coins,
 		Items = entry.Items,
 		Trips = entry.Trips,
@@ -1511,7 +1514,7 @@ end
 
 -- Spawning -------------------------------------------------------------------------------
 
-local function spawnBot(id: number, state: any, trip: any): Bot
+local function spawnBot(id: number, state: any, trip: any, at: { x: number, z: number }?): Bot
 	local entry = BotService.Colors[id]
 	local bot: Bot = {
 		Id = id,
@@ -1541,8 +1544,8 @@ local function spawnBot(id: number, state: any, trip: any): Bot
 		StartedAt = now(),
 		StartSpeed = speedFactor,
 	}
-	bot.X = HOME.x + ((id - 1) % 5 - 2) * 6
-	bot.Z = HOME.z + ((id - 1) // 5 - 1.5) * 5
+	bot.X = if at then at.x else HOME.x + ((id - 1) % 5 - 2) * 6
+	bot.Z = if at then at.z else HOME.z + ((id - 1) // 5 - 1.5) * 5
 	bot.GroundY = Beach.groundAt(bot.X, bot.Z)
 	dropTrail(bot)
 	bot.Model = buildMan(bot)
@@ -1711,6 +1714,211 @@ function BotService.stop()
 		botFolder:Destroy()
 		botFolder = nil
 	end
+end
+
+-- Carrying a game over -----------------------------------------------------------------------
+
+-- The whole game as plain data (JSON-safe), so a sweep can run one long game as a chain of tasks:
+-- the tide's place, every bot (purse, gear, rewards, stats, position, cargo), every free item on
+-- the beach, which loot spots have settled this tide, and the counts. importState puts it back.
+local function round1(v: number): number
+	return math.floor(v * 10 + 0.5) / 10
+end
+
+function BotService.exportState()
+	local t = now()
+	local tide = Tide.getState(t)
+	local out = {
+		Version = 1,
+		Speed = speedFactor,
+		Tide = { Phase = tide.Phase, Progress = tide.PhaseProgress },
+		Seed = Workspace:GetAttribute(Tide.SeedAttribute),
+		CycleBase = cycleBase + tide.Cycle,
+		Bots = {},
+		Items = {},
+		Settled = ItemService.exportSettled(tide.Cycle),
+		ServerStats = {},
+		Searches = table.clone(searchStats),
+	}
+	for key, value in ItemService.stats do
+		out.ServerStats[key] = if type(value) == "table" then table.clone(value) else value
+	end
+	for id, bot in bots do
+		local cargo = {}
+		for _, item in bot.Cargo do
+			if ItemService.isItem(item) then
+				table.insert(cargo, { Id = item:GetAttribute("ItemId"), Zone = item:GetAttribute("Zone") })
+			end
+		end
+		local state = bot.State
+		out.Bots[tostring(id)] = {
+			Id = id,
+			X = round1(bot.X),
+			Z = round1(bot.Z),
+			GameSeconds = (t - bot.StartedAt) * bot.StartSpeed,
+			Stats = table.clone(bot.Stats),
+			Cargo = cargo,
+			State = {
+				Coins = state.Coins,
+				Rebirths = state.Rebirths,
+				Rewards = state.Rewards,
+				Tools = state.Tools,
+				Vessels = state.Vessels,
+			},
+		}
+	end
+	local carried = {}
+	for _, bot in bots do
+		for _, item in bot.Cargo do
+			carried[item] = true
+		end
+	end
+	for item in ItemService.all() do
+		-- (Whatever a bot is holding but hasn't loaded goes back on the beach where it is.)
+		if not carried[item] then
+			local position = item.CFrame.Position
+			table.insert(out.Items, {
+				Id = item:GetAttribute("ItemId"),
+				Zone = item:GetAttribute("Zone"),
+				X = round1(position.X),
+				Z = round1(position.Z),
+				Fresh = item:GetAttribute("Fresh") == true,
+				Age = round1(math.max(0, t - (item:GetAttribute("Since") or t))),
+			})
+		end
+	end
+	return out
+end
+
+-- Where a carried-over bot stands: its own spot if the sea would let it, else the nearest safe
+-- ground toward the shore (logged in `BotService.moves()`).
+local function safeSpot(x: number, z: number): (number, number, boolean)
+	grid = grid or Routes.new()
+	local sea = Tide.sea()
+	local limit = Config.Beach.WaistDepth - DEPTH_MARGIN
+	local function safe(px: number, pz: number): boolean
+		local col, row = grid:cellOf(px, pz)
+		return not grid:isRock(col, row) and Beach.waterYAt(sea, px) - Beach.groundAt(px, pz) < limit
+	end
+	if z < 0 or safe(x, z) then
+		return x, z, false
+	end
+	for step = 1, 400 do
+		local pz = z - step * Routes.STEP
+		if pz < 0 then
+			break
+		end
+		if safe(x, pz) then
+			return x, pz, true
+		end
+	end
+	return HOME.x, HOME.z, true
+end
+
+-- Puts the tide and the beach back (before the way-home fields are built, which read the tide).
+function BotService.importWorld(data: any)
+	assert(math.abs((data.Speed or 1) - speedFactor) < 1e-9, "a chained game runs at one speed")
+	ensureRunning()
+	local t = now()
+	if data.Seed then
+		Workspace:SetAttribute(Tide.SeedAttribute, data.Seed)
+	end
+	Workspace:SetAttribute(Tide.StartAttribute, Tide.startFor(data.Tide.Phase, data.Tide.Progress, t))
+	lastCycle = Tide.getState(t).Cycle
+	cycleBase = data.CycleBase or 0
+	for _, record in data.Items do
+		local def = Items.get(record.Id)
+		if def then
+			local item = ItemService.spawnAt(
+				def,
+				record.Zone,
+				Vector3.new(record.X, Beach.groundAt(record.X, record.Z) + def.Size.Y / 2, record.Z)
+			)
+			item:SetAttribute("Fresh", record.Fresh)
+			item:SetAttribute("Since", t - record.Age)
+		end
+	end
+	ItemService.importSettled(data.Settled or {}, lastCycle)
+end
+
+-- Puts the bots back: purses, gear, stats, positions and what they carried.
+function BotService.importBots(data: any)
+	ensureRunning()
+	local t = now()
+	table.clear(moved)
+	local ids = {}
+	for key in data.Bots do
+		table.insert(ids, tonumber(key) :: number)
+	end
+	table.sort(ids)
+	for _, id in ids do
+		local record = data.Bots[tostring(id)]
+		local state = BotEconomy.newState()
+		state.Coins = record.State.Coins
+		state.Rebirths = record.State.Rebirths
+		state.Rewards = table.clone(record.State.Rewards)
+		state.Tools = table.clone(record.State.Tools)
+		state.Vessels = table.clone(record.State.Vessels)
+		local x, z, wasMoved = safeSpot(record.X, record.Z)
+		if wasMoved then
+			table.insert(
+				moved,
+				{ Bot = id, From = { record.X, record.Z }, To = { x, z }, Cargo = #record.Cargo }
+			)
+		end
+		local bot = spawnBot(id, state, nil, { x = x, z = z })
+		for key, value in record.Stats do
+			bot.Stats[key] = value
+		end
+		bot.StartedAt = t - record.GameSeconds / speedFactor
+		for _, carried in record.Cargo do
+			local def = Items.get(carried.Id)
+			if def then
+				local item = ItemService.spawnAt(def, carried.Zone, Vector3.new(x, bot.GroundY + 2, z))
+				if ItemService.claimForBot(item, bot.OwnerId) then
+					table.insert(bot.Cargo, item)
+					if bot.Cart then
+						ItemService.setInCart(item, bot.CartVessel, bot.OwnerId)
+					end
+				end
+			end
+		end
+		placeCart(bot)
+		setStatus(bot, "waiting for the tide")
+	end
+	ItemService.setBotCount(BotService.count())
+	-- The counts carry on from where they were (importing re-made things and counted them).
+	for key, value in data.ServerStats or {} do
+		ItemService.stats[key] = if type(value) == "table" then table.clone(value) else value
+	end
+	for key, value in data.Searches or {} do
+		searchStats[key] = value
+	end
+end
+
+function BotService.importState(data: any, warmModes: { any }?)
+	BotService.importWorld(data)
+	if warmModes then
+		BotService.warmUp(warmModes)
+	end
+	BotService.importBots(data)
+end
+
+-- Bots that had to be moved to safety by the last import: { Bot, From, To, Cargo }.
+function BotService.moves(): { any }
+	return moved
+end
+
+-- Coins earned by all bots so far and the game time they have played (for a sweep's progress curve).
+function BotService.progress()
+	local coins, seconds, n = 0, 0, 0
+	local t = now()
+	for _, bot in bots do
+		coins += bot.Stats.Coins
+		seconds += (t - bot.StartedAt) * bot.StartSpeed
+		n += 1
+	end
+	return { Coins = coins, GameSeconds = if n > 0 then seconds / n else 0, Bots = n }
 end
 
 -- Reports ---------------------------------------------------------------------------------

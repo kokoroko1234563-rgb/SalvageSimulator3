@@ -295,6 +295,43 @@ def write_report():
             lines.append("")
             lines.extend(table)
             lines.append("")
+    chains = sorted(glob.glob(os.path.join(OUT, "chain_*.json")))
+    if chains:
+        lines.append("## Chained runs (one continuous game per row)")
+        lines.append("")
+        lines.append("| run | X | speed | game minutes | coins/h per bot: mean / median / min / max | server total coins/h | thinking % | tide deaths | despawned unclaimed | bots that bought gear | rebirths (total) | worst frame ms: Heartbeat / bot work |")
+        lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+        detail = []
+        for path in chains:
+            chain = json.load(open(path))
+            name = os.path.basename(path)[6:-5]
+            snap = chain["snapshot"]
+            bots = snap["Bots"]
+            rates = sorted(b["Coins"] / (b["GameSeconds"] / 3600) for b in bots)
+            mid = len(rates) // 2
+            median = rates[mid] if len(rates) % 2 else (rates[mid - 1] + rates[mid]) / 2
+            minutes = sum(b["GameSeconds"] for b in bots) / len(bots) / 60
+            hours = minutes / 60
+            total = sum(b["Coins"] for b in bots) / hours
+            think = 100 * sum(b["ThinkingGameSeconds"] for b in bots) / sum(b["GameSeconds"] for b in bots)
+            bought = sum(1 for b in bots if b.get("Purchases", 0) > 0 or b["Rebirths"] > 0)
+            lines.append(f"| {name} | {len(bots)} | x{chain['job']['speed']:g} | {minutes:.0f} | {sum(rates) / len(rates):,.0f} / {median:,.0f} / {rates[0]:,.0f} / {rates[-1]:,.0f} | "
+                         f"{total:,.0f} | {think:.1f} | {sum(b['Deaths'] for b in bots)} | {snap['Server']['Despawned']} | {bought}/{len(bots)} | "
+                         f"{sum(b['Rebirths'] for b in bots)} | {1000 * chain['frames']['MaxDt']:.0f} / {1000 * chain['frames']['MaxWork']:.0f} |")
+            gear = {}
+            for b in bots:
+                key = f"{b['Gear']['Tool']}+{b['Gear'].get('Vessel') or 'hands'}"
+                gear[key] = gear.get(key, 0) + 1
+            quarters, n = chain_rows(chain)
+            detail.append((name, gear, quarters, n, len(chain["moves"]), chain["links"]))
+        lines.append("")
+        lines.append("Income per game quarter-hour (server total coins, then per bot), and gear at the end:")
+        lines.append("")
+        for name, gear, quarters, n, moved, links in detail:
+            mix = ", ".join(f"{k} {v}" for k, v in sorted(gear.items(), key=lambda kv: -kv[1]))
+            lines.append(f"- {name} ({links} links, {moved} bots moved to safety on import): "
+                         + ", ".join(f"{q:,.0f} ({q / n:,.0f})" for q in quarters) + f". Gear: {mix}.")
+        lines.append("")
     trip_path = os.path.join(OUT, "final_trip.json")
     if os.path.exists(trip_path):
         trip = json.load(open(trip_path))["trip"]
@@ -312,6 +349,74 @@ def write_report():
     print(f"wrote {os.path.relpath(os.path.join(OUT, 'sweep.md'), ROOT)}")
 
 
+def run_chain(name, job, links):
+    """One long game as `links` tasks: each starts from the previous task's final state (the tide,
+    the free items on the beach, every bot with its purse, gear, cargo and place)."""
+    results = []
+    state = None
+    for i in range(links):
+        link = dict(job)
+        if state is not None:
+            link["state"] = state
+        print(f"== chain {name} link {i + 1}/{links}: {json.dumps({k: v for k, v in link.items() if k != 'state'})}"
+              f"{' (carrying the state)' if state is not None else ''}")
+        try:
+            result = run_task(link)
+        except RuntimeError as error:
+            print(f"{name} link {i + 1}: {error} (the chain stops here)")
+            break
+        state = result.pop("state", None)
+        results.append(result)
+        print("\n".join(result.get("report", [])[-4:]))
+        frames = result["snapshot"].get("Frames")
+        if frames:
+            print(f"frames: worst Heartbeat {1000 * frames['MaxDt']:.0f} ms, bot work {1000 * frames['MaxWork']:.1f} ms")
+        if result.get("moves"):
+            print(f"moved to safety on import: {json.dumps(result['moves'])}")
+    if not results:
+        return
+    last = results[-1]
+    chain = {
+        "job": {k: v for k, v in job.items() if k != "state"},
+        "links": len(results),
+        "snapshot": last["snapshot"],
+        "series": [point for r in results for point in r.get("series", [])],
+        "log": [entry for r in results for entry in r.get("log", [])],
+        "moves": [m for r in results for m in r.get("moves", [])],
+        "frames": {
+            "MaxDt": max(r["snapshot"]["Frames"]["MaxDt"] for r in results),
+            "MaxWork": max(r["snapshot"]["Frames"]["MaxWork"] for r in results),
+            "Slow": sum(r["snapshot"]["Frames"]["Slow"] for r in results),
+        },
+        "searches": last["snapshot"].get("Searches"),
+    }
+    with open(os.path.join(OUT, "chain_" + name + ".json"), "w") as f:
+        json.dump(chain, f, indent=1)
+
+
+def chain_rows(chain):
+    """Income per game quarter-hour (server total, and per bot), from the progress series."""
+    series = chain["series"]
+    bots = chain["snapshot"]["BotCount"]
+    points = [(p["GameSeconds"], p["Coins"]) for p in series]
+    points.sort()
+
+    def coins_at(g):
+        if g <= points[0][0]:
+            return points[0][1]
+        for (g0, c0), (g1, c1) in zip(points, points[1:]):
+            if g0 <= g <= g1:
+                return c0 + (c1 - c0) * (g - g0) / max(g1 - g0, 1e-9)
+        return points[-1][1]
+    end = points[-1][0]
+    quarters = []
+    q = 0
+    while (q + 1) * 900 <= end + 1:
+        quarters.append(coins_at((q + 1) * 900) - coins_at(q * 900))
+        q += 1
+    return quarters, bots
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--xs", default="1,2,4,8,12,16,20")
@@ -319,6 +424,8 @@ def main():
     parser.add_argument("--seconds", type=int, default=250)
     parser.add_argument("--final-trip", action="store_true")
     parser.add_argument("--no-publish", action="store_true")
+    parser.add_argument("--chain", type=int, default=0,
+                        help="N consecutive tasks per X, each starting from the previous one's final state (one long game)")
     parser.add_argument("--scale", type=float, help="Config.Items.CrowdSpawn.Scale for the run (1 = off)")
     parser.add_argument("--tag", help="name a repeat run (x8_<tag>.json), kept out of the main table")
     parser.add_argument("--report-only", action="store_true")
@@ -348,6 +455,10 @@ def main():
             fcntl.flock(lock, fcntl.LOCK_EX)
         if not args.no_publish:
             publish()
+        if args.chain:
+            for name, job in jobs:
+                run_chain(name, job, args.chain)
+            jobs = []
         for name, job in jobs:
             print(f"== {name}: {json.dumps(job)}")
             try:

@@ -496,6 +496,25 @@ end
 -- Weight raises its chance of a find and how rare the find is.
 local settled: { [string]: number } = {} -- spot key -> the tide cycle it last settled in
 
+-- The loot spots that have settled in tide cycle `cycle` (for carrying a game over to a new
+-- server clock, see BotService.exportState), and putting them back as settled in `cycle`.
+function ItemService.exportSettled(cycle: number): { string }
+	local keys = {}
+	for key, at in settled do
+		if at == cycle then
+			table.insert(keys, key)
+		end
+	end
+	return keys
+end
+
+function ItemService.importSettled(keys: { string }, cycle: number)
+	table.clear(settled)
+	for _, key in keys do
+		settled[key] = cycle
+	end
+end
+
 function ItemService.settleSpots(sea: Tide.Sea, cycle: number): number
 	local spawned = 0
 	for tile = 1, Beach.ActiveTiles do

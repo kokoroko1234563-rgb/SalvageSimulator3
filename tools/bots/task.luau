@@ -43,17 +43,26 @@ end
 BotService.clearLog()
 BotService.setSpeed(JOB.speed or 1)
 -- The way-home fields are built before anyone plays, in big slices (a bot would wait for them).
+-- A chained task (JOB.state, the previous task's final state) first puts the tide and the beach
+-- back, since the fields read the tide, then the bots.
+local warm = { {}, { Cart = "Small" }, { Cart = "Medium" } }
+if JOB.state then
+	BotService.importWorld(JOB.state)
+end
 if JOB.finalTrip then
 	BotService.warmUp({ { Cart = "Small", Loose = true } })
 else
-	BotService.warmUp({ {}, { Cart = "Small" }, { Cart = "Medium" } })
+	BotService.warmUp(warm)
 end
 local setup = os.clock() - started
 if JOB.finalTrip then
 	BotService.startTrip(JOB.zone or 6, JOB.tool or "HandWinch", JOB.vessel or "Wheelbarrow")
+elseif JOB.state then
+	BotService.importBots(JOB.state)
 else
 	BotService.setCount(JOB.bots)
 end
+local series = { BotService.progress() }
 
 -- The first seconds build models and routes; the frame timings are for the play after.
 task.wait(5)
@@ -61,6 +70,7 @@ BotService.resetFrameStats()
 local deadline = os.clock() + (JOB.seconds or 200)
 while os.clock() < deadline do
 	task.wait(if JOB.finalTrip then 1 else 5)
+	table.insert(series, BotService.progress())
 	if JOB.finalTrip then
 		local trip = BotService.tripResult()
 		if trip and trip.Done then
@@ -94,6 +104,9 @@ local result = {
 		}
 		else nil,
 	report = logLines,
+	series = series,
+	moves = BotService.moves(),
+	state = if JOB.finalTrip then nil else BotService.exportState(),
 }
 BotService.stop()
 return HttpService:JSONEncode(result)

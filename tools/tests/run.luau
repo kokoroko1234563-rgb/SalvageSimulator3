@@ -3983,6 +3983,115 @@ test(
 	end
 )
 
+test("bot state round-trips: export, import and export again give the same game", function()
+	local Beach = h.require("Shared/Beach")
+	local Tide = h.require("Shared/Tide")
+	local ItemService = h.require("Server/ItemService")
+	local BotService = h.require("Server/BotService")
+	local workspace = h.game.Workspace
+	local savedStart = workspace:GetAttribute(Tide.StartAttribute)
+	BotService.stop()
+	for item in ItemService.all() do
+		ItemService.destroy(item)
+	end
+	local stats = {}
+	for key, value in ItemService.stats do
+		stats[key] = if type(value) == "table" then table.clone(value) else value
+	end
+	stats.Claimed = 41
+	stats.Despawned = 7
+	local data = {
+		Version = 1,
+		Speed = 1,
+		Tide = { Phase = "Hold", Progress = 0.5 },
+		Seed = 4321,
+		CycleBase = 2,
+		Settled = {},
+		ServerStats = stats,
+		Searches = { Chosen = 9 },
+		Items = {
+			{ Id = "Seashell", Zone = 1, X = 10.5, Z = 200, Fresh = true, Age = 5 },
+			{ Id = "Seashell", Zone = 2, X = -40, Z = 900.2, Fresh = false, Age = 12 },
+		},
+		Bots = {
+			["1"] = {
+				Id = 1,
+				X = 80,
+				Z = 120.5,
+				GameSeconds = 1000,
+				Stats = { Coins = 500, Items = 3, Trips = 2, ThinkSeconds = 4 },
+				Cargo = { { Id = "Seashell", Zone = 1 }, { Id = "Seashell", Zone = 2 } },
+				State = {
+					Coins = 77,
+					Rebirths = 1,
+					Rewards = { StrongBack = true },
+					Tools = { BareHands = true, BeachRake = true },
+					Vessels = { Wheelbarrow = true },
+				},
+			},
+			["3"] = {
+				Id = 3,
+				X = -50,
+				Z = 20,
+				GameSeconds = 1000,
+				Stats = { Coins = 9 },
+				Cargo = {},
+				State = { Coins = 0, Rebirths = 0, Rewards = {}, Tools = { BareHands = true }, Vessels = {} },
+			},
+		},
+	}
+	BotService.importState(data)
+	local out = BotService.exportState()
+	assert(out.Tide.Phase == "Hold" and math.abs(out.Tide.Progress - 0.5) < 0.01, "the tide is where it was")
+	assert(out.Seed == 4321 and out.CycleBase == 2, "the sea's seed and the cycle count carry")
+	assert(#out.Items == 2, "the free items are back (" .. #out.Items .. ")")
+	table.sort(out.Items, function(a, b)
+		return a.Zone < b.Zone
+	end)
+	assert(
+		out.Items[1].Id == "Seashell" and out.Items[1].X == 10.5 and out.Items[1].Fresh,
+		"an item, as it was"
+	)
+	assert(out.Items[2].Z == 900.2 and not out.Items[2].Fresh and out.Items[2].Age >= 12, "and its age")
+	local bot = out.Bots["1"]
+	assert(bot and out.Bots["3"] and not out.Bots["2"], "the same bots")
+	assert(
+		bot.State.Coins == 77 and bot.State.Rebirths == 1 and bot.State.Rewards.StrongBack,
+		"purse and rewards"
+	)
+	assert(bot.State.Tools.BeachRake and bot.State.Vessels.Wheelbarrow, "gear")
+	assert(bot.X == 80 and bot.Z == 120.5, "position")
+	assert(#bot.Cargo == 2 and bot.Cargo[2].Zone == 2, "cargo")
+	assert(bot.Stats.Coins == 500 and bot.Stats.Trips == 2, "stats")
+	assert(bot.GameSeconds >= 1000, "game time played")
+	assert(out.ServerStats.Claimed == 41 and out.ServerStats.Despawned == 7, "the server counts carry")
+	assert(#BotService.moves() == 0, "nobody was moved")
+	-- Closing the tide on a bot: High tide covers the beach out at z 1000, so the bot is put on
+	-- safe ground with what it carried.
+	for item in ItemService.all() do
+		ItemService.destroy(item)
+	end
+	BotService.stop()
+	data.Tide = { Phase = "Out", Progress = 0 }
+	data.Bots["1"].X, data.Bots["1"].Z = 0, 1000
+	BotService.importState(data)
+	local safe = BotService.exportState().Bots["1"]
+	assert(safe.Z < 200 and safe.Z >= 0, "moved landward to safe ground (z " .. safe.Z .. ")")
+	assert(#safe.Cargo == 2, "with its cargo")
+	local log = BotService.moves()
+	assert(#log == 1 and log[1].Bot == 1 and log[1].Cargo == 2, "and the move is logged")
+	local sea = Tide.sea()
+	assert(
+		Beach.seaDepthAt(roblox.Vector3.new(safe.X, Beach.groundAt(safe.X, safe.Z), safe.Z), sea) < 4.5,
+		"above waist depth"
+	)
+	for item in ItemService.all() do
+		ItemService.destroy(item)
+	end
+	BotService.stop()
+	workspace:SetAttribute(Tide.StartAttribute, savedStart)
+end)
+
 test("bot route searches are time-sliced: a hopeless one yields and stays within its bound", function()
 	local Beach = h.require("Shared/Beach")
 	local Layouts = h.require("Shared/Layouts")
