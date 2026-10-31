@@ -4525,8 +4525,8 @@ test("item tiers: every tier holds each rarity its zone rolls, 4 to 7 items each
 	-- Every sellable item is in exactly one tier; unlock items are in none.
 	local sellable, tiered = 0, 0
 	for _, def in Items.Catalog do
-		if def.Unlock then
-			assert(def.Tier == nil, def.Id .. ": unlock items have no tier")
+		if def.Unlock or def.Biome then
+			assert(def.Tier == nil, def.Id .. ": unlock and biome items have no tier")
 		else
 			sellable += 1
 			assert(
@@ -4656,57 +4656,356 @@ test("grab: water depth no longer blocks a lift", function()
 	end
 end)
 
-test("biome: loot takes the tier of the zone it washes up in", function()
+-- Biome items (docs/design/biome-items.md) -----------------------------------------------
+
+-- Makes every tile of the beach a biome, for the tests that spawn into it.
+local function setBiome(biomeId: string?)
+	local Beach = h.require("Shared/Beach")
+	local Biomes = h.require("Shared/Biomes")
+	for tile = 1, Beach.ActiveTiles do
+		h.game.Workspace:SetAttribute(Biomes.attributeFor(tile), biomeId)
+	end
+end
+
+-- The Z in the middle of a zone.
+local function zoneMiddle(zone: number): number
+	local z0, z1 = h.require("Shared/Beach").zoneRange(zone)
+	return (z0 + z1) / 2
+end
+
+test("biome items: the list is the doc's and each biome has some of every rarity it rolls", function()
+	local Biomes = h.require("Shared/Biomes")
+	local Config = h.require("Shared/Config")
+	local Items = h.require("Shared/Items")
+	local count = 0
+	for _, def in Items.Catalog do
+		if def.Biome then
+			count += 1
+			assert(Biomes.List[def.Biome], def.Id .. ": a real biome")
+			assert(def.Tier == nil and def.Value == 0, def.Id .. ": no fixed tier or value")
+		end
+	end
+	assert(count == 53, "53 biome items (" .. count .. ")")
+	for id, biome in Biomes.List do
+		assert(#Items.ofBiome(id) >= 3, id .. " has its items")
+		for zone, weight in biome.Zones do
+			for rarity in Config.Zones[zone].Rarity do
+				assert(
+					weight <= 0 or #Items.ofBiome(id, rarity) > 0,
+					id .. " has no " .. rarity .. " for zone " .. zone
+				)
+			end
+		end
+	end
+	assert(#Items.ofBiome("NoSuchBiome", "Common") == 0, "an unknown biome has none")
+end)
+
+test("biome items: not in the normal pools, the lexicon or the tower man's check", function()
+	local DataService = h.require("Server/DataService")
+	local Items = h.require("Shared/Items")
+	for tier = 1, Items.MaxTier do
+		for _, rarity in Items.Rarities do
+			for _, def in Items.ofTier(tier, rarity) do
+				assert(not def.Biome, def.Id .. " is in the tier pool")
+			end
+		end
+	end
+	for _, rarity in Items.Rarities do
+		for _, def in Items.ofRarity(rarity) do
+			assert(not def.Biome, def.Id .. " is in the rarity pool")
+		end
+	end
+	for _, def in Items.Lexicon do
+		assert(not def.Biome, def.Id .. " is in the main lexicon")
+	end
+	-- Everything but the biome items found: complete. A biome item found changes nothing.
+	local p = fakePlayer("BiomeLexicon", 77)
+	DataService._setProfile(p, {})
+	for _, def in Items.Lexicon do
+		DataService.recordLexicon(p :: any, def.Id)
+	end
+	assert(DataService.lexiconComplete(p :: any), "the normal items alone complete it")
+	assert(p:GetAttribute("LexiconCount") == #Items.Lexicon, "and the count is of the main page")
+	assert(DataService.recordLexicon(p :: any, "SandDollar") == true, "a biome item is recorded")
+	assert(DataService.lexiconComplete(p :: any), "still complete")
+	assert(p:GetAttribute("LexiconCount") == #Items.Lexicon, "the main count ignores it")
+	assert(DataService.lexiconFound(p :: any, Items.ofBiome("SandcastleFlats")) == 1, "but its page has it")
+end)
+
+test("lexicon: one page per biome lists its items", function()
+	local Biomes = h.require("Shared/Biomes")
+	local Items = h.require("Shared/Items")
+	local pages = {}
+	for _, biomeId in Items.BiomeOrder do
+		pages[biomeId] = true
+		local page = Items.ofBiome(biomeId)
+		assert(#page > 0, biomeId .. ": an empty page")
+		for _, def in page do
+			assert(def.Biome == biomeId, def.Id .. " is on the wrong page")
+		end
+	end
+	for id in Biomes.List do
+		assert(pages[id], id .. " has no lexicon page")
+	end
+	assert(#Items.BiomeOrder == 12, "twelve pages (" .. #Items.BiomeOrder .. ")")
+end)
+
+test("biome items: every biome item has a model", function()
+	local Items = h.require("Shared/Items")
+	local ItemModels = h.require("Server/ItemModels")
+	for _, def in Items.Catalog do
+		if def.Biome then
+			assert(ItemModels.has(def.Id), def.Id .. " has no model")
+		end
+	end
+end)
+
+test("biome items: they only spawn in their biome and take the zone's tier", function()
 	local Beach = h.require("Shared/Beach")
 	local Biomes = h.require("Shared/Biomes")
 	local Config = h.require("Shared/Config")
 	local Items = h.require("Shared/Items")
 	local Tide = h.require("Shared/Tide")
 	local ItemService = h.require("Server/ItemService")
-	local workspace = h.game.Workspace
-	local biome = Biomes.List.SandcastleFlats
-	local share, chance, exotic =
-		biome.LootShare, Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance
-	biome.LootShare = 1
+	local chance, exotic = Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance
 	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = 0, 0
-	for tile = 1, Beach.ActiveTiles do
-		workspace:SetAttribute(Biomes.attributeFor(tile), "SandcastleFlats")
+	local share = Config.Biomes.ItemShare
+	-- Through the item chooser: whatever biome the tiles are, only that one's items turn up.
+	for id, biome in Biomes.List do
+		setBiome(id)
+		local own, total = 0, 0
+		for zone in biome.Zones do
+			for _ = 1, 300 do
+				local def = ItemService._chooseDef(zone, zoneMiddle(zone), 1)
+				assert(def, "an item")
+				total += 1
+				if def.Biome then
+					assert(def.Biome == id, def.Id .. " washed up in " .. id)
+					own += 1
+				end
+			end
+		end
+		assert(
+			math.abs(own / total - share) < 0.07,
+			string.format("%s: %.2f of the spawns are its own", id, own / total)
+		)
 	end
-	local loot = {}
-	for _, id in biome.Loot do
-		loot[id] = true
+	-- No biome (or another one): none of the other biomes' items.
+	setBiome(nil)
+	for zone = 1, #Config.Zones do
+		for _ = 1, 100 do
+			local def = ItemService._chooseDef(zone, zoneMiddle(zone), 1)
+			assert(def and not def.Biome, "no biome item without a biome")
+		end
 	end
-	local differs, made = 0, 0
+	-- The real spawns, in the surf and on the sand: the tier is the zone, and a biome item's Value
+	-- is the one it is worth there.
+	Config.Biomes.ItemShare = 1
+	setBiome("SandcastleFlats")
+	local made, sand = 0, 0
 	for _, time in { 0, 200, 450, 700, 1100 } do
 		for _ = 1, 40 do
-			local item = ItemService.spawnInSurf(Tide.sea(time))
-			if item then
-				made += 1
+			for kind, item in
+				{
+					surf = ItemService.spawnInSurf(Tide.sea(time)),
+					sand = ItemService.spawnOnSand(Tide.sea(time), 1),
+				}
+			do
 				local id = item:GetAttribute("ItemId")
 				local zone = item:GetAttribute("Zone")
-				if zone > Config.Beach.ActiveZones then
-					ItemService.destroy(item) -- (the Far Sandbar has no biomes)
-					continue
-				end
-				assert(loot[id], id .. " isn't the biome's loot")
-				assert(
-					item:GetAttribute("Tier") == zone,
-					id .. " in zone " .. zone .. " has tier " .. tostring(item:GetAttribute("Tier"))
-				)
-				if Items.get(id).Tier ~= zone then
-					differs += 1
+				if zone <= Config.Beach.ActiveZones then
+					local def = Items.get(id)
+					assert(def.Biome == "SandcastleFlats", id .. " isn't a Sandcastle Flats item")
+					assert(
+						item:GetAttribute("Tier") == zone,
+						id .. " in zone " .. zone .. " has tier " .. tostring(item:GetAttribute("Tier"))
+					)
+					assert(
+						item:GetAttribute("Value") == Items.biomeValue(zone, "Common", def.Rarity),
+						id .. ": its Value attribute"
+					)
+					assert(item:GetAttribute("Value") > 0, id .. ": worth something")
+					made += 1
+					if kind == "sand" then
+						sand += 1
+					end
 				end
 				ItemService.destroy(item)
 			end
 		end
 	end
-	for tile = 1, Beach.ActiveTiles do
-		workspace:SetAttribute(Biomes.attributeFor(tile), nil)
-	end
-	biome.LootShare = share
+	Config.Biomes.ItemShare = share
+	setBiome(nil)
 	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = chance, exotic
-	assert(made > 50, "biome loot washes up (" .. made .. ")")
-	assert(differs > 0, "some loot washed up in a zone other than its own tier")
+	assert(made > 50, "biome items wash up (" .. made .. ")")
+	assert(sand > 0, "some on the sand")
+end)
+
+test("biome items: sand spawns never roll unlock items or the Beacon Pearl", function()
+	local Config = h.require("Shared/Config")
+	local ItemService = h.require("Server/ItemService")
+	local chance = Config.Unlocks.SpawnChance
+	Config.Unlocks.SpawnChance = 1
+	setBiome("SandcastleFlats")
+	for _ = 1, 200 do
+		local def = ItemService._chooseDef(1, zoneMiddle(1), 1, true)
+		assert(def and not def.Unlock and def.Id ~= "BeaconPearl", "an ordinary item")
+	end
+	Config.Unlocks.SpawnChance = chance
+	setBiome(nil)
+end)
+
+test("biome items: a biome with none of the rolled rarity falls back on the nearest", function()
+	local Items = h.require("Shared/Items")
+	local ItemService = h.require("Server/ItemService")
+	local Config = h.require("Shared/Config")
+	local hasCommon = function(rarity)
+		return rarity == "Common"
+	end
+	assert(Items.nearestRarity("VeryRare", hasCommon) == "Common", "down to the only one")
+	local hasUncommonAndRare = function(rarity)
+		return rarity == "Uncommon" or rarity == "Rare"
+	end
+	assert(Items.nearestRarity("Common", hasUncommonAndRare) == "Uncommon", "up from common")
+	assert(Items.nearestRarity("VeryRare", hasUncommonAndRare) == "Rare", "down from very rare")
+	assert(Items.nearestRarity("Uncommon", function(_)
+		return false
+	end) == nil, "none at all")
+	-- A biome whose only VeryRare items are taken away gives its Rare ones in their place.
+	local biomeItems = Items.ofBiome("SandcastleFlats", "VeryRare")
+	local saved = table.clone(biomeItems)
+	table.clear(biomeItems)
+	local zone = Config.Zones[3]
+	local rarity = zone.Rarity
+	zone.Rarity = { VeryRare = 100 }
+	local share = Config.Biomes.ItemShare
+	Config.Biomes.ItemShare = 1
+	local chance = Config.Unlocks.SpawnChance
+	Config.Unlocks.SpawnChance = 0
+	setBiome("SandcastleFlats")
+	for _ = 1, 50 do
+		local def = ItemService._chooseDef(3, zoneMiddle(3), 1)
+		assert(
+			def and def.Biome == "SandcastleFlats" and def.Rarity == "Rare",
+			"the nearest rarity: " .. tostring(def and def.Id)
+		)
+	end
+	setBiome(nil)
+	Config.Unlocks.SpawnChance = chance
+	Config.Biomes.ItemShare = share
+	zone.Rarity = rarity
+	for _, def in saved do
+		table.insert(biomeItems, def)
+	end
+end)
+
+test("biome items: worth the biome's premium over the zone's normal finds on average", function()
+	local Biomes = h.require("Shared/Biomes")
+	local Config = h.require("Shared/Config")
+	local Items = h.require("Shared/Items")
+	local ItemService = h.require("Server/ItemService")
+	local chance, exotic = Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance
+	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = 0, 0
+	local share = Config.Biomes.ItemShare
+	local function averageOf(zone: number, biomeId: string?, samples: number): number
+		local sum = 0
+		setBiome(biomeId)
+		for _ = 1, samples do
+			local def = ItemService._chooseDef(zone, zoneMiddle(zone), 1)
+			assert(def, "an item")
+			if def.Biome then
+				sum += Items.biomeValue(zone, Biomes.List[def.Biome].Tier, def.Rarity)
+			else
+				sum += math.floor(def.Value * Config.Zones[zone].Multiplier)
+			end
+		end
+		setBiome(nil)
+		return sum / samples
+	end
+	-- Exactly: the rarity table's weighted value of one biome item per rarity is the premium
+	-- over the zone's normal average (to the whole coins the values round to).
+	for tier, premium in Config.Biomes.Premium do
+		for zone = 1, Config.Beach.ActiveZones do
+			local weights = Config.Zones[zone].Rarity
+			local total, value = 0, 0
+			for rarity, weight in weights do
+				total += weight
+				value += weight * Items.biomeValue(zone, tier, rarity)
+			end
+			local normal = 0
+			for rarity, weight in weights do
+				local pool = Items.ofTier(zone, rarity)
+				local sum = 0
+				for _, def in pool do
+					sum += def.Value
+				end
+				normal += weight * sum / #pool * Config.Zones[zone].Multiplier
+			end
+			local measured = (value / total) / (normal / total)
+			assert(
+				math.abs(measured / premium - 1) < 0.02,
+				string.format("%s zone %d: %.3f against %.2f", tier, zone, measured, premium)
+			)
+		end
+	end
+	-- Sampled through the spawner: a biome in each of its zones averages its premium.
+	local lines = {}
+	for _, biomeId in { "SandcastleFlats", "ShipwreckShallows", "HermitHollows", "StrandedIceberg" } do
+		local biome = Biomes.List[biomeId]
+		local ratioSum, zones = 0, 0
+		for zone in biome.Zones do
+			Config.Biomes.ItemShare = 0
+			local normal = averageOf(zone, biomeId, 6000)
+			Config.Biomes.ItemShare = 1
+			local own = averageOf(zone, biomeId, 6000)
+			local ratio = own / normal
+			assert(
+				math.abs(ratio / Config.Biomes.Premium[biome.Tier] - 1) < 0.12,
+				string.format(
+					"%s zone %d: %.2fx against %.2f",
+					biomeId,
+					zone,
+					ratio,
+					Config.Biomes.Premium[biome.Tier]
+				)
+			)
+			ratioSum += ratio
+			zones += 1
+		end
+		table.insert(lines, string.format("%s (%s) %.2fx", biomeId, biome.Tier, ratioSum / zones))
+	end
+	print("      measured premium: " .. table.concat(lines, ", "))
+	Config.Biomes.ItemShare = share
+	Config.Unlocks.SpawnChance, Config.Unlocks.ExoticSpawnChance = chance, exotic
+end)
+
+test("biome items: Validate catches a biome missing a rarity its zones roll", function()
+	local Items = h.require("Shared/Items")
+	local Validate = h.require("Shared/Validate")
+	local pool = Items.ofBiome("ShipwreckShallows", "VeryRare")
+	assert(#pool > 0, "it has a VeryRare item")
+	local saved = table.clone(pool)
+	table.clear(pool)
+	local text = table.concat(Validate.run(), "\n")
+	for _, def in saved do
+		table.insert(pool, def)
+	end
+	assert(
+		string.find(text, "ShipwreckShallows: zone", 1, true)
+			and string.find(text, "rolls rarity VeryRare, which it has no items of", 1, true),
+		"Validate missed the missing rarity: " .. text
+	)
+	local def = Items.get("SandDollar")
+	local biome = def.Biome
+	def.Biome = "NoSuchBiome"
+	local named = table.concat(Validate.run(), "\n")
+	def.Biome = biome
+	assert(string.find(named, "SandDollar: names biome NoSuchBiome", 1, true), "Validate missed a bad biome")
+	def.Tier = 2
+	local tiered = table.concat(Validate.run(), "\n")
+	def.Tier = nil
+	assert(string.find(tiered, "SandDollar: biome items have no Tier", 1, true), "Validate missed a Tier")
+	assert(#Validate.run() == 0, "and the data is clean again")
 end)
 
 test("data: Validate checks the tier fields", function()

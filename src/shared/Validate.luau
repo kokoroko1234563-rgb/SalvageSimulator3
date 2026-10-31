@@ -63,7 +63,15 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		check(typeof(item.Size) == "Vector3", where .. ": Size must be a Vector3")
 		check(isColor(item.Color), where .. ": Color must be a Color3")
 		check(type(item.Value) == "number", where .. ": missing Value")
-		if item.Unlock then
+		if item.Biome then
+			check(
+				Biomes.List[item.Biome] ~= nil,
+				where .. ": names biome " .. tostring(item.Biome) .. ", which doesn't roll on the beach"
+			)
+			check(item.Tier == nil, where .. ": biome items have no Tier (they take their zone's)")
+			check(item.Unlock == nil, where .. ": a biome item can't also be an unlock item")
+			check(item.Value == 0, where .. ": biome items have no fixed Value (it's set when they spawn)")
+		elseif item.Unlock then
 			check(item.Tier == nil, where .. ": unlock items have no Tier (they are always liftable)")
 		else
 			check(
@@ -369,8 +377,29 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 			rolls = rolls or (type(weight) == "number" and weight > 0)
 		end
 		check(rolls, where .. ": needs Zones = { [zone] = weight } to roll anywhere")
-		for _, lootId in biome.Loot do
-			check(Items.get(lootId) ~= nil, where .. ": loot item " .. lootId .. " doesn't exist")
+		check(
+			Config.Biomes.Premium[biome.Tier] ~= nil,
+			where .. ": Config.Biomes.Premium has no entry for its Tier " .. tostring(biome.Tier)
+		)
+		-- Its own items: some of every rarity its zones roll (a biome item of a rarity it has
+		-- none of would fall back on the nearest one: ItemService.chooseDef; the data doesn't rely
+		-- on that), and every item it names is its own.
+		check(#Items.ofBiome(id) > 0, where .. ': has no items (Biome = "' .. id .. '" in Items.luau)')
+		for zone, weight in biome.Zones or {} do
+			local zoneData = Config.Zones[zone]
+			if type(weight) == "number" and weight > 0 and zoneData then
+				for rarity, rarityWeight in zoneData.Rarity do
+					check(
+						rarityWeight <= 0 or #Items.ofBiome(id, rarity) > 0,
+						string.format(
+							"%s: zone %d rolls rarity %s, which it has no items of",
+							where,
+							zone,
+							rarity
+						)
+					)
+				end
+			end
 		end
 		local unlock = Items.get(biome.UnlockItem)
 		check(
@@ -411,14 +440,21 @@ function Validate.run(extra: { [string]: { [string]: any } }?): { string }
 		end
 	end
 
+	for _, rarity in Items.Rarities do
+		check(Config.Biomes.RarityWorth[rarity] ~= nil, "Config.Biomes.RarityWorth has no " .. rarity)
+	end
+	check(
+		type(Config.Biomes.ItemShare) == "number"
+			and Config.Biomes.ItemShare >= 0
+			and Config.Biomes.ItemShare <= 1,
+		"Config.Biomes.ItemShare must be a share from 0 to 1"
+	)
+
 	-- Planned biomes: everything they name must exist.
 	for id, biome in Biomes.Planned do
 		local where = "Planned biome " .. id
 		local unlock = Items.get(biome.UnlockItem)
 		check(unlock ~= nil and unlock.Unlock == id, where .. ": unlock item must exist and point back at it")
-		for _, lootId in biome.Loot or {} do
-			check(Items.get(lootId) ~= nil, where .. ": loot " .. lootId .. " isn't an item")
-		end
 		for _, rewardId in biome.Rewards or {} do
 			check(
 				Catalog.get(rewardId) ~= nil,
