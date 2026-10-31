@@ -13,6 +13,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Palette = require(Shared.Palette)
 local Catalog = require(Shared.Catalog)
 local Hotbar = require(Shared.Hotbar)
+local Biomes = require(Shared.Biomes)
 local Items = require(Shared.Items)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
@@ -36,6 +37,8 @@ local BORDER = Palette.Reset
 
 local snapshot: any = nil
 local tab = "Items"
+local lexiconPage = "Main" -- "Main", or the id of a biome whose page the lexicon shows
+local requestRefresh: () -> () = function() end -- (set once refresh is defined)
 
 local panel: Frame
 local content: ScrollingFrame
@@ -442,7 +445,8 @@ local function showRewards()
 	end
 end
 
--- Every beach item; the ones this player has found are shown, the rest are "???".
+-- The collection log: a page of the normal beach items and one page per biome for its own
+-- items. The ones this player has found are shown, the rest are "???".
 local function showLexicon()
 	make("UIGridLayout", {
 		CellSize = UDim2.fromOffset(120, 74),
@@ -453,21 +457,55 @@ local function showLexicon()
 	for _, id in snapshot.Lexicon or {} do
 		found[id] = true
 	end
-	local count = 0
-	for _, item in Items.Lexicon do
-		if found[item.Id] then
-			count += 1
+	local function foundIn(list: { any }): number
+		local n = 0
+		for _, item in list do
+			if found[item.Id] then
+				n += 1
+			end
+		end
+		return n
+	end
+	-- The pages, as buttons across the top: the main one, then each biome's.
+	local pages = { { Id = "Main", Name = "Beach", Items = Items.Lexicon } }
+	for _, biomeId in Items.BiomeOrder do
+		local biome = Biomes.List[biomeId]
+		table.insert(
+			pages,
+			{ Id = biomeId, Name = if biome then biome.Name else biomeId, Items = Items.ofBiome(biomeId) }
+		)
+	end
+	local page = pages[1]
+	for _, candidate in pages do
+		if candidate.Id == lexiconPage then
+			page = candidate
 		end
 	end
+	for index, candidate in pages do
+		local b = button(
+			string.format("%s\n%d/%d", candidate.Name, foundIn(candidate.Items), #candidate.Items),
+			if candidate == page then Palette.UI.Buy else Palette.UI.Tab,
+			content
+		)
+		b.TextSize = 13
+		b.TextWrapped = true
+		b.LayoutOrder = -1000 + index
+		b.Activated:Connect(function()
+			lexiconPage = candidate.Id
+			requestRefresh()
+		end)
+	end
+	local list = page.Items
+	local count = foundIn(list)
 	local header = make("Frame", { BackgroundTransparency = 1, LayoutOrder = 0 }, content)
 	label({
-		Text = string.format("%d / %d found", count, #Items.Lexicon),
+		Text = string.format("%s: %d / %d found", page.Name, count, #list),
 		Font = FONT,
 		TextSize = 18,
 		Size = UDim2.fromScale(1, 1),
 		TextYAlignment = Enum.TextYAlignment.Center,
 	}, header)
-	for index, item in Items.Lexicon do
+	for index, item in list do
 		local card = make("Frame", { BackgroundColor3 = CARD, LayoutOrder = index }, content)
 		corner(card, 8)
 		if found[item.Id] then
@@ -503,11 +541,13 @@ local function showLexicon()
 			}, card)
 		end
 	end
-	if count == #Items.Lexicon then
+	if count == #list then
 		label({
-			Text = "Complete! Find the man on the dirt tower.",
+			Text = if page.Id == "Main"
+				then "Complete! Find the man on the dirt tower."
+				else "Page complete!",
 			TextColor3 = ACCENT,
-			LayoutOrder = #Items.Lexicon + 1,
+			LayoutOrder = #list + 1,
 			Size = UDim2.fromScale(1, 1),
 		}, content)
 	end
@@ -605,6 +645,8 @@ local function refresh()
 		showRewards()
 	end
 end
+
+requestRefresh = refresh
 
 local function setOpen(open: boolean)
 	panel.Visible = open
