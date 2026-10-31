@@ -1676,6 +1676,20 @@ builders.GoldCrown = function(root, def)
 	end
 end
 
+-- Biome items' models: one module per biome in BiomeItemModels, each returning
+-- { [itemId] = builder } (docs/design/biome-items.md).
+local biomeModels = script.Parent:FindFirstChild("BiomeItemModels")
+if biomeModels then
+	for _, module in biomeModels:GetChildren() do
+		if module:IsA("ModuleScript") then
+			for id, builder in require(module) :: any do
+				assert(not builders[id], "two models for " .. id)
+				builders[id] = builder
+			end
+		end
+	end
+end
+
 -- Whether an item has a model. Items without one keep their plain catalog look.
 function ItemModels.has(id: string): boolean
 	return builders[id] ~= nil
