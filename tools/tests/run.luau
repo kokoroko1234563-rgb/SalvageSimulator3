@@ -328,7 +328,7 @@ test("rebirth rewards stack in Stats", function()
 	local tool = Gear.getTool("BasicGrabber") or Gear.Tools[1]
 	assert(Stats.lift(rewarded, tool) == tool.Tier + 1, "Strong Back lifts one zone tier further")
 	assert(Stats.lift(plain, tool) == tool.Tier, "without it, the tool's own tier")
-	assert(Stats.lift(rewarded, Gear.getTool("BubbleWand")) == 7, "lift is capped at the last zone")
+	assert(Stats.lift(rewarded, Gear.getTool("ElectricWinch")) == 7, "lift is capped at the last zone")
 end)
 
 test("private servers scale rare spawns", function()

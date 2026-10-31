@@ -1,4 +1,4 @@
--- Pockets: store Light items safe from bumps and waves. 3 slots from Deep Pockets (rebirth
+-- Pockets: store items (any weight) safe from bumps and waves. 3 slots from Deep Pockets (rebirth
 -- reward), 3 more from a worn Deckhand's Satchel (exotic, attuned). Pockets are saved, sold
 -- when you talk to the buyer (from anywhere), can be taken out one at a time, and drop where
 -- you die if you drown. Unlock items can't be pocketed.
@@ -6,7 +6,6 @@
 local Players = game:GetService("Players")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
-local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 
@@ -50,10 +49,6 @@ local function store(player: Player, part: any)
 	end
 	if item:GetAttribute("Unlock") then
 		notify(player, "Unlock items can't go in your pockets. Bank them at the bank house.")
-		return
-	end
-	if (item:GetAttribute("Class") or 1) ~= Gear.WeightClass.Light then
-		notify(player, "Only Light items fit in your pockets.")
 		return
 	end
 	if #profile.Pockets >= slots then

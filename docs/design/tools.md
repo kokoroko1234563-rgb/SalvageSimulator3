@@ -32,8 +32,21 @@ The tool decides how far out you can work; inside a zone you can work, you can l
 | 6 | The Drowned Reach | Hand Winch (30,000) | 5 |
 | 7 | The Far Sandbar | Electric Winch (90,000) | 5 |
 
-Exotic and magical tools sit on the ladder by their old strength, until they are redesigned: Freeze
-Wand 4, Anchor Hook 5, Tide Magnet 5, Gust Gloves 6, Bubble Wand 7, Crab Claw 7, Obsidian Grabber 7.
+Exotic tools sit on the ladder by their old strength, until they are redesigned: Freeze Wand 4,
+Anchor Hook 5, Gust Gloves 6, Crab Claw 7, Obsidian Grabber 7. The magical grabbers from rebirth
+rewards, which are kept through rebirths, sit at tier 4 (Tide Magnet, Bubble Wand): a head start on
+each climb, not a way past the ladder; their worth is the water (the magnet pulls, the wand floats
+from any depth).
+
+## Rebirth rewards
+
+Each of the first five rebirths offers 3 rewards at random from those not owned yet
+(`Rebirth.rollOptions`, `Config.Rebirth.Choices`); the player keeps one. Rewards last until a true
+rebirth. Swift Feet: +20% walk and towing. Sea Legs: waves push 50% less, the water slows half as
+much, breath lasts twice as long. Strong Back: +1 tier. Deep Pockets: 3 slots for any item. Tide
+Magnet and Bubble Wand: tier-4 magical grabbers. Floating Clamshell: carries 10, hovers (over the
+Far Sandbar's channel too). Sea Turtle: carries 10, swims (crosses the channel), cargo washes off
+half as often as a boat's.
 
 ## Items per tier
 

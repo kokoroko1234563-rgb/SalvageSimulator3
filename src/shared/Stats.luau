@@ -29,7 +29,7 @@ end
 function Stats.wavePush(player: Player): number
 	local push = Traders.wavePushMultiplier(levels(player))
 	if hasReward(player, "SeaLegs") then
-		push *= 0.6
+		push *= 0.5
 	end
 	local accessory = Gear.getAccessory(player:GetAttribute("Accessory"))
 	if accessory and accessory.WaveResist then
@@ -53,7 +53,12 @@ end
 -- How much of the water's slowdown a player shrugs off (0 = none, 1 = all).
 function Stats.wadeBonus(player: Player): number
 	local worn = accessory(player)
-	return if worn and worn.WadeBonus then worn.WadeBonus else 0
+	local kept = 1 - (if worn and worn.WadeBonus then worn.WadeBonus else 0)
+	-- Sea Legs: the water slows you half as much.
+	if hasReward(player, "SeaLegs") then
+		kept *= 0.5
+	end
+	return 1 - kept
 end
 
 -- The highest zone tier a player can lift with a tool: the tool's own Tier, one more with Strong

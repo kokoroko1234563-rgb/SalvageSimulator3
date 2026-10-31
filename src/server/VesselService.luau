@@ -1334,7 +1334,11 @@ local function tick()
 		local swims = vessel:GetAttribute("Swims") == true or boat
 		if swims and Beach.isDeep(base.Position, sea) then
 			-- Swimming vessels survive deep water, but the waves can wash cargo off.
-			if math.random() < Config.Grab.SwimWashChance then
+			local def = Gear.getVessel(vessel:GetAttribute("Kind"))
+			if
+				math.random()
+				< Config.Grab.SwimWashChance * (if def and def.WashScale then def.WashScale else 1)
+			then
 				local contents = VesselService.contents(vessel)
 				if #contents > 0 then
 					ItemService.setLoose(contents[math.random(#contents)])
