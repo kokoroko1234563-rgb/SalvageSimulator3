@@ -1,6 +1,7 @@
 -- Normal rebirth at the shopkeeper: costs coins (rising each time), resets coins, shop
 -- tools and shop vessels, and adds a coin multiplier. At each of the first rebirths the
--- player picks one reward from those they don't have yet; all remaining options are shown.
+-- player picks one reward from Config.Rebirth.Choices offered at random from those they don't
+-- have yet (Rebirth.rollOptions). The offer is saved, so leaving and rejoining doesn't reroll it.
 -- Kept: rebirth count, rewards, magical vessels, banked unlock items and colored coins.
 
 local Players = game:GetService("Players")
@@ -18,6 +19,7 @@ local DataService = require(script.Parent.DataService)
 local VesselService = require(script.Parent.VesselService)
 
 local RebirthService = {}
+local rng = Random.new()
 
 local notify: (Player, string) -> () = function(_player: Player, _text: string) end
 local nearShop: (Player) -> boolean = function(_player: Player)
@@ -63,7 +65,7 @@ function RebirthService.rebirth(player: Player, free: boolean): (boolean, string
 	end
 
 	if profile.Rebirths <= Config.Rebirth.MaxPicks then
-		local options = Rebirth.remaining(profile.Rewards)
+		local options = Rebirth.rollOptions(profile.Rewards, rng)
 		profile.PendingPick = if #options > 0 then options else nil
 	end
 	DataService.changed(player)

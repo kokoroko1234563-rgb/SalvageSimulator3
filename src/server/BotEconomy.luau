@@ -18,6 +18,8 @@ local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
 local Rebirth = require(Shared.Rebirth)
+
+local rng = Random.new() -- the rewards offered at a bot's rebirth
 local Stats = require(Shared.Stats)
 local Beach = require(Shared.Beach)
 local Tide = require(Shared.Tide)
@@ -345,7 +347,8 @@ function BotEconomy.rebirth(state: State): string?
 	end
 	state.Vessels = vessels
 	if state.Rebirths <= Config.Rebirth.MaxPicks then
-		local options = Rebirth.remaining(state.Rewards)
+		-- Offered a few at random, as players are; the bot takes the most useful of them.
+		local options = Rebirth.rollOptions(state.Rewards, rng)
 		local pick = BotEconomy.bestReward(state, options)
 		if pick then
 			BotEconomy.grant(state, pick)

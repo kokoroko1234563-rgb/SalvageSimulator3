@@ -717,6 +717,7 @@ Config.Rebirth = {
 	CostGrowth = 1.5, -- each rebirth costs this much more than the last
 	MultiplierStep = 0.5, -- coin multiplier gained per rebirth
 	MaxPicks = 5, -- reward picks at the first 5 rebirths
+	Choices = 3, -- each pick offers this many rewards, at random from those not owned yet
 }
 
 -- Carts (vessels) meet the map as one of four standard boxes: a vessel's size decides the box

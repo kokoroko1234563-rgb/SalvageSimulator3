@@ -4357,7 +4357,7 @@ test("bot buying rule picks the best income per price, and rebirths first", func
 	assert(pick and state.Rewards[pick], "takes a reward")
 	assert(state.Rebirths == 1 and state.Coins == 0, "coins reset")
 	assert(not state.Tools.BoatHook and not state.Vessels.Wheelbarrow, "shop gear goes")
-	-- It takes the pick that gives most income.
+	-- Of the rewards it's offered, it takes the one that gives most income.
 	local options = Rebirth.remaining({})
 	local bestIncome, bestId = -1, nil
 	for _, id in options do
@@ -4368,7 +4368,46 @@ test("bot buying rule picks the best income per price, and rebirths first", func
 			bestIncome, bestId = Economy.income(trial), id
 		end
 	end
-	assert(pick == bestId, "the most useful reward is " .. tostring(bestId) .. ", took " .. tostring(pick))
+	local chooser = Economy.newState()
+	chooser.Rebirths = 1
+	local chosen = Economy.bestReward(chooser, options)
+	assert(
+		chosen == bestId,
+		"the most useful reward is " .. tostring(bestId) .. ", took " .. tostring(chosen)
+	)
+end)
+
+test("rebirth: a pick offers 3 rewards at random from those not owned, all when fewer are left", function()
+	local Config = h.require("Shared/Config")
+	local Rebirth = h.require("Shared/Rebirth")
+	-- (A stand-in for Roblox's Random, which Lune hasn't got.)
+	local rng = {
+		NextInteger = function(_, min: number, max: number): number
+			return math.random(min, max)
+		end,
+	} :: any
+	local seen = {}
+	for _ = 1, 40 do
+		local options = Rebirth.rollOptions({ SwiftFeet = true }, rng)
+		assert(#options == Config.Rebirth.Choices, "offers " .. Config.Rebirth.Choices)
+		local unique = {}
+		for _, id in options do
+			assert(Rebirth.Rewards[id] and id ~= "SwiftFeet", "a reward not owned yet: " .. id)
+			assert(not unique[id], "no repeats")
+			unique[id] = true
+			seen[id] = true
+		end
+	end
+	local kinds = 0
+	for _ in seen do
+		kinds += 1
+	end
+	assert(kinds == #Rebirth.Order - 1, "every reward not owned comes up sometimes")
+	local owned = {}
+	for i = 1, #Rebirth.Order - 2 do
+		owned[Rebirth.Order[i]] = true
+	end
+	assert(#Rebirth.rollOptions(owned, rng) == 2, "only 2 left: both offered")
 end)
 
 test("bot speed-up keeps each zone's supply per second of game time", function()

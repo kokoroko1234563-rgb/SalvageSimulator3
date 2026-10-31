@@ -94,4 +94,22 @@ function Rebirth.remaining(owned: { [string]: boolean }): { string }
 	return list
 end
 
+-- The rewards offered at a pick: Config.Rebirth.Choices of those still available, at random
+-- (all of them when fewer are left), in the rewards' usual order.
+function Rebirth.rollOptions(owned: { [string]: boolean }, rng: Random): { string }
+	local pool = Rebirth.remaining(owned)
+	local offered = {}
+	for _ = 1, math.min(cfg.Choices, #pool) do
+		local id = table.remove(pool, rng:NextInteger(1, #pool))
+		offered[id] = true
+	end
+	local options = {}
+	for _, id in Rebirth.Order do
+		if offered[id] then
+			table.insert(options, id)
+		end
+	end
+	return options
+end
+
 return Rebirth
