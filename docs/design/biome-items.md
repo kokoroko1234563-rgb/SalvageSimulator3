@@ -17,8 +17,23 @@ same zone, more so the rarer the biome. Each biome has its own page in the colle
   wherever the biome rolls. Premiums by biome tier: Common 1.25, Uncommon 1.4, Rare 1.6,
   VeryRare 2.0 (`Config.Biomes.Premium`). Rarity weights: Common 1, Uncommon 2, Rare 4,
   VeryRare 8 (`Config.Biomes.RarityWorth`).
+- **How it is built.** The items are in `src/shared/Items.luau` with `Biome = "<BiomeId>"`, no
+  `Tier` and `Value = 0`; `Items.ofBiome(biomeId, rarity)` lists them, `Items.BiomeOrder` is the
+  pages' order. `Items.biomeValue(zone, biomeTier, rarity)` is the spawn-time worth; the zone's
+  average normal find and average rarity weight are worked out once per zone from its `Rarity`
+  table as written (the private-server scale-down of rare spawns does not change them).
+  `ItemService.chooseDef` rolls the rarity first, then with chance `ItemShare` takes the biome's
+  item of it (`Items.nearestRarity`: the rarer neighbour first on a tie), and `createItem` sets
+  the Value attribute. This holds for surf, sand and loot-spot spawns alike; sand spawns still
+  never roll unlock items or the Beacon Pearl. `Validate` requires every biome in `Biomes.List`
+  to have an item of each rarity its zones roll, so the fallback is a safety net (tested), not
+  something the data relies on. Biome items are not in the normal pools, `Items.Lexicon` or
+  the tower man's check. Measured on the spawner: Common 1.25x, Uncommon 1.40x, Rare 1.6x,
+  VeryRare 2.0x of the zone's normal average. The bots' income estimate (`BotEconomy`) includes
+  the average lift from biomes.
 - **Collection log.** One page per biome. The tower man's complete-lexicon check stays on the
-  normal items only.
+  normal items only. In the inventory's Lexicon tab the main page ("Beach") and each biome's page
+  are buttons across the top; the "new lexicon entry" message counts on the biome's page.
 - **Models.** Every item has a built model to the standard of `src/server/ItemModels.luau`
   (several welded parts, shaped and shaded, built in the root's frame). Biome items' builders
   live in `src/server/BiomeItemModels/<BiomeId>.luau`, each returning `{ [itemId] = builder }`.

@@ -5,6 +5,7 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Biomes = require(Shared.Biomes)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Stats = require(Shared.Stats)
@@ -97,13 +98,21 @@ local function grabItem(player: Player, item: BasePart, root: BasePart): (boolea
 		local itemId = item:GetAttribute("ItemId")
 		if DataService.recordLexicon(player, itemId) then
 			local def = Items.get(itemId)
+			-- (A biome item is counted on its biome's page.)
+			local biome = if def and def.Biome then Biomes.List[def.Biome] else nil
+			local found, total = player:GetAttribute("LexiconCount") or 0, #Items.Lexicon
+			if biome then
+				local page = Items.ofBiome(biome.Id)
+				found, total = DataService.lexiconFound(player, page), #page
+			end
 			notify(
 				player,
 				string.format(
-					"New lexicon entry: %s! (%d/%d)",
+					"New %slexicon entry: %s! (%d/%d)",
+					if biome then biome.Name .. " " else "",
 					if def then def.Name else itemId,
-					player:GetAttribute("LexiconCount") or 0,
-					#Items.Lexicon
+					found,
+					total
 				)
 			)
 		end

@@ -14,7 +14,7 @@ local Biomes = {}
 --   Zones        { [zone] = weight }: the zones it can roll in, and how often (against the
 --                other biomes there, once a zone has rolled to get a biome at all:
 --                Config.Biomes.Chance). Each biome turns up at most once a tide.
---   Loot, LootShare  the zone's surf spawns: this share comes from Loot.
+--   (Its own items are the Biome items in Items.luau, Items.ofBiome: docs/design/biome-items.md.)
 --   Hazards      a list of hazard entries (see Hazards.luau): { Type = "Patrol", ... }.
 --   Secret, UnlockItem, Entrance, EntranceName, EntranceSpots  its secret, the entrance to it
 --                (the name of its builder in BiomeService), what the opening's prompt calls it,
@@ -31,8 +31,6 @@ Biomes.List = {
 		Name = "Sandcastle Flats",
 		Tier = "Common",
 		Zones = { [1] = 45, [2] = 45, [3] = 40, [4] = 30 },
-		Loot = { "Bucket", "Sunglasses", "BeachBall", "FlipFlop" },
-		LootShare = 0.6, -- this share of the zone's surf spawns comes from Loot
 		UnlockItem = "GoldenSpade",
 		Secret = "SandcastleFlats",
 		EntranceSpots = { -110, -40, 40, 110 }, -- X positions the secret's sandcastle can stand at
@@ -56,8 +54,6 @@ Biomes.List = {
 		Name = "Shipwreck Shallows",
 		Tier = "Uncommon", -- a rare biome: never announced
 		Zones = { [2] = 15, [3] = 15, [4] = 15, [5] = 15, [6] = 12 },
-		Loot = { "Barrel", "SmallCrate", "Lantern", "GlassBottle", "ShipBell" },
-		LootShare = 0.6,
 		UnlockItem = "CaptainsKey",
 		Secret = "ShipwreckShallows",
 		EntranceSpots = { -100, -20, 60, 120 },
@@ -94,8 +90,6 @@ Biomes.List = {
 		Name = "Hermit Hollows",
 		Tier = "Rare", -- never announced
 		Zones = { [4] = 8, [5] = 12, [6] = 15 },
-		Loot = { "BigShell" },
-		LootShare = 0.5,
 		UnlockItem = "SpiralConch",
 		Secret = "HermitHollows",
 		Entrance = "Burrow",
@@ -138,11 +132,9 @@ Biomes.List = {
 			{ Type = "Sink", Scatter = false },
 		},
 		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
-		LootShare = 0.6,
 		Decor = Color3.fromRGB(196, 170, 136),
 		Name = "Driftwood Cove",
 		Tier = "Common",
-		Loot = { "Plank", "Rope", "GlassBottle", "OldBoot" },
 		UnlockItem = "CarvedIdol",
 		Secret = "DriftwoodCove",
 		Entrance = "Trunk",
@@ -170,11 +162,9 @@ Biomes.List = {
 			},
 		},
 		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
-		LootShare = 0.6,
 		Decor = Color3.fromRGB(120, 140, 150),
 		Name = "Tidepool Rocks",
 		Tier = "Common",
-		Loot = { "Seashell", "Starfish", "FishingLure" },
 		UnlockItem = "PearlEyedShell",
 		Secret = "TidepoolRocks",
 		Entrance = "Blowhole",
@@ -185,13 +175,11 @@ Biomes.List = {
 	SeagrassShallows = {
 		Id = "SeagrassShallows",
 		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
-		LootShare = 0.6,
 		Decor = Color3.fromRGB(110, 150, 100),
 		-- Tangling seagrass slows you where its layout puts it (gentle: a common biome).
 		Hazards = { { Type = "Slow", Scatter = false, Factor = 0.6, Color = Color3.fromRGB(70, 120, 60) } },
 		Name = "Seagrass Shallows",
 		Tier = "Common",
-		Loot = { "Buoy", "Net", "GlassFloat" },
 		UnlockItem = "BarnacledLantern",
 		Secret = "SeagrassShallows",
 		Entrance = "Jetty",
@@ -207,13 +195,11 @@ Biomes.List = {
 	CoralGarden = {
 		Id = "CoralGarden",
 		Zones = { [1] = 30, [2] = 30, [3] = 25, [4] = 20 },
-		LootShare = 0.6,
 		Decor = Color3.fromRGB(235, 170, 180),
 		-- Sharp coral slows you where its layout puts it: wide beds right across the lanes, hard to avoid.
 		Hazards = { { Type = "Slow", Scatter = false, Factor = 0.6, Color = Color3.fromRGB(240, 150, 160) } },
 		Name = "Coral Garden",
 		Tier = "Common",
-		Loot = { "Coral", "Snorkel", "Coconut" },
 		UnlockItem = "CoralComb",
 		Secret = "CoralGarden",
 		Entrance = "ReefArch",
@@ -229,8 +215,6 @@ Biomes.List = {
 	FogBank = {
 		Id = "FogBank",
 		Zones = { [2] = 12, [3] = 12, [4] = 14, [5] = 14, [6] = 14 },
-		Loot = {},
-		LootShare = 0,
 		Decor = Color3.fromRGB(200, 205, 210),
 		-- The fog, cleared now and then by the lighthouse's foghorn; covered pits in the deep zones.
 		Hazards = { { Type = "Fog", Scatter = false }, { Type = "Pit", Scatter = false } },
@@ -247,8 +231,6 @@ Biomes.List = {
 	WhirlwindDunes = {
 		Id = "WhirlwindDunes",
 		Zones = { [4] = 10, [5] = 10, [6] = 10 },
-		Loot = {},
-		LootShare = 0,
 		Decor = Color3.fromRGB(225, 195, 140),
 		-- The whirlwind circling its bowl; spike pits in zone 6 where it can throw you.
 		Hazards = { { Type = "Whirlwind", Scatter = false }, { Type = "Pit", Scatter = false } },
@@ -271,13 +253,11 @@ Biomes.List = {
 	StrandedIceberg = {
 		Id = "StrandedIceberg",
 		Zones = { [5] = 4, [6] = 6 },
-		LootShare = 0.5,
 		Decor = Color3.fromRGB(200, 230, 245),
 		-- Slippery ice across the frozen lake; crevasses (spike pits), covered and open.
 		Hazards = { { Type = "Ice", Scatter = false }, { Type = "Pit", Scatter = false } },
 		Name = "Stranded Iceberg",
 		Tier = "VeryRare",
-		Loot = { "FrozenFish" },
 		UnlockItem = "FrozenCompass",
 		Secret = "StrandedIceberg",
 		Entrance = "IceCave",
@@ -297,8 +277,6 @@ Biomes.List = {
 	SpearstoneReef = {
 		Id = "SpearstoneReef",
 		Zones = { [4] = 10, [5] = 10, [6] = 10 },
-		Loot = {},
-		LootShare = 0,
 		Decor = Color3.fromRGB(70, 80, 90),
 		-- Fields of spearstones on a rhythm, room after room: an obstacle course.
 		Hazards = { { Type = "Spears", Scatter = false } },
@@ -315,8 +293,6 @@ Biomes.List = {
 	JellyfishLagoon = {
 		Id = "JellyfishLagoon",
 		Zones = { [2] = 12, [3] = 12, [4] = 14, [5] = 14, [6] = 14 },
-		Loot = {},
-		LootShare = 0,
 		Decor = Color3.fromRGB(190, 150, 230),
 		Hazards = { { Type = "Jelly", Scatter = false } },
 		Name = "Jellyfish Lagoon",

@@ -1,6 +1,8 @@
 -- The lexicon and the tower man.
 --   * The first time a player grabs an item type off the beach, it's recorded in their
---     lexicon forever (see GrabService).
+--     lexicon forever (see GrabService). The lexicon has a main page (Items.Lexicon) and one page
+--     per biome for its own items (Items.ofBiome, docs/design/biome-items.md); the tower man's
+--     check below counts the main page only.
 --   * Each tide cycle, every zone has a tiny chance of a man appearing on top of a tall dirt
 --     tower. Players with a complete lexicon can climb up and claim the Tall Top Hat from
 --     him: untradeable, never lost, worn from the inventory.

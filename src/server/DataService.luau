@@ -369,7 +369,14 @@ local function publish(player: Player)
 	player:SetAttribute("Accessory", if accessory then accessory.Id else "")
 	player:SetAttribute("Cores", profile.Cores)
 	player:SetAttribute("ColoredCoinCount", countKeys(profile.ColoredCoins))
-	player:SetAttribute("LexiconCount", countKeys(profile.Lexicon))
+	-- (The main page only: the biomes' pages are counted by lexiconFound.)
+	local foundHere = 0
+	for _, item in Items.Lexicon do
+		if profile.Lexicon[item.Id] then
+			foundHere += 1
+		end
+	end
+	player:SetAttribute("LexiconCount", foundHere)
 	local cosmetic = profile.EquippedCosmetic
 	player:SetAttribute("Cosmetic", if cosmetic and ownedTypes(profile)[cosmetic] then cosmetic else "")
 	local upgrades = {}
@@ -546,6 +553,19 @@ function DataService.recordLexicon(player: Player, itemId: string): boolean
 	return true
 end
 
+-- How many of a lexicon page's items (Items.Lexicon, or Items.ofBiome(biomeId)) the player has found.
+function DataService.lexiconFound(player: Player, page: { any }): number
+	local profile = profiles[player]
+	local count = 0
+	for _, item in page do
+		if profile and profile.Lexicon[item.Id] then
+			count += 1
+		end
+	end
+	return count
+end
+
+-- The tower man's check: the main page only (Items.Lexicon). The biomes' pages don't count.
 function DataService.lexiconComplete(player: Player): boolean
 	local profile = profiles[player]
 	if not profile then

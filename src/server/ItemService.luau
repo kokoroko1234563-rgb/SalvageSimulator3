@@ -17,7 +17,8 @@
 --     faster it refills, up to MaxRate per second when empty; at or above target it spawns
 --     nothing. A zone only ever looks at its own count, so items dropped in one zone can't
 --     speed up another.
---   * Rarity. What a spawn is (chooseDef) is rolled exactly as before; emptiness changes only
+--   * Rarity. What a spawn is (chooseDef) is rolled as before, and in a biome zone a share of it is
+--     the biome's own items (Config.Biomes.ItemShare); emptiness changes only
 --     how often a zone spawns, never what.
 --   * Where. Zones with SpawnOnSand (1 to 3) put a spawn on their open, walkable sand (not
 --     under the sea, not rock, not under a roof, not on a cliff) at any point of the tide, or,
@@ -266,7 +267,9 @@ function ItemService.itemsOwnedBy(player: Player): { BasePart }
 end
 
 -- `tier` is the zone tier the tool must reach to lift it: where the item washed up (so a biome's
--- loot takes its zone's tier), else its own Tier. Unlock items have none: always liftable.
+-- items take their zone's tier), else its own Tier. Unlock items have none: always liftable.
+-- A biome item's Value attribute is set for the zone and its biome's tier (Items.biomeValue);
+-- every other item's is its catalog Value times the zone's multiplier.
 local function createItem(def, zoneIndex: number, position: Vector3, tier: number?): BasePart
 	local part = Instance.new("Part")
 	part.Name = def.Name
@@ -292,7 +295,11 @@ local function createItem(def, zoneIndex: number, position: Vector3, tier: numbe
 	if not def.Unlock then
 		part:SetAttribute("Tier", tier or def.Tier or zoneIndex)
 	end
-	part:SetAttribute("Value", math.floor(def.Value * Config.Zones[zoneIndex].Multiplier))
+	if def.Biome then
+		part:SetAttribute("Value", Items.biomeValue(zoneIndex, Biomes.List[def.Biome].Tier, def.Rarity))
+	else
+		part:SetAttribute("Value", math.floor(def.Value * Config.Zones[zoneIndex].Multiplier))
+	end
 	if def.Unlock then
 		-- Unlock items glow so they're findable, and are banked rather than sold.
 		part:SetAttribute("Unlock", def.Unlock)
@@ -341,12 +348,14 @@ local function rollRarity(weights: { [string]: number }, rolls: number): string
 	return Items.Rarities[best]
 end
 
--- What washes up at a point in a zone: a biome's secret unlock item or own loot sometimes, the
--- sky-beam item on the Far Sandbar, else an item of the zone's own tier (Items.Catalog Tier) at
--- a rarity from the zone's table (the rarest of `rarityRolls` rolls). Biome loot takes the
--- tier of the zone it washes up in, whatever its own Tier (createItem).
+-- What washes up at a point in a zone: a biome's secret unlock item sometimes, the sky-beam item
+-- on the Far Sandbar, else a rarity from the zone's table (the rarest of `rarityRolls` rolls) and
+-- with chance Config.Biomes.ItemShare, in a zone whose tile has a biome, one of that biome's items
+-- of the rarity (the nearest it has), or otherwise an item of the zone's own tier (Items.Catalog
+-- Tier) at that rarity. A biome item takes the tier of the zone it washes up in and gets its
+-- Value there (createItem, Items.biomeValue).
 -- With `ordinary` set (spawns on open sand) there is no unlock item and no sky-beam item: those
--- only come from the surf; the biome's own loot is still allowed.
+-- only come from the surf; the biome's own items are still allowed.
 local function chooseDef(zoneIndex: number, z: number, rarityRolls: number, ordinary: boolean?)
 	local biome = Biomes.activeIn(Beach.tileAt(z))
 	local def
@@ -374,28 +383,27 @@ local function chooseDef(zoneIndex: number, z: number, rarityRolls: number, ordi
 	then
 		def = Items.get("BeaconPearl")
 	end
-	if not def and biome and rng:NextNumber() < biome.LootShare then
-		def = Items.get(biome.Loot[rng:NextInteger(1, #biome.Loot)])
-	end
 	if not def then
 		local rarity = rollRarity(Items.scaleRare(Config.Zones[zoneIndex].Rarity, rareScale), rarityRolls)
-		local choices = Items.ofTier(zoneIndex, rarity)
-		if #choices == 0 then
-			-- (A rarity the tier has none of, such as the commons that scaled-down rare spawns
-			-- turn the Far Sandbar's rolls into: the nearest rarer one, else the nearest common.)
-			local index = table.find(Items.Rarities, rarity) or 1
-			for offset = 1, #Items.Rarities do
-				for _, step in { offset, -offset } do
-					local other = Items.Rarities[index + step]
-					if other and #choices == 0 then
-						choices = Items.ofTier(zoneIndex, other)
-					end
-				end
+		-- A biome's own item with chance ItemShare, at the rolled rarity (the nearest the biome has).
+		if biome and rng:NextNumber() < Config.Biomes.ItemShare then
+			local own = Items.nearestRarity(rarity, function(other)
+				return #Items.ofBiome(biome.Id, other) > 0
+			end)
+			if own then
+				local choices = Items.ofBiome(biome.Id, own)
+				return choices[rng:NextInteger(1, #choices)]
 			end
 		end
-		if #choices == 0 then
+		-- (A rarity the tier has none of, such as the commons that scaled-down rare spawns
+		-- turn the Far Sandbar's rolls into: the nearest rarer one, else the nearest common.)
+		local nearest = Items.nearestRarity(rarity, function(other)
+			return #Items.ofTier(zoneIndex, other) > 0
+		end)
+		if not nearest then
 			return nil
 		end
+		local choices = Items.ofTier(zoneIndex, nearest)
 		def = choices[rng:NextInteger(1, #choices)]
 	end
 	return def

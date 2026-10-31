@@ -483,6 +483,16 @@ Config.Biomes = {
 	-- biomes that can turn up there (Biomes.luau). Each biome turns up at most once a tide.
 	-- Rare biomes are never announced.
 	Chance = { 0.2, 0.22, 0.25, 0.28, 0.3, 0.3 },
+	-- Biome items (docs/design/biome-items.md): in a zone whose tile has a biome, this share of
+	-- the spawns is one of the biome's own items (at the rarity the zone rolled, else the nearest
+	-- the biome has).
+	ItemShare = 0.45,
+	-- A biome's average find is worth this much over the zone's normal average, by the biome's
+	-- Tier (Biomes.luau)...
+	Premium = { Common = 1.25, Uncommon = 1.4, Rare = 1.6, VeryRare = 2.0 },
+	-- ...and within a biome, an item's worth goes by its rarity weight over the zone's average
+	-- weight under its Rarity table (Items.biomeValue).
+	RarityWorth = { Common = 1, Uncommon = 2, Rare = 4, VeryRare = 8 },
 }
 
 -- Rare unlock items for secrets.
