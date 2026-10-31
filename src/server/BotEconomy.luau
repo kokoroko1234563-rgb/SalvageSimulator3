@@ -14,6 +14,7 @@
 -- its vessel carries, against the walk there and back.
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Biomes = require(Shared.Biomes)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
@@ -146,6 +147,30 @@ local heavyReach = math.clamp(
 	1
 )
 
+-- How much a biome's items lift the worth of a spawn in zone `z` on average: the zone has a biome
+-- with chance Config.Biomes.Chance, which (picked by the Zones weights) makes ItemShare of the
+-- spawns its own items, worth its premium over a normal find (Config.Biomes.Premium). (A biome's
+-- items are about as easy to take as the rest: the tier is the zone's, only the class differs.)
+local biomeFactors: { [number]: number } = {}
+local function biomeFactor(z: number): number
+	if biomeFactors[z] then
+		return biomeFactors[z]
+	end
+	local weight, premium = 0, 0
+	for _, biome in Biomes.List do
+		local w = biome.Zones[z] or 0
+		weight += w
+		premium += w * (Config.Biomes.Premium[biome.Tier] or 1)
+	end
+	local factor = 1
+	if weight > 0 then
+		local chance = Config.Biomes.Chance[z] or 0
+		factor = 1 + chance * Config.Biomes.ItemShare * (premium / weight - 1)
+	end
+	biomeFactors[z] = factor
+	return factor
+end
+
 -- What a spawned item in zone `z` is worth to a bot, and how likely it can take it:
 -- (expected value over all spawns, chance a spawn can be taken). Zone `z` washes up only items of
 -- tier `z`, so a tool that works the zone (its lift tier at least `z`) can take them all, bar the
@@ -165,7 +190,7 @@ local function zoneYield(z: number, lift: number): (number, number)
 		for _, def in pool do
 			local share = (w / total) / #pool
 			local reach = if def.Class >= Gear.WeightClass.Heavy then heavyReach else 1
-			value += share * reach * def.Value * Config.Zones[z].Multiplier
+			value += share * reach * def.Value * Config.Zones[z].Multiplier * biomeFactor(z)
 			chance += share * reach
 		end
 	end

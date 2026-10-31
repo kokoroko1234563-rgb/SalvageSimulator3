@@ -86,13 +86,19 @@ local function colours(group: string)
 	return list
 end
 
--- Beach items: the catalog body with its model on it, exactly as it washes up.
-local function items()
+-- Beach items: the catalog body with its model on it, exactly as it washes up. `biomeItems`
+-- picks the biomes' own items (docs/design/biome-items.md) or the rest.
+local function items(biomeItems: boolean)
 	local list = {}
 	for _, def in Items.Catalog do
+		if (def.Biome ~= nil) ~= biomeItems then
+			continue
+		end
 		table.insert(list, {
 			Name = def.Name,
-			Note = def.Rarity .. (if ItemModels.has(def.Id) then "" else " · no model yet"),
+			Note = (if def.Biome then def.Biome .. " · " else "")
+				.. def.Rarity
+				.. (if ItemModels.has(def.Id) then "" else " · no model yet"),
 			Pedestal = 2,
 			Build = function(p, at)
 				local root = Instance.new("Part")
@@ -450,7 +456,12 @@ return function()
 				return list
 			end)(),
 		},
-		{ Name = "Beach items", Description = "Items.Catalog with ItemModels", Exhibits = items() },
+		{ Name = "Beach items", Description = "Items.Catalog with ItemModels", Exhibits = items(false) },
+		{
+			Name = "Biome items",
+			Description = "Items.Catalog items with a Biome, with ItemModels",
+			Exhibits = items(true),
+		},
 		{ Name = "Vessels", Description = "VesselService builders", Exhibits = vessels() },
 		{ Name = "Grabbers", Description = "Gear.Tools (no model: info boards)", Exhibits = tools() },
 		{
