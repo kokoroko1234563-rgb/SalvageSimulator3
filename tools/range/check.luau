@@ -817,7 +817,10 @@ if JOB.reroll and JOB.reroll > 0 then
 	local beat = RunService.Heartbeat:Connect(function(dt)
 		longest = math.max(longest, dt)
 	end)
-	task.wait(1)
+	-- (First, a quiet stretch: the longest frame with nothing of ours running.)
+	longest = 0
+	task.wait(4)
+	report.measurements.idleLongestFrame = longest
 	Perf.reset()
 	local rerolls = {}
 	for _ = 1, JOB.reroll do

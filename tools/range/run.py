@@ -124,6 +124,8 @@ def summarise(report):
             lines.append(f"  (Roblox's pathfinder: {crossing['pathfinderSeconds']:.0f}s)")
     for note in report.get("notes", []):
         lines.append(f"  note: {note}")
+    if m.get("idleLongestFrame") is not None:
+        lines.append(f"  longest frame with nothing running: {m['idleLongestFrame'] * 1000:.0f} ms")
     for i, r in enumerate(m.get("rerolls", []), 1):
         lines.append(f"  biome reroll {i}: {r['seconds'] * 1000:.0f} ms, longest frame {r['longestFrame'] * 1000:.0f} ms")
     perf = m.get("perf")
