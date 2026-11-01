@@ -209,7 +209,9 @@ end
 function WallBarriers.build(tile: number, pause: (() -> ())?)
 	local slabs = WallBarriers.slabsFor(tile, pause)
 	local folder = folderFor(tile)
+	local rest = pause or function() end
 	for index, slab in slabs do
+		rest()
 		local part = Instance.new("Part")
 		part.Name = "WallBarrier" .. index
 		part.Anchored = true

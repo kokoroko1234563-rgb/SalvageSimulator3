@@ -20,6 +20,7 @@ local DecorService = require(script.Parent.DecorService)
 local GroundShift = require(script.Parent.GroundShift)
 local HazardService = require(script.Parent.HazardService)
 local Perf = require(script.Parent.Perf)
+local Slice = require(script.Parent.Slice)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 
 local BiomeService = {}
@@ -635,11 +636,16 @@ end
 -- Sets (or clears, with nil) a tile's biome and rebuilds its decor and entrance. A tile is a
 -- whole zone. `choice` picks its layout's crossing and rooms (Layouts.encode's text, or a
 -- Choice); without one, they're rolled.
-function BiomeService.set(tile: number, biomeId: string?, choice: any?, rebuild: boolean?)
+function BiomeService.set(tile: number, biomeId: string?, choice: any?, rebuild: boolean?, sliced: boolean?)
 	local setStarted = Perf.start()
 	local step = setStarted
+	-- (A lap ends a step: it is timed, and when the rebuild is sliced the frame goes back before
+	-- the next one, so one frame never holds two steps.)
 	local function lap(name: string)
 		Perf.stop(name, step)
+		if sliced then
+			task.wait()
+		end
 		step = os.clock()
 	end
 	local biome = biomeId and Biomes.List[biomeId]
@@ -692,7 +698,12 @@ function BiomeService.set(tile: number, biomeId: string?, choice: any?, rebuild:
 				lap("Biome.set.entrance")
 			end
 		end
-		HazardService.start(tile, biome or zone, tileFolder)
+		HazardService.start(
+			tile,
+			biome or zone,
+			tileFolder,
+			if sliced then Slice.new("Hazard.startSlice") else nil
+		)
 		lap("Biome.set.hazards")
 		tileFolder.Parent = folder
 		if biome then
@@ -758,10 +769,7 @@ function BiomeService.reroll(sliced: boolean?)
 	local started = Perf.start()
 	local picked = BiomeService.pick(rng)
 	for tile = 1, Beach.ActiveTiles do
-		BiomeService.set(tile, picked[tile])
-		if sliced then
-			task.wait()
-		end
+		BiomeService.set(tile, picked[tile], nil, nil, sliced)
 	end
 	for _, callback in rerollCallbacks do
 		task.spawn(callback)

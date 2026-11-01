@@ -22,6 +22,7 @@ local Tide = require(Shared.Tide)
 
 local CollisionGroups = require(script.Parent.CollisionGroups)
 local Perf = require(script.Parent.Perf)
+local Slice = require(script.Parent.Slice)
 
 local HazardService = {}
 
@@ -2386,8 +2387,11 @@ HazardService.Builders = builders
 
 -- Builds a source's hazards on a tile into its folder: a biome's, or a plain zone's
 -- (Config.Zones[i]), anything with a Hazards list.
-function HazardService.start(tile: number, source: any, folder: Instance)
+function HazardService.start(tile: number, source: any, folder: Instance, pause: (() -> ())?)
 	for _, entry in source.Hazards or {} do
+		if pause then
+			pause()
+		end
 		local settings = Hazards.settings(entry)
 		local build = builders[settings.Type]
 		if build then
