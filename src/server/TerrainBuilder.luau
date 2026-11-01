@@ -17,6 +17,7 @@ local Looks = require(Shared.Looks)
 
 local WallBarriers = require(script.Parent.WallBarriers)
 local Perf = require(script.Parent.Perf)
+local Slice = require(script.Parent.Slice)
 
 local TerrainBuilder = {}
 
@@ -182,10 +183,9 @@ function TerrainBuilder.heightRange(z0: number, z1: number): (number, number)
 end
 
 -- A slab is written in chunks this many voxels wide along X (each its own compute and write),
--- and the frame is given back once the work since the last pause has used this many seconds, so
+-- and the frame is given back once the work since the last pause has used its budget (Slice), so
 -- rebuilding terrain in the running game is a run of short frames and not one long one.
-local CHUNK = 8
-local BUDGET = 0.005
+local CHUNK = 4
 
 -- The X ranges a slab is written in: whole voxels, from lo.X to hi.X (tools/tests).
 function TerrainBuilder.chunks(loX: number, hiX: number): { { number } }
@@ -208,7 +208,7 @@ function TerrainBuilder.buildRange(fromZ: number, toZ: number)
 	local lo, hi = TerrainBuilder.bounds()
 	local z0 = math.max(lo.Z, snap(fromZ, false))
 	local stop = math.min(hi.Z, snap(toZ, true))
-	local pausedAt = os.clock()
+	local pause = Slice.new("Terrain.slice")
 	while z0 < stop do
 		local z1 = math.min(z0 + SLAB * VOXEL, stop)
 		local ranging = Perf.start()
@@ -224,13 +224,9 @@ function TerrainBuilder.buildRange(fromZ: number, toZ: number)
 			local writing = Perf.start()
 			terrain:WriteVoxels(region, VOXEL, materials, occupancy)
 			Perf.stop("Terrain.slabWrite", writing)
-			-- A breath when the budget is used: the whole beach takes seconds to work out, and a
-			-- script that runs that long without a pause is stopped (and holds everything else
-			-- up meanwhile).
-			if os.clock() - pausedAt > BUDGET then
-				task.wait()
-				pausedAt = os.clock()
-			end
+			-- (The whole beach takes seconds to work out, and a script that runs that long without
+			-- a pause is stopped, and holds everything else up meanwhile.)
+			pause()
 		end
 		z0 = z1
 	end
@@ -241,7 +237,7 @@ function TerrainBuilder.buildTile(tile: number)
 	local z0, z1 = Beach.tileRange(tile)
 	TerrainBuilder.buildRange(z0, z1)
 	local barriers = Perf.start()
-	WallBarriers.build(tile)
+	WallBarriers.build(tile, Slice.new("Terrain.slice"))
 	Perf.stop("Terrain.wallBarriers", barriers)
 end
 

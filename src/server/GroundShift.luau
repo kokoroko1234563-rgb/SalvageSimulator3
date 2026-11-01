@@ -22,6 +22,7 @@ local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
 
 local Perf = require(script.Parent.Perf)
+local Slice = require(script.Parent.Slice)
 
 local GroundShift = {}
 
@@ -205,7 +206,9 @@ function GroundShift.capture(tile: number): () -> ()
 	Perf.stop("GroundShift.capture", capturing)
 	return function()
 		local settling = Perf.start()
+		local pause = Slice.new("GroundShift.slice")
 		for _, record in records do
+			pause()
 			local target = record.target
 			if not target.Parent then
 				continue

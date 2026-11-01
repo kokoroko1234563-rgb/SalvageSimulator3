@@ -16,6 +16,9 @@ local Hazards = require(Shared.Hazards)
 local Layouts = require(Shared.Layouts)
 local Palette = require(Shared.Palette)
 
+local Perf = require(script.Parent.Perf)
+local Slice = require(script.Parent.Slice)
+
 local D = Palette.Decor
 local M = Palette.Material
 local Ball = Enum.PartType.Ball
@@ -732,14 +735,18 @@ function DecorService.build(tile: number): Folder?
 		root = folder
 	end
 	local name = "Tile" .. tile
-	local old = (root :: Folder):FindFirstChild(name)
-	if old then
-		old:Destroy()
-	end
 	local entries = Layouts.decor(tile)
 	if #entries == 0 then
+		local old = (root :: Folder):FindFirstChild(name)
+		if old then
+			old:Destroy()
+		end
 		return nil
 	end
+	local started = Perf.start()
+	-- (A tile's decor is many models: the frame goes back between them, and the old decor stays
+	-- until the new is ready.)
+	local pause = Slice.new("Decor.slice")
 	local layout = Layouts.active(tile)
 	local folder = Instance.new("Folder")
 	folder.Name = name
@@ -767,9 +774,15 @@ function DecorService.build(tile: number): Folder?
 				rng
 			)
 			model.Parent = folder
+			pause()
 		end
 	end
+	local old = (root :: Folder):FindFirstChild(name)
+	if old then
+		old:Destroy()
+	end
 	folder.Parent = root
+	Perf.stop("Decor.build", started)
 	return folder
 end
 

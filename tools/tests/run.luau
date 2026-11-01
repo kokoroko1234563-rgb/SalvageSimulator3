@@ -2076,7 +2076,22 @@ test("walls get an invisible barrier inside them, open where a ramp cuts through
 		assert(top > Beach.groundY(z0 + 75) + 18 + 7, "higher than a jump off the wall's top")
 		assert(slab.size.X < 14, "inside the wall")
 	end
-	WallBarriers.build(tile)
+	-- Worked out in slices (pausing as it goes), the same slabs come out.
+	local pauses = 0
+	local sliced = WallBarriers.slabsFor(tile, function()
+		pauses += 1
+	end)
+	assert(pauses > 3, "it gives the frame back as it goes, got " .. pauses)
+	assert(#sliced == #slabs, "the same number of slabs")
+	for index, slab in slabs do
+		assert(
+			(sliced[index].cframe.Position - slab.cframe.Position).Magnitude < 1e-6
+				and (sliced[index].size - slab.size).Magnitude < 1e-6,
+			"and the same slabs"
+		)
+	end
+	-- (The Area walls' rows are paused too.)
+	WallBarriers.build(tile, function() end)
 	assert(#h.game.Workspace.WallBarriers["Tile" .. tile]:GetChildren() == 2, "built as parts")
 	Layouts.setActive(tile, false)
 	WallBarriers.build(tile)
@@ -4505,6 +4520,23 @@ test("the bots' candidate scan, time-sliced, still finds the same items", functi
 			ItemService.destroy(item)
 		end
 	end
+end)
+
+test("Slice pauses once the budget is used, and times the run it cut", function()
+	local Perf = h.require("Server/Perf")
+	local Slice = h.require("Server/Slice")
+	Perf.reset()
+	local lazy = Slice.new("Lazy", math.huge)
+	for _ = 1, 5 do
+		lazy()
+	end
+	assert(Perf.snapshot().Lazy == nil, "within the budget: no pause")
+	local eager = Slice.new("Eager", 0)
+	for _ = 1, 3 do
+		eager()
+	end
+	assert(Perf.snapshot().Eager.Count == 3, "over the budget every time: a pause each")
+	Perf.reset()
 end)
 
 test("the server timings (Perf) count, total, keep the worst, and reset", function()

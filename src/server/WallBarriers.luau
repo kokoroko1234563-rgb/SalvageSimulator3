@@ -42,7 +42,7 @@ end
 
 -- An Area wall's slabs: rows of CELL-stud cells where its rock stands (and still stands INSET
 -- studs further out each way), runs along each row, merged down the rows while they match.
-local function areaSlabs(p, tile: number, slabs)
+local function areaSlabs(p, tile: number, slabs, pause: () -> ())
 	local z0, z1 = Beach.tileRange(tile)
 	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
 	for _, point in p.Area do
@@ -76,6 +76,7 @@ local function areaSlabs(p, tile: number, slabs)
 		})
 	end
 	for z = minZ, maxZ - CELL, CELL do
+		pause()
 		local runs = {}
 		local start = nil
 		local x = minX
@@ -117,7 +118,8 @@ local function areaSlabs(p, tile: number, slabs)
 end
 
 -- The barrier slabs for a tile's walls: { CFrame, Size } each.
-function WallBarriers.slabsFor(tile: number): { { cframe: CFrame, size: Vector3 } }
+function WallBarriers.slabsFor(tile: number, pause: (() -> ())?): { { cframe: CFrame, size: Vector3 } }
+	local pause = pause or function() end
 	local layout = Layouts.active(tile)
 	local slabs = {}
 	if not layout then
@@ -129,7 +131,7 @@ function WallBarriers.slabsFor(tile: number): { { cframe: CFrame, size: Vector3 
 			continue
 		end
 		if p.Area then
-			areaSlabs(p, tile, slabs)
+			areaSlabs(p, tile, slabs, pause)
 			continue
 		end
 		-- The lines the slabs run along: a Path wall's middle line.
@@ -182,6 +184,9 @@ function WallBarriers.slabsFor(tile: number): { { cframe: CFrame, size: Vector3 
 				runStart, low, high = nil, math.huge, -math.huge
 			end
 			for k = 0, count do
+				if k % 16 == 0 then
+					pause()
+				end
 				local point = a:Lerp(b, k / count)
 				local standing = Beach.feature(point.X, point.Z) >= p.Height * STANDING
 				if standing then
@@ -199,10 +204,12 @@ function WallBarriers.slabsFor(tile: number): { { cframe: CFrame, size: Vector3 
 	return slabs
 end
 
--- (Re)builds the barriers for one tile.
-function WallBarriers.build(tile: number)
+-- (Re)builds the barriers for one tile. `pause` (Slice) is called through the slow part, working out
+-- the slabs; the old barriers stay up until the new ones are ready.
+function WallBarriers.build(tile: number, pause: (() -> ())?)
+	local slabs = WallBarriers.slabsFor(tile, pause)
 	local folder = folderFor(tile)
-	for index, slab in WallBarriers.slabsFor(tile) do
+	for index, slab in slabs do
 		local part = Instance.new("Part")
 		part.Name = "WallBarrier" .. index
 		part.Anchored = true
