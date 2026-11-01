@@ -424,7 +424,7 @@ end
 
 -- Time slicing: route searches run in the bot's own thread and give the frame back once all bots
 -- together have used FRAME_BUDGET seconds of it, so thinking never stalls the server.
-local FRAME_BUDGET = 0.003 -- (a var for tools/tests)
+local FRAME_BUDGET = 0.003
 local frameUsed = 0
 local lastMark = 0
 
@@ -932,7 +932,6 @@ BotService.sandbarPlan = sandbarPlan -- for tools/tests
 -- slot for (BotService.candidates).
 local SLOT_FLOOR = 0.3
 local SAMPLE_ITEMS = 8 -- free items per zone looked at for the share with a safe approach
-local SCAN_SLICE = 40 -- items looked at between two checks of the frame's budget
 
 local function candidates(bot: Bot, entry: any, relaxed: boolean?): ({ any }, { any })
 	local lift = BotEconomy.lift(bot.State, BotEconomy.tool(bot.State))
@@ -965,17 +964,9 @@ local function candidates(bot: Bot, entry: any, relaxed: boolean?): ({ any }, { 
 	local sandbarZone = Beach.FarSandbarZone
 	local samples: { [number]: { any } } = {}
 	local scanning = Perf.start()
-	-- (The scan looks at every item on the beach and gives the frame back as it goes, so it
-	-- walks a copy: items come and go meanwhile.)
-	local items = ItemService.list()
-	local pause = yieldFor(bot, "Bot.scanSlice")
-	for index, item in items do
-		if index % SCAN_SLICE == 0 then
-			pause()
-		end
-		if not ItemService.isItem(item) then
-			continue
-		end
+	-- (Not time-sliced: waiting for a share of the bots' frame budget made a decision wait
+	-- seconds, since the route searches use it up. One scan takes a few milliseconds.)
+	for item in ItemService.all() do
 		local zone = item:GetAttribute("Zone")
 		if bot.Foot and zone ~= sandbarZone then
 			continue -- (a shuttle is for the sandbar only)
@@ -1079,11 +1070,6 @@ local function candidates(bot: Bot, entry: any, relaxed: boolean?): ({ any }, { 
 end
 
 BotService.candidates = candidates -- for tools/tests
--- For tools/tests (nothing is running there, no frame ever resets): how much of a frame the bots
--- may use before a search gives it back.
-function BotService._setFrameBudget(seconds: number)
-	FRAME_BUDGET = seconds
-end
 
 -- Where to stand to claim an item: the nearest spot to the bot, within the tool's reach of the item,
 -- that stays safe (the way home open, the water under the route limit) for `delay` seconds from

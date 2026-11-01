@@ -4451,7 +4451,7 @@ test("bot: a find's worth rises with the zone, and a tool's zones only", functio
 	assert(Economy.findValue(state, 6) == 0, "a zone beyond the tool is worth nothing to it")
 end)
 
-test("the bots' candidate scan, time-sliced, still finds the same items", function()
+test("the bots' candidate scan finds the free items and not the claimed or destroyed", function()
 	local Items = h.require("Shared/Items")
 	local Economy = h.require("Server/BotEconomy")
 	local ItemService = h.require("Server/ItemService")
@@ -4487,20 +4487,18 @@ test("the bots' candidate scan, time-sliced, still finds the same items", functi
 		end
 		return found
 	end
-	-- (Nothing runs here, so no frame ever gives the budget back: a search must not wait.)
-	BotService._setFrameBudget(math.huge)
-	local sliced = scan()
+	local found = scan()
 	local count = 0
-	for item in sliced do
+	for item in found do
 		count += 1
 		assert(ItemService.isItem(item), "only items that are still there")
 		assert(item ~= taken and item ~= gone, "not a claimed or destroyed one")
 	end
 	assert(count >= 100, "the scan found what is lying there, got " .. count)
-	-- The same set whatever the order or the slicing: every free one is in, every other is out.
+	-- Every free one is in, every other is out.
 	for _, item in made do
 		if item ~= gone and item ~= taken then
-			assert(sliced[item], "a free seashell is a candidate")
+			assert(found[item], "a free seashell is a candidate")
 		end
 	end
 	local copy = ItemService.list()
@@ -4514,7 +4512,6 @@ test("the bots' candidate scan, time-sliced, still finds the same items", functi
 		all += 1
 	end
 	assert(listed == all, "the list is every item")
-	BotService._setFrameBudget(0.003)
 	for _, item in made do
 		if ItemService.isItem(item) then
 			ItemService.destroy(item)
