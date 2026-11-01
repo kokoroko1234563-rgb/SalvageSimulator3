@@ -45,6 +45,7 @@ local Tide = require(Shared.Tide)
 local BotEconomy = require(script.Parent.BotEconomy)
 local GrabService = require(script.Parent.GrabService)
 local ItemService = require(script.Parent.ItemService)
+local Perf = require(script.Parent.Perf)
 
 local BotService = {}
 
@@ -263,6 +264,7 @@ local function buildCart(bot: Bot, vessel): Model
 end
 
 local function setStatus(bot: Bot, status: string)
+	local started = Perf.start()
 	bot.Status = status
 	local rebirths = bot.State.Rebirths
 	local zone = Beach.zoneAt(bot.Z)
@@ -281,6 +283,7 @@ local function setStatus(bot: Bot, status: string)
 		bot.StatusText = text
 		bot.StatusLabel.Text = text
 	end
+	Perf.stop("Bot.setStatus", started)
 end
 
 -- Moving ---------------------------------------------------------------------------------
@@ -431,16 +434,23 @@ local function mark()
 	lastMark = t
 end
 
-local function yieldFor(bot: Bot): () -> ()
+local function yieldFor(bot: Bot, sliceName: string?): () -> ()
+	-- (When the search's current run began: it is timed, as a slice, each time it gives the frame back.)
+	local runStart = os.clock()
 	return function()
 		mark()
 		-- (A bot with a load to get home gets more of the frame.)
 		while frameUsed > FRAME_BUDGET * (if #bot.Cargo > 0 then 3 else 1) do
+			if runStart then
+				Perf.stop(sliceName or "Bot.searchSlice", runStart)
+				runStart = nil
+			end
 			task.wait()
 			if bot.Gone or not running then
 				error("bot gone")
 			end
 			lastMark = os.clock()
+			runStart = lastMark
 		end
 	end
 end
@@ -656,7 +666,8 @@ local function buildFieldFor(cart: string?, loose: boolean, urgent: boolean?)
 					lastMark = os.clock()
 				end
 			end
-			else yieldFor(worker)
+			else yieldFor(worker, "Field.slice")
+		local built = Perf.start()
 		local field = grid:buildField({
 			goals = { { x = HOME.x, z = 0 } },
 			goalRadius = 8,
@@ -667,6 +678,7 @@ local function buildFieldFor(cart: string?, loose: boolean, urgent: boolean?)
 			yield = yieldNow,
 		})
 		fields[key] = { Field = field, T0 = t0, Version = version }
+		Perf.stop("Field.build", built)
 	end
 	local ok, err = pcall(run)
 	building[key] = false
@@ -926,10 +938,12 @@ local function candidates(bot: Bot, entry: any, relaxed: boolean?): ({ any }, { 
 	local speed = BotEconomy.walkSpeed(bot.State) * speedFactor
 	local sea = Tide.sea()
 	local t = now()
+	local started = Perf.start()
 	local lo, hi = stretchOf(bot)
 	local hands = BotEconomy.cartSize(bot.State) == nil and BotEconomy.capacity(bot.State) == 1
 	local mine, others = {}, {}
 	local reserved = reservedItems(bot)
+	Perf.stop("Bot.stretchReserved", started)
 	-- Zone 7 only while a sandbar trip is on (the channel shallow, a useful stay fits).
 	-- (A cart bot's plan is for its feet: it parks its cart at the channel and crosses alone.)
 	local cartBot = BotEconomy.cartSize(bot.State) ~= nil
@@ -949,6 +963,7 @@ local function candidates(bot: Bot, entry: any, relaxed: boolean?): ({ any }, { 
 		or (not cartBot and plan ~= nil and plan.Feasible and plan.Opens <= 0)
 	local sandbarZone = Beach.FarSandbarZone
 	local samples: { [number]: { any } } = {}
+	local scanning = Perf.start()
 	for item in ItemService.all() do
 		local zone = item:GetAttribute("Zone")
 		if bot.Foot and zone ~= sandbarZone then
@@ -1006,6 +1021,7 @@ local function candidates(bot: Bot, entry: any, relaxed: boolean?): ({ any }, { 
 			end
 		end
 	end
+	Perf.stop("Bot.candidateScan", scanning)
 	-- A cart slot is worth something: skip what's worth much less than the best finds the free
 	-- slots could hold, anywhere the bot can reach, or than a find in the best zone the tide will
 	-- still uncover for its tool (so cheap things by the shore don't fill the cart on the way out
@@ -2070,6 +2086,7 @@ end
 local frameStats = { Frames = 0, MaxDt = 0, MaxWork = 0, Slow = 0 }
 
 function BotService.resetFrameStats()
+	Perf.reset()
 	frameStats = { Frames = 0, MaxDt = 0, MaxWork = 0, Slow = 0 }
 end
 
@@ -2106,6 +2123,7 @@ local function onFrame(rawDt: number)
 		end
 	end
 	frameStats.MaxWork = math.max(frameStats.MaxWork, os.clock() - started)
+	Perf.stop("Bot.frame", started)
 end
 
 -- Spawning -------------------------------------------------------------------------------
@@ -2583,6 +2601,7 @@ function BotService.snapshot()
 		Speed = speedFactor,
 		BotCount = #list,
 		Frames = table.clone(frameStats),
+		Perf = Perf.snapshot(),
 		Searches = table.clone(searchStats),
 		Nodes = {
 			Search = grid and grid.nodes - nodesBase.Search or 0,

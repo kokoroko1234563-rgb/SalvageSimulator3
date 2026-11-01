@@ -48,6 +48,7 @@ local Waves = require(Shared.Waves)
 
 local CollisionGroups = require(script.Parent.CollisionGroups)
 local ItemModels = require(script.Parent.ItemModels)
+local Perf = require(script.Parent.Perf)
 
 local cfg = Config.Items
 
@@ -664,7 +665,9 @@ local function spawnTick()
 	local t = now()
 	local sea = Tide.sea(t)
 	local scale = ItemService.crowdScale()
+	local counted = Perf.start()
 	local counts, total = ItemService.countFree(sea)
+	Perf.stop("Item.countFree", counted)
 	ItemService.stats.SpawnTicks += 1
 	local anyWanted = false
 	for zoneIndex = 1, #Config.Zones do
@@ -692,7 +695,9 @@ local function spawnTick()
 		ItemService.stats.SurfFullTicks += 1
 	end
 	if total < cfg.MaxTotal then
+		local settling = Perf.start()
 		ItemService.settleSpots(sea, Tide.getState(t).Cycle)
+		Perf.stop("Item.settleSpots", settling)
 	end
 end
 
@@ -749,23 +754,29 @@ function ItemService.init(map: Instance)
 
 	-- Server simulates loose items, so the server pushes them with the waves.
 	RunService.Heartbeat:Connect(function(dt)
+		local started = Perf.start()
 		local sea = Tide.sea(now())
 		for item in loose do
 			Waves.applyToPart(item, dt, sea)
 		end
+		Perf.stop("Item.looseHeartbeat", started)
 	end)
 
 	task.spawn(function()
 		while true do
 			task.wait(cfg.SpawnInterval)
+			local started = Perf.start()
 			spawnTick()
+			Perf.stop("Item.spawnTick", started)
 		end
 	end)
 
 	task.spawn(function()
 		while true do
 			task.wait(0.5)
+			local started = Perf.start()
 			maintenanceTick()
+			Perf.stop("Item.maintenanceTick", started)
 		end
 	end)
 

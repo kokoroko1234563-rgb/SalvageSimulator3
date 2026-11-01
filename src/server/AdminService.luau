@@ -24,6 +24,7 @@ local Waves = require(Shared.Waves)
 local AuctionService = require(script.Parent.AuctionService)
 local BiomeService = require(script.Parent.BiomeService)
 local BotService = require(script.Parent.BotService)
+local Perf = require(script.Parent.Perf)
 local DataService = require(script.Parent.DataService)
 local LexiconService = require(script.Parent.LexiconService)
 local Showroom = require(script.Parent.Showroom)
@@ -1243,6 +1244,25 @@ command(
 		n = math.clamp(math.floor(n), 0, BotService.MaxBots)
 		BotService.setCount(n)
 		return { string.format("%d bot%s playing.", n, if n == 1 then "" else "s") }
+	end
+)
+
+command(
+	"perf",
+	"perf [reset]",
+	"How long the server's pieces of work take (count, total, mean and worst time, runs over 16 ms): perf shows, perf reset starts over",
+	function(_, args)
+		if (args[1] or ""):lower() == "reset" then
+			Perf.reset()
+			BotService.resetFrameStats()
+			return { "Timings reset." }
+		end
+		local lines = Perf.lines()
+		table.insert(lines, 1, "Server timings since the last reset (ms):")
+		for _, line in lines do
+			print("[Perf] " .. line)
+		end
+		return lines
 	end
 )
 

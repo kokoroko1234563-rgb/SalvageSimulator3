@@ -21,6 +21,7 @@ local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
 
 local CollisionGroups = require(script.Parent.CollisionGroups)
+local Perf = require(script.Parent.Perf)
 
 local HazardService = {}
 
@@ -2443,6 +2444,7 @@ function HazardService.init()
 	end)
 	RunService.Heartbeat:Connect(function(dt)
 		local now = os.clock()
+		local started = Perf.start()
 		for i = #running, 1, -1 do
 			local entry = running[i]
 			if not entry.folder.Parent then
@@ -2455,6 +2457,7 @@ function HazardService.init()
 				end
 			end
 		end
+		Perf.stop("Hazard.step", started)
 	end)
 end
 

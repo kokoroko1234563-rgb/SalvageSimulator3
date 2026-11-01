@@ -19,6 +19,7 @@ local Tide = require(Shared.Tide)
 local DecorService = require(script.Parent.DecorService)
 local GroundShift = require(script.Parent.GroundShift)
 local HazardService = require(script.Parent.HazardService)
+local Perf = require(script.Parent.Perf)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 
 local BiomeService = {}
@@ -635,6 +636,12 @@ end
 -- whole zone. `choice` picks its layout's crossing and rooms (Layouts.encode's text, or a
 -- Choice); without one, they're rolled.
 function BiomeService.set(tile: number, biomeId: string?, choice: any?, rebuild: boolean?)
+	local setStarted = Perf.start()
+	local step = setStarted
+	local function lap(name: string)
+		Perf.stop(name, step)
+		step = os.clock()
+	end
 	local biome = biomeId and Biomes.List[biomeId]
 	local wasLayout = Layouts.active(tile)
 	local wasOwnGround = Looks.hasOwnGround(Biomes.activeIn(tile))
@@ -650,18 +657,23 @@ function BiomeService.set(tile: number, biomeId: string?, choice: any?, rebuild:
 		text = Layouts.encode(picked)
 	end
 	Workspace:SetAttribute(Layouts.attributeFor(tile), text)
+	lap("Biome.set.prep")
 	if rebuild or Layouts.active(tile) ~= wasLayout or wasOwnGround or Looks.hasOwnGround(biome) then
 		-- The biome brings its own ground (its shape or its materials): rebuild the tile's
 		-- terrain and keep things on it.
 		TerrainBuilder.buildTile(tile)
+		lap("Biome.set.terrain")
 		settle()
+		lap("Biome.set.settle")
 	end
 	local old = folder and folder:FindFirstChild("Tile" .. tile)
 	if old then
 		old:Destroy()
 	end
 	-- The layout's decor (its props, the Gloom's wards) goes with its ground.
+	lap("Biome.set.destroyOld")
 	DecorService.build(tile)
+	lap("Biome.set.layoutDecor")
 	-- The plain zone has its own hazards (Config.Zones[i].Hazards), where no biome rolled.
 	local zone = Config.Zones[Beach.zoneOfTile(tile)]
 	local plainHazards = not biome and zone and zone.Hazards and #zone.Hazards > 0
@@ -672,19 +684,25 @@ function BiomeService.set(tile: number, biomeId: string?, choice: any?, rebuild:
 			local startZ, endZ = Beach.tileRange(tile)
 			local decor = biome.Scenery and decorBuilders[biome.Scenery] or decorBuilders.Mounds
 			decor(tileFolder, biome, startZ, endZ)
+			lap("Biome.set.decor")
 			GroundShift.clearMisfits(tileFolder)
+			lap("Biome.set.misfits")
 			if biome.Secret and biome.Entrance then
 				buildEntrance(tileFolder, biome, tile)
+				lap("Biome.set.entrance")
 			end
 		end
 		HazardService.start(tile, biome or zone, tileFolder)
+		lap("Biome.set.hazards")
 		tileFolder.Parent = folder
 		if biome then
 			for _, callback in setCallbacks do
 				task.spawn(callback, tile, biome, tileFolder)
 			end
+			lap("Biome.set.callbacks")
 		end
 	end
+	Perf.stop("Biome.set", setStarted)
 end
 
 -- The roll weights on a tile: each biome that can roll in its zone.
@@ -736,6 +754,7 @@ end
 
 -- Rolls every tile's biome for the new tide.
 function BiomeService.reroll()
+	local started = Perf.start()
 	local picked = BiomeService.pick(rng)
 	for tile = 1, Beach.ActiveTiles do
 		BiomeService.set(tile, picked[tile])
@@ -743,6 +762,7 @@ function BiomeService.reroll()
 	for _, callback in rerollCallbacks do
 		task.spawn(callback)
 	end
+	Perf.stop("Biome.reroll", started)
 end
 
 -- For the data validator and tools/tests.

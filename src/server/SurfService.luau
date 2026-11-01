@@ -14,6 +14,7 @@ local Tide = require(Shared.Tide)
 local Waves = require(Shared.Waves)
 
 local ItemService = require(script.Parent.ItemService)
+local Perf = require(script.Parent.Perf)
 
 local cfg = Config.Waves
 local rng = Random.new()
@@ -83,7 +84,9 @@ function SurfService.init()
 			task.wait(0.25)
 			local now = Tide.now()
 			while nextWave * cfg.Period + Waves.lifetime(nextWave) <= now do
+				local started = Perf.start()
 				SurfService.afterWave(nextWave)
+				Perf.stop("Surf.afterWave", started)
 				nextWave += 1
 			end
 		end

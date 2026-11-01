@@ -21,6 +21,8 @@ local Workspace = game:GetService("Workspace")
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Beach = require(Shared.Beach)
 
+local Perf = require(script.Parent.Perf)
+
 local GroundShift = {}
 
 -- Map folders whose contents never move with the ground (they stand at fixed heights) or aren't
@@ -128,6 +130,7 @@ end
 
 -- Puts away every prop in the map that doesn't stand on open ground (once it's built).
 function GroundShift.tidy(map: Instance)
+	local started = Perf.start()
 	local tidied = 0
 	eachProp(map, function(target)
 		if not GroundShift.fits(target) then
@@ -135,16 +138,19 @@ function GroundShift.tidy(map: Instance)
 			tidied += 1
 		end
 	end)
+	Perf.stop("GroundShift.tidy", started)
 	return tidied
 end
 
 -- Destroys the props in a folder that don't stand on open ground (a biome's decor, just built).
 function GroundShift.clearMisfits(folder: Instance)
+	local started = Perf.start()
 	eachProp(folder, function(target)
 		if not GroundShift.fits(target) then
 			target:Destroy()
 		end
 	end)
+	Perf.stop("GroundShift.clearMisfits", started)
 end
 
 local function moveBy(target: Instance, delta: number)
@@ -159,6 +165,7 @@ local function moveBy(target: Instance, delta: number)
 end
 
 function GroundShift.capture(tile: number): () -> ()
+	local capturing = Perf.start()
 	local z0, z1 = Beach.tileRange(tile)
 	local records: { Record } = {}
 	local function note(target: Instance, position: Vector3, isPlayer: boolean?)
@@ -195,7 +202,9 @@ function GroundShift.capture(tile: number): () -> ()
 		end
 	end
 
+	Perf.stop("GroundShift.capture", capturing)
 	return function()
+		local settling = Perf.start()
 		for _, record in records do
 			local target = record.target
 			if not target.Parent then
@@ -221,6 +230,7 @@ function GroundShift.capture(tile: number): () -> ()
 				putAway(target)
 			end
 		end
+		Perf.stop("GroundShift.settle", settling)
 	end
 end
 

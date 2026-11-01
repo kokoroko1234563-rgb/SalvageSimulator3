@@ -80,6 +80,29 @@ def publish():
     print(f"published the build as version {result.get('versionNumber')}")
 
 
+def merge_perf(perfs):
+    """Server timings (Perf) of several tasks as one: counts and totals add, the worst is the worst."""
+    merged = {}
+    for perf in perfs:
+        for name, e in (perf or {}).items():
+            m = merged.setdefault(name, {"Count": 0, "Total": 0, "Max": 0, "Slow": 0})
+            m["Count"] += e["Count"]
+            m["Total"] += e["Total"]
+            m["Max"] = max(m["Max"], e["Max"])
+            m["Slow"] += e["Slow"]
+    return merged
+
+
+def perf_lines(perf):
+    """The server timings, worst first: what, runs, total ms, mean ms, max ms, runs over 16 ms."""
+    rows = sorted((perf or {}).items(), key=lambda kv: -kv[1]["Max"])
+    lines = [f"{'server timing':<26} {'runs':>8} {'total ms':>9} {'mean ms':>9} {'max ms':>9} {'slow':>6}"]
+    for name, e in rows:
+        lines.append(f"{name:<26} {e['Count']:>8} {1000 * e['Total']:>9.1f} "
+                     f"{1000 * e['Total'] / max(e['Count'], 1):>9.3f} {1000 * e['Max']:>9.2f} {e['Slow']:>6}")
+    return lines
+
+
 def run_task(job):
     script = open(os.path.join(HERE, "task.luau")).read()
     script = "local JOB_JSON = [==[" + json.dumps(job) + "]==]\n" + script
@@ -350,6 +373,15 @@ def write_report():
             lines.append(f"- {name} ({links} links, {moved} bots moved to safety on import): "
                          + ", ".join(f"{q:,.0f} ({q / n:,.0f})" for q in quarters) + f". Gear: {mix}.")
         lines.append("")
+        for path in chains:
+            chain = json.load(open(path))
+            if chain.get("perf"):
+                lines.append(f"Server timings of {os.path.basename(path)[6:-5]} (worst first):")
+                lines.append("")
+                lines.append("```")
+                lines.extend(perf_lines(chain["perf"]))
+                lines.append("```")
+                lines.append("")
     trip_path = os.path.join(OUT, "final_trip.json")
     if os.path.exists(trip_path):
         trip = json.load(open(trip_path))["trip"]
@@ -389,6 +421,8 @@ def run_chain(name, job, links):
         frames = result["snapshot"].get("Frames")
         if frames:
             print(f"frames: worst Heartbeat {1000 * frames['MaxDt']:.0f} ms, bot work {1000 * frames['MaxWork']:.1f} ms")
+        if result["snapshot"].get("Perf"):
+            print("\n".join(perf_lines(result["snapshot"]["Perf"])))
         if result.get("moves"):
             print(f"moved to safety on import: {json.dumps(result['moves'])}")
     if not results:
@@ -407,7 +441,9 @@ def run_chain(name, job, links):
             "Slow": sum(r["snapshot"]["Frames"]["Slow"] for r in results),
         },
         "searches": last["snapshot"].get("Searches"),
+        "perf": merge_perf([r["snapshot"].get("Perf") for r in results]),
     }
+    print("\n".join(perf_lines(chain["perf"])))
     with open(os.path.join(OUT, "chain_" + name + ".json"), "w") as f:
         json.dump(chain, f, indent=1)
 
@@ -500,6 +536,8 @@ def main():
             if frames:
                 print(f"frames: {frames['Frames']}, worst Heartbeat {1000 * frames['MaxDt']:.0f} ms, "
                       f"worst bot work {1000 * frames['MaxWork']:.1f} ms, over 50 ms: {frames['Slow']}")
+            if result["snapshot"].get("Perf"):
+                print("\n".join(perf_lines(result["snapshot"]["Perf"])))
             print(f"(setup {result['setupSeconds']:.1f}s, played {result['ranSeconds']:.0f}s)")
     write_report()
 
