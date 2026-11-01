@@ -752,12 +752,16 @@ function BiomeService.pick(random: Random): { [number]: string }
 	return picked
 end
 
--- Rolls every tile's biome for the new tide.
-function BiomeService.reroll()
+-- Rolls every tile's biome for the new tide. `sliced` (the running game) gives the frame back
+-- after each tile, so the rebuild is a run of short frames and not one long one.
+function BiomeService.reroll(sliced: boolean?)
 	local started = Perf.start()
 	local picked = BiomeService.pick(rng)
 	for tile = 1, Beach.ActiveTiles do
 		BiomeService.set(tile, picked[tile])
+		if sliced then
+			task.wait()
+		end
 	end
 	for _, callback in rerollCallbacks do
 		task.spawn(callback)
@@ -785,7 +789,7 @@ function BiomeService.init(entranceCallback: (Player, string, CFrame) -> (), _no
 			local cycle = Tide.getState().Cycle
 			if cycle ~= lastCycle then
 				lastCycle = cycle
-				BiomeService.reroll()
+				BiomeService.reroll(true)
 			end
 		end
 	end)

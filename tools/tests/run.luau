@@ -3945,7 +3945,7 @@ test("bot: the sandbar counts as coming only when a crossing, a stay and the way
 	assert(plan and plan.Opens <= 0 and plan.Feasible, "the channel is open and a stay fits")
 	local lying = {}
 	for k = 1, 8 do
-		table.insert(lying, { Position = roblox.Vector3.new(k * 6, 0, Beach.zoneRange(7) + 60) })
+		table.insert(lying, { CFrame = roblox.CFrame.new(k * 6, 0, Beach.zoneRange(7) + 60) })
 	end
 	local withSandbar = BotService.comingValue(bot, roomy, plan, { [7] = lying })
 	assert(withSandbar > Economy.findValue(state, 6), "zone 7's find sets the bar when it can be worked")
@@ -4434,6 +4434,130 @@ test("bot: a find's worth rises with the zone, and a tool's zones only", functio
 	state.Tools.BoatHook = true
 	assert(Economy.findValue(state, 5) > Economy.findValue(state, 1), "deeper zones are worth more")
 	assert(Economy.findValue(state, 6) == 0, "a zone beyond the tool is worth nothing to it")
+end)
+
+test("the bots' candidate scan, time-sliced, still finds the same items", function()
+	local Items = h.require("Shared/Items")
+	local Economy = h.require("Server/BotEconomy")
+	local ItemService = h.require("Server/ItemService")
+	local BotService = h.require("Server/BotService")
+	local made = {}
+	for k = 1, 130 do -- (more than three slices of the scan)
+		table.insert(made, ItemService.spawnAt(Items.get("Seashell"), 1, roblox.Vector3.new(k - 65, 0, 40)))
+	end
+	local gone = made[7]
+	ItemService.destroy(gone)
+	local taken = made[8]
+	ItemService.claimForBot(taken, -1)
+	local state = Economy.newState()
+	local bot = { Id = 1, State = state, Cargo = {}, Skip = {}, X = 0, Z = 30 }
+	local entry = {
+		T0 = h.require("Shared/Tide").now(),
+		Field = {
+			distance = function(_, x, z)
+				return math.abs(x) + z
+			end,
+			slack = function()
+				return 1e6
+			end,
+		},
+	}
+	local function scan()
+		local mine, others = BotService.candidates(bot, entry, true)
+		local found = {}
+		for _, list in { mine, others } do
+			for _, candidate in list do
+				found[candidate.Item] = true
+			end
+		end
+		return found
+	end
+	-- (Nothing runs here, so no frame ever gives the budget back: a search must not wait.)
+	BotService._setFrameBudget(math.huge)
+	local sliced = scan()
+	local count = 0
+	for item in sliced do
+		count += 1
+		assert(ItemService.isItem(item), "only items that are still there")
+		assert(item ~= taken and item ~= gone, "not a claimed or destroyed one")
+	end
+	assert(count >= 100, "the scan found what is lying there, got " .. count)
+	-- The same set whatever the order or the slicing: every free one is in, every other is out.
+	for _, item in made do
+		if item ~= gone and item ~= taken then
+			assert(sliced[item], "a free seashell is a candidate")
+		end
+	end
+	local copy = ItemService.list()
+	local listed = 0
+	for _, item in copy do
+		assert(ItemService.isItem(item), "the list holds items")
+		listed += 1
+	end
+	local all = 0
+	for _ in ItemService.all() do
+		all += 1
+	end
+	assert(listed == all, "the list is every item")
+	BotService._setFrameBudget(0.003)
+	for _, item in made do
+		if ItemService.isItem(item) then
+			ItemService.destroy(item)
+		end
+	end
+end)
+
+test("the server timings (Perf) count, total, keep the worst, and reset", function()
+	local Perf = h.require("Server/Perf")
+	Perf.reset()
+	assert(next(Perf.snapshot()) == nil, "empty after a reset")
+	local before = os.clock()
+	Perf.stop("A", before - 0.5)
+	Perf.stop("A", os.clock())
+	Perf.stop("B", os.clock())
+	local snap = Perf.snapshot()
+	assert(snap.A.Count == 2 and snap.B.Count == 1, "counts")
+	assert(snap.A.Max >= 0.5 and snap.A.Total >= 0.5, "the worst and the total")
+	assert(snap.A.Slow == 1 and snap.B.Slow == 0, "only the long one is slow")
+	snap.A.Count = 99
+	assert(Perf.snapshot().A.Count == 2, "a snapshot is a copy")
+	local lines = Perf.lines()
+	assert(#lines == 3 and string.find(lines[2], "A", 1, true), "worst first, after the header")
+	Perf.reset()
+	assert(next(Perf.snapshot()) == nil, "empty again")
+end)
+
+test("terrain is written in chunks that cover the slab exactly", function()
+	local TerrainBuilder = h.require("Server/TerrainBuilder")
+	local Config = h.require("Shared/Config")
+	local voxel = Config.Beach.Terrain.Voxel
+	local lo, hi = TerrainBuilder.bounds()
+	local ranges = TerrainBuilder.chunks(lo.X, hi.X)
+	assert(#ranges > 1, "wide terrain is more than one chunk")
+	assert(ranges[1][1] == lo.X and ranges[#ranges][2] == hi.X, "from edge to edge")
+	for index, range in ranges do
+		assert(range[2] > range[1], "not empty")
+		assert((range[1] - lo.X) % voxel == 0, "whole voxels")
+		if index > 1 then
+			assert(range[1] == ranges[index - 1][2], "no gap and no overlap")
+		end
+	end
+end)
+
+test("a sliced biome reroll finishes with every tile in a consistent state", function()
+	local Beach = h.require("Shared/Beach")
+	local Biomes = h.require("Shared/Biomes")
+	local BiomeService = h.require("Server/BiomeService")
+	local Perf = h.require("Server/Perf")
+	Perf.reset()
+	BiomeService.reroll(true)
+	for tile = 1, Beach.ActiveTiles do
+		local id = BiomeService.get(tile)
+		assert(id == nil or Biomes.List[id], "tile " .. tile .. " has a real biome or none")
+	end
+	local snap = Perf.snapshot()
+	assert(snap["Biome.reroll"] and snap["Biome.reroll"].Count == 1, "the reroll is timed")
+	assert(snap["Biome.set"].Count == Beach.ActiveTiles, "every tile was set")
 end)
 
 test("bot can't claim an item another already claimed", function()

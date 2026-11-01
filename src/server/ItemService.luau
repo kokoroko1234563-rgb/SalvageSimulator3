@@ -110,6 +110,15 @@ function ItemService.all(): { [BasePart]: boolean }
 	return all
 end
 
+-- Every item on the beach as an array (a copy: safe to walk while items come and go).
+function ItemService.list(): { BasePart }
+	local items = {}
+	for item in all do
+		table.insert(items, item)
+	end
+	return items
+end
+
 function ItemService.isItem(instance: Instance?): boolean
 	return instance ~= nil and all[instance :: any] == true
 end

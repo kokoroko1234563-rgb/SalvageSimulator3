@@ -181,6 +181,24 @@ function TerrainBuilder.heightRange(z0: number, z1: number): (number, number)
 		snap(high + math.max(shape.MaxHeight, shape.WallMaxHeight, shape.RoofMaxTop) + 4, true)
 end
 
+-- A slab is written in chunks this many voxels wide along X (each its own compute and write),
+-- and the frame is given back once the work since the last pause has used this many seconds, so
+-- rebuilding terrain in the running game is a run of short frames and not one long one.
+local CHUNK = 8
+local BUDGET = 0.005
+
+-- The X ranges a slab is written in: whole voxels, from lo.X to hi.X (tools/tests).
+function TerrainBuilder.chunks(loX: number, hiX: number): { { number } }
+	local ranges = {}
+	local x0 = loX
+	while x0 < hiX do
+		local x1 = math.min(x0 + CHUNK * VOXEL, hiX)
+		table.insert(ranges, { x0, x1 })
+		x0 = x1
+	end
+	return ranges
+end
+
 -- Writes the terrain between two Z positions (snapped out to whole voxels).
 function TerrainBuilder.buildRange(fromZ: number, toZ: number)
 	local terrain = Workspace:FindFirstChildOfClass("Terrain")
@@ -190,22 +208,31 @@ function TerrainBuilder.buildRange(fromZ: number, toZ: number)
 	local lo, hi = TerrainBuilder.bounds()
 	local z0 = math.max(lo.Z, snap(fromZ, false))
 	local stop = math.min(hi.Z, snap(toZ, true))
+	local pausedAt = os.clock()
 	while z0 < stop do
 		local z1 = math.min(z0 + SLAB * VOXEL, stop)
-		local slabStarted = Perf.start()
+		local ranging = Perf.start()
 		local yLow, yHigh = TerrainBuilder.heightRange(z0, z1)
-		local slabLo = Vector3.new(lo.X, yLow, z0)
-		local slabHi = Vector3.new(hi.X, yHigh, z1)
-		local materials, occupancy = TerrainBuilder.slab(slabLo, slabHi, z0, z1)
-		local region = Region3.new(slabLo, slabHi)
-		Perf.stop("Terrain.slabCompute", slabStarted)
-		local writing = Perf.start()
-		terrain:WriteVoxels(region, VOXEL, materials, occupancy)
-		Perf.stop("Terrain.slabWrite", writing)
+		Perf.stop("Terrain.heightRange", ranging)
+		for _, range in TerrainBuilder.chunks(lo.X, hi.X) do
+			local started = Perf.start()
+			local slabLo = Vector3.new(range[1], yLow, z0)
+			local slabHi = Vector3.new(range[2], yHigh, z1)
+			local materials, occupancy = TerrainBuilder.slab(slabLo, slabHi, z0, z1)
+			local region = Region3.new(slabLo, slabHi)
+			Perf.stop("Terrain.slabCompute", started)
+			local writing = Perf.start()
+			terrain:WriteVoxels(region, VOXEL, materials, occupancy)
+			Perf.stop("Terrain.slabWrite", writing)
+			-- A breath when the budget is used: the whole beach takes seconds to work out, and a
+			-- script that runs that long without a pause is stopped (and holds everything else
+			-- up meanwhile).
+			if os.clock() - pausedAt > BUDGET then
+				task.wait()
+				pausedAt = os.clock()
+			end
+		end
 		z0 = z1
-		-- A breath between slabs: the whole beach takes seconds to work out, and a script that
-		-- runs that long without a pause is stopped (and holds everything else up meanwhile).
-		task.wait()
 	end
 end
 
