@@ -4522,6 +4522,59 @@ test("the bots' candidate scan, time-sliced, still finds the same items", functi
 	end
 end)
 
+test("the item loops (count free, maintenance), time-sliced, give the same result", function()
+	local Items = h.require("Shared/Items")
+	local Tide = h.require("Shared/Tide")
+	local ItemService = h.require("Server/ItemService")
+	local made = {}
+	for k = 1, 90 do
+		table.insert(
+			made,
+			ItemService.spawnAt(Items.get("Seashell"), 1, roblox.Vector3.new(k - 45, 0, 60 + k))
+		)
+	end
+	ItemService.destroy(made[3])
+	local sea = Tide.sea()
+	local plainCounts, plainTotal = ItemService.countFree(sea)
+	local pauses = 0
+	local slicedCounts, slicedTotal = ItemService.countFree(sea, function()
+		pauses += 1
+	end)
+	assert(pauses >= 89, "it pauses as it goes, got " .. pauses)
+	assert(slicedTotal == plainTotal, "the same total")
+	for zone, count in plainCounts do
+		assert(slicedCounts[zone] == count, "the same count in zone " .. zone)
+	end
+	-- Maintenance: the same items are left standing either way (and a destroyed one is skipped).
+	local survivors = {}
+	for _, item in made do
+		survivors[item] = ItemService.isItem(item)
+	end
+	pauses = 0
+	ItemService._maintenanceTick(function()
+		pauses += 1
+		-- (An item destroyed mid-walk is skipped, not touched.)
+		if pauses == 10 then
+			ItemService.destroy(made[50])
+		end
+	end)
+	assert(pauses > 80, "maintenance pauses as it goes, got " .. pauses)
+	assert(not ItemService.isItem(made[50]), "gone")
+	for index, item in made do
+		if index ~= 50 then
+			assert(
+				ItemService.isItem(item) == survivors[item],
+				"maintenance left item " .. index .. " as it was"
+			)
+		end
+	end
+	for _, item in made do
+		if ItemService.isItem(item) then
+			ItemService.destroy(item)
+		end
+	end
+end)
+
 test("Slice pauses once the budget is used, and times the run it cut", function()
 	local Perf = h.require("Server/Perf")
 	local Slice = h.require("Server/Slice")

@@ -49,6 +49,7 @@ local Waves = require(Shared.Waves)
 local CollisionGroups = require(script.Parent.CollisionGroups)
 local ItemModels = require(script.Parent.ItemModels)
 local Perf = require(script.Parent.Perf)
+local Slice = require(script.Parent.Slice)
 
 local cfg = Config.Items
 
@@ -623,10 +624,10 @@ end
 -- The free items lying in each zone: Unclaimed or Loose, on sand or in the surf (not in deep
 -- water, where they're about to be lost). Held and InVessel items don't count. Also the total
 -- number of items of all kinds.
-function ItemService.countFree(sea: Tide.Sea): ({ number }, number)
+function ItemService.countFree(sea: Tide.Sea, pause: (() -> ())?): ({ number }, number)
 	local counts = zoneCounts()
 	local total = 0
-	for item in all do
+	local function look(item: BasePart)
 		total += 1
 		local state = ItemService.getState(item)
 		if state == "Unclaimed" or state == "Loose" then
@@ -635,6 +636,19 @@ function ItemService.countFree(sea: Tide.Sea): ({ number }, number)
 			if zoneIndex and zoneIndex >= 1 and Beach.depthAt(position, sea) < Config.Beach.WaistDepth then
 				counts[zoneIndex] += 1
 			end
+		end
+	end
+	if pause then
+		-- (Walks a copy of the items, calling `pause` as it goes to give the frame back.)
+		for _, item in ItemService.list() do
+			pause()
+			if all[item] then
+				look(item)
+			end
+		end
+	else
+		for item in all do
+			look(item)
 		end
 	end
 	return counts, total
@@ -670,12 +684,15 @@ local function spawnInZone(sea: Tide.Sea, zoneIndex: number): BasePart?
 	return item
 end
 
-local function spawnTick()
+-- The share of a frame the loops over every item may use before giving it back.
+local ITEM_BUDGET = 0.002
+
+local function spawnTick(pause: (() -> ())?)
 	local t = now()
 	local sea = Tide.sea(t)
 	local scale = ItemService.crowdScale()
 	local counted = Perf.start()
-	local counts, total = ItemService.countFree(sea)
+	local counts, total = ItemService.countFree(sea, pause)
 	Perf.stop("Item.countFree", counted)
 	ItemService.stats.SpawnTicks += 1
 	local anyWanted = false
@@ -710,10 +727,10 @@ local function spawnTick()
 	end
 end
 
-local function maintenanceTick()
+local function maintenanceTick(pause: (() -> ())?)
 	local t = now()
 	local sea = Tide.sea(t)
-	for item in all do
+	local function maintain(item: BasePart)
 		local position = item.CFrame.Position
 		local state = ItemService.getState(item)
 		local since = item:GetAttribute("Since") or t
@@ -743,6 +760,19 @@ local function maintenanceTick()
 			if t - since > cfg.LooseTimeout and item.AssemblyLinearVelocity.Magnitude < 1 and not afloat then
 				ItemService.setUnclaimed(item, true)
 			end
+		end
+	end
+	if pause then
+		-- (Walks a copy of the items, calling `pause` as it goes to give the frame back.)
+		for _, item in ItemService.list() do
+			pause()
+			if all[item] then
+				maintain(item)
+			end
+		end
+	else
+		for item in all do
+			maintain(item)
 		end
 	end
 end
@@ -775,7 +805,7 @@ function ItemService.init(map: Instance)
 		while true do
 			task.wait(cfg.SpawnInterval)
 			local started = Perf.start()
-			spawnTick()
+			spawnTick(Slice.new("Item.spawnSlice", ITEM_BUDGET))
 			Perf.stop("Item.spawnTick", started)
 		end
 	end)
@@ -784,7 +814,7 @@ function ItemService.init(map: Instance)
 		while true do
 			task.wait(0.5)
 			local started = Perf.start()
-			maintenanceTick()
+			maintenanceTick(Slice.new("Item.maintenanceSlice", ITEM_BUDGET))
 			Perf.stop("Item.maintenanceTick", started)
 		end
 	end)
