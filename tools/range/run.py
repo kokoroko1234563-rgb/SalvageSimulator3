@@ -124,6 +124,13 @@ def summarise(report):
             lines.append(f"  (Roblox's pathfinder: {crossing['pathfinderSeconds']:.0f}s)")
     for note in report.get("notes", []):
         lines.append(f"  note: {note}")
+    for i, r in enumerate(m.get("rerolls", []), 1):
+        lines.append(f"  biome reroll {i}: {r['seconds'] * 1000:.0f} ms, longest frame {r['longestFrame'] * 1000:.0f} ms")
+    perf = m.get("perf")
+    if perf:
+        lines.append(f"  {'server timing':<26} {'runs':>6} {'total ms':>9} {'max ms':>9}")
+        for name, e in sorted(perf.items(), key=lambda kv: -kv[1]["Max"]):
+            lines.append(f"  {name:<26} {e['Count']:>6} {1000 * e['Total']:>9.1f} {1000 * e['Max']:>9.1f}")
     for tide in m.get("tides", []):
         flooded = tide.get("tunnelsFlooded")
         lines.append(f"  waterline z {tide['waterline']:.0f}: {tide['underWater'] * 100:.0f}% under water, "
@@ -150,6 +157,9 @@ def main():
     parser.add_argument("--full", action="store_true")
     parser.add_argument("--tide", action="append", type=float, default=[])
     parser.add_argument("--no-routes", action="store_true")
+    parser.add_argument("--reroll", type=int, default=0,
+                        help="after the checks, reroll the whole beach's biomes N times as a tide does and report "
+                             "how long it took, the longest frame, and the server's timings of its steps")
     parser.add_argument("--no-publish", action="store_true")
     args = parser.parse_args()
 
@@ -162,6 +172,8 @@ def main():
         job["tides"] = args.tide
     if args.choice:
         job["choice"] = args.choice
+    if args.reroll:
+        job["reroll"] = args.reroll
 
     # One Test Range run at a time: every run publishes its own build to the one place, so
     # runs from other worktrees wait their turn.

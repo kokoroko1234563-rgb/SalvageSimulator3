@@ -16,6 +16,7 @@ local Config = require(Shared.Config)
 local Looks = require(Shared.Looks)
 
 local WallBarriers = require(script.Parent.WallBarriers)
+local Perf = require(script.Parent.Perf)
 
 local TerrainBuilder = {}
 
@@ -191,12 +192,16 @@ function TerrainBuilder.buildRange(fromZ: number, toZ: number)
 	local stop = math.min(hi.Z, snap(toZ, true))
 	while z0 < stop do
 		local z1 = math.min(z0 + SLAB * VOXEL, stop)
+		local slabStarted = Perf.start()
 		local yLow, yHigh = TerrainBuilder.heightRange(z0, z1)
 		local slabLo = Vector3.new(lo.X, yLow, z0)
 		local slabHi = Vector3.new(hi.X, yHigh, z1)
 		local materials, occupancy = TerrainBuilder.slab(slabLo, slabHi, z0, z1)
 		local region = Region3.new(slabLo, slabHi)
+		Perf.stop("Terrain.slabCompute", slabStarted)
+		local writing = Perf.start()
 		terrain:WriteVoxels(region, VOXEL, materials, occupancy)
+		Perf.stop("Terrain.slabWrite", writing)
 		z0 = z1
 		-- A breath between slabs: the whole beach takes seconds to work out, and a script that
 		-- runs that long without a pause is stopped (and holds everything else up meanwhile).
@@ -208,7 +213,9 @@ end
 function TerrainBuilder.buildTile(tile: number)
 	local z0, z1 = Beach.tileRange(tile)
 	TerrainBuilder.buildRange(z0, z1)
+	local barriers = Perf.start()
 	WallBarriers.build(tile)
+	Perf.stop("Terrain.wallBarriers", barriers)
 end
 
 function TerrainBuilder.build()

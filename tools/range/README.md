@@ -21,6 +21,8 @@ python3 tools/range/run.py --zone 2 --no-routes
 - `--tide Z`: a waterline Z to measure the water at (repeatable). By default: the zone's top,
   middle and bottom, and low tide.
 - `--no-routes`: skip pathfinding (quicker). `--no-publish`: reuse the last published build.
+- `--reroll N`: after the checks, reroll every tile's biome N times as a tide does and report how long
+  each took, the longest frame meanwhile, and the server's timings of the steps (`Perf`).
 
 A check takes about 15 to 60 seconds. Only one runs at a time (every run publishes its own build
 to the one Test Range place); others wait their turn. The report is printed and saved to `tools/range/out/zone<N>.json`;

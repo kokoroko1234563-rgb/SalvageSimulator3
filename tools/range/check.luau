@@ -807,5 +807,30 @@ if JOB.routes ~= false then
 	report.measurements.spotsChecked = #spots
 end
 
+-- A tide's biome reroll, as the game does it (JOB.reroll times): how long each took, the longest
+-- Heartbeat gap while it ran, and the server's own timings of its steps (Perf). The tiles' biomes
+-- change, so this comes after every other check.
+if JOB.reroll and JOB.reroll > 0 then
+	local RunService = game:GetService("RunService")
+	local Perf = require(Server.Perf)
+	local longest = 0
+	local beat = RunService.Heartbeat:Connect(function(dt)
+		longest = math.max(longest, dt)
+	end)
+	task.wait(1)
+	Perf.reset()
+	local rerolls = {}
+	for _ = 1, JOB.reroll do
+		longest = 0
+		local started = os.clock()
+		BiomeService.reroll(true)
+		table.insert(rerolls, { seconds = os.clock() - started, longestFrame = longest })
+		task.wait(1)
+	end
+	beat:Disconnect()
+	report.measurements.rerolls = rerolls
+	report.measurements.perf = Perf.snapshot()
+end
+
 report.measurements.seconds = os.clock() - t0
 return HttpService:JSONEncode(report)
