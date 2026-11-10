@@ -317,9 +317,11 @@ Gear.Vessels = {
 		Rarity = "Exotic",
 		Price = 0,
 		Capacity = 12,
-		Note = "Exotic vessel: long, steady, holds 12",
+		Note = "Exotic boat: board it over deep water and it carries you and the load. Holds 12",
 		Available = false,
 		Exotic = true,
+		Boat = true,
+		Rides = true, -- the owner boards it over deep water and drives it (VesselService, BoatController)
 	},
 	{
 		-- Magical (rebirth reward): swims, so deep water doesn't take it.
@@ -342,10 +344,13 @@ Gear.Vessels = {
 		Name = "Leviathan Rowboat",
 		Rarity = "Exotic",
 		Price = 0,
-		Capacity = 20,
-		Note = "Exotic vessel: huge and steady, holds 20",
+		Capacity = 30,
+		Note = "Exotic boat: the biggest hold in the game, slow. Board it over deep water. Holds 30",
 		Available = false,
 		Exotic = true,
+		Boat = true,
+		Rides = true,
+		Speed = 0.6,
 	},
 	-- Exotic vessels from the rare biomes' lootboxes.
 	{
@@ -356,11 +361,12 @@ Gear.Vessels = {
 		Rarity = "Exotic",
 		Price = 0,
 		Capacity = 10,
-		Note = "Exotic vessel: follows you and swims, so deep water doesn't take it. Holds 10",
+		Note = "Exotic vessel: swims after you and scoops up free items within 4 studs. Holds 10",
 		Available = false,
 		Exotic = true,
 		Follows = true,
 		Swims = true,
+		Scoops = true, -- VesselPowers.canScoop
 	},
 	{
 		-- Whirlwind Dunes: flies behind you, over sand and sea alike.
@@ -370,11 +376,12 @@ Gear.Vessels = {
 		Rarity = "Exotic",
 		Price = 0,
 		Capacity = 10,
-		Note = "Exotic vessel: flies behind you over sand and sea, fast. Holds 10",
+		Note = "Exotic vessel: flies behind you over rock, walls and water, in a straight line. Holds 10",
 		Available = false,
 		Exotic = true,
 		Follows = true,
 		Flies = true,
+		Ghost = true, -- never collides with the map
 		Speed = 1.5,
 	},
 	{
@@ -385,10 +392,11 @@ Gear.Vessels = {
 		Rarity = "Exotic",
 		Price = 0,
 		Capacity = 14,
-		Note = "Exotic vessel: a giant shell on wheels, very hard to tip. Holds 14",
+		Note = "Exotic vessel: cargo can never be lost (no tipping, spilling or wash-off). Holds 14",
 		Available = false,
 		Exotic = true,
-		Stability = 3,
+		Stability = 12, -- a near-locked stabiliser
+		Unspillable = true,
 	},
 	{
 		-- Sea-Glass Shore: a glass swan that swims behind you.
@@ -398,11 +406,12 @@ Gear.Vessels = {
 		Rarity = "Exotic",
 		Price = 0,
 		Capacity = 12,
-		Note = "Exotic vessel: swims behind you, through deep water. Holds 12",
+		Note = "Exotic vessel: swims behind you; what it carries sells for 10% more. Holds 12",
 		Available = false,
 		Exotic = true,
 		Follows = true,
 		Swims = true,
+		SellBonus = 0.10, -- VesselPowers.sellMultiplier
 	},
 	{
 		-- Stranded Iceberg: slides fast over sand and ice.
@@ -412,10 +421,11 @@ Gear.Vessels = {
 		Rarity = "Exotic",
 		Price = 0,
 		Capacity = 12,
-		Note = "Exotic vessel: slides very fast over sand. Holds 12",
+		Note = "Exotic vessel: fastest on sand; you run 15% faster while you tow it. Holds 12",
 		Available = false,
 		Exotic = true,
-		Speed = 1.7,
+		TowWalkBonus = 0.15, -- VesselPowers.towWalkMultiplier
+		Speed = 2 -- fastest on sand (the pickup truck is 1.8),
 		Stability = 1.5,
 	},
 }

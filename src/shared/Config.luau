@@ -807,6 +807,13 @@ Config.Grab = {
 	SwimWashChance = 0.02, -- per 0.3s in deep water: a swimming vessel loses one item
 	SwimSandSpeed = 0.35, -- swimming vessels follow this much slower on dry sand
 	SwimFloat = 1, -- how high a swimming vessel's base sits above the water
+	-- Exotic vessels (VesselPowers):
+	BoatSpeed = 22, -- a boat's top speed with its owner at the helm, times the boat's Speed
+	BoatSpeedSlack = 1.5, -- the server ejects the rider past this many times that speed
+	BoardRange = 12, -- how close the owner must be to board their boat
+	ScoopRange = 4, -- the Jelly Raft takes free items this close
+	ScoopInterval = 0.5, -- and at most one every this many seconds
+	CarpetLeash = 45, -- the Magic Carpet is pulled back to its owner past this distance
 }
 
 Config.Drowning = {
