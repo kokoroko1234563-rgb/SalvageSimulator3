@@ -7,6 +7,7 @@ local Gear = require(Shared.Gear)
 local Items = require(Shared.Items)
 local Rebirth = require(Shared.Rebirth)
 local Remotes = require(Shared.Remotes)
+local VesselPowers = require(Shared.VesselPowers)
 
 local DataService = require(script.Parent.DataService)
 local MonetizationService = require(script.Parent.MonetizationService)
@@ -35,6 +36,19 @@ end
 -- plain numbers, so the bots (which have no Player) are paid the same way.
 function ShopService.payout(value: number, rebirths: number, passMultiplier: number?): number
 	return math.floor(value * Rebirth.multiplier(rebirths) * (passMultiplier or 1))
+end
+
+-- What one item sells for before the multipliers: its value, times its vessel's sell bonus if
+-- it is sitting in one (the Glass Swan's +10%). `vesselKind` is the kind of vessel it is in.
+function ShopService.soldValue(value: number, vesselKind: string?): number
+	return value * VesselPowers.sellMultiplier(vesselKind)
+end
+
+local function itemSoldValue(item: BasePart): number
+	local kind = if item:GetAttribute("State") == "InVessel"
+		then VesselService.kindOfId(item:GetAttribute("VesselId"))
+		else nil
+	return ShopService.soldValue(item:GetAttribute("Value") or 0, kind)
 end
 
 -- A shop listing: the tool or vessel (category "Tool" or "Vessel") with this id if the shop
@@ -155,7 +169,7 @@ local function sellFromPad(player: Player)
 			and not item:GetAttribute("Unlock")
 			and inSellZone(item.Position)
 		then
-			earned += item:GetAttribute("Value") or 0
+			earned += itemSoldValue(item)
 			count += 1
 			ItemService.destroy(item)
 		end

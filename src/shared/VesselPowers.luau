@@ -64,15 +64,18 @@ function VesselPowers.boatSpeed(kind: string?, speedMultiplier: number): number
 end
 
 -- Server-side sanity check on a ridden boat: it moved `distance` studs in `dt` seconds.
-function VesselPowers.boatSpeedOk(kind: string?, speedMultiplier: number, distance: number, dt: number): boolean
+function VesselPowers.boatSpeedOk(
+	kind: string?,
+	speedMultiplier: number,
+	distance: number,
+	dt: number
+): boolean
 	return distance <= VesselPowers.boatSpeed(kind, speedMultiplier) * Config.Grab.BoatSpeedSlack * dt + 2
 end
 
 -- Whether a raft scoops now: a free item within range, room in the hold and the interval over.
 function VesselPowers.canScoop(distance: number, held: number, capacity: number, since: number): boolean
-	return distance <= Config.Grab.ScoopRange
-		and held < capacity
-		and since >= Config.Grab.ScoopInterval
+	return distance <= Config.Grab.ScoopRange and held < capacity and since >= Config.Grab.ScoopInterval
 end
 
 -- Where a leashed vessel (the carpet) should be: where it is, or on the leash if it strayed.

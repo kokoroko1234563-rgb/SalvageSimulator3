@@ -26,6 +26,7 @@ local Traders = require(Shared.Traders)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
+local VesselPowers = require(Shared.VesselPowers)
 
 local HUD = require(script.Parent.HUD)
 
@@ -242,6 +243,27 @@ local function canPocket(): boolean
 		and (player:GetAttribute("Pockets") or 0) < slots
 end
 
+-- The Frost Sled: while you tow it you run faster. Applied through the walk-speed path
+-- (humanoid BaseWalkSpeed, which WaveController scales) and restored when you let go.
+local towBoost: { humanoid: Humanoid, factor: number, written: number }? = nil
+local function setTowBoost(factor: number)
+	if towBoost then
+		local boost = towBoost
+		towBoost = nil
+		-- (If the server rewrote the base meanwhile, leave its value alone.)
+		if boost.humanoid.Parent and boost.humanoid:GetAttribute("BaseWalkSpeed") == boost.written then
+			boost.humanoid:SetAttribute("BaseWalkSpeed", boost.written / boost.factor)
+		end
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if factor > 1 and humanoid then
+		local written = (humanoid:GetAttribute("BaseWalkSpeed") or Stats.walkSpeed(player)) * factor
+		humanoid:SetAttribute("BaseWalkSpeed", written)
+		towBoost = { humanoid = humanoid, factor = factor, written = written }
+	end
+end
+
 local function cleanup()
 	if not held then
 		return
@@ -254,6 +276,7 @@ local function cleanup()
 	-- Local-only marks for WaveController (see begin).
 	held.part:SetAttribute("WaveScale", nil)
 	held = nil
+	setTowBoost(1)
 	HUD.setHoldButtons(false)
 end
 
@@ -348,6 +371,7 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 		end
 	else
 		local vessel = part.Parent :: Model
+		setTowBoost(VesselPowers.towWalkMultiplier(vessel:GetAttribute("Kind"), true))
 		align.ApplyAtCenterOfMass = false
 		align.MaxForce = loadedMass(vessel)
 			* grabCfg.TowAcceleration
@@ -473,6 +497,13 @@ local function updateBrake()
 
 	local current = brake :: any
 	local mass = loadedMass(vessel)
+
+	-- A boat with its owner at the helm is driven by BoatController, not held in place.
+	if vessel:GetAttribute("Ridden") then
+		current.align.Enabled = false
+		current.park = base.Position
+		return
+	end
 
 	-- Magical hovering vessel: follow behind the player, upright and facing the same way.
 	if vessel:GetAttribute("Hover") then

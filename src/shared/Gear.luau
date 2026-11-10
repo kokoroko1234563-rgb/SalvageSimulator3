@@ -425,7 +425,7 @@ Gear.Vessels = {
 		Available = false,
 		Exotic = true,
 		TowWalkBonus = 0.15, -- VesselPowers.towWalkMultiplier
-		Speed = 2 -- fastest on sand (the pickup truck is 1.8),
+		Speed = 2, -- fastest on sand (the pickup truck is 1.8)
 		Stability = 1.5,
 	},
 }
