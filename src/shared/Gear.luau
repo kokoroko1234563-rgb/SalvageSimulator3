@@ -13,6 +13,8 @@ Gear.Depth = { Dry = 0, Shallow = 1, KneeDeep = 2, Waist = 3, Deep = 4 }
 -- lifts everything there (an item's Tier, Items.Catalog; Config.Zones[tier] is its zone), and
 -- there is no water-depth limit on lifting: the sea itself (drowning, waves) limits players.
 -- Strong Back adds one tier (Stats.liftWith). Reach and Grip still differ between tools.
+-- Exotic grabbers (Tracks) have no fixed zone: they work up to the tier of the best shop tool the
+-- player owns, and never less than their own Tier (2). See Stats.liftWith / Stats.trackedTier.
 --
 -- Grip is the acceleration (studs/s^2) the tool can hold an item with; gravity is ~196,
 -- so a weak grip barely lifts and is easily knocked loose by waves.
@@ -109,12 +111,14 @@ Gear.Tools = {
 		Rarity = "Exotic",
 		Price = 0,
 		Reach = 22,
-		Tier = 5,
+		Tier = 2,
 		Grip = 480,
 		GripBreak = 10,
-		Note = "Exotic grabber: long reach, holds tight in the surf",
+		Note = "Works up to your best shop tool's zone (at least zone 2). Key E, 12s cooldown: hurl the hook at an item up to 3x reach away, even out in the water, and reel it in",
 		Available = false,
 		Exotic = true,
+		Tracks = true,
+		Hook = { Cooldown = 12, ReachScale = 3, ReelSeconds = 5 },
 	},
 	{
 		-- Magical (rebirth reward): pulls whatever it grabs toward you through the water.
@@ -156,15 +160,17 @@ Gear.Tools = {
 		Rarity = "Exotic",
 		Price = 0,
 		Reach = 28,
-		Tier = 6,
+		Tier = 2,
 		Grip = 520,
 		GripBreak = 12,
-		Note = "Exotic grabber: a gust reels items in fast, in or out of the water",
+		Note = "Works up to your best shop tool's zone (at least zone 2). Anything you grab within 40 studs of your vessel is blown straight into it",
 		Available = false,
 		Exotic = true,
+		Tracks = true,
 		Magnet = true,
 		PullSpeed = 16,
 		PullAnywhere = true,
+		Gust = { Range = 40 },
 	},
 	{
 		-- Hermit Hollows: short, but nothing pulls out of its grip.
@@ -173,12 +179,14 @@ Gear.Tools = {
 		Rarity = "Exotic",
 		Price = 0,
 		Reach = 14,
-		Tier = 7,
+		Tier = 2,
 		Grip = 900,
 		GripBreak = 25,
-		Note = "Exotic grabber: short reach, almost impossible to knock loose",
+		Note = "Works up to your best shop tool's zone (at least zone 2). Holds two items at once; short reach, almost impossible to knock loose",
 		Available = false,
 		Exotic = true,
+		Tracks = true,
+		Holds = 2,
 	},
 	{
 		-- Black Sand Vents: the best all-round grabber.
@@ -187,12 +195,14 @@ Gear.Tools = {
 		Rarity = "Exotic",
 		Price = 0,
 		Reach = 30,
-		Tier = 7,
+		Tier = 2,
 		Grip = 700,
 		GripBreak = 14,
-		Note = "Exotic grabber: very long reach and a strong grip",
+		Note = "Works up to your best shop tool's zone (at least zone 2). Anything you grab with it is worth 15% more (once per item); very long reach and a strong grip",
 		Available = false,
 		Exotic = true,
+		Tracks = true,
+		ValueBoost = 0.15,
 	},
 	{
 		-- Stranded Iceberg: freezes the waves around you for a few seconds (never the tide).
@@ -201,13 +211,14 @@ Gear.Tools = {
 		Rarity = "Exotic",
 		Price = 0,
 		Reach = 18,
-		Tier = 4,
+		Tier = 2,
 		Grip = 400,
 		GripBreak = 8,
-		Note = "Exotic grabber: press F to freeze the waves around you for 5 seconds (25s cooldown)",
+		Note = "Works up to your best shop tool's zone (at least zone 2). Press F to freeze the waves around you for 5 seconds (25s cooldown); items you grab while they're frozen can't be knocked loose for 10s",
 		Available = false,
 		Exotic = true,
-		Freeze = { Duration = 5, Cooldown = 25, Radius = 30 },
+		Tracks = true,
+		Freeze = { Duration = 5, Cooldown = 25, Radius = 30, SecureSeconds = 10 },
 	},
 	{
 		-- Temporary, for exploring the dark deep zones: given with the admin console (give

@@ -61,14 +61,37 @@ function Stats.wadeBonus(player: Player): number
 	return 1 - kept
 end
 
+-- The tier an exotic grabber tracks: the best shop tool in an owned-tool set ({ [id] = true }),
+-- never below `floor` (the exotic's own Tier).
+function Stats.trackedTier(owned: { [string]: boolean }, floor: number): number
+	return math.max(floor, Gear.bestTool(owned).Tier)
+end
+
+local function ownedTools(player: Player): { [string]: boolean }
+	local owned = {}
+	for id in string.gmatch(player:GetAttribute("OwnedTools") or "", "[^,]+") do
+		owned[id] = true
+	end
+	return owned
+end
+
 -- The highest zone tier a player can lift with a tool: the tool's own Tier, one more with Strong
--- Back, never past the last zone.
-function Stats.liftWith(tool, strongBack: boolean): number
-	return math.min(tool.Tier + (if strongBack then 1 else 0), #Config.Zones)
+-- Back, never past the last zone. An exotic grabber (Tracks) works up to the best shop tool the
+-- player owns instead (`owned`, { [id] = true }; none = just the starting tool), at least its Tier.
+function Stats.liftWith(tool, strongBack: boolean, owned: { [string]: boolean }?): number
+	local tier = tool.Tier
+	if tool.Tracks then
+		tier = Stats.trackedTier(owned or {}, tool.Tier)
+	end
+	return math.min(tier + (if strongBack then 1 else 0), #Config.Zones)
 end
 
 function Stats.lift(player: Player, tool): number
-	return Stats.liftWith(tool, hasReward(player, "StrongBack"))
+	return Stats.liftWith(
+		tool,
+		hasReward(player, "StrongBack"),
+		if tool.Tracks then ownedTools(player) else nil
+	)
 end
 
 function Stats.grip(player: Player): number

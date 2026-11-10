@@ -331,6 +331,32 @@ test("rebirth rewards stack in Stats", function()
 	assert(Stats.lift(rewarded, Gear.getTool("ElectricWinch")) == 7, "lift is capped at the last zone")
 end)
 
+test("exotic grabbers track the best shop tool", function()
+	local Stats = h.require("Shared/Stats")
+	local Gear = h.require("Shared/Gear")
+	local function fake(attributes)
+		return {
+			GetAttribute = function(_, name)
+				return attributes[name]
+			end,
+		}
+	end
+	local none = fake({})
+	local hook = fake({ OwnedTools = "BareHands,BoatHook" })
+	local strong = fake({ OwnedTools = "BareHands,BoatHook", Rewards = "StrongBack" })
+	local boatHook = Gear.getTool("BoatHook")
+	for _, id in { "AnchorHook", "GustGloves", "CrabClaw", "ObsidianGrabber", "FreezeWand" } do
+		local tool = Gear.getTool(id)
+		assert(Stats.lift(none, tool) == 2, id .. ": no shop tool is tier 2")
+		assert(Stats.lift(hook, tool) == boatHook.Tier, id .. ": a Boat Hook is tier " .. boatHook.Tier)
+		assert(Stats.lift(strong, tool) == boatHook.Tier + 1, id .. ": Strong Back adds one")
+		assert(Stats.lift(fake({ OwnedTools = "BareHands", Rewards = "StrongBack" }), tool) == 3, id)
+	end
+	assert(boatHook.Tier == 5, "the Boat Hook is tier 5")
+	-- Shop tools themselves are unchanged by what else the player owns.
+	assert(Stats.lift(hook, Gear.getTool("BareHands")) == 1, "a shop tool keeps its own tier")
+end)
+
 test("private servers scale rare spawns", function()
 	local Items = h.require("Shared/Items")
 	local weights = { Common = 60, Uncommon = 25, Rare = 10, VeryRare = 5 }
@@ -4821,7 +4847,9 @@ test("tool tiers: a tool lifts exactly up to its tier, Strong Back one more", fu
 	for _, tool in Gear.Tools do
 		assert(tool.Tier >= 1 and tool.Tier <= 7, tool.Id .. " has a tier")
 	end
-	assert(Gear.getTool("CrabClaw").Tier == 7 and Gear.getTool("FreezeWand").Tier == 4, "exotics by strength")
+	for _, tool in Gear.Tools do
+		assert(not tool.Exotic or (tool.Tracks and tool.Tier == 2), tool.Id .. " tracks the shop ladder")
+	end
 end)
 
 test("grab: water depth no longer blocks a lift", function()
