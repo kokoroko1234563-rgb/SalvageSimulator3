@@ -130,7 +130,10 @@ function Accessories.foghornPull(origin: Vector3, items, range: number, pull: nu
 		if distance > range or distance < 0.01 then
 			continue
 		end
-		table.insert(moves, { Item = item, Position = item.Position + offset.Unit * math.min(pull, distance) })
+		table.insert(
+			moves,
+			{ Item = item, Position = item.Position + offset.Unit * math.min(pull, distance) }
+		)
 	end
 	return moves
 end
@@ -157,7 +160,10 @@ function Accessories.prismReveals(item, distance: number, radius: number): boole
 		return false
 	end
 	local rarity = item:GetAttribute("Rarity")
-	return rarity == "Rare" or rarity == "VeryRare" or rarity == "Unlock" or item:GetAttribute("Unlock") ~= nil
+	return rarity == "Rare"
+		or rarity == "VeryRare"
+		or rarity == "Unlock"
+		or item:GetAttribute("Unlock") ~= nil
 end
 
 -- Ember Lantern ------------------------------------------------------------------------------

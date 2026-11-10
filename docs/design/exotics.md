@@ -33,15 +33,19 @@ and never goes out of date. It is equipped for its power:
 
 ## Accessories (worn)
 
-| Item | Power |
+Rules live in `src/shared/Accessories.luau` (shared by server, client and the tests); the key
+abilities are checked in `src/server/AccessoryService.luau` (the client only asks, over the
+`Accessory` remote) and drawn in `src/client/AccessoryEffects.luau`.
+
+| Item | Power, as built |
 |---|---|
-| Deckhand's Satchel | +3 pocket slots, and pocketed items sell for 10% more |
-| Tide Crown | Shows the tide's timeline (when each zone uncovers and closes again); waves push you 25% less |
-| Glow Pearl | A light the Gloom can't put out (zone 6); breath lasts 25% longer |
-| Lantern of Clear Sight | See through the haze and the Fog Bank's fog |
-| Foghorn | Warns of big and rogue waves 10 s early; its blast (key G, 30 s cooldown) pulls free items within 30 studs 8 studs toward you |
-| Tidewalker Boots | Walk on the water's surface for 3 s (key R, 20 s cooldown); waves push you 30% less |
-| Prism Lens | Rare and very rare items, unlock items and biome very-rares within 150 studs shine through anything |
-| Ember Lantern | Breath lasts 50% longer; ice in the Stranded Iceberg (Ice hazard) doesn't slide you |
+| Deckhand's Satchel | +3 pocket slots. What is sold from the pockets pays 10% more: `PocketService.takeAll` (which the buyer calls) raises each entry's Value, rounded to a coin. Items dropped on death keep their plain value |
+| Tide Crown | A "Tide timeline" panel (left of the screen) lists every zone and the Far Sandbar: "open, closes in 4:12", "opens in 1:30, closes in 6:00", "always uncovered" or "stays covered". A zone counts as uncovered while the waterline is past its near edge. Computed by `Accessories.timeline` from `Tide.waterlineAt` over the next cycle or two, refreshed twice a second. Waves push 25% less |
+| Glow Pearl | In the Gloom (zones 5 and 6) a steady light (range 38) is kept on your head, and the Gloom blacks the world out only to 60% (`GloomLight.Blind`) instead of fully. Not put out by the shadow, and it flickers no more. Breath +25% |
+| Lantern of Clear Sight | Haze thins 2.5x (as before). In the Fog Bank's Fog hazard only 1/2.5 of the fog closes in, and you see 2.5x as far through it |
+| Foghorn | Warns of big and rogue waves 10 s early (`SeaController`). Key G, 30 s cooldown: the server pulls every free (Unclaimed) item within 30 studs 8 studs toward you (never past you); held, loose and vessel items are not touched. A ring spreads out from you and a banner shows. There is no audio asset yet |
+| Tidewalker Boots | Key R, 20 s cooldown: for 3 s you walk on the surface. The server sets your `WaterWalkUntil` attribute; `WaveController` holds your feet at the surface and skips the water's slowdown, `DrowningService` doesn't tick breath down while it lasts, and foam rides under your feet. Waves push 30% less, water slows half as much |
+| Prism Lens | Within 150 studs, free (Unclaimed) items that are Rare or VeryRare (every biome very-rare among them) or unlock items get a Highlight that draws through walls, nearest 20 at a time. Its Gear field is `Prism` (not the old `RevealRare`, which `GearEffects` still reads) |
+| Ember Lantern | Breath +50%. The Slide (ice) hazard in `HazardController` doesn't slide you (`Accessories.iceGrip`) |
 
 Attunement stays as it is: an exotic needs a core to use.

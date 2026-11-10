@@ -92,6 +92,7 @@ test("load server services", function()
 			"SecretService",
 			"RebirthService",
 			"PocketService",
+			"AccessoryService",
 			"InventoryService",
 			"AdminService",
 			"DrowningService",
@@ -5300,6 +5301,218 @@ test("bot: income follows the tool's tier, not depth or weight", function()
 		Economy.income(with("BeachRake", { "StrongBack" })) > Economy.income(with("BeachRake")),
 		"Strong Back opens another zone"
 	)
+end)
+
+-- 11. Exotic accessories: the rules behind each power.
+local function wearer(accessory: string?, attributes: { [string]: any }?)
+	local values: { [string]: any } = attributes or {}
+	values.Accessory = accessory or ""
+	return {
+		Name = "Wearer",
+		UserId = 77,
+		Parent = true,
+		SetAttribute = function(_, key, value)
+			values[key] = value
+		end,
+		GetAttribute = function(_, key)
+			return values[key]
+		end,
+	}
+end
+
+local function fakeItem(position, attributes)
+	return {
+		Position = position,
+		GetAttribute = function(_, key)
+			return attributes[key]
+		end,
+	}
+end
+
+test("exotic accessory: the Satchel sells pocketed items for 10% more", function()
+	local DataService = h.require("Server/DataService")
+	local PocketService = h.require("Server/PocketService")
+	local Accessories = h.require("Shared/Accessories")
+	assert(Accessories.pocketValue(wearer("DeckhandsSatchel"), 100) == 110, "10% more with the Satchel")
+	assert(Accessories.pocketValue(wearer("DeckhandsSatchel"), 15) == 17, "rounded to a whole coin")
+	assert(Accessories.pocketValue(wearer("TideCrown"), 100) == 100, "other accessories: no bonus")
+	assert(Accessories.pocketValue(wearer(nil), 100) == 100, "nothing worn: no bonus")
+	local function pockets(accessory: string?)
+		local player = wearer(accessory)
+		DataService._setProfile(player, {
+			Pockets = {
+				{ ItemId = "Seashell", Zone = 1, Value = 200 },
+				{ ItemId = "GlassBottle", Zone = 2, Value = 50 },
+			},
+		})
+		player:SetAttribute("Accessory", accessory or "") -- (the profile's publish cleared it: nothing owned)
+		local total = 0
+		for _, entry in PocketService.takeAll(player :: any) do
+			total += entry.Value
+		end
+		return total
+	end
+	assert(pockets("DeckhandsSatchel") == 275, "the buyer pays the Satchel's wearer 10% more for pockets")
+	assert(pockets(nil) == 250, "and everyone else the plain value")
+end)
+
+test("exotic accessory: the Tide Crown's timeline", function()
+	local Accessories = h.require("Shared/Accessories")
+	local Tide = h.require("Shared/Tide")
+	local Beach = h.require("Shared/Beach")
+	local Config = h.require("Shared/Config")
+	-- A made-up tide: the waterline swings 0..2000 over a 100 s cycle, rising for the first half.
+	local function line(t: number): number
+		return 1000 + 1000 * math.sin(t / 100 * 2 * math.pi)
+	end
+	local windows = Accessories.timeline(line, 0, 100, {
+		{ Zone = 1, Z = -500 },
+		{ Zone = 2, Z = 1500 },
+		{ Zone = 3, Z = 5000 },
+	})
+	assert(windows[1].AlwaysOpen and windows[1].Open, "a zone behind the lowest line is always uncovered")
+	assert(windows[3].NeverOpen and not windows[3].Open, "a zone past the highest line stays covered")
+	local two = windows[2]
+	assert(
+		not two.Open and math.abs((two.OpensIn :: number) - 100 / 12) < 0.05,
+		"uncovers when the line passes it"
+	)
+	assert(math.abs((two.ClosesIn :: number) - 100 * 5 / 12) < 0.05, "and closes when it falls back")
+	-- Mid-window: open now, closing soon.
+	local later = Accessories.timeline(line, 20, 100, { { Zone = 2, Z = 1500 } })[1]
+	assert(
+		later.Open
+			and later.OpensIn == 0
+			and math.abs((later.ClosesIn :: number) - (100 * 5 / 12 - 20)) < 0.05
+	)
+	-- The real tide: zone 1 never closes, and a deep zone opens when the line reaches it.
+	local start = 5000
+	h.game.Workspace:SetAttribute(Tide.StartAttribute, start)
+	local edges = {}
+	for zone = 1, Config.Beach.ActiveZones do
+		table.insert(edges, { Zone = zone, Z = (Beach.zoneRange(zone)) })
+	end
+	local real = Accessories.timeline(function(t)
+		return Tide.waterlineAt(Tide.sea(t), 0)
+	end, start + 10, Tide.cycleLength(), edges)
+	assert(real[1].AlwaysOpen, "zone 1 is always partly uncovered")
+	local six = real[6]
+	assert(six.OpensIn and six.ClosesIn and six.ClosesIn > six.OpensIn, "zone 6 opens, then closes again")
+	local at = Tide.waterlineAt(Tide.sea(start + 10 + six.OpensIn + 1), 0)
+	assert(at >= edges[6].Z, "it really is uncovered just after it opens")
+	assert(
+		Tide.waterlineAt(Tide.sea(start + 10 + six.ClosesIn + 1), 0) < edges[6].Z,
+		"and covered just after it closes"
+	)
+	h.game.Workspace:SetAttribute(Tide.StartAttribute, nil)
+end)
+
+test("exotic accessory: the Foghorn's pull range and cooldown", function()
+	local AccessoryService = h.require("Server/AccessoryService")
+	local Accessories = h.require("Shared/Accessories")
+	local V = roblox.Vector3
+	local function field()
+		return {
+			fakeItem(V.new(10, 0, 0), { State = "Unclaimed" }), -- 1: pulled 8 of 10
+			fakeItem(V.new(0, 0, 5), { State = "Unclaimed" }), -- 2: closer than the pull
+			fakeItem(V.new(31, 0, 0), { State = "Unclaimed" }), -- 3: out of range
+			fakeItem(V.new(30, 0, 0), { State = "Unclaimed" }), -- 4: at the edge of the range
+			fakeItem(V.new(10, 0, 10), { State = "Held" }), -- 5: not free
+			fakeItem(V.new(0, 0, -12), { State = "Loose" }), -- 6: not free
+		}
+	end
+	local player = wearer("Foghorn")
+	local items = field()
+	local ok, _, moved = AccessoryService.foghorn(player, V.zero, items, 100)
+	assert(ok and moved == 3, "the blast pulls the three free items in range, got " .. tostring(moved))
+	assert((items[1].Position - V.new(2, 0, 0)).Magnitude < 1e-3, "8 studs closer")
+	assert(items[2].Position.Magnitude < 1e-3, "an item nearer than 8 studs lands on you, not past you")
+	assert(items[3].Position.X == 31, "out of range: left alone")
+	assert((items[4].Position - V.new(22, 0, 0)).Magnitude < 1e-3, "30 studs is in range")
+	assert(
+		items[5].Position == V.new(10, 0, 10) and items[6].Position == V.new(0, 0, -12),
+		"not free: left alone"
+	)
+	local again, reason = AccessoryService.foghorn(player, V.zero, field(), 129)
+	assert(not again and reason and string.find(reason, "Recharging"), "30 s cooldown: not ready after 29")
+	assert((AccessoryService.foghorn(player, V.zero, field(), 130)), "ready after 30 s")
+	assert(
+		not (AccessoryService.foghorn(wearer("TideCrown"), V.zero, field(), 500)),
+		"needs the Foghorn worn"
+	)
+	assert(not (AccessoryService.foghorn(wearer(nil), V.zero, field(), 500)), "needs something worn")
+	assert(#Accessories.foghornPull(V.zero, field(), 30, 8) == 3, "the pure rule agrees")
+	local Gear = h.require("Shared/Gear")
+	local spec = Gear.getAccessory("Foghorn").Blast
+	assert(spec.Key == "G" and spec.Range == 30 and spec.Pull == 8 and spec.Cooldown == 30, "as designed")
+end)
+
+test("exotic accessory: Tidewalker Boots walk on water, no drowning, 20 s cooldown", function()
+	local AccessoryService = h.require("Server/AccessoryService")
+	local Accessories = h.require("Shared/Accessories")
+	local Gear = h.require("Shared/Gear")
+	local player = wearer("TidewalkerBoots")
+	assert(Accessories.canDrown(player, 100), "before the walk, deep water drowns")
+	local ok = AccessoryService.waterWalk(player, 100)
+	assert(ok, "the walk starts")
+	assert(
+		Accessories.isWaterWalking(player, 102.9) and not Accessories.canDrown(player, 102.9),
+		"3 s: no drowning"
+	)
+	assert(Accessories.canDrown(player, 103.1), "then it ends and deep water drowns again")
+	local early, reason = AccessoryService.waterWalk(player, 119)
+	assert(not early and reason and string.find(reason, "Recharging"), "20 s cooldown")
+	assert(not Accessories.isWaterWalking(player, 119), "a refused walk doesn't start one")
+	assert(AccessoryService.waterWalk(player, 120), "ready after 20 s")
+	assert(not (AccessoryService.waterWalk(wearer("Foghorn"), 100)), "needs the Boots worn")
+	local spec = Gear.getAccessory("TidewalkerBoots").WaterWalk
+	assert(spec.Key == "R" and spec.Duration == 3 and spec.Cooldown == 20, "as designed")
+end)
+
+test("exotic accessory: Prism Lens selection rules", function()
+	local Accessories = h.require("Shared/Accessories")
+	local V = roblox.Vector3
+	local function shows(attributes, distance)
+		attributes.State = attributes.State or "Unclaimed"
+		return Accessories.prismReveals(fakeItem(V.zero, attributes), distance, 150)
+	end
+	assert(shows({ Rarity = "Rare" }, 100), "rare items shine")
+	assert(shows({ Rarity = "VeryRare" }, 100), "very rare items shine (biome very-rares among them)")
+	assert(shows({ Rarity = "Unlock", Unlock = "Something" }, 100), "unlock items shine")
+	assert(not shows({ Rarity = "Common" }, 100), "common items don't")
+	assert(not shows({ Rarity = "Uncommon" }, 100), "uncommon items don't")
+	assert(not shows({ Rarity = "Rare" }, 151), "past 150 studs they don't")
+	assert(shows({ Rarity = "Rare" }, 150), "at 150 they do")
+	assert(not shows({ Rarity = "Rare", State = "Held" }, 10), "held items are already yours")
+	assert(
+		not Accessories.prismReveals(fakeItem(V.zero, { Rarity = "Rare", State = "Unclaimed" }), 10, 0),
+		"no lens"
+	)
+	local Gear = h.require("Shared/Gear")
+	assert(Gear.getAccessory("PrismLens").Prism == 150)
+end)
+
+test("exotic accessory: Ember Lantern ice, Lantern fog and Glow Pearl gloom", function()
+	local Accessories = h.require("Shared/Accessories")
+	assert(Accessories.iceGrip(wearer("EmberLantern"), 0.3) == nil, "Ember: the ice doesn't slide you")
+	assert(Accessories.iceGrip(wearer("GlowPearl"), 0.3) == 0.3, "other wearers slide as ever")
+	assert(Accessories.iceGrip(wearer(nil), 0.3) == 0.3, "nothing worn: slides")
+	assert(math.abs(Accessories.fogShare(wearer("LanternOfClearSight")) - 0.4) < 1e-9, "less fog closes in")
+	assert(Accessories.fogSightScale(wearer("LanternOfClearSight")) == 2.5, "and you see further through it")
+	assert(Accessories.fogShare(wearer(nil)) == 1 and Accessories.fogSightScale(wearer(nil)) == 1)
+	assert(Accessories.gloomBlind(wearer("GlowPearl")) < 1, "the Gloom can't black out a Glow Pearl")
+	assert(Accessories.gloomBlind(wearer(nil)) == 1, "but blacks out everyone else")
+	local Stats = h.require("Shared/Stats")
+	assert(
+		math.abs(Stats.breath(wearer("EmberLantern")) / Stats.breath(wearer(nil)) - 1.5) < 1e-9,
+		"Ember breath"
+	)
+	assert(
+		math.abs(Stats.breath(wearer("GlowPearl")) / Stats.breath(wearer(nil)) - 1.25) < 1e-9,
+		"Pearl breath"
+	)
+	assert(math.abs(Stats.wavePush(wearer("TidewalkerBoots")) / Stats.wavePush(wearer(nil)) - 0.7) < 1e-9)
+	assert(math.abs(Stats.wadeBonus(wearer("TidewalkerBoots")) - 0.5) < 1e-9, "water slows half as much")
 end)
 
 print(string.format("\n%d passed, %d failed", passed, failures))

@@ -35,10 +35,10 @@ function PocketService.takeAll(player: Player): { DataService.PocketEntry }
 	end
 	local list = profile.Pockets
 	profile.Pockets = {}
-	DataService.changed(player)
 	for _, entry in list do
 		entry.Value = Accessories.pocketValue(player, entry.Value)
 	end
+	DataService.changed(player)
 	return list
 end
 
