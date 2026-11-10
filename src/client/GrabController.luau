@@ -6,12 +6,21 @@
 --           "To vessel") to send it there; tap anywhere else (or press "Drop") to drop it.
 --   Vessels are towed the same way by grabbing their handle.
 --
+-- Exotic grabbers add to that:
+--   * Anchor Hook: press E to hurl the hook at the item under the pointer (up to 3x reach, even
+--     out in the water); the server claims it and it is reeled to you.
+--   * Gust Gloves: the server blows what you grab into a vessel within 40 studs; we show the gust.
+--   * Crab Claw: a second item can be grabbed while the first is lifted; both float beside you,
+--     and Drop / To vessel act on both.
+--   * Freeze Wand: an item grabbed while the waves are frozen can't be knocked loose for 10 s.
+--
 -- The server gives us network ownership of what we hold, so the constraint that moves it
 -- lives only on this client.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
@@ -27,6 +36,7 @@ local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 local Tide = require(Shared.Tide)
 
+local GearEffects = require(script.Parent.GearEffects)
 local HUD = require(script.Parent.HUD)
 
 local player = Players.LocalPlayer
@@ -50,6 +60,10 @@ type Held = {
 	startedAt: number,
 	farFor: number,
 	checkedOwnership: boolean?,
+	-- Until when this item can't be knocked loose (Freeze Wand), and until when it may be far
+	-- from you while the Anchor Hook reels it in.
+	secureUntil: number,
+	reelUntil: number,
 }
 
 type Press = {
@@ -62,6 +76,9 @@ type Press = {
 }
 
 local held: Held? = nil
+-- The Crab Claw's other item: lifted and floating beside you while `held` is the newer one.
+local second: Held? = nil
+local hookReadyAt = 0
 local press: Press? = nil
 -- On touch screens a touch that starts while something is lifted might be a camera pan,
 -- so it's only treated as a tap (and acted on) once it ends short and still.
@@ -110,6 +127,9 @@ local function raycastFrom(screenPosition: Vector2): RaycastResult?
 	end
 	if held then
 		table.insert(exclude, held.part)
+	end
+	if second then
+		table.insert(exclude, second.part)
 	end
 	params.FilterDescendantsInstances = exclude
 	return Workspace:Raycast(ray.Origin, ray.Direction * 300, params)
@@ -242,19 +262,30 @@ local function canPocket(): boolean
 		and (player:GetAttribute("Pockets") or 0) < slots
 end
 
+local function destroyHold(current: Held)
+	current.align:Destroy()
+	current.attachment:Destroy()
+	if current.bubble then
+		current.bubble:Destroy()
+	end
+	-- Local-only marks for WaveController (see begin).
+	current.part:SetAttribute("WaveScale", nil)
+end
+
 local function cleanup()
 	if not held then
 		return
 	end
-	held.align:Destroy()
-	held.attachment:Destroy()
-	if held.bubble then
-		held.bubble:Destroy()
-	end
-	-- Local-only marks for WaveController (see begin).
-	held.part:SetAttribute("WaveScale", nil)
+	destroyHold(held)
 	held = nil
 	HUD.setHoldButtons(false)
+end
+
+local function cleanupSecond()
+	if second then
+		destroyHold(second)
+		second = nil
+	end
 end
 
 -- Whether this client is holding something (an item or a vessel's handle).
@@ -269,10 +300,16 @@ local function pick(screenPosition: Vector2): (BasePart?, ("item" | "vessel")?, 
 end
 
 function GrabController.isHolding(): boolean
-	return held ~= nil
+	return held ~= nil or second ~= nil
 end
 
+-- Lets go of everything held (the Crab Claw holds two).
 function GrabController.release()
+	local other = second
+	cleanupSecond()
+	if other then
+		releaseRemote:FireServer(other.part)
+	end
 	local current = held
 	if not current then
 		return
@@ -296,14 +333,9 @@ function GrabController.pocket()
 	Remotes.get("Pocket"):FireServer("store", current.part)
 end
 
-function GrabController.sendToVessel()
-	local current = held
-	if not current or current.kind ~= "item" then
-		return
-	end
-	-- Stop pulling it; the server either loads it or tells us why not (and it stays held
-	-- server-side, so drop it properly in that case).
-	cleanup()
+-- Stop pulling an item; the server either loads it or tells us why not (and it stays held
+-- server-side, so drop it properly in that case).
+local function sendOne(current: Held)
 	sendRemote:FireServer(current.part)
 	task.delay(0.6, function()
 		if
@@ -314,6 +346,20 @@ function GrabController.sendToVessel()
 			releaseRemote:FireServer(current.part)
 		end
 	end)
+end
+
+function GrabController.sendToVessel()
+	local other = second
+	if other then
+		cleanupSecond()
+		sendOne(other)
+	end
+	local current = held
+	if not current or current.kind ~= "item" then
+		return
+	end
+	cleanup()
+	sendOne(current)
 end
 
 local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vector3)
@@ -339,6 +385,10 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 		local tool = currentTool()
 		if tool.MaxSpeed then
 			align.MaxVelocity = tool.MaxSpeed
+		end
+		if tool.Hook then
+			-- Reeling in a thrown hook is fast.
+			align.MaxVelocity = 90
 		end
 		-- Set on this client only: WaveController reads it to soften waves on what we hold.
 		if tool.Bubble then
@@ -366,7 +416,15 @@ local function begin(part: BasePart, kind: "item" | "vessel", hitPosition: Vecto
 		align = align,
 		startedAt = os.clock(),
 		farFor = 0,
+		secureUntil = 0,
+		reelUntil = 0,
 	}
+	-- Freeze Wand: grabbed while the waves are frozen here, it can't be knocked loose for a while.
+	local root = getRoot()
+	if kind == "item" and root then
+		held.secureUntil = os.clock()
+			+ Stats.secureSeconds(currentTool(), GearEffects.isFrozen(root.Position))
+	end
 	if kind == "item" and currentTool().Bubble then
 		local bubble = Instance.new("Part")
 		bubble.Name = "Bubble"
@@ -599,7 +657,60 @@ local function targetPosition(current: Held, root: BasePart): Vector3
 	return target
 end
 
+-- The Crab Claw's other item floats beside you, a little to the right.
+local function secondTarget(current: Held, root: BasePart): Vector3
+	local look = root.CFrame.LookVector
+	local flatLook = Vector3.new(look.X, 0, look.Z).Unit
+	local right = flatLook:Cross(Vector3.yAxis).Unit * -1
+	local size = current.part.Size.Magnitude / 2
+	return root.Position + flatLook * 2 + right * (3 + size) + Vector3.new(0, 2.5, 0)
+end
+
+local function updateSecond(dt: number)
+	local current = second
+	if not current then
+		return
+	end
+	local part = current.part
+	local root = getRoot()
+	if
+		not part.Parent
+		or not root
+		or (
+			os.clock() - current.startedAt > 1
+			and (part:GetAttribute("State") ~= "Held" or part:GetAttribute("Owner") ~= player.UserId)
+		)
+	then
+		cleanupSecond()
+		return
+	end
+	local target = secondTarget(current, root)
+	current.align.Position = target
+	part.AssemblyAngularVelocity *= 0.9
+	local tool = currentTool()
+	if
+		os.clock() > current.secureUntil
+		and (part.Position - target).Magnitude
+			> tool.GripBreak * Traders.gripMultiplier(upgrades()) + part.Size.Magnitude / 2
+	then
+		current.farFor += dt
+		if current.farFor > grabCfg.GripBreakTime then
+			local lost = current
+			cleanupSecond()
+			releaseRemote:FireServer(lost.part)
+			HUD.notify("Knocked loose!")
+		end
+	else
+		current.farFor = 0
+	end
+end
+
 local function update(dt: number)
+	-- The Crab Claw's first item takes over if the newer one is gone.
+	if not held and second then
+		held, second = second, nil
+	end
+	updateSecond(dt)
 	local current = held
 	if not current then
 		return
@@ -619,7 +730,11 @@ local function update(dt: number)
 
 	-- Knocked over by a wave (WaveController): you lose your grip on whatever you held.
 	local character = player.Character
-	if character and character:GetAttribute("KnockedDown") then
+	if
+		character
+		and character:GetAttribute("KnockedDown")
+		and not (current.kind == "item" and os.clock() < current.secureUntil)
+	then
 		local wasItem = current.kind == "item"
 		GrabController.release()
 		if wasItem then
@@ -678,6 +793,8 @@ local function update(dt: number)
 		local tool = currentTool()
 		if
 			os.clock() - current.startedAt > 0.8
+			and os.clock() > current.secureUntil
+			and os.clock() > current.reelUntil
 			and (part.Position - target).Magnitude
 				> tool.GripBreak * Traders.gripMultiplier(upgrades()) + part.Size.Magnitude / 2
 		then
@@ -736,6 +853,137 @@ local function updateHover()
 	end
 end
 
+-- Effects ----------------------------------------------------------------------------------
+
+local function effectPart(size: Vector3, color: Color3, shape: Enum.PartType?): Part
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Size = size
+	part.Color = color
+	part.Material = Palette.Material.Smooth
+	if shape then
+		part.Shape = shape
+	end
+	part.Parent = Workspace
+	return part
+end
+
+-- Anchor Hook: the hook flies out to the item, and the line stays taut while it is reeled in.
+local function playHookEffect(part: BasePart)
+	local root = getRoot()
+	if not root then
+		return
+	end
+	local line = effectPart(Vector3.new(0.2, 0.2, 1), Palette.UI.Text)
+	local hook = effectPart(Vector3.new(1.2, 1.2, 1.2), Palette.UI.Disabled, Enum.PartType.Ball)
+	local started = os.clock()
+	local connection
+	connection = RunService.Heartbeat:Connect(function()
+		local origin = getRoot()
+		local elapsed = os.clock() - started
+		if not origin or not part.Parent or elapsed > 3 then
+			connection:Disconnect()
+			line:Destroy()
+			hook:Destroy()
+			return
+		end
+		local from = origin.Position
+		-- The throw takes a quarter second; after that the hook rides the item.
+		local head = if elapsed < 0.25 then from:Lerp(part.Position, elapsed / 0.25) else part.Position
+		hook.Position = head
+		local length = math.max((head - from).Magnitude, 0.1)
+		line.Size = Vector3.new(0.2, 0.2, length)
+		line.CFrame = CFrame.lookAt(from:Lerp(head, 0.5), head)
+		if elapsed > 0.5 and (part.Position - from).Magnitude < 6 then
+			connection:Disconnect()
+			line:Destroy()
+			hook:Destroy()
+		end
+	end)
+end
+
+-- Gust Gloves: a few white puffs rush from where the item was to your vessel.
+local function playGustEffect(from: Vector3)
+	local vessel = myVessel()
+	local base = vessel and vessel.PrimaryPart
+	if not base then
+		return
+	end
+	for i = 1, 6 do
+		local puff = effectPart(Vector3.new(1.4, 1.4, 1.4), Color3.new(1, 1, 1), Enum.PartType.Ball)
+		puff.Transparency = 0.4
+		puff.Position = from + Vector3.new(math.random() - 0.5, math.random() * 2, math.random() - 0.5) * 2
+		local tween = TweenService:Create(
+			puff,
+			TweenInfo.new(0.45 + i * 0.04, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+			{
+				Position = base.Position + Vector3.new(0, 3, 0),
+				Transparency = 1,
+				Size = Vector3.new(0.4, 0.4, 0.4),
+			}
+		)
+		tween.Completed:Once(function()
+			puff:Destroy()
+		end)
+		tween:Play()
+	end
+end
+
+-- Anchor Hook: hurl the hook at the item under the pointer. The server checks the reach.
+function GrabController.throwHook()
+	local tool = currentTool()
+	local spec = tool.Hook
+	local root = getRoot()
+	if not spec or not root or tool.NoGrab then
+		return
+	end
+	local now = os.clock()
+	if now < hookReadyAt then
+		HUD.notify(string.format("The hook is still reeling in (%ds)", math.ceil(hookReadyAt - now)))
+		return
+	end
+	if held and (held.kind == "vessel" or held.mode == "drag") then
+		return
+	end
+	local mouse = UserInputService:GetMouseLocation()
+	local screen = mouse - game:GetService("GuiService"):GetGuiInset()
+	local part, kind = pick(screen)
+	if not part or kind ~= "item" then
+		HUD.notify("Point at an item to throw the hook")
+		return
+	end
+	if (part.Position - root.Position).Magnitude > tool.Reach * spec.ReachScale then
+		HUD.notify("Too far for the hook")
+		return
+	end
+	hookReadyAt = now + 1 -- (no double throws while the server answers)
+	task.spawn(function()
+		local called, ok, reason = pcall(grabRemote.InvokeServer, grabRemote, part, "hook")
+		if not called then
+			ok, reason = false, "Hook failed: " .. tostring(ok)
+		end
+		if not ok then
+			hookReadyAt = 0
+			HUD.notify(reason or "Couldn't hook that")
+			return
+		end
+		hookReadyAt = os.clock() + spec.Cooldown
+		if not part.Parent then
+			return
+		end
+		playHookEffect(part)
+		begin(part, "item", part.Position)
+		if held then
+			held.reelUntil = os.clock() + spec.ReelSeconds
+			enterLifted()
+		end
+	end)
+end
+
 local function isTap(p: Press): boolean
 	local duration = (p.endedAt or os.clock()) - p.startedAt
 	return duration <= grabCfg.TapTime and p.moved <= grabCfg.TapMovePixels
@@ -756,9 +1004,27 @@ local function onInputBegan(input: InputObject, processed: boolean)
 	end
 	local screen = Vector2.new(input.Position.X, input.Position.Y)
 
-	-- While something is lifted, the next tap decides where it goes.
+	-- Crab Claw: with one item lifted, grabbing a free item takes it as the second.
 	local current = held
-	if current and current.mode == "lifted" and input.UserInputType == Enum.UserInputType.Touch then
+	local crabGrab = false
+	if
+		current
+		and not second
+		and current.kind == "item"
+		and current.mode == "lifted"
+		and (currentTool().Holds or 1) > 1
+	then
+		local target, targetKind = pick(screen)
+		crabGrab = target ~= nil and targetKind == "item" and target:GetAttribute("State") == "Unclaimed"
+	end
+
+	-- While something is lifted, the next tap decides where it goes.
+	if
+		not crabGrab
+		and current
+		and current.mode == "lifted"
+		and input.UserInputType == Enum.UserInputType.Touch
+	then
 		liftedTouch = {
 			input = input,
 			startedAt = os.clock(),
@@ -768,7 +1034,7 @@ local function onInputBegan(input: InputObject, processed: boolean)
 		}
 		return
 	end
-	if current and current.mode == "lifted" then
+	if not crabGrab and current and current.mode == "lifted" then
 		local hit = raycastFrom(screen)
 		if current.kind == "item" and hit and ownVesselFrom(hit.Instance) then
 			GrabController.sendToVessel()
@@ -777,7 +1043,7 @@ local function onInputBegan(input: InputObject, processed: boolean)
 		end
 		return
 	end
-	if held then
+	if held and not crabGrab then
 		return
 	end
 	if press then
@@ -790,6 +1056,7 @@ local function onInputBegan(input: InputObject, processed: boolean)
 	end
 
 	local part, kind, hitPosition, why = pick(screen)
+	local clickedAt = if part then part.Position else Vector3.zero
 	if not part or not kind or not hitPosition then
 		debugLog("click did not grab:", why)
 		return
@@ -822,7 +1089,19 @@ local function onInputBegan(input: InputObject, processed: boolean)
 		if not part.Parent then
 			return
 		end
+		if reason == "gust" then
+			-- Blown straight into the vessel: nothing to carry.
+			if press == thisPress then
+				press = nil
+			end
+			playGustEffect(clickedAt)
+			return
+		end
 		debugLog("grabbed", part:GetFullName(), "anchored on this client:", part.Anchored)
+		if crabGrab and held and not second and held.mode == "lifted" then
+			-- The Crab Claw keeps the first item floating beside you.
+			second, held = held, nil
+		end
 		begin(part, kind, hitPosition :: Vector3)
 		if thisPress.ended then
 			-- The press finished while we waited for the server.
@@ -915,8 +1194,13 @@ function GrabController.init()
 
 	HUD.bindHoldButtons(GrabController.release, GrabController.sendToVessel, GrabController.pocket)
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if not processed and input.KeyCode == Enum.KeyCode.Q then
+		if processed then
+			return
+		end
+		if input.KeyCode == Enum.KeyCode.Q then
 			GrabController.pocket()
+		elseif input.KeyCode == Enum.KeyCode.E then
+			GrabController.throwHook()
 		end
 	end)
 
@@ -930,7 +1214,10 @@ function GrabController.init()
 		updateHover()
 	end)
 
-	player.CharacterRemoving:Connect(cleanup)
+	player.CharacterRemoving:Connect(function()
+		cleanupSecond()
+		cleanup()
+	end)
 end
 
 return GrabController

@@ -7,17 +7,20 @@ climb, instead of being a bigger number.
 
 ## Grabbers: they track your progress
 
-An exotic grabber works up to the tier of the best shop tool you own (at least tier 2), never past
-it (`Stats.lift` / `Gear.canLift`; Strong Back still adds one). So it never skips the tool ladder
-and never goes out of date. It is equipped for its power:
+An exotic grabber works up to the tier of the best **shop** tool you own (the `Available` tools in
+`Gear.Tools`, read from the `OwnedTools` attribute), and at least tier 2. It never skips the tool
+ladder and never goes out of date. Strong Back still adds one. This is `Stats.lift` /
+`Stats.liftWith` (exotics have `Tracks = true` and a `Tier` of 2, the floor), so every lift check
+uses it, on the server (`GrabService.canClaim`) and the client (hover text). The bots never own
+exotics, so `BotEconomy.lift` is unchanged. An exotic is equipped for its power:
 
 | Item | Power |
 |---|---|
-| Anchor Hook | Hurl the hook (key E, 12 s cooldown): grab one item from 3x reach, even out in the water, and reel it in |
-| Gust Gloves | A grabbed item within 40 studs of your cart is blown straight into it (no carrying) |
-| Crab Claw | Holds two items at once |
-| Obsidian Grabber | Anything you grab with it is worth 15% more (its Value attribute rises once, on the first grab) |
-| Freeze Wand | Freezes the waves around you (key F, as now), and items you grab while they're frozen can't be knocked loose for 10 s |
+| Anchor Hook | Key E, 12 s cooldown: hurl the hook at the item under the pointer, up to 3x the tool's reach away (22 studs, so 66), even out in the water. If the item passes the usual claim rules (tier, free, not unlock-restricted) it is claimed and reeled to you. The server checks 3x reach plus the usual slack, and the cooldown. A hook-and-line effect shows the throw |
+| Gust Gloves | When you grab an item and your active vessel is within 40 studs of you, the item is blown straight into the vessel (the same load as "To vessel", so a full vessel refuses and you just hold it), with a gust effect |
+| Crab Claw | Holds two items at once: grab a second item while the first is lifted and both float beside you; Drop and To vessel act on both. A third grab lets go of the oldest. Every other tool still holds one |
+| Obsidian Grabber | The first time an item is grabbed with it, its `Value` attribute rises 15% (marked on the item with `ObsidianBoost`, so once per item) |
+| Freeze Wand | Freezes the waves around you (key F, as before). Items grabbed while the waves are frozen get a 10 s window where they can't be knocked loose: no grip break from waves or pulls and no knock-down release (client side, like all grip breaks) |
 
 ## Vessels
 
