@@ -436,7 +436,8 @@ Gear.Accessories = {
 		Name = "Deckhand's Satchel",
 		Rarity = "Exotic",
 		PocketSlots = 3,
-		Note = "Exotic accessory: 3 extra pocket slots for Light items",
+		PocketSellBonus = 0.1, -- items sold from your pockets are worth this much more
+		Note = "Exotic accessory: 3 extra pocket slots, and what you sell from your pockets is worth 10% more",
 		Exotic = true,
 	},
 	{
@@ -445,7 +446,8 @@ Gear.Accessories = {
 		Name = "Tide Crown",
 		Rarity = "Exotic",
 		WaveResist = 0.25,
-		Note = "Exotic accessory: waves push you 25% less",
+		TideTimeline = true, -- shows when each zone uncovers and closes this cycle (AccessoryEffects)
+		Note = "Exotic accessory: shows the tide's timeline (when each zone uncovers and closes), and waves push you 25% less",
 		Exotic = true,
 	},
 	-- Exotic accessories from the rare biomes' lootboxes.
@@ -456,7 +458,10 @@ Gear.Accessories = {
 		Rarity = "Exotic",
 		Light = { Color = Color3.fromRGB(150, 240, 255), Range = 18, Brightness = 1.5 },
 		BreathBonus = 0.25,
-		Note = "Exotic accessory: glows around you, and your breath lasts 25% longer",
+		-- In the Gloom its light holds: a bright pool around you the dark can't put out, and the
+		-- blackness never closes in past Blind (HazardController, AccessoryEffects).
+		GloomLight = { Range = 38, Brightness = 3, Blind = 0.6 },
+		Note = "Exotic accessory: a light the Gloom can't put out, and your breath lasts 25% longer",
 		Exotic = true,
 	},
 	{
@@ -465,8 +470,8 @@ Gear.Accessories = {
 		Name = "Lantern of Clear Sight",
 		Rarity = "Exotic",
 		Light = { Color = Color3.fromRGB(255, 235, 170), Range = 16, Brightness = 1.2 },
-		ClearSight = 2.5,
-		Note = "Exotic accessory: you see 2.5x further through the haze",
+		ClearSight = 2.5, -- thins the haze, and the Fog Bank's fog (MistController)
+		Note = "Exotic accessory: you see 2.5x further through the haze and the Fog Bank's fog",
 		Exotic = true,
 	},
 	{
@@ -475,7 +480,9 @@ Gear.Accessories = {
 		Name = "Foghorn",
 		Rarity = "Exotic",
 		WaveWarning = 10,
-		Note = "Exotic accessory: warns you of big and rogue waves 10 seconds earlier",
+		-- Key G: pulls free (Unclaimed) items within Range studs Pull studs toward you.
+		Blast = { Key = "G", Range = 30, Pull = 8, Cooldown = 30 },
+		Note = "Exotic accessory: warns of big and rogue waves 10 seconds early. Key G (30 s): its blast pulls free items within 30 studs 8 studs toward you",
 		Exotic = true,
 	},
 	{
@@ -485,7 +492,9 @@ Gear.Accessories = {
 		Rarity = "Exotic",
 		WaveResist = 0.3,
 		WadeBonus = 0.5,
-		Note = "Exotic accessory: waves push you 30% less, and water slows you half as much",
+		-- Key R: walk on the water's surface for Duration seconds, no drowning meanwhile.
+		WaterWalk = { Key = "R", Duration = 3, Cooldown = 20 },
+		Note = "Exotic accessory: key R (20 s): walk on the water for 3 seconds. Waves push you 30% less and water slows you half as much",
 		Exotic = true,
 	},
 	{
@@ -493,8 +502,9 @@ Gear.Accessories = {
 		Id = "PrismLens",
 		Name = "Prism Lens",
 		Rarity = "Exotic",
-		RevealRare = 150,
-		Note = "Exotic accessory: rare items and unlock items within 150 studs shine through anything",
+		-- (Not "RevealRare": GearEffects' older reveal would draw it twice.) AccessoryEffects.
+		Prism = 150,
+		Note = "Exotic accessory: rare and very rare items, unlock items and biome very-rares within 150 studs shine through anything",
 		Exotic = true,
 	},
 	{
@@ -504,7 +514,8 @@ Gear.Accessories = {
 		Rarity = "Exotic",
 		Light = { Color = Color3.fromRGB(255, 140, 60), Range = 16, Brightness = 1.5 },
 		BreathBonus = 0.5,
-		Note = "Exotic accessory: keeps you warm underwater: breath lasts 50% longer",
+		NoSlide = true, -- ice (the Slide hazard) doesn't slide you
+		Note = "Exotic accessory: breath lasts 50% longer, and ice doesn't slide you",
 		Exotic = true,
 	},
 }

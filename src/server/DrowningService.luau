@@ -4,6 +4,7 @@
 local Players = game:GetService("Players")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Accessories = require(Shared.Accessories)
 local Config = require(Shared.Config)
 local Beach = require(Shared.Beach)
 local Tide = require(Shared.Tide)
@@ -30,7 +31,13 @@ local function tick()
 		-- rock, a prop or a ridge above the water you can breathe.
 		local feet = root.Position.Y - root.Size.Y / 2 - humanoid.HipHeight
 		local deep = Beach.waterYAt(sea, root.Position.X) - feet >= Config.Beach.WaistDepth
-		if deep and not player:GetAttribute("AdminGod") and not player:GetAttribute("AdminFly") then
+		-- (Tidewalker Boots: walking on the water, you don't drown.)
+		if
+			deep
+			and not player:GetAttribute("AdminGod")
+			and not player:GetAttribute("AdminFly")
+			and Accessories.canDrown(player, Tide.now())
+		then
 			local lungs = Stats.breath(player)
 			breath = math.max(0, breath - TICK / (cfg.BreathTime * lungs))
 			if breath <= 0 then

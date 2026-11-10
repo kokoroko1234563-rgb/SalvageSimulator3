@@ -1,5 +1,6 @@
 -- Salvage Simulator 3 client entry point (Milestones 1 and 2).
 
+local AccessoryEffects = require(script.AccessoryEffects)
 local AdminConsole = require(script.AdminConsole)
 local AuctionUI = require(script.AuctionUI)
 local ReviewUI = require(script.ReviewUI)
@@ -54,5 +55,6 @@ start("TradeUI", TradeUI.init)
 start("TraderUI", TraderUI.init)
 start("AuctionUI", AuctionUI.init)
 start("AdminConsole", AdminConsole.init)
+start("AccessoryEffects", AccessoryEffects.init)
 start("FlyController", FlyController.init)
 start("ReviewUI", ReviewUI.init)
