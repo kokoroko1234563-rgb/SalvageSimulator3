@@ -6,6 +6,7 @@
 local Players = game:GetService("Players")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Accessories = require(Shared.Accessories)
 local Items = require(Shared.Items)
 local Remotes = require(Shared.Remotes)
 
@@ -25,7 +26,8 @@ local function release(player: Player, entry: DataService.PocketEntry, position:
 	ItemService.setLoose(item)
 end
 
--- Removes and returns everything in the player's pockets (for selling).
+-- Removes and returns everything in the player's pockets (for selling). Each entry's Value is
+-- what it sells for: a worn Deckhand's Satchel adds 10% (items dropped on death keep their own).
 function PocketService.takeAll(player: Player): { DataService.PocketEntry }
 	local profile = DataService.get(player)
 	if not profile then
@@ -33,6 +35,9 @@ function PocketService.takeAll(player: Player): { DataService.PocketEntry }
 	end
 	local list = profile.Pockets
 	profile.Pockets = {}
+	for _, entry in list do
+		entry.Value = Accessories.pocketValue(player, entry.Value)
+	end
 	DataService.changed(player)
 	return list
 end

@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Accessories = require(Shared.Accessories)
 local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Tide = require(Shared.Tide)
@@ -94,6 +95,18 @@ function WaveController.init()
 			local wade = Stats.wadeBonus(player) -- Tidewalker Boots
 			speedScale = 1 - (1 - speedScale) * (1 - wade)
 			jumpScale = 1 - (1 - jumpScale) * (1 - wade)
+			-- Tidewalker Boots (AccessoryService): for a few seconds you walk on the surface, so
+			-- the water doesn't slow you, and you're held up at the surface instead of sinking.
+			if Accessories.isWaterWalking(player, Tide.now()) then
+				speedScale, jumpScale = 1, 1
+				local surface = Beach.surfaceY(root.Position, sea)
+				local feet = root.Position.Y - root.Size.Y / 2 - humanoid.HipHeight
+				if Beach.depthAt(root.Position, sea) > 0.2 and feet < surface then
+					root.CFrame += Vector3.new(0, surface - feet, 0)
+					local velocity = root.AssemblyLinearVelocity
+					root.AssemblyLinearVelocity = Vector3.new(velocity.X, math.max(0, velocity.Y), velocity.Z)
+				end
+			end
 			local base = humanoid:GetAttribute("BaseWalkSpeed") or Stats.walkSpeed(player)
 			humanoid.WalkSpeed = base * speedScale * WaveController.hazardSlow
 			local jumpBase = humanoid:GetAttribute("BaseJump")

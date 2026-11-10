@@ -10,7 +10,8 @@
 --   Current    dragged along its Direction at Strength (into deep water, where you drown).
 --   Harm       the server is told you were hit (it applies the Damage), and you're thrown.
 --   Gloom      its shadow makes you Benighted (not within a ward's light, Hazards.WardTag):
---              the world goes black around you (DayController.blind) and only lights show,
+--              the world goes black around you (DayController.blind) and only lights show
+--              (a worn Glow Pearl keeps a pool of light: the dark closes in only to its Blind),
 --              until you die or leave the deep (zones 5 and 6). The LocalPlayer's "Benighted"
 --              attribute says so, shown on screen.
 --   Sting      (jellyfish) the server is told (it applies the Damage, checked like Harm), you drop
@@ -21,6 +22,7 @@
 --   Slide      (ice) your velocity follows where you want to go at only Grip x SLIDE_RATE per
 --              second: you keep the momentum you came with and turn slowly (the slide is
 --              carried as WaveController.hazardPush on top of the Humanoid's own walking).
+--              An Ember Lantern's wearer doesn't slide (Accessories.iceGrip).
 --   Fog        (foghorn) nothing here: MistController thickens the mist while you're on the
 --              hazard's tile (its ZMin/ZMax) and lifts it while its Clearing attribute is set.
 -- A hazard with an Active attribute only hits while it's set.
@@ -30,6 +32,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Accessories = require(Shared.Accessories)
 local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Hazards = require(Shared.Hazards)
@@ -151,7 +154,11 @@ local function step(dt: number)
 				HUD.notify(part:GetAttribute("HitText") or "Ouch!")
 			end
 		elseif effect == "Slide" then
-			grip = math.min(grip or 1, part:GetAttribute("Grip") or 1)
+			-- (An Ember Lantern's wearer doesn't slide.)
+			local kept = Accessories.iceGrip(player, part:GetAttribute("Grip") or 1)
+			if kept then
+				grip = math.min(grip or 1, kept)
+			end
 		elseif effect == "Sting" then
 			-- A sting: the server applies the Damage, what you hold is dropped, a small push, and
 			-- from StunZone down you can't move for Stun seconds.
@@ -281,7 +288,8 @@ local function step(dt: number)
 		benighted = false
 		HUD.notify("The Gloom lets go of you.")
 	end
-	DayController.blind = if benighted then 1 else 0
+	-- A worn Glow Pearl's light holds: the dark never closes in all the way.
+	DayController.blind = if benighted then Accessories.gloomBlind(player) else 0
 	player:SetAttribute("Benighted", if benighted then true else nil)
 	if benightedLabel then
 		benightedLabel.Visible = benighted

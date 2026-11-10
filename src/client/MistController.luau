@@ -6,8 +6,9 @@
 -- A Fog hazard (the Fog Bank's foghorn, Hazards.luau) closes the mist in further while you're on
 -- its tile: to its Sight studs (the Atmosphere at full density and Offset, the fog distances at
 -- Sight), easing in and out. Its foghorn pulse sets the part's Clearing attribute for Clear
--- seconds, and the fog lifts back to the place's own mist meanwhile. A lantern or the Lantern of
--- Clear Sight does nothing for it: it's fog, not darkness.
+-- seconds, and the fog lifts back to the place's own mist meanwhile. A lantern does nothing for it
+-- (fog, not darkness); the Lantern of
+-- Clear Sight thins it: 2.5x less fog closes in and you see 2.5x as far through it.
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -15,6 +16,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage").Shared
+local Accessories = require(Shared.Accessories)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
 local Hazards = require(Shared.Hazards)
@@ -68,7 +70,13 @@ local function update(dt: number)
 	local density = current :: number
 	-- The Fog hazard: thick to its Sight unless its foghorn is clearing it.
 	local sight, clearing = MistController.fogAt(root.Position.Z)
-	local wanted = if sight and not clearing and not inSecretOrShowroom then 1 else 0
+	-- (The Lantern of Clear Sight: less of the fog closes in, and you see further through it.)
+	local wanted = if sight
+			and not clearing
+			and not inSecretOrShowroom
+		then Accessories.fogShare(player)
+		else 0
+	sight = if sight then sight * Accessories.fogSightScale(player) else nil
 	fogShare += math.clamp(wanted - fogShare, -FOG_OUT * dt, FOG_IN * dt)
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 	if atmosphere then
