@@ -196,10 +196,11 @@ local function tools()
 					at,
 					tool.Name,
 					string.format(
-						"%s · reach %d · works up to zone %d\n%s",
+						"%s · reach %d · %s\n%s",
 						kind(tool),
 						tool.Reach,
-						tool.Tier,
+						-- (Exotic grabbers track the best shop tool owned: their note says so.)
+						if tool.Tracks then "tracks your best tool" else "works up to zone " .. tool.Tier,
 						tool.Note or ""
 					),
 					Palette.Rarity[tool.Rarity] or W.Post

@@ -6,7 +6,7 @@ local RunService = game:GetService("RunService")
 local FOLDER_NAME = "Remotes"
 
 local FUNCTIONS = {
-	"GrabRequest", -- (part) -> ok, reason
+	"GrabRequest", -- (part, "hook"?) -> ok, reason ("hook": the Anchor Hook's throw)
 	"Buy", -- (category, id) -> ok, reason
 	"SpawnVessel", -- (id) -> ok, reason
 	"AdminCommand", -- (commandLine) -> { output lines } (admins only)
