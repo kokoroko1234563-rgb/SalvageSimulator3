@@ -40,7 +40,7 @@ and never goes out of date. It is equipped for its power:
 | Glow Pearl | A light the Gloom can't put out (zone 6); breath lasts 25% longer |
 | Lantern of Clear Sight | See through the haze and the Fog Bank's fog |
 | Foghorn | Warns of big and rogue waves 10 s early; its blast (key G, 30 s cooldown) pulls free items within 30 studs 8 studs toward you |
-| Tidewalker Boots | Walk on the water's surface for 3 s (key Q, 20 s cooldown); waves push you 30% less |
+| Tidewalker Boots | Walk on the water's surface for 3 s (key R, 20 s cooldown); waves push you 30% less |
 | Prism Lens | Rare and very rare items, unlock items and biome very-rares within 150 studs shine through anything |
 | Ember Lantern | Breath lasts 50% longer; ice in the Stranded Iceberg (Ice hazard) doesn't slide you |
 
