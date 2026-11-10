@@ -12,7 +12,9 @@ local Palette = require(Shared.Palette)
 local Beach = require(Shared.Beach)
 local Config = require(Shared.Config)
 local Gear = require(Shared.Gear)
+local Stats = require(Shared.Stats)
 local Tide = require(Shared.Tide)
+local VesselPowers = require(Shared.VesselPowers)
 
 local CollisionGroups = require(script.Parent.CollisionGroups)
 local ItemService = require(script.Parent.ItemService)
@@ -25,6 +27,8 @@ VesselService.HandleTag = "VesselHandle"
 
 local folder: Folder
 local vesselOf: { [Player]: Model } = {}
+local lastPosition: { [Model]: { at: Vector3, time: number } } = {} -- a ridden boat, for the speed check
+local lastScoop: { [Model]: number } = {} -- when each Jelly Raft last took something
 local notify: (Player, string) -> () = function(_player: Player, _text: string) end
 
 -- Builds a vessel model in local space: front is -Z, the floor ("Base") is the PrimaryPart,
@@ -1109,6 +1113,16 @@ function VesselService.getVessel(player: Player): Model?
 	return nil
 end
 
+-- The kind of the vessel with this id (items carry their vessel's VesselId), if it's out.
+function VesselService.kindOfId(vesselId: string?): string?
+	for _, vessel in vesselOf do
+		if vessel.Parent and vessel:GetAttribute("VesselId") == vesselId then
+			return vessel:GetAttribute("Kind")
+		end
+	end
+	return nil
+end
+
 function VesselService.ownerOf(vessel: Model): Player?
 	return Players:GetPlayerByUserId(vessel:GetAttribute("Owner") or 0)
 end
@@ -1169,7 +1183,7 @@ function VesselService.load(player: Player, item: BasePart): (boolean, string?)
 	while used[slot] do
 		slot += 1
 	end
-	local columns = math.min(2, capacity)
+	local columns = math.min(if capacity > 24 then 4 else 2, capacity) -- (the Leviathan's hold is wide)
 	local rows = math.ceil(capacity / columns)
 	local column = (slot - 1) % columns
 	local row = math.floor((slot - 1) / columns)
@@ -1199,9 +1213,12 @@ local function destroyVessel(player: Player, reason: string?)
 	local vessel = vesselOf[player]
 	vesselOf[player] = nil
 	player:SetAttribute("ActiveVessel", "")
+	player:SetAttribute("Riding", nil)
 	if not vessel then
 		return
 	end
+	lastPosition[vessel] = nil
+	lastScoop[vessel] = nil
 	for _, item in VesselService.contents(vessel) do
 		ItemService.destroy(item)
 	end
@@ -1295,6 +1312,9 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 	model:SetAttribute("Swims", def.Swims == true)
 	model:SetAttribute("Flies", def.Flies == true)
 	model:SetAttribute("Boat", def.Boat == true)
+	model:SetAttribute("Rides", def.Rides == true)
+	model:SetAttribute("Ridden", false)
+	model:SetAttribute("Unspillable", def.Unspillable == true)
 	model:SetAttribute("Speed", def.Speed or 1)
 	handle:SetAttribute("VesselId", vesselId)
 	-- A little above its resting height, so the wheelbarrow's legs lift clear of the sand.
@@ -1308,6 +1328,17 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 			descendant.Anchored = false
 		end
 	end
+	if def.Ghost then
+		VesselService.makeGhost(model)
+	end
+	local prompt = model:FindFirstChild("BoardPrompt", true) :: ProximityPrompt?
+	if prompt then
+		prompt.Triggered:Connect(function(who: Player)
+			if who == player then
+				VesselService.toggleBoard(player)
+			end
+		end)
+	end
 	model.Parent = folder
 	for _, descendant in model:GetDescendants() do
 		if descendant:IsA("BasePart") then
@@ -1318,6 +1349,111 @@ function VesselService.spawn(player: Player, kind: string, at: CFrame?): (boolea
 	vesselOf[player] = model
 	player:SetAttribute("ActiveVessel", def.Id)
 	return true
+end
+
+local function humanoidOf(player: Player): (Humanoid?, BasePart?)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not humanoid or not root or humanoid.Health <= 0 then
+		return nil, nil
+	end
+	return humanoid, root
+end
+
+-- Whether the player is sitting at the helm of their boat.
+function VesselService.isRiding(player: Player): boolean
+	local vessel = vesselOf[player]
+	local humanoid = humanoidOf(player)
+	local helm = vessel and vessel:FindFirstChild("Helm")
+	return humanoid ~= nil and helm ~= nil and humanoid.SeatPart == helm
+end
+
+-- Boards the player's boat (over deep water, close by) or, if they're already aboard, leaves it.
+function VesselService.toggleBoard(player: Player): (boolean, string?)
+	local vessel = VesselService.getVessel(player)
+	local helm = vessel and vessel:FindFirstChild("Helm") :: Seat?
+	if not vessel or not helm or not vessel.PrimaryPart then
+		return false, "You don't have a boat out"
+	end
+	local humanoid, root = humanoidOf(player)
+	if not humanoid or not root then
+		return false, "You can't board right now"
+	end
+	if humanoid.SeatPart == helm then
+		humanoid.Sit = false
+		return true, "left"
+	end
+	local base = vessel.PrimaryPart
+	local ok, reason = VesselPowers.canBoard(
+		(base.Position - root.Position).Magnitude,
+		Beach.isDeep(base.Position, Tide.sea())
+	)
+	if not ok then
+		notify(player, reason or "Can't board")
+		return false, reason
+	end
+	helm:Sit(humanoid)
+	vessel:SetAttribute("Ridden", true)
+	player:SetAttribute("Riding", true)
+	return true, "boarded"
+end
+
+-- Keeps a boat's riding state true to the seat: no rider (they jumped off, died, were
+-- teleported) or a boat that has left the water clears it; a boat moving faster than a boat can
+-- is put back where it was and the rider let go.
+local function tickRider(player: Player, vessel: Model, base: BasePart, sea: number)
+	if vessel:GetAttribute("Rides") ~= true then
+		return
+	end
+	local riding = VesselService.isRiding(player)
+	local humanoid = humanoidOf(player)
+	if riding and humanoid and Beach.depthAt(base.Position, sea) <= 0 then
+		humanoid.Sit = false -- aground: they stand and tow it as usual
+		riding = false
+		notify(player, "Your boat ran aground")
+	end
+	vessel:SetAttribute("Ridden", riding)
+	player:SetAttribute("Riding", if riding then true else nil)
+	if not riding then
+		lastPosition[vessel] = nil
+		return
+	end
+	local now = os.clock()
+	local last = lastPosition[vessel]
+	if last then
+		local moved = Vector3.new(base.Position.X - last.at.X, 0, base.Position.Z - last.at.Z).Magnitude
+		local speedOk = VesselPowers.boatSpeedOk(
+			vessel:GetAttribute("Kind"),
+			Stats.vesselSpeed(player),
+			moved,
+			now - last.time
+		)
+		if not speedOk then
+			vessel:PivotTo(CFrame.new(last.at) * base.CFrame.Rotation)
+			base.AssemblyLinearVelocity = Vector3.zero
+			if humanoid then
+				humanoid.Sit = false
+			end
+			lastPosition[vessel] = nil
+			notify(player, "Your boat can't go that fast")
+			return
+		end
+	end
+	lastPosition[vessel] = { at = base.Position, time = now }
+end
+
+-- The Magic Carpet stays within a leash of its owner whatever happens to it.
+local function tickLeash(player: Player, vessel: Model, base: BasePart)
+	local _, root = humanoidOf(player)
+	if not root or not VesselPowers.ghost(vessel:GetAttribute("Kind")) then
+		return
+	end
+	local target = VesselPowers.leashed(base.Position, root.Position, Config.Grab.CarpetLeash)
+	if target ~= base.Position then
+		vessel:PivotTo(base.CFrame.Rotation + target)
+		base.AssemblyLinearVelocity = Vector3.zero
+	end
 end
 
 local function tick()
@@ -1331,8 +1467,12 @@ local function tick()
 		-- Swimming and flying vessels, and boats, survive deep water.
 		local flies = vessel:GetAttribute("Flies") == true
 		local boat = vessel:GetAttribute("Boat") == true
-		local swims = vessel:GetAttribute("Swims") == true or boat
-		if swims and Beach.isDeep(base.Position, sea) then
+		local unspillable = vessel:GetAttribute("Unspillable") == true
+		-- The Shell Wagon floats like a shell: the sea never takes it or what it holds.
+		local swims = vessel:GetAttribute("Swims") == true or boat or unspillable
+		tickRider(player, vessel, base, sea)
+		tickLeash(player, vessel, base)
+		if swims and not unspillable and Beach.isDeep(base.Position, sea) then
 			-- Swimming vessels survive deep water, but the waves can wash cargo off.
 			local def = Gear.getVessel(vessel:GetAttribute("Kind"))
 			if
@@ -1357,12 +1497,19 @@ local function tick()
 			continue
 		end
 		-- A boat that flips over is lost (the doc's dinghy).
-		if boat and base.CFrame.UpVector.Y < 0.25 then
+		if boat and not unspillable and base.CFrame.UpVector.Y < 0.25 then
 			destroyVessel(player, "Your boat flipped over and sank, along with everything in it.")
 			continue
 		end
-		-- Cargo is welded in, so it only comes out if the vessel actually tips over.
-		if base.CFrame.UpVector.Y < 0.25 then
+		-- Cargo is welded in, so it only comes out if the vessel actually tips over. The Shell
+		-- Wagon never does: if it leans, it's stood upright where it is.
+		if unspillable then
+			if base.CFrame.UpVector.Y < 0.9 then
+				local _, yaw = base.CFrame:ToOrientation()
+				vessel:PivotTo(CFrame.new(base.Position + Vector3.new(0, 2, 0)) * CFrame.Angles(0, yaw, 0))
+				base.AssemblyAngularVelocity = Vector3.zero
+			end
+		elseif base.CFrame.UpVector.Y < 0.25 then
 			local contents = VesselService.contents(vessel)
 			for _, item in contents do
 				ItemService.setLoose(item)
@@ -1374,17 +1521,107 @@ local function tick()
 	end
 end
 
+-- A boat's helm: an invisible seat over the deck (the owner sits in it to ride) with the prompt
+-- that boards and leaves. Nothing walks onto it by touch; the server sits the owner in it.
+local function addHelm(model: Model)
+	local base = model.PrimaryPart :: BasePart
+	local helm = Instance.new("Seat")
+	helm.Name = "Helm"
+	helm.Size = Vector3.new(2, 0.4, 2)
+	helm.CFrame = base.CFrame * CFrame.new(0, 0.9, 1.5)
+	helm.Transparency = 1
+	helm.CanCollide = false
+	helm.CanTouch = false
+	helm.CanQuery = false
+	helm.Massless = true
+	helm.TopSurface = Enum.SurfaceType.Smooth
+	helm.BottomSurface = Enum.SurfaceType.Smooth
+	helm.Parent = model
+	weld(base, helm)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "BoardPrompt"
+	prompt.ActionText = "Board"
+	prompt.ObjectText = "Boat"
+	prompt.HoldDuration = 0
+	prompt.KeyboardKeyCode = Enum.KeyCode.B -- (E is the Anchor Hook's)
+	prompt.RequiresLineOfSight = false
+	prompt.MaxActivationDistance = Config.Grab.BoardRange
+	prompt.Parent = helm
+end
+
 -- For the data validator and tools/tests.
 -- The builders above make each vessel's bare shape; VesselTrim paints and trims it.
 for kind, build in builders do
 	builders[kind] = function(model: Model, at: CFrame)
 		local handle = build(model, at)
 		VesselTrim.apply(model, kind)
+		if VesselPowers.rides(kind) then
+			addHelm(model)
+		end
 		return handle
 	end
 end
 
+-- The Magic Carpet flies on a straight line, so nothing of it collides with the map.
+function VesselService.makeGhost(model: Model)
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.CanCollide = false
+		end
+	end
+end
+
 VesselService._builders = builders
+
+-- The Jelly Raft's scoop: if the raft has room and its interval is up, claims the nearest free
+-- item within range for its owner through GrabService.canClaim (the owner's tool tier and lift),
+-- and loads it. Returns the item scooped.
+function VesselService.scoop(player: Player, now: number): BasePart?
+	local vessel = VesselService.getVessel(player)
+	local base = vessel and vessel.PrimaryPart
+	local def = vessel and Gear.getVessel(vessel:GetAttribute("Kind"))
+	if not vessel or not base or not def or not def.Scoops then
+		return nil
+	end
+	local held = #VesselService.contents(vessel)
+	local capacity = vessel:GetAttribute("Capacity") or 0
+	local since = now - (lastScoop[vessel] or -math.huge)
+	if held >= capacity or since < Config.Grab.ScoopInterval then
+		return nil
+	end
+	local best, bestDistance = nil, math.huge
+	for item in ItemService.all() do
+		if ItemService.getState(item) == "Unclaimed" then
+			local distance = (item.Position - base.Position).Magnitude
+			if distance < bestDistance and VesselPowers.canScoop(distance, held, capacity, since) then
+				best, bestDistance = item, distance
+			end
+		end
+	end
+	if not best then
+		return nil
+	end
+	-- (Required here: GrabService requires this module.)
+	local GrabService = require(script.Parent.GrabService)
+	local tool = Gear.getTool(player:GetAttribute("Tool"))
+	local ok = GrabService.canClaim(
+		best,
+		player.UserId,
+		{ Name = "Jelly Raft", Reach = Config.Grab.ScoopRange, Tier = tool.Tier },
+		Stats.lift(player, tool),
+		base.Position
+	)
+	if not ok then
+		return nil
+	end
+	lastScoop[vessel] = now
+	ItemService.setHeld(best, player)
+	if not VesselService.load(player, best) then
+		ItemService.setLoose(best)
+		return nil
+	end
+	return best
+end
 
 function VesselService.init(notifyFn: (Player, string) -> ())
 	notify = notifyFn
@@ -1396,6 +1633,17 @@ function VesselService.init(notifyFn: (Player, string) -> ())
 		while true do
 			task.wait(0.3)
 			tick()
+		end
+	end)
+
+	task.spawn(function()
+		while true do
+			task.wait(Config.Grab.ScoopInterval / 2)
+			for player, vessel in vesselOf do
+				if vessel.Parent and vessel:GetAttribute("Kind") == "JellyRaft" then
+					VesselService.scoop(player, os.clock())
+				end
+			end
 		end
 	end)
 

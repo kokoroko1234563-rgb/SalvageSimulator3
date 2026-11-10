@@ -5467,5 +5467,122 @@ test("bot: income follows the tool's tier, not depth or weight", function()
 	)
 end)
 
+-- Exotic vessels (docs/design/exotics.md).
+local function exoticModel(kind: string)
+	local model = Harness.wrap(roblox.Instance.new("Model"))
+	VesselService._builders[kind](model, roblox.CFrame.new(0, 1, 0))
+	return model
+end
+
+test("exotic vessel: boats have a helm, board over deep water and ride within a speed limit", function()
+	local Gear = h.require("Shared/Gear")
+	local Config = h.require("Shared/Config")
+	local Powers = h.require("Shared/VesselPowers")
+	for id, capacity in { CaptainsLongboat = 12, LeviathanRowboat = 30 } do
+		local def = Gear.getVessel(id)
+		assert(def.Capacity == capacity, id .. " should hold " .. capacity)
+		assert(Powers.rides(id) and def.Boat, id .. " is a boat you ride")
+		local model = exoticModel(id)
+		local helm = model:FindFirstChild("Helm")
+		assert(helm and helm:IsA("Seat"), id .. " needs a helm seat")
+		assert(not helm.CanTouch, id .. "'s helm can only be boarded through the server")
+		assert(helm:FindFirstChildOfClass("ProximityPrompt"), id .. " needs a boarding prompt")
+	end
+	assert(not exoticModel("SandCart"):FindFirstChild("Helm"), "ordinary vessels have no helm")
+	assert(not Powers.rides("Dinghy"), "the dinghy is towed, not ridden")
+	-- Boarding: close by, and the boat in deep water.
+	assert(Powers.canBoard(5, true), "boards in deep water")
+	assert(not Powers.canBoard(5, false), "no boarding on sand")
+	assert(not Powers.canBoard(Config.Grab.BoardRange + 1, true), "too far away to board")
+	-- The Leviathan is slow; the server turns away speeds a boat can't make.
+	assert(
+		Powers.boatSpeed("LeviathanRowboat", 1) < Powers.boatSpeed("CaptainsLongboat", 1),
+		"leviathan is slow"
+	)
+	local top = Powers.boatSpeed("CaptainsLongboat", 1)
+	assert(Powers.boatSpeedOk("CaptainsLongboat", 1, top * 0.3, 0.3), "full speed is fine")
+	assert(not Powers.boatSpeedOk("CaptainsLongboat", 1, top * 3 * 0.3 + 5, 0.3), "a teleporting boat is not")
+	-- The server's boarding and speed check are wired in.
+	assert(VesselService.toggleBoard and VesselService.isRiding, "VesselService boards and tracks riders")
+end)
+
+test("exotic vessel: the jelly raft scoops within 4 studs, with room, once per half second", function()
+	local Gear = h.require("Shared/Gear")
+	local Config = h.require("Shared/Config")
+	local Powers = h.require("Shared/VesselPowers")
+	assert(Gear.getVessel("JellyRaft").Capacity == 10 and Gear.getVessel("JellyRaft").Scoops, "raft holds 10")
+	assert(Config.Grab.ScoopRange == 4 and Config.Grab.ScoopInterval == 0.5, "4 studs, 0.5 s")
+	assert(Powers.canScoop(3.9, 0, 10, 1), "scoops what it passes within 4 studs")
+	assert(not Powers.canScoop(4.1, 0, 10, 1), "ignores what's farther")
+	assert(Powers.canScoop(1, 9, 10, 1), "scoops into the last slot")
+	assert(not Powers.canScoop(1, 10, 10, 1), "a full raft scoops nothing")
+	assert(not Powers.canScoop(1, 0, 10, 0.49), "at most one scoop every half second")
+	assert(Powers.canScoop(1, 0, 10, 0.5), "and one every half second")
+	assert(VesselService.scoop, "the server claims for the owner (GrabService.canClaim)")
+end)
+
+test("exotic vessel: the magic carpet ignores the map and stays on a leash", function()
+	local Powers = h.require("Shared/VesselPowers")
+	local model = exoticModel("MagicCarpet")
+	VesselService.makeGhost(model)
+	local parts = 0
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			parts += 1
+			assert(not part.CanCollide, "carpet part " .. part.Name .. " collides with the map")
+		end
+	end
+	assert(parts > 0 and Powers.ghost("MagicCarpet"), "the carpet is a ghost")
+	assert(not Powers.ghost("SandCart"), "carts are not")
+	local owner = roblox.Vector3.new(0, 10, 0)
+	local near = roblox.Vector3.new(10, 10, 0)
+	assert(Powers.leashed(near, owner, 45) == near, "inside the leash it is left alone")
+	local pulled = Powers.leashed(roblox.Vector3.new(200, 10, 0), owner, 45)
+	assert(math.abs((pulled - owner).Magnitude - 45) < 0.01, "past the leash it is pulled to it")
+end)
+
+test("exotic vessel: the shell wagon loses nothing to tipping or wash-off", function()
+	local Gear = h.require("Shared/Gear")
+	local Powers = h.require("Shared/VesselPowers")
+	local wagon = Gear.getVessel("ShellWagon")
+	assert(wagon.Capacity == 14 and Powers.unspillable("ShellWagon"), "the wagon holds 14 and never spills")
+	assert(wagon.Stability >= 10, "and is held upright by a near-locked stabiliser")
+	assert(
+		not wagon.Swims and not wagon.WashScale,
+		"wash-off is skipped by the unspillable check, not scaled"
+	)
+	assert(
+		not Powers.unspillable("SeaTurtle") and not Powers.unspillable("QuadBike"),
+		"others can lose cargo"
+	)
+end)
+
+test("exotic vessel: the glass swan sells its cargo for 10% more", function()
+	local Shop = h.require("Server/ShopService")
+	local Powers = h.require("Shared/VesselPowers")
+	assert(h.require("Shared/Gear").getVessel("GlassSwan").Capacity == 12, "swan holds 12")
+	assert(math.abs(Shop.soldValue(100, "GlassSwan") - 110) < 1e-6, "+10% from a swan")
+	assert(Shop.soldValue(100, "SandCart") == 100, "no bonus from other vessels")
+	assert(Shop.soldValue(100, nil) == 100, "none for items outside a vessel")
+	assert(math.abs(Powers.sellMultiplier("GlassSwan") - 1.1) < 1e-6, "the multiplier is 1.1")
+	-- It stacks with the rebirth and pass multipliers through payout.
+	assert(Shop.payout(Shop.soldValue(100, "GlassSwan"), 0, 1.25) == 137, "payout takes the bonus value")
+end)
+
+test("exotic vessel: the frost sled makes you 15% faster only while you tow it", function()
+	local Gear = h.require("Shared/Gear")
+	local Powers = h.require("Shared/VesselPowers")
+	assert(Gear.getVessel("FrostSled").Capacity == 12, "sled holds 12")
+	assert(Powers.towWalkMultiplier("FrostSled", true) == 1.15, "+15% while towing")
+	assert(Powers.towWalkMultiplier("FrostSled", false) == 1, "nothing when you let go")
+	assert(Powers.towWalkMultiplier("SandCart", true) == 1, "other vessels give nothing")
+	for _, vessel in Gear.Vessels do
+		assert(
+			vessel.Speed == nil or vessel.Speed <= Gear.getVessel("FrostSled").Speed,
+			"the sled is the fastest"
+		)
+	end
+end)
+
 print(string.format("\n%d passed, %d failed", passed, failures))
 process.exit(if failures > 0 then 1 else 0)
