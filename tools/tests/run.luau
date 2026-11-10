@@ -4852,6 +4852,143 @@ test("tool tiers: a tool lifts exactly up to its tier, Strong Back one more", fu
 	end
 end)
 
+-- Exotic grabbers' powers, through GrabService.grab (the vessel is a stand-in).
+do
+	local nextId = 9000
+	local function setup(toolId: string, owned: string?)
+		local Items = h.require("Shared/Items")
+		local ItemService = h.require("Server/ItemService")
+		local GrabService = h.require("Server/GrabService")
+		nextId += 1
+		local attributes = { Tool = toolId, OwnedTools = owned or "BareHands" }
+		local player = {
+			Name = "Ex" .. nextId,
+			UserId = nextId,
+			Parent = true,
+			SetAttribute = function(_, key, value)
+				attributes[key] = value
+			end,
+			GetAttribute = function(_, key)
+				return attributes[key]
+			end,
+		}
+		local root = roblox.Instance.new("Part")
+		root.Position = roblox.Vector3.new(0, 0, 0)
+		local function item(distance: number, zone: number?)
+			local part = ItemService.spawnAt(
+				Items.get("Seashell"),
+				zone or 1,
+				roblox.Vector3.new(0, 0, 100 + distance),
+				zone or 1
+			)
+			root.Position = roblox.Vector3.new(0, 0, 100)
+			return part
+		end
+		return player, root, item, GrabService, ItemService
+	end
+
+	test("exotic grabber: Anchor Hook validates its 3x reach", function()
+		local player, root, item, GrabService = setup("AnchorHook")
+		local far, tooFar = item(60), item(80)
+		local ok = GrabService.grab(player :: any, far, root, false)
+		assert(not ok, "without the throw, 60 studs is out of reach")
+		local hooked, why = GrabService.grab(player :: any, far, root, true)
+		assert(hooked, "the hook reaches 3x: " .. tostring(why))
+		assert(far:GetAttribute("State") == "Held", "and the item is claimed")
+		local again = GrabService.grab(player :: any, tooFar, root, true)
+		assert(not again, "the hook is on cooldown")
+		local other, otherRoot, otherItem = setup("AnchorHook")
+		local beyond = otherItem(80)
+		assert(not GrabService.grab(other :: any, beyond, otherRoot, true), "80 studs is past 3x reach")
+		local zone3 = otherItem(40, 3)
+		local blocked, reason = GrabService.grab(other :: any, zone3, otherRoot, true)
+		assert(not blocked and reason, "the tier rule still applies (no shop tool: zone 2)")
+		local plain, plainRoot, plainItem = setup("BareHands")
+		assert(not GrabService.grab(plain :: any, plainItem(30), plainRoot, true), "only the hook throws")
+	end)
+
+	test("exotic grabber: Gust Gloves blow items into a vessel in range only", function()
+		local VesselService = h.require("Server/VesselService")
+		local player, root, item, GrabService = setup("GustGloves")
+		local vesselAt, loaded, full = 30, {}, false
+		local realGet, realLoad = VesselService.getVessel, VesselService.load
+		VesselService.getVessel = function()
+			return { PrimaryPart = { Position = roblox.Vector3.new(0, 0, 100 + vesselAt) } } :: any
+		end
+		VesselService.load = function(_, part)
+			if full then
+				return false, "Your vessel is full"
+			end
+			table.insert(loaded, part)
+			return true
+		end
+		local ok, result = pcall(function()
+			local near = item(10)
+			local grabbed, how = GrabService.grab(player :: any, near, root)
+			assert(grabbed and how == "gust" and loaded[1] == near, "blown into the vessel at 30 studs")
+			assert(#GrabService.getAllHeld(player :: any) == 0, "it isn't held")
+			vesselAt = 45
+			local plain = item(10)
+			local held, how2 = GrabService.grab(player :: any, plain, root)
+			assert(held and how2 == nil and #loaded == 1, "a vessel 45 studs away: an ordinary grab")
+			assert(GrabService.getHeld(player :: any) == plain, "held")
+			GrabService.forceRelease(player :: any)
+			vesselAt, full = 20, true
+			local blocked = item(10)
+			local held3, how3 = GrabService.grab(player :: any, blocked, root)
+			assert(held3 and how3 == nil and #loaded == 1, "a full vessel: you just hold it")
+		end)
+		VesselService.getVessel, VesselService.load = realGet, realLoad
+		assert(ok, result)
+	end)
+
+	test("exotic grabber: Crab Claw holds two", function()
+		local player, root, item, GrabService = setup("CrabClaw")
+		local a, b, c = item(5), item(6), item(7)
+		assert(GrabService.grab(player :: any, a, root), "first")
+		assert(GrabService.grab(player :: any, b, root), "second")
+		local held = GrabService.getAllHeld(player :: any)
+		assert(#held == 2 and held[1] == a and held[2] == b, "holds two items")
+		assert(GrabService.getHeld(player :: any) == b, "the newest is the active one")
+		assert(GrabService.grab(player :: any, c, root), "a third")
+		assert(#GrabService.getAllHeld(player :: any) == 2, "still two")
+		assert(a:GetAttribute("State") ~= "Held", "the oldest was let go")
+		GrabService.forceRelease(player :: any)
+		assert(#GrabService.getAllHeld(player :: any) == 0, "release drops both")
+		assert(b:GetAttribute("State") ~= "Held" and c:GetAttribute("State") ~= "Held", "both loose")
+		local single, singleRoot, singleItem = setup("BeachRake", "BareHands,BeachRake")
+		local x, y = singleItem(4), singleItem(5)
+		GrabService.grab(single :: any, x, singleRoot)
+		GrabService.grab(single :: any, y, singleRoot)
+		assert(#GrabService.getAllHeld(single :: any) == 1, "other tools still hold one")
+	end)
+
+	test("exotic grabber: Obsidian raises an item's value 15% once", function()
+		local player, root, item, GrabService = setup("ObsidianGrabber")
+		local part = item(5)
+		part:SetAttribute("Value", 200)
+		assert(GrabService.grab(player :: any, part, root), "grab")
+		assert(part:GetAttribute("Value") == 230, "+15%")
+		GrabService.forceRelease(player :: any)
+		assert(GrabService.grab(player :: any, part, root), "grab again")
+		assert(part:GetAttribute("Value") == 230, "only once per item")
+		local plain, plainRoot, plainItem = setup("BareHands")
+		local other = plainItem(5)
+		other:SetAttribute("Value", 200)
+		GrabService.grab(plain :: any, other, plainRoot)
+		assert(other:GetAttribute("Value") == 200, "other tools don't")
+	end)
+
+	test("exotic grabber: Freeze Wand's no-knock-loose window", function()
+		local Stats = h.require("Shared/Stats")
+		local Gear = h.require("Shared/Gear")
+		local wand = Gear.getTool("FreezeWand")
+		assert(Stats.secureSeconds(wand, true) == 10, "grabbed while frozen: 10s")
+		assert(Stats.secureSeconds(wand, false) == 0, "not frozen: nothing")
+		assert(Stats.secureSeconds(Gear.getTool("CrabClaw"), true) == 0, "only the wand")
+	end)
+end
+
 test("grab: water depth no longer blocks a lift", function()
 	local Beach = h.require("Shared/Beach")
 	local Config = h.require("Shared/Config")

@@ -94,6 +94,12 @@ function Stats.lift(player: Player, tool): number
 	)
 end
 
+-- Freeze Wand: how many seconds an item grabbed with `tool` can't be knocked loose (no grip break
+-- from waves or pulls), given whether the waves were frozen where it was grabbed.
+function Stats.secureSeconds(tool, wavesFrozen: boolean): number
+	return if wavesFrozen and tool.Freeze then tool.Freeze.SecureSeconds else 0
+end
+
 function Stats.grip(player: Player): number
 	return Traders.gripMultiplier(levels(player))
 end
